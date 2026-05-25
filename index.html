@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kula Mocy - Vibe Coding</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Google Fonts dla lepszego wyglądu -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Import map dla najnowszego MediaPipe Tasks API -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs"
+        }
+      }
+    </script>
+</head>
+<body>
+    <div id="ui-layer">
+        <div id="start-screen">
+            <h1>Vibe Coding<br><span class="highlight">Kula Mocy</span></h1>
+            <p>Pokaż, jaką masz energię. Po kliknięciu zaakceptuj dostęp do kamery.</p>
+            <button id="start-btn">START</button>
+        </div>
+        
+        <div id="loading-screen" class="hidden">
+            <p>Inicjalizacja sztucznej inteligencji i kamery...</p>
+        </div>
+
+
+    </div>
+
+    <!-- Ukryte wideo do pobierania klatek -->
+    <video id="webcam" autoplay playsinline></video>
+    
+    <!-- Płótno, na którym rysujemy lustrzany podgląd oraz samą kulę -->
+    <canvas id="output-canvas"></canvas>
+
+    <!-- Inicjujemy aplikację -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

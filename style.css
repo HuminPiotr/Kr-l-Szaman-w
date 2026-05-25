@@ -1,0 +1,124 @@
+:root {
+    --bg-color: #050510;
+    --primary-color: #00ffcc;
+    --accent-color: #ff00ff;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: white;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Wideo jest niewidoczne, pobieramy z niego tylko klatki do Canvasa */
+#webcam {
+    display: none;
+}
+
+/* Płótno rozciągamy na cały ekran i odwracamy poziomo (efekt lustra) */
+#output-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    transform: scaleX(-1);
+    background-color: var(--bg-color);
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+#start-screen, #loading-screen {
+    pointer-events: auto;
+    text-align: center;
+    background: rgba(10, 10, 20, 0.85);
+    padding: 3rem;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 40px rgba(0, 255, 204, 0.1);
+    backdrop-filter: blur(10px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.highlight {
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+p {
+    font-size: 1.2rem;
+    color: #a0a0b0;
+    margin-bottom: 2rem;
+    max-width: 400px;
+    line-height: 1.5;
+}
+
+#loading-screen {
+    padding: 2rem 3rem;
+}
+
+
+
+button {
+    background: linear-gradient(45deg, var(--primary-color), #0099ff);
+    color: #000;
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(0, 255, 204, 0.6);
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+.hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: scale(0.95);
+}
