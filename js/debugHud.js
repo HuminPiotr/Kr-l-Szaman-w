@@ -109,9 +109,12 @@ export class DebugHud {
         // podglądowo. Min/max podtrzymane, bo z chwilowej wartości nic się nie
         // odczyta. Zatańcz, przeczytaj zakres, zresetuj klawiszem R.
         if (stats.predkosc !== undefined) {
-            lines.push(`v     ${this._num(stats.predkosc)} m/s  (surowa ${this._num(stats.predkoscSurowa)})`);
+            lines.push(`v     ${this._num(stats.predkosc)} m/s zmierzone (surowa ${this._num(stats.predkoscSurowa)})`);
+            // Po odjęciu podłogi szumu. TA wartość steruje grą - jeśli przy
+            // nieruchomym staniu nie schodzi do 0.00, podłoga jest za niska.
+            lines.push(`      ${this._num(stats.predkoscEfektywna)} m/s efektywne  <- to steruje grą`);
             const min = this.vMin === Infinity ? 0 : this.vMin;
-            lines.push(`      zakres ${this._num(min)} – ${this._num(this.vMax)} m/s   [R = reset]`);
+            lines.push(`      zakres zmierzonej ${this._num(min)} – ${this._num(this.vMax)}   [R = reset]`);
         }
         if (stats.ruch !== undefined) lines.push(`ruch  ${this._num(stats.ruch)}   ${this._bar(stats.ruch)}`);
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);

@@ -14,8 +14,9 @@
 import { MotionMeter } from '../js/motionMeter.js';
 
 const DT = 1 / 60;
-// m/s - wartości zmierzone na żywym tańcu (nakładka debug, klawisz D)
-const PREDKOSCI = [0.1, 0.25, 0.5, 1.0, 1.4, 2.5, 4.0, 6.0];
+// m/s ZMIERZONE (surowo, przed odjęciem podłogi szumu) - wartości z nakładki.
+// Stanie na baczność daje ~0.5, spokojny taniec do ~1.4, energiczny do ~6.
+const PREDKOSCI = [0.5, 0.8, 1.0, 1.4, 2.0, 3.0, 6.0];
 
 // Syntetyczne ciało: śledzone kończyny oscylują tak, by średnia |v| ≈ zadanej
 function cialo(t, predkoscMs) {
@@ -48,15 +49,19 @@ function symuluj({ predkosc, sekundy, mocPoczatkowa = 0, pose = true }) {
 const czasDo = (slad, cel, rosnaco) =>
     slad.find(s => rosnaco ? s.moc >= cel : s.moc <= cel)?.t ?? null;
 
-console.log('CEL: pełna moc w 6-10 s spokojnego tańca | zanik do zera po ~15 s\n');
-console.log('  v [m/s]   responsywność   czas do pełnej mocy');
-console.log('  ' + '-'.repeat(46));
+console.log('CEL: pełna moc w 6-10 s spokojnego tańca | zanik do zera po ~15 s');
+console.log('     stanie na baczność (~0.5 m/s zmierzone) MUSI dawać zanik\n');
+console.log('  zmierz.  efektyw.  responsyw.   czas do pełnej mocy');
+console.log('  ' + '-'.repeat(52));
 
 for (const v of PREDKOSCI) {
     const { m, slad } = symuluj({ predkosc: v, sekundy: 60 });
     const t = czasDo(slad, 0.99, true);
-    const ocena = t === null ? '' : (t >= 6 && t <= 10 ? '  ← w celu' : '');
-    console.log(`  ${v.toFixed(2).padStart(6)}   ${m.responsywnosc.toFixed(2).padStart(12)}   ${(t ? t.toFixed(1) + ' s' : 'nigdy').padStart(12)}${ocena}`);
+    const ocena = t === null ? '  ← zanik (dobrze dla bezruchu)' : (t >= 6 && t <= 10 ? '  ← w celu' : '');
+    console.log(
+        `  ${v.toFixed(2).padStart(6)}  ${m.predkoscEfektywna.toFixed(2).padStart(8)}  ${m.responsywnosc.toFixed(2).padStart(10)}   ` +
+        `${(t ? t.toFixed(1) + ' s' : 'nigdy').padStart(9)}${ocena}`
+    );
 }
 
 const { slad: bezruch } = symuluj({ predkosc: 0, sekundy: 60, mocPoczatkowa: 1 });

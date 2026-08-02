@@ -267,6 +267,7 @@ function renderLoop(now) {
         ruch: motionMeter.responsywnosc,
         predkosc: motionMeter.predkosc,
         predkoscSurowa: motionMeter.predkoscSurowa,
+        predkoscEfektywna: motionMeter.predkoscEfektywna,
         moc: motionMeter.moc,
         stan: powerBall ? powerBall.state : '—',
         znaki: wynikiZnakow

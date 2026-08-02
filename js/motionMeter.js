@@ -21,11 +21,16 @@
 // Te liczby są ZGADNIĘTE i wymagają dostrojenia na żywym ciele.
 // Nakładka debug (klawisz D) pokazuje surową prędkość w m/s - stroić z niej,
 // nie z wyobraźni.
-// Zmierzone na żywym tańcu: spokojnie ~1.4 m/s, energicznie do 6 m/s,
-// dolna granica ruchu ~0.5 m/s. Pierwsza wersja miała tu 0.6, przez co
-// wskaźnik siedział wysycony na 1.00 przez cały czas i gra nie odróżniała
-// kołysania od szaleństwa.
-const PROG_PELNEJ_MOCY = 2.5;  // m/s -> pełne tempo ładowania
+// PODŁOGA SZUMU. Zmierzone: stanie na baczność pokazuje ~0.5 m/s, mimo że
+// gracz się nie rusza. To drgania trackingu, nie ruch. Bez odjęcia tego
+// progu gra nigdy nie uzna, że gracz stoi, i moc nigdy nie opadnie.
+// Odejmujemy u ŹRÓDŁA, zamiast podnosić progi w kilku miejscach osobno.
+const PROG_SZUMU_MS = 0.6;
+
+// Skala liczona już na prędkości EFEKTYWNEJ (po odjęciu szumu).
+// Zmierzone na żywym tańcu: spokojnie do ~1.4 m/s surowo (~0.8 efektywnie),
+// energicznie do 6 m/s surowo (~5.4 efektywnie).
+const PROG_PELNEJ_MOCY = 1.5;  // m/s efektywnych -> pełne tempo ładowania
 
 // Odpowiedź jest pierwiastkowa, nie liniowa: hojna przy wolnym ruchu
 // (delikatne kołysanie ma sensownie ładować), ale zostawia zapas skali
@@ -36,13 +41,15 @@ const PRZYROST = 1 / 8;        // pełne naładowanie w ~8 s przy pełnym tempie
 const ZANIK = 1 / 15;          // spadek do zera po ~15 s bezruchu
 const ZANIK_POZA_KADREM = 0.4; // mnożnik: wyjście z kadru zanika WOLNIEJ, bo nie może karać
 
-// Bezruch mierzymy w m/s, NIE na krzywej responsywności.
-// Krzywa pierwiastkowa podbija małe prędkości, więc drgania trackingu przy
-// staniu w miejscu wyglądałyby na ruch i moc nigdy by nie opadła.
-// Zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym" ruchu - inaczej
-// gra mówi "źle" komuś, kto robi dokładnie to, o co prosiliśmy.
-const PROG_BEZRUCHU_MS = 0.25; // poniżej tylu m/s uznajemy, że gracz stoi
-const ALFA_WYGLADZANIA = 0.1;  // mocne wygładzenie EMA - relaks znaczy gładko, bez skoków
+// Bezruch liczymy na prędkości EFEKTYWNEJ i w m/s, nie na krzywej.
+// Krzywa pierwiastkowa podbija małe wartości, więc resztki szumu wyglądałyby
+// na ruch. Zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym" ruchu -
+// inaczej gra mówi "źle" komuś, kto robi dokładnie to, o co prosiliśmy.
+const PROG_BEZRUCHU_MS = 0.2;  // poniżej tylu m/s EFEKTYWNYCH gracz stoi
+// Stała czasowa EMA musi być DŁUŻSZA niż jeden cykl ruchu tanecznego (~1 s),
+// inaczej wskaźnik oscyluje wokół podłogi szumu i moc w każdym takcie na
+// przemian rośnie i opada. Przy 60 FPS: tau = dt/alfa ≈ 0.55 s.
+const ALFA_WYGLADZANIA = 0.03;
 const MAX_DT = 0.1;            // sufit kroku czasu; bez tego przełączenie karty skacze mocą
 
 // Punkty MediaPipe Pose: nadgarstki, łokcie, kostki.
@@ -52,11 +59,12 @@ const SLEDZONE_PUNKTY = [15, 16, 13, 14, 27, 28];
 
 export class MotionMeter {
     constructor() {
-        this.moc = 0;              // 0..1 - jedyne źródło energii w grze
-        this.predkosc = 0;         // wygładzona średnia prędkość kończyn [m/s]
-        this.predkoscSurowa = 0;   // bez wygładzenia - do strojenia stałych powyżej
-        this.responsywnosc = 0;    // predkosc zmapowana na 0..1
-        this._poprzednie = null;   // pozycje z poprzedniej klatki
+        this.moc = 0;               // 0..1 - jedyne źródło energii w grze
+        this.predkosc = 0;          // wygładzona średnia prędkość kończyn [m/s]
+        this.predkoscSurowa = 0;    // bez wygładzenia - podglądowo
+        this.predkoscEfektywna = 0; // po odjęciu podłogi szumu; TA steruje grą
+        this.responsywnosc = 0;     // predkoscEfektywna zmapowana na 0..1
+        this._poprzednie = null;    // pozycje z poprzedniej klatki
     }
 
     update(frame) {
@@ -70,6 +78,7 @@ export class MotionMeter {
             this._poprzednie = null;
             this.predkoscSurowa = 0;
             this.predkosc += ALFA_WYGLADZANIA * (0 - this.predkosc);
+            this.predkoscEfektywna = 0;
             this.responsywnosc = 0;
             this.moc = Math.max(0, this.moc - ZANIK * ZANIK_POZA_KADREM * dt);
             return this.moc;
@@ -77,13 +86,18 @@ export class MotionMeter {
 
         this.predkoscSurowa = this._zmierzPredkosc(pose.worldLandmarks, dt);
         this.predkosc += ALFA_WYGLADZANIA * (this.predkoscSurowa - this.predkosc);
-        this.responsywnosc = Math.min(1, Math.pow(this.predkosc / PROG_PELNEJ_MOCY, KRZYWA));
+
+        // Odjęcie podłogi szumu. Wszystko poniżej to drgania trackingu,
+        // nie ruch gracza - stąd cała dalsza logika liczy na tej wartości.
+        this.predkoscEfektywna = Math.max(0, this.predkosc - PROG_SZUMU_MS);
+
+        this.responsywnosc = Math.min(1, Math.pow(this.predkoscEfektywna / PROG_PELNEJ_MOCY, KRZYWA));
 
         // Przyrost jest proporcjonalny do ruchu i NIGDY ujemny.
-        // Zanik włącza się dopiero poniżej progu bezruchu (liczonego w m/s,
-        // nie na krzywej) i narasta płynnie do pełnej wartości przy zatrzymaniu.
+        // Zanik włącza się dopiero poniżej progu bezruchu i narasta płynnie
+        // do pełnej wartości przy całkowitym zatrzymaniu.
         const przyrost = PRZYROST * this.responsywnosc;
-        const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkosc) / PROG_BEZRUCHU_MS);
+        const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkoscEfektywna) / PROG_BEZRUCHU_MS);
         const netto = przyrost - ZANIK * bezruch;
 
         this.moc = this._bezpiecznaMoc(this.moc + netto * dt);
