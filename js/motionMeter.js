@@ -33,10 +33,13 @@ const PROG_SZUMU_MS = 0.15;
 // Skala liczona już na prędkości EFEKTYWNEJ (po odjęciu szumu).
 // Zmierzone na żywym tańcu: spokojnie do ~1.4 m/s surowo (~0.8 efektywnie),
 // energicznie do 6 m/s surowo (~5.4 efektywnie).
-// Przeliczone ze zmierzonych wartości po odjęciu szumu w kwadraturze:
-// spokojny taniec 1.4 przy szumie 1.2 -> sygnał ~0.7 m/s, po filtrze ~0.5.
-// UWAGA: to wciąż oszacowanie - wymaga jednego pomiaru potwierdzającego.
-const PROG_PELNEJ_MOCY = 0.6;  // m/s efektywnych -> pełne tempo ładowania
+// Ustawione na ZMIERZONYCH wartościach z nakładki (nie na oszacowaniu):
+//   stanie w miejscu -> 0.00 efektywnych  (zanik)
+//   spokojny taniec  -> 0.30 zmierzonych  = 0.15 efektywnych
+//   energiczny       -> 0.67 zmierzonych  = 0.52 efektywnych
+// Próg dobrany tak, by SPOKOJNY taniec ładował w ~10 s - to jest tryb
+// podstawowy gry, nie tryb premiowy. Energiczny wysyca skalę i daje ~8 s.
+const PROG_PELNEJ_MOCY = 0.25; // m/s efektywnych -> pełne tempo ładowania
 
 // Odpowiedź jest pierwiastkowa, nie liniowa: hojna przy wolnym ruchu
 // (delikatne kołysanie ma sensownie ładować), ale zostawia zapas skali
