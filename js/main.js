@@ -134,6 +134,14 @@ function buildFrame(fit, dt, now) {
 function renderLoop(now) {
     if (!isRunning) return;
 
+    // Bez wymiarów wideo computeCoverFit dzieli przez zero, ratio robi się
+    // Infinity i WSZYSTKIE przemapowane punkty stają się NaN. Zdarza się zanim
+    // ścieżka kamery się ustabilizuje albo gdy zostanie przerwana.
+    if (!video.videoWidth || !video.videoHeight) {
+        requestAnimationFrame(renderLoop);
+        return;
+    }
+
     // Krok czasu w sekundach - MotionMeter liczy prędkość, więc potrzebuje dt,
     // a nie założenia o stałych 60 FPS.
     const dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0;
@@ -185,12 +193,13 @@ function renderLoop(now) {
     if (powerBall) {
         const state = powerBall.state;
         const energy = powerBall.currentEnergy;
-        // BŁĄD ZASTANY (obecny już w v2): lastEfficiency nie jest nigdzie
-        // przypisywane, więc to zawsze undefined. Przez to komunikaty
-        // "Moc rośnie!", "Pokaż obie dłonie" i "Jedna dłoń wykryta" są
-        // nieosiągalne. Zostawione świadomie - naprawa w osobnym commicie,
-        // żeby test regresji tego refaktoru cokolwiek dowodził.
-        const efficiency = powerBall.lastEfficiency;
+        // Wynik znaku i liczba dłoni pochodzą teraz wprost z kontraktu klatki
+        // i z rejestru. Wcześniej czytano powerBall.lastEfficiency (nigdy nie
+        // przypisywane) i powerBall.lastHandsLength (właściwość o tej nazwie
+        // nie istnieje - jest lastHandsCount), więc oba były undefined
+        // i trzy komunikaty poniżej były nieosiągalne.
+        const efficiency = wynikiZnakow.swarog;
+        const liczbaDloni = frame.hands.length;
 
         // Aktualizacja paska postępu
         const energyPct = Math.round(energy * 100);
@@ -218,10 +227,10 @@ function renderLoop(now) {
         let icon = "🙌";
 
         if (state === 'CHARGING') {
-            if (powerBall.lastHandsLength === 0) {
+            if (liczbaDloni === 0) {
                 text = "Pokaż obie dłonie kamerze ✋";
                 icon = "✋";
-            } else if (powerBall.lastHandsLength === 1) {
+            } else if (liczbaDloni === 1) {
                 text = "Jedna dłoń wykryta! Pokaż drugą dla 100% mocy 🙌";
                 icon = "⚡";
             } else {
