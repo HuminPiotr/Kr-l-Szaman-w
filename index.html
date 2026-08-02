@@ -27,12 +27,26 @@
             <p>Pokaż, jaką masz energię. Po kliknięciu zaakceptuj dostęp do kamery.</p>
             <button id="start-btn">START</button>
         </div>
-        
         <div id="loading-screen" class="hidden">
             <p>Inicjalizacja sztucznej inteligencji i kamery...</p>
         </div>
 
+        <!-- Podpowiedź UI -->
+        <div id="instruction-hud" class="hidden">
+            <span id="instruction-icon">🙌</span>
+            <span id="instruction-text">Złóż dłonie w miseczkę naprzeciw siebie</span>
+        </div>
 
+        <!-- HUD poziomu energii -->
+        <div id="energy-hud" class="hidden">
+            <div class="hud-header">
+                <span class="hud-label">MOC SKUMULOWANA</span>
+                <span id="energy-percentage">0%</span>
+            </div>
+            <div class="hud-bar-wrapper">
+                <div id="energy-fill"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Ukryte wideo do pobierania klatek -->

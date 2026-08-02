@@ -122,3 +122,152 @@ button:active {
     pointer-events: none !important;
     transform: scale(0.95);
 }
+
+/* --- HUD INSTRUKCJI --- */
+#instruction-hud {
+    position: absolute;
+    top: 2rem;
+    pointer-events: auto;
+    background: rgba(10, 10, 20, 0.75);
+    border: 1px solid rgba(0, 255, 204, 0.3);
+    box-shadow: 0 0 25px rgba(0, 255, 204, 0.15), inset 0 0 10px rgba(0, 255, 204, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 1rem 2rem;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    animation: floatingHUD 3s ease-in-out infinite;
+    z-index: 15;
+}
+
+@keyframes floatingHUD {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+#instruction-icon {
+    font-size: 1.5rem;
+    animation: pulseIcon 1.5s infinite alternate;
+    display: inline-block;
+}
+
+@keyframes pulseIcon {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.15); }
+}
+
+/* --- HUD ENERGII --- */
+#energy-hud {
+    position: absolute;
+    bottom: 3rem;
+    width: 90%;
+    max-width: 600px;
+    background: rgba(10, 10, 20, 0.75);
+    border: 1px solid rgba(255, 0, 255, 0.25);
+    box-shadow: 0 0 30px rgba(255, 0, 255, 0.1), inset 0 0 15px rgba(255, 0, 255, 0.05);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 16px;
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    pointer-events: auto;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    z-index: 15;
+}
+
+.hud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hud-label {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #ff00ff;
+    text-shadow: 0 0 10px rgba(255, 0, 255, 0.4);
+}
+
+#energy-percentage {
+    font-size: 1.4rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #00ffcc;
+    text-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+}
+
+.hud-bar-wrapper {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#energy-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #00ffcc, #ff00ff);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.8);
+    border-radius: 6px;
+    transition: width 0.1s linear;
+}
+
+/* Stan 100% naładowania */
+.charged-glow {
+    animation: barPulse 1s infinite alternate;
+}
+
+@keyframes barPulse {
+    0% { box-shadow: 0 0 10px rgba(255, 0, 255, 0.8); }
+    100% { box-shadow: 0 0 25px rgba(0, 255, 204, 1); }
+}
+
+/* Efekty stanów gry na cały ekran */
+body.ready-pulse::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    box-shadow: inset 0 0 100px rgba(0, 255, 204, 0.35);
+    pointer-events: none;
+    z-index: 5;
+    animation: fullscreenPulse 1.5s infinite alternate;
+}
+
+@keyframes fullscreenPulse {
+    0% { opacity: 0.3; }
+    100% { opacity: 0.9; }
+}
+
+body.cooldown-state::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.2);
+    pointer-events: none;
+    z-index: 5;
+    animation: cooldownPulse 0.5s infinite alternate;
+}
+
+@keyframes cooldownPulse {
+    0% { opacity: 0.4; }
+    100% { opacity: 0.8; }
+}
+

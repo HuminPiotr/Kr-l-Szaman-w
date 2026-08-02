@@ -5,6 +5,16 @@ export class PowerBall {
         this.particles = [];
         this.currentEnergy = 0; // Wartość 0.0 do 1.0 (Akumulator Mocy)
         
+        // Stany kuli: 'CHARGING', 'READY', 'FIRING', 'COOLDOWN'
+        this.state = 'CHARGING';
+        this.positionHistory = []; // Śledzenie ostatnich pozycji do wyznaczenia wektora zamachu
+        this.lastNormalizedDistance = null;
+        this.lastHandsCount = 0;
+        this.shockwaves = [];
+        this.flyingBall = null;
+        this.cooldownStartTime = 0;
+        this.cooldownDuration = 1000; // 1 sekunda cooldownu
+
         // Inicjalizacja cząsteczek
         for (let i = 0; i < 150; i++) {
             this.particles.push({
@@ -23,58 +33,211 @@ export class PowerBall {
     updateAndDraw(hands, width, height) {
         // 1. Obliczanie efektywności obecnego ułożenia dłoni
         const efficiency = this.calculateEfficiency(hands, width, height);
-        const isOneHanded = hands.length === 1;
-        const maxEnergy = isOneHanded ? 0.5 : 1.0; // Jedna ręka może osiągnąć tylko 50% mocy
 
-        // 2. Akumulacja lub rozładowywanie energii
-        if (efficiency > 0.5) {
-            const chargeRate = (efficiency - 0.5) * 0.02;
-            
-            if (this.currentEnergy < maxEnergy) {
-                this.currentEnergy = Math.min(maxEnergy, this.currentEnergy + chargeRate);
-            } else if (this.currentEnergy > maxEnergy) {
-                // Jeżeli mieliśmy moc z dwóch rąk i nagle użyliśmy jednej - energia szybko spada do 50%
-                this.currentEnergy = Math.max(maxEnergy, this.currentEnergy - 0.05);
+        // 2. Maszyna Stanów Logiki
+        if (this.state === 'CHARGING') {
+            if (efficiency > 0.5) {
+                const chargeRate = (efficiency - 0.5) * 0.02;
+                if (this.currentEnergy < 1.0) {
+                    this.currentEnergy = Math.min(1.0, this.currentEnergy + chargeRate);
+                }
+                // Wejście w gotowość do strzału przy 95% naładowania
+                if (this.currentEnergy >= 0.95) {
+                    this.state = 'READY';
+                }
+            } else {
+                const dischargeRate = hands.length > 0 ? 0.005 : 0.05;
+                this.currentEnergy = Math.max(0.0, this.currentEnergy - dischargeRate);
             }
-        } else {
-            // Rozładowywanie - szybsze jeśli dłoni nie ma
-            const dischargeRate = hands.length > 0 ? 0.005 : 0.05;
-            this.currentEnergy = Math.max(0.0, this.currentEnergy - dischargeRate);
+        } else if (this.state === 'READY') {
+            // W gotowości sprawdzamy gest rozłączenia dłoni i buforujemy położenie kuli
+        } else if (this.state === 'FIRING') {
+            if (this.flyingBall) {
+                this.flyingBall.x += this.flyingBall.vx;
+                this.flyingBall.y += this.flyingBall.vy;
+                this.flyingBall.size *= 0.93; // Kurczenie (lot w głąb)
+                this.flyingBall.alpha -= 0.025; // Stopniowe zanikanie
+
+                if (this.flyingBall.alpha <= 0 || this.flyingBall.size < 5) {
+                    this.flyingBall = null;
+                    this.state = 'COOLDOWN';
+                    this.cooldownStartTime = performance.now();
+                }
+            } else {
+                this.state = 'COOLDOWN';
+                this.cooldownStartTime = performance.now();
+            }
+        } else if (this.state === 'COOLDOWN') {
+            const elapsed = performance.now() - this.cooldownStartTime;
+            if (elapsed >= this.cooldownDuration) {
+                this.state = 'CHARGING';
+                this.currentEnergy = 0;
+            }
         }
 
-        // 3. Aktualizacja i rysowanie Trails (Śladów Palców)
-        this.updateFingerHistory(hands, width, height);
-        this.drawFingerTrails();
+        // 3. Rysowanie fal uderzeniowych (pod kulą)
+        this.updateAndDrawShockwaves();
 
-        // Jeżeli energia jest prawie zerowa, wygaszamy kulę i błyskawice
-        if (this.currentEnergy < 0.01) return;
+        // 4. Rysowanie śladów palców (tylko w fazie ładowania i gotowości)
+        if (this.state === 'CHARGING' || this.state === 'READY') {
+            this.updateFingerHistory(hands, width, height);
+            this.drawFingerTrails();
+        }
 
+        // Jeśli poziom naładowania jest bliski zera i nie strzelamy, nie rysujemy kuli
+        if (this.state === 'CHARGING' && this.currentEnergy < 0.01) return;
+
+        // Obliczamy środek geometryczny dla kuli
         let centerX = width / 2;
         let centerY = height / 2;
-        
-        if (hands.length === 2) {
-            const h1 = hands[0][9];
-            const h2 = hands[1][9];
-            centerX = ((h1.x + h2.x) / 2) * width;
-            centerY = ((h1.y + h2.y) / 2) * height;
 
-
-        } else if (hands.length === 1) {
-            // W przypadku jednej ręki rysujemy kulę wewnątrz "koszyczka" tworzonego przez palce
-            const h = hands[0];
-            const fingers = [4, 8, 12, 16]; // kciuk, wskazujący, środkowy, serdeczny
-            let cx = 0;
-            let cy = 0;
-            for (let idx of fingers) {
-                cx += h[idx].x * width;
-                cy += h[idx].y * height;
+        if (this.state === 'CHARGING' || this.state === 'READY') {
+            if (hands.length === 2) {
+                const h1 = hands[0][9];
+                const h2 = hands[1][9];
+                centerX = ((h1.x + h2.x) / 2) * width;
+                centerY = ((h1.y + h2.y) / 2) * height;
+            } else if (hands.length === 1) {
+                const h = hands[0];
+                const fingers = [4, 8, 12, 16];
+                let cx = 0;
+                let cy = 0;
+                for (let idx of fingers) {
+                    cx += h[idx].x * width;
+                    cy += h[idx].y * height;
+                }
+                centerX = cx / fingers.length;
+                centerY = cy / fingers.length;
             }
-            centerX = cx / fingers.length;
-            centerY = cy / fingers.length;
+
+            // --- Logika READY ---
+            if (this.state === 'READY') {
+                this.positionHistory.push({ x: centerX, y: centerY });
+                if (this.positionHistory.length > 5) {
+                    this.positionHistory.shift();
+                }
+
+                if (hands.length === 2) {
+                    const h1 = hands[0];
+                    const h2 = hands[1];
+                    const dx = (h1[9].x - h2[9].x) * width;
+                    const dy = (h1[9].y - h2[9].y) * height;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    const size_dx = (h1[0].x - h1[9].x) * width;
+                    const size_dy = (h1[0].y - h1[9].y) * height;
+                    const handSize = Math.max(10, Math.sqrt(size_dx*size_dx + size_dy*size_dy));
+                    
+                    const normalizedDistance = distance / handSize;
+
+                    // Gest Release: nagłe rozszerzenie dłoni (np. zmiana odległości > 1.2 w klatce lub odległość > 6.0)
+                    if (this.lastNormalizedDistance && (normalizedDistance - this.lastNormalizedDistance > 1.2 || normalizedDistance > 6.0)) {
+                        this.fire(centerX, centerY);
+                    }
+                    this.lastNormalizedDistance = normalizedDistance;
+                } else if (hands.length < 2 && this.lastHandsCount === 2) {
+                    // Nagła utrata rąk z wizji w stanie READY (efekt szybkiego wyrzutu rąk poza kadr)
+                    this.fire(centerX, centerY);
+                }
+
+                // Jeżeli użytkownik trzyma ręce za mało stabilnie, energia powoli uchodzi
+                if (efficiency < 0.3) {
+                    this.currentEnergy = Math.max(0.0, this.currentEnergy - 0.006);
+                    if (this.currentEnergy < 0.9) {
+                        this.state = 'CHARGING';
+                    }
+                }
+            }
+            this.lastHandsCount = hands.length;
         }
 
-        // 4. Renderowanie Głównej Kuli i cząsteczek
-        this.drawBall(centerX, centerY, this.currentEnergy);
+        // 5. Renderowanie kuli
+        if (this.state === 'FIRING' && this.flyingBall) {
+            this.drawBall(this.flyingBall.x, this.flyingBall.y, this.flyingBall.energy, this.flyingBall.size, this.flyingBall.alpha);
+        } else if (this.state === 'CHARGING' || this.state === 'READY') {
+            this.drawBall(centerX, centerY, this.currentEnergy);
+        }
+    }
+
+    fire(centerX, centerY) {
+        this.state = 'FIRING';
+
+        // Wyznaczenie wektora prędkości zamachu
+        let vx = 0;
+        let vy = 0;
+        if (this.positionHistory.length >= 2) {
+            const first = this.positionHistory[0];
+            const last = this.positionHistory[this.positionHistory.length - 1];
+            vx = last.x - first.x;
+            vy = last.y - first.y;
+        }
+
+        const velocityMag = Math.sqrt(vx*vx + vy*vy);
+
+        // Fallback: jeśli ruch był zbyt powolny lub pionowy, leci prosto w głąb (pionowo w górę ekranu)
+        if (velocityMag < 7) {
+            this.fireDirection = { x: 0, y: -1 };
+            this.fireSpeed = 15;
+        } else {
+            this.fireDirection = { x: vx / velocityMag, y: vy / velocityMag };
+            this.fireSpeed = Math.min(50, Math.max(12, velocityMag * 1.8));
+        }
+
+        // Parametry lecącej kuli
+        this.flyingBall = {
+            x: centerX,
+            y: centerY,
+            vx: this.fireDirection.x * this.fireSpeed,
+            vy: this.fireDirection.y * this.fireSpeed,
+            size: this.currentEnergy * 350,
+            energy: this.currentEnergy,
+            alpha: 1.0
+        };
+
+        // Shockwave wybuchowy
+        this.shockwaves.push({
+            x: centerX,
+            y: centerY,
+            radius: 40,
+            maxRadius: 380,
+            alpha: 1.0,
+            color: this.getColorForEnergy(this.currentEnergy)
+        });
+
+        // Reset pomocniczych zmiennych
+        this.positionHistory = [];
+        this.lastNormalizedDistance = null;
+    }
+
+    updateAndDrawShockwaves() {
+        for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+            const sw = this.shockwaves[i];
+            sw.radius += 14;
+            sw.alpha -= 0.035;
+            
+            if (sw.alpha <= 0) {
+                this.shockwaves.splice(i, 1);
+                continue;
+            }
+
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            
+            // Parsowanie koloru rgb
+            const rgbMatches = sw.color.match(/\d+/g);
+            if (rgbMatches && rgbMatches.length >= 3) {
+                ctx.strokeStyle = `rgba(${rgbMatches[0]}, ${rgbMatches[1]}, ${rgbMatches[2]}, ${sw.alpha * 0.75})`;
+            } else {
+                ctx.strokeStyle = `rgba(0, 255, 204, ${sw.alpha * 0.75})`;
+            }
+            
+            ctx.lineWidth = 10 * sw.alpha;
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     calculateEfficiency(hands, width, height) {
@@ -107,7 +270,6 @@ export class PowerBall {
             const size_dy = (h[0].y - h[9].y) * height;
             const handSize = Math.max(10, Math.sqrt(size_dx*size_dx + size_dy*size_dy));
 
-            // Mierzymy średnią odległość od czubków głównych palców do czubka kciuka (landmark 4)
             const thumb = h[4];
             const fingers = [8, 12, 16]; // wskazujący, środkowy, serdeczny
             let totalDist = 0;
@@ -121,11 +283,7 @@ export class PowerBall {
             const avgDist = totalDist / fingers.length;
             const normalizedDist = avgDist / handSize;
 
-            // Zaciśnięta pięść: ok 0.2 - 0.4
-            // Całkowicie otwarta dłoń: ok 1.5 - 2.0
-            // Koszyczek/Pazury: ok 0.6 - 1.2
             if (normalizedDist > 0.5 && normalizedDist < 1.3) {
-                // Optymalne ściśnięcie to około 0.9
                 const diff = Math.abs(normalizedDist - 0.9);
                 return Math.max(0, 1.0 - (diff / 0.4));
             }
@@ -134,7 +292,6 @@ export class PowerBall {
         return 0;
     }
 
-    // Funkcja obliczająca kolor w zależności od energii
     getColorForEnergy(energy, alpha = 1) {
         let r, g, b;
         if (energy < 0.4) {
@@ -153,7 +310,7 @@ export class PowerBall {
             // Przejście Magenta -> Żółty/Ognisty Czerwony
             const t = (energy - 0.8) / 0.2;
             r = 255;
-            g = Math.floor(t * 200); // Dochodzi do jasnego żółtego
+            g = Math.floor(t * 200);
             b = Math.floor(255 - t * 255);
         }
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
@@ -161,7 +318,6 @@ export class PowerBall {
 
     updateFingerHistory(hands, width, height) {
         const currentPoints = [];
-        // Landmarki końcówek palców: 4(Kciuk), 8(Wskazujący), 12(Środkowy), 16(Serdeczny), 20(Mały)
         const fingerIndices = [4, 8, 12, 16, 20];
         
         for (const hand of hands) {
@@ -204,17 +360,14 @@ export class PowerBall {
                 }
             }
             
-            // Kolor powiązany z główną energią kuli
             const baseEnergy = Math.max(0.1, this.currentEnergy);
             
-            // Subtelniejsza obwódka (glow) - niemal przezroczysta
             ctx.strokeStyle = this.getColorForEnergy(baseEnergy, 0.1);
             ctx.lineWidth = 8;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.stroke();
             
-            // Bardzo cienki, lekko widoczny rdzeń linii
             ctx.lineWidth = 1;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
             ctx.stroke();
@@ -222,20 +375,20 @@ export class PowerBall {
         ctx.restore();
     }
 
-    drawBall(x, y, energy) {
-        // Zwiększono maksymalny promień kuli
-        const radius = energy * 350;
+    drawBall(x, y, energy, customRadius = null, customAlpha = null) {
+        const radius = customRadius !== null ? customRadius : (energy * 350);
         if (radius < 1) return;
+
+        const alpha = customAlpha !== null ? customAlpha : 1.0;
 
         const ctx = this.ctx;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         
         const gradient = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius);
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${energy})`);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${energy * alpha})`);
         
-        // Dynamiczne kolory kuli
-        const coreColor = this.getColorForEnergy(energy, energy * 0.8);
+        const coreColor = this.getColorForEnergy(energy, energy * 0.8 * alpha);
         gradient.addColorStop(0.2, coreColor);
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
@@ -244,30 +397,44 @@ export class PowerBall {
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Renderowanie wirujących wokół cząsteczek
+        // Renderowanie wirujących cząsteczek
         for (let p of this.particles) {
             p.life -= 0.02;
             
             if (p.life <= 0) {
                 p.life = 1;
                 const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * radius * 0.4;
-                p.x = x + Math.cos(angle) * dist;
-                p.y = y + Math.sin(angle) * dist;
                 
-                // Prędkość wypuszczania cząsteczek zależy od zebranej energii
-                const speed = Math.random() * 12 * energy + 2;
-                p.vx = Math.cos(angle) * speed;
-                p.vy = Math.sin(angle) * speed;
+                if (this.state === 'FIRING' && this.flyingBall) {
+                    // Ogon komety lecący przeciwnie do wektora ruchu kuli z małym rozrzutem
+                    const flyAngle = Math.atan2(this.flyingBall.vy, this.flyingBall.vx);
+                    const emitAngle = flyAngle + Math.PI + (Math.random() - 0.5) * 0.6;
+                    p.x = x;
+                    p.y = y;
+                    const speed = Math.random() * 9 + 3;
+                    p.vx = Math.cos(emitAngle) * speed;
+                    p.vy = Math.sin(emitAngle) * speed;
+                } else {
+                    const dist = Math.random() * radius * 0.4;
+                    p.x = x + Math.cos(angle) * dist;
+                    p.y = y + Math.sin(angle) * dist;
+                    const speed = Math.random() * 12 * energy + 2;
+                    p.vx = Math.cos(angle) * speed;
+                    p.vy = Math.sin(angle) * speed;
+                }
             }
             
-            p.vx *= 0.95;
-            p.vy *= 0.95;
+            if (this.state === 'FIRING') {
+                p.vx *= 0.98; // Mniejsza tarcie w locie dla długiego ogona
+                p.vy *= 0.98;
+            } else {
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+            }
             p.x += p.vx;
             p.y += p.vy;
 
-            // Kolor cząsteczek także podlega pod Color Shifting
-            ctx.fillStyle = this.getColorForEnergy(energy, p.life * energy);
+            ctx.fillStyle = this.getColorForEnergy(energy, p.life * energy * alpha);
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * (1 + energy), 0, Math.PI * 2);
             ctx.fill();
