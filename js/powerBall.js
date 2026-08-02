@@ -9,6 +9,7 @@ export class PowerBall {
         this.ctx = ctx;
         this.particles = [];
         this.currentEnergy = 0; // Wartość 0.0 do 1.0 (Akumulator Mocy)
+        this.szczytEnergii = 0; // najwyższa energia osiągnięta w gotowości - to nią strzelamy
         
         // Stany kuli: 'CHARGING', 'READY', 'FIRING', 'COOLDOWN'
         this.state = 'CHARGING';
@@ -53,6 +54,17 @@ export class PowerBall {
             this.currentEnergy = moc * efficiency;
         } else {
             this.currentEnergy = 0;
+        }
+
+        // Szczyt energii osiągnięty w gotowości. Wystrzał używa TEJ wartości,
+        // nie chwilowej: gest rozsunięcia dłoni psuje wynik znaku, więc
+        // odczyt w momencie strzału daje wartość bliską zeru i gracz wypuszcza
+        // niewidzialną kulę zamiast tej, którą przed chwilą trzymał.
+        // Moc zebrana tańcem należy mu się w pełni.
+        if (this.state === 'READY') {
+            this.szczytEnergii = Math.max(this.szczytEnergii, this.currentEnergy);
+        } else if (this.state === 'CHARGING') {
+            this.szczytEnergii = 0;
         }
 
         // Maszyna Stanów Logiki
@@ -161,7 +173,13 @@ export class PowerBall {
                 //
                 // Bez tej reguły READY byłby pułapką: energii nie liczy się już
                 // wewnątrz tej klasy, więc jedynym wyjściem zostałby wystrzał.
-                if (this.currentEnergy < PROG_PODTRZYMANIA) {
+                //
+                // Warunek na stan jest KONIECZNY: gest wystrzału to rozsunięcie
+                // dłoni, które jednocześnie psuje wynik znaku Swaroga. Energia
+                // spada więc poniżej progu w tej samej klatce, w której padł
+                // strzał - bez tej osłony degradacja nadpisywała świeżo
+                // ustawione FIRING i wystrzał w ogóle się nie odbywał.
+                if (this.state === 'READY' && this.currentEnergy < PROG_PODTRZYMANIA) {
                     this.state = 'CHARGING';
                 }
             }
@@ -178,6 +196,10 @@ export class PowerBall {
 
     fire(centerX, centerY) {
         this.state = 'FIRING';
+
+        // Strzelamy szczytem osiągniętym w gotowości, nie wartością chwilową -
+        // gest rozsunięcia dłoni zdążył już zepsuć wynik znaku.
+        const energiaStrzalu = Math.max(this.szczytEnergii, this.currentEnergy);
 
         // Wyznaczenie wektora prędkości zamachu
         let vx = 0;
@@ -206,8 +228,8 @@ export class PowerBall {
             y: centerY,
             vx: this.fireDirection.x * this.fireSpeed,
             vy: this.fireDirection.y * this.fireSpeed,
-            size: this.currentEnergy * 350,
-            energy: this.currentEnergy,
+            size: energiaStrzalu * 350,
+            energy: energiaStrzalu,
             alpha: 1.0
         };
 
@@ -218,12 +240,13 @@ export class PowerBall {
             radius: 40,
             maxRadius: 380,
             alpha: 1.0,
-            color: this.getColorForEnergy(this.currentEnergy)
+            color: this.getColorForEnergy(energiaStrzalu)
         });
 
         // Reset pomocniczych zmiennych
         this.positionHistory = [];
         this.lastNormalizedDistance = null;
+        this.szczytEnergii = 0;
     }
 
     updateAndDrawShockwaves() {
