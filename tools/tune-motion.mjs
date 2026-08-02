@@ -14,9 +14,10 @@
 import { MotionMeter } from '../js/motionMeter.js';
 
 const DT = 1 / 60;
-// m/s ZMIERZONE (surowo, przed odjęciem podłogi szumu) - wartości z nakładki.
-// Stanie na baczność daje ~0.5, spokojny taniec do ~1.4, energiczny do ~6.
-const PREDKOSCI = [0.5, 0.8, 1.0, 1.4, 2.0, 3.0, 6.0];
+// m/s ZMIERZONE po wygładzaniu pozycji (odczyt z nakładki, klawisz D).
+// Skala zmieniła się ~30x względem wersji sprzed wygładzania - stanie
+// w miejscu powinno teraz dawać ~0.05-0.1, a nie ~1.2.
+const PREDKOSCI = [0.05, 0.1, 0.2, 0.35, 0.5, 0.8, 1.5, 3.0];
 
 // Syntetyczne ciało: śledzone kończyny oscylują tak, by średnia |v| ≈ zadanej
 function cialo(t, predkoscMs) {
@@ -50,7 +51,7 @@ const czasDo = (slad, cel, rosnaco) =>
     slad.find(s => rosnaco ? s.moc >= cel : s.moc <= cel)?.t ?? null;
 
 console.log('CEL: pełna moc w 6-10 s spokojnego tańca | zanik do zera po ~15 s');
-console.log('     stanie na baczność (~0.5 m/s zmierzone) MUSI dawać zanik\n');
+console.log('     stanie w miejscu MUSI dawać zanik (efektywna 0.00)\n');
 console.log('  zmierz.  efektyw.  responsyw.   czas do pełnej mocy');
 console.log('  ' + '-'.repeat(52));
 

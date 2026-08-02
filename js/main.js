@@ -268,6 +268,7 @@ function renderLoop(now) {
         predkosc: motionMeter.predkosc,
         predkoscSurowa: motionMeter.predkoscSurowa,
         predkoscEfektywna: motionMeter.predkoscEfektywna,
+        szumPunktow: motionMeter.szumPunktow,
         moc: motionMeter.moc,
         stan: powerBall ? powerBall.state : '—',
         znaki: wynikiZnakow

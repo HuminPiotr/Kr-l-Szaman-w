@@ -25,12 +25,18 @@
 // gracz się nie rusza. To drgania trackingu, nie ruch. Bez odjęcia tego
 // progu gra nigdy nie uzna, że gracz stoi, i moc nigdy nie opadnie.
 // Odejmujemy u ŹRÓDŁA, zamiast podnosić progi w kilku miejscach osobno.
-const PROG_SZUMU_MS = 0.6;
+// Po wprowadzeniu wygładzania pozycji szum spadł ~32x (zmierzone na
+// symulacji: 2.22 -> 0.07 m/s przy bezruchu), więc próg jest teraz
+// odpowiednio niższy. Zostawiony margines nad resztkowym szumem.
+const PROG_SZUMU_MS = 0.15;
 
 // Skala liczona już na prędkości EFEKTYWNEJ (po odjęciu szumu).
 // Zmierzone na żywym tańcu: spokojnie do ~1.4 m/s surowo (~0.8 efektywnie),
 // energicznie do 6 m/s surowo (~5.4 efektywnie).
-const PROG_PELNEJ_MOCY = 1.5;  // m/s efektywnych -> pełne tempo ładowania
+// Przeliczone ze zmierzonych wartości po odjęciu szumu w kwadraturze:
+// spokojny taniec 1.4 przy szumie 1.2 -> sygnał ~0.7 m/s, po filtrze ~0.5.
+// UWAGA: to wciąż oszacowanie - wymaga jednego pomiaru potwierdzającego.
+const PROG_PELNEJ_MOCY = 0.6;  // m/s efektywnych -> pełne tempo ładowania
 
 // Odpowiedź jest pierwiastkowa, nie liniowa: hojna przy wolnym ruchu
 // (delikatne kołysanie ma sensownie ładować), ale zostawia zapas skali
@@ -45,17 +51,37 @@ const ZANIK_POZA_KADREM = 0.4; // mnożnik: wyjście z kadru zanika WOLNIEJ, bo 
 // Krzywa pierwiastkowa podbija małe wartości, więc resztki szumu wyglądałyby
 // na ruch. Zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym" ruchu -
 // inaczej gra mówi "źle" komuś, kto robi dokładnie to, o co prosiliśmy.
-const PROG_BEZRUCHU_MS = 0.2;  // poniżej tylu m/s EFEKTYWNYCH gracz stoi
+const PROG_BEZRUCHU_MS = 0.08; // poniżej tylu m/s EFEKTYWNYCH gracz stoi
 // Stała czasowa EMA musi być DŁUŻSZA niż jeden cykl ruchu tanecznego (~1 s),
 // inaczej wskaźnik oscyluje wokół podłogi szumu i moc w każdym takcie na
 // przemian rośnie i opada. Przy 60 FPS: tau = dt/alfa ≈ 0.55 s.
 const ALFA_WYGLADZANIA = 0.03;
 const MAX_DT = 0.1;            // sufit kroku czasu; bez tego przełączenie karty skacze mocą
 
+// WYGŁADZANIE POZYCJI przed różniczkowaniem.
+//
+// To jest właściwe lekarstwo na drgania trackingu. Różniczkowanie wzmacnia
+// szum o wysokiej częstotliwości: liczenie prędkości z surowych, skaczących
+// pozycji daje ogromną podłogę szumu (zmierzone: ~1.2 m/s przy nieruchomym
+// staniu). Filtr dolnoprzepustowy na POZYCJACH tłumi szum nieskorelowany
+// między klatkami, prawie nie ruszając ruchu tanecznego (~1 Hz).
+// tau ≈ 0.17 s: szum spada ~3x, sinusoida 1 Hz traci ~27%.
+const ALFA_POZYCJI = 0.1;
+
 // Punkty MediaPipe Pose: nadgarstki, łokcie, kostki.
 // Barki i biodra celowo pominięte - w worldLandmarks są blisko początku układu,
 // więc prawie się nie ruszają i tylko rozwadniałyby średnią.
 const SLEDZONE_PUNKTY = [15, 16, 13, 14, 27, 28];
+const NAZWY_PUNKTOW = { 15: 'nadg.L', 16: 'nadg.P', 13: 'łok.L', 14: 'łok.P', 27: 'kost.L', 28: 'kost.P' };
+
+// Oś Z z pojedynczej kamery jest zgadywana, nie mierzona, i drga
+// wielokrotnie mocniej niż X i Y. Dla tańca liczy się i tak ruch w płaszczyźnie
+// obrazu. Waga 0 = całkowicie pomijamy głębię.
+const WAGA_Z = 0;
+
+// Punkty gorzej widoczne niż tyle to zgadywanie MediaPipe (np. stopy poza
+// kadrem albo zasłonięte). Ich "ruch" to czysty szum.
+const PROG_WIDOCZNOSCI = 0.5;
 
 export class MotionMeter {
     constructor() {
@@ -64,7 +90,8 @@ export class MotionMeter {
         this.predkoscSurowa = 0;    // bez wygładzenia - podglądowo
         this.predkoscEfektywna = 0; // po odjęciu podłogi szumu; TA steruje grą
         this.responsywnosc = 0;     // predkoscEfektywna zmapowana na 0..1
-        this._poprzednie = null;    // pozycje z poprzedniej klatki
+        this._wygladzone = null;    // wygładzone pozycje z poprzedniej klatki
+        this.szumPunktow = {};      // diagnostyka: prędkość per kończyna [m/s]
     }
 
     update(frame) {
@@ -75,7 +102,7 @@ export class MotionMeter {
 
         if (!pose || !pose.worldLandmarks) {
             // Gracz wyszedł z kadru. Nie karzemy - tylko wolniejszy zanik.
-            this._poprzednie = null;
+            this._wygladzone = null;
             this.predkoscSurowa = 0;
             this.predkosc += ALFA_WYGLADZANIA * (0 - this.predkosc);
             this.predkoscEfektywna = 0;
@@ -118,43 +145,77 @@ export class MotionMeter {
         return Math.max(0, Math.min(1, v));
     }
 
+    /**
+     * Prędkość liczona z POZYCJI WYGŁADZONYCH, nie surowych.
+     *
+     * Kolejność ma znaczenie: filtr dolnoprzepustowy najpierw, różniczkowanie
+     * potem. Odwrotnie (jak było) różniczkowanie wzmacnia szum trackingu,
+     * a późniejsze wygładzanie prędkości już go nie usunie - uśredni tylko
+     * duży szum do dużej stałej.
+     */
     _zmierzPredkosc(worldLandmarks, dt) {
-        const teraz = SLEDZONE_PUNKTY.map(i => worldLandmarks[i]);
+        const surowe = SLEDZONE_PUNKTY.map(i => worldLandmarks[i]);
 
-        if (!this._poprzednie) {
-            this._poprzednie = teraz;
+        // Filtr dolnoprzepustowy na pozycjach
+        if (!this._wygladzone) {
+            this._wygladzone = surowe.map(p => this._kopia(p));
             return 0; // pierwsza klatka nie ma z czym porównać
         }
 
         let suma = 0;
         let liczone = 0;
-        let zdrowe = 0;
+        this.szumPunktow = {};
 
-        for (let i = 0; i < teraz.length; i++) {
-            const a = teraz[i];
-            const b = this._poprzednie[i];
-            if (!a || !b) continue;
+        for (let i = 0; i < surowe.length; i++) {
+            const p = surowe[i];
+            const poprz = this._wygladzone[i];
+            const idx = SLEDZONE_PUNKTY[i];
 
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const dz = a.z - b.z;
+            if (!this._zdrowy(p)) continue;
+
+            // Punkty słabo widoczne to zgadywanie MediaPipe, nie pomiar.
+            // Ich "ruch" byłby czystym szumem, więc nie aktualizujemy ich
+            // ani nie wliczamy - inaczej stopy poza kadrem generują moc.
+            if (p.visibility !== undefined && p.visibility < PROG_WIDOCZNOSCI) continue;
+
+            if (!poprz) {
+                this._wygladzone[i] = this._kopia(p);
+                continue;
+            }
+
+            const px = poprz.x + ALFA_POZYCJI * (p.x - poprz.x);
+            const py = poprz.y + ALFA_POZYCJI * (p.y - poprz.y);
+            const pz = poprz.z + ALFA_POZYCJI * (p.z - poprz.z);
+
+            const dx = px - poprz.x;
+            const dy = py - poprz.y;
+            const dz = (pz - poprz.z) * WAGA_Z;
             const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-            // Punkt z NaN pomijamy zamiast wliczać - inaczej jeden zepsuty
-            // staw unieważnia całą klatkę.
             if (!Number.isFinite(d)) continue;
 
-            suma += d;
+            // BEZ przeskalowywania przez 1/ALFA_POZYCJI. Różnica kolejnych
+            // wartości filtra JEST już prędkością w m/s: dla ruchu ciągłego
+            // filtr odtwarza pełne nachylenie sygnału, a dla ruchu ~1 Hz tłumi
+            // je tylko o ~27%. Szum nieskorelowany tłumi za to ~14x. Dzielenie
+            // przez alfę przywracałoby szum do poziomu sprzed filtrowania.
+            const v = d / dt;
+
+            this._wygladzone[i] = { x: px, y: py, z: pz, visibility: p.visibility };
+            this.szumPunktow[NAZWY_PUNKTOW[idx] ?? idx] = v;
+
+            suma += v;
             liczone++;
         }
 
-        // Zapamiętujemy tylko punkty o skończonych współrzędnych, żeby zepsuta
-        // klatka nie stała się punktem odniesienia dla następnej.
-        for (const p of teraz) {
-            if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)) zdrowe++;
-        }
-        if (zdrowe === teraz.length) this._poprzednie = teraz;
+        return liczone > 0 ? suma / liczone : 0;
+    }
 
-        return liczone > 0 ? (suma / liczone) / dt : 0;
+    _zdrowy(p) {
+        return !!p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z);
+    }
+
+    _kopia(p) {
+        return this._zdrowy(p) ? { x: p.x, y: p.y, z: p.z, visibility: p.visibility } : null;
     }
 }

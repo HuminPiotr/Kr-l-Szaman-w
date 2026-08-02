@@ -116,6 +116,13 @@ export class DebugHud {
             const min = this.vMin === Infinity ? 0 : this.vMin;
             lines.push(`      zakres zmierzonej ${this._num(min)} – ${this._num(this.vMax)}   [R = reset]`);
         }
+        // Rozbicie na kończyny: gdy przy bezruchu któraś wystaje ponad resztę,
+        // to ona generuje szum (typowo kostki - stopy poza kadrem albo zasłonięte).
+        if (stats.szumPunktow && Object.keys(stats.szumPunktow).length) {
+            const czesci = Object.entries(stats.szumPunktow)
+                .map(([k, v]) => `${k} ${this._num(v)}`).join('  ');
+            lines.push(`      ${czesci}`);
+        }
         if (stats.ruch !== undefined) lines.push(`ruch  ${this._num(stats.ruch)}   ${this._bar(stats.ruch)}`);
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
