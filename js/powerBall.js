@@ -1,3 +1,8 @@
+// Progi wejścia i wyjścia z gotowości. Rozstęp między nimi to histereza -
+// bez niej stan migotałby tam i z powrotem przy najlżejszym drgnięciu na granicy.
+const PROG_GOTOWOSCI = 0.9;     // wejście w READY
+const PROG_PODTRZYMANIA = 0.65; // spadek poniżej wraca do CHARGING
+
 export class PowerBall {
     constructor(canvas, ctx) {
         this.canvas = canvas;
@@ -34,25 +39,29 @@ export class PowerBall {
      * @param {Array} hands       listy punktów dłoni (do rysowania i geometrii gestu wystrzału)
      * @param {number} width
      * @param {number} height
-     * @param {number} efficiency wynik znaku Swaroga 0..1, liczony NA ZEWNĄTRZ przez ZnakRegistry
+     * @param {number} moc        moc z MotionMeter 0..1 - ładowana TAŃCEM
+     * @param {number} efficiency wynik znaku Swaroga 0..1 z ZnakRegistry - FORMA, jaką moc przybiera
      */
-    updateAndDraw(hands, width, height, efficiency) {
+    updateAndDraw(hands, width, height, moc, efficiency) {
+        // Tańczysz -> ładujesz moc. Rzucasz znak -> moc przybiera formę.
+        // Oba czynniki są ciągłe, więc kula pojawia się i znika płynnie -
+        // nie ma progu, migotania ani momentu "nie udało się".
+        //
+        // Po wystrzale energia jest zużyta: lecąca kula ma własną, zapamiętaną
+        // w chwili strzału, a licznik wraca do zera aż do końca przeładowania.
+        if (this.state === 'CHARGING' || this.state === 'READY') {
+            this.currentEnergy = moc * efficiency;
+        } else {
+            this.currentEnergy = 0;
+        }
+
         // Maszyna Stanów Logiki
-        // (rozpoznawanie gestu wyprowadzone do js/znaki/swarog.js - ta klasa
-        //  zajmuje się już tylko stanem i renderowaniem)
+        // (rozpoznawanie gestu wyprowadzone do js/znaki/swarog.js, a ładowanie
+        //  do js/motionMeter.js - ta klasa zajmuje się już tylko stanem
+        //  i renderowaniem. currentEnergy ma dokładnie JEDNEGO pisarza: linijkę wyżej.)
         if (this.state === 'CHARGING') {
-            if (efficiency > 0.5) {
-                const chargeRate = (efficiency - 0.5) * 0.02;
-                if (this.currentEnergy < 1.0) {
-                    this.currentEnergy = Math.min(1.0, this.currentEnergy + chargeRate);
-                }
-                // Wejście w gotowość do strzału przy 95% naładowania
-                if (this.currentEnergy >= 0.95) {
-                    this.state = 'READY';
-                }
-            } else {
-                const dischargeRate = hands.length > 0 ? 0.005 : 0.05;
-                this.currentEnergy = Math.max(0.0, this.currentEnergy - dischargeRate);
+            if (this.currentEnergy >= PROG_GOTOWOSCI) {
+                this.state = 'READY';
             }
         } else if (this.state === 'READY') {
             // W gotowości sprawdzamy gest rozłączenia dłoni i buforujemy położenie kuli
@@ -76,7 +85,8 @@ export class PowerBall {
             const elapsed = performance.now() - this.cooldownStartTime;
             if (elapsed >= this.cooldownDuration) {
                 this.state = 'CHARGING';
-                this.currentEnergy = 0;
+                // Bez zerowania - od następnej klatki currentEnergy liczy się
+                // znowu jako moc x znak. Zapas mocy w ciele zużył wystrzał.
             }
         }
 
@@ -145,12 +155,14 @@ export class PowerBall {
                     this.fire(centerX, centerY);
                 }
 
-                // Jeżeli użytkownik trzyma ręce za mało stabilnie, energia powoli uchodzi
-                if (efficiency < 0.3) {
-                    this.currentEnergy = Math.max(0.0, this.currentEnergy - 0.006);
-                    if (this.currentEnergy < 0.9) {
-                        this.state = 'CHARGING';
-                    }
+                // Wyjście z gotowości: energia (moc x znak) spadła poniżej progu
+                // podtrzymania. Próg jest WYRAŹNIE niżej niż próg wejścia -
+                // histereza, żeby stan nie migotał na granicy.
+                //
+                // Bez tej reguły READY byłby pułapką: energii nie liczy się już
+                // wewnątrz tej klasy, więc jedynym wyjściem zostałby wystrzał.
+                if (this.currentEnergy < PROG_PODTRZYMANIA) {
+                    this.state = 'CHARGING';
                 }
             }
             this.lastHandsCount = hands.length;

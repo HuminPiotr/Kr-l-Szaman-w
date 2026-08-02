@@ -136,6 +136,17 @@ export class MotionMeter {
     }
 
     /**
+     * Moc została zamieniona na efekt (wystrzał) - zbiornik pusty.
+     *
+     * Bez tego wystrzał nic nie kosztuje i traci ciężar: gracz tańczy raz,
+     * a potem strzela w kółko. Tańcz dalej, żeby naładować ponownie.
+     * To NIE jest kara - nic nie mówi "źle", po prostu zaczynasz od nowa.
+     */
+    zuzyj() {
+        this.moc = 0;
+    }
+
+    /**
      * Ostatnia linia obrony przed NaN.
      *
      * Bez tego JEDNA klatka z NaN w worldLandmarks (zdarza się przy niskiej

@@ -1,11 +1,13 @@
 import { HandTracker } from './handTracker.js';
 import { PoseTracker } from './poseTracker.js';
 import { PowerBall } from './powerBall.js';
+import { Wiatr } from './wiatr.js';
 import { AudioEngine } from './audioEngine.js';
 import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
 import { ZnakRegistry } from './znaki/registry.js';
 import { swarog } from './znaki/swarog.js';
+import { stribog } from './znaki/stribog.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 
 const uiStartScreen = document.getElementById('start-screen');
@@ -25,6 +27,7 @@ const ctx = canvas.getContext('2d');
 let handTracker = new HandTracker();
 let poseTracker = new PoseTracker();
 let powerBall = null;
+let wiatr = null;
 let audioEngine = new AudioEngine();
 let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
@@ -37,6 +40,7 @@ let lastState = 'CHARGING';
 let lastFrameTime = 0;
 
 znaki.zarejestruj(swarog);
+znaki.zarejestruj(stribog);
 
 // Skalowanie płótna do rozmiarów okna
 function resizeCanvas() {
@@ -77,6 +81,7 @@ startBtn.addEventListener('click', async () => {
 
         // 4. Inicjalizacja renderingu Kuli Mocy
         powerBall = new PowerBall(canvas, ctx);
+        wiatr = new Wiatr(canvas, ctx);
 
         // 5. Inicjalizacja syntezatora audio
         audioEngine.init();
@@ -180,14 +185,19 @@ function renderLoop(now) {
     // Kula czyta wynik SUROWY, bo tak zachowywał się kod przed refaktorem.
     const wynikiZnakow = znaki.ocen(frame);
 
-    // --- 5. Ciągłość ruchu ---
-    // Na razie tylko mierzy i pokazuje w nakładce - nic jeszcze nie steruje.
-    // Przełączenie energii na ten wskaźnik to osobna, następna zmiana.
-    motionMeter.update(frame);
+    // --- 5. Ciągłość ruchu -> moc ---
+    // To jest teraz JEDYNE źródło energii w grze.
+    const moc = motionMeter.update(frame);
 
     // --- 6. Renderowanie Kuli Mocy ---
+    // Tańczysz -> ładujesz moc. Rzucasz znak -> moc przybiera formę.
     const mappedLandmarks = frame.hands.map(h => h.landmarks);
-    powerBall.updateAndDraw(mappedLandmarks, canvas.width, canvas.height, wynikiZnakow.swarog);
+    powerBall.updateAndDraw(mappedLandmarks, canvas.width, canvas.height, moc, wynikiZnakow.swarog);
+
+    // --- 6b. Znak Striboga - wiatr. Ta sama zasada: moc x wynik znaku. ---
+    // Wiatr wieje w stronę, w którą wychylona jest dłoń względem środka kadru.
+    const kierunekWiatru = mappedLandmarks.length && mappedLandmarks[0][9].x > 0.5 ? 1 : -1;
+    wiatr.updateAndDraw(moc * wynikiZnakow.stribog, kierunekWiatru);
 
     // --- 7. Aktualizacja Interaktywnego HUD oraz Audio ---
     if (powerBall) {
@@ -222,20 +232,28 @@ function renderLoop(now) {
             document.body.className = '';
         }
 
-        // Dynamiczne komunikaty instruktażowe
-        let text = "Złóż dłonie w miseczkę naprzeciw siebie 🙌";
-        let icon = "🙌";
+        // Dynamiczne komunikaty instruktażowe.
+        //
+        // REGUŁA: żaden z nich nie może brzmieć jak wytyk. Zamiast mówić, co
+        // gracz robi ŹLE, mówimy, co jest dostępne DALEJ. Nie ma stanu porażki,
+        // więc nie ma komunikatu o porażce.
+        let text = "Tańcz swobodnie — obudź moc 🔥";
+        let icon = "🔥";
 
         if (state === 'CHARGING') {
-            if (liczbaDloni === 0) {
-                text = "Pokaż obie dłonie kamerze ✋";
-                icon = "✋";
-            } else if (liczbaDloni === 1) {
-                text = "Jedna dłoń wykryta! Pokaż drugą dla 100% mocy 🙌";
-                icon = "⚡";
+            if (!frame.pose) {
+                text = "Odsuń się, żeby kamera widziała całą sylwetkę 🕺";
+                icon = "🕺";
+            } else if (moc < 0.25) {
+                text = "Tańcz swobodnie — moc budzi się w ruchu 🔥";
+                icon = "🔥";
+            } else if (efficiency < 0.3) {
+                // Moc jest, brakuje formy. To zaproszenie, nie poprawka.
+                text = "Moc płynie! Złóż dłonie w miseczkę, by nadać jej kształt 🙌";
+                icon = "🙌";
             } else {
-                text = efficiency > 0.5 ? "Moc rośnie! Utrzymaj pozycję 🔥" : "Ułóż dłonie optymalnie naprzeciw siebie 🫱 🫲";
-                icon = efficiency > 0.5 ? "🔥" : "↔️";
+                text = "Kula rośnie! Tańcz dalej 🌀";
+                icon = "🌀";
             }
         } else if (state === 'READY') {
             text = "KULA GOTOWA! Wykonaj zamach i rozszerz dłonie! 💥";
@@ -244,7 +262,7 @@ function renderLoop(now) {
             text = "WYSTRZAŁ ENERGII! ☄️";
             icon = "☄️";
         } else if (state === 'COOLDOWN') {
-            text = "Przeładowanie systemu... Bądź gotów! ⏳";
+            text = "Moc uszła w świat. Tańcz, by zebrać ją na nowo ⏳";
             icon = "⏳";
         }
 
@@ -253,7 +271,10 @@ function renderLoop(now) {
 
         // Jednorazowe odtworzenie dźwięku wystrzału
         if (state === 'FIRING' && lastState !== 'FIRING') {
-            audioEngine.playFireSFX(energy);
+            audioEngine.playFireSFX(powerBall.flyingBall?.energy ?? energy);
+            // Wystrzał zużywa zapas mocy zebrany tańcem - inaczej można by
+            // strzelać w kółko z jednego naładowania i strzał traci ciężar.
+            motionMeter.zuzyj();
         }
         lastState = state;
 

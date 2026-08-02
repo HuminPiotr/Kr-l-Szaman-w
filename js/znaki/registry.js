@@ -40,14 +40,22 @@ export class ZnakRegistry {
         this.wygladzone[znak.id] = 0;
     }
 
-    /** Ocenia wszystkie znaki na tej klatce. Wywoływane raz na klatkę. */
+    /**
+     * Ocenia wszystkie znaki na tej klatce. Wywoływane raz na klatkę.
+     *
+     * Zwraca KOPIĘ, nie referencję do stanu wewnętrznego. Bez tego konsument,
+     * który zapamięta wynik (a dokładnie to będzie robił silnik kombosów,
+     * porównując sekwencje znaków w oknie czasowym), dostawałby obiekt
+     * zmieniający się pod nim przy każdej klatce - i cała historia
+     * wyglądałaby jak powtórzenie ostatniej wartości.
+     */
     ocen(frame) {
         for (const znak of this.znaki) {
             const wynik = this._ocenJeden(znak, frame);
             this.surowe[znak.id] = wynik;
             this.wygladzone[znak.id] += this.alpha * (wynik - this.wygladzone[znak.id]);
         }
-        return this.surowe;
+        return { ...this.surowe };
     }
 
     _ocenJeden(znak, frame) {
