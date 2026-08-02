@@ -21,16 +21,27 @@
 // Te liczby są ZGADNIĘTE i wymagają dostrojenia na żywym ciele.
 // Nakładka debug (klawisz D) pokazuje surową prędkość w m/s - stroić z niej,
 // nie z wyobraźni.
-const PROG_PELNEJ_MOCY = 0.6;  // m/s średniej prędkości kończyn = pełne tempo ładowania
-const PRZYROST = 1 / 8;        // pełne naładowanie w ~8 s spokojnego tańca
+// Zmierzone na żywym tańcu: spokojnie ~1.4 m/s, energicznie do 6 m/s,
+// dolna granica ruchu ~0.5 m/s. Pierwsza wersja miała tu 0.6, przez co
+// wskaźnik siedział wysycony na 1.00 przez cały czas i gra nie odróżniała
+// kołysania od szaleństwa.
+const PROG_PELNEJ_MOCY = 2.5;  // m/s -> pełne tempo ładowania
+
+// Odpowiedź jest pierwiastkowa, nie liniowa: hojna przy wolnym ruchu
+// (delikatne kołysanie ma sensownie ładować), ale zostawia zapas skali
+// na ruch energiczny. Liniowa albo dławiła wolnych, albo wysycała szybkich.
+const KRZYWA = 0.5;            // wykładnik: 0.5 = pierwiastek
+
+const PRZYROST = 1 / 8;        // pełne naładowanie w ~8 s przy pełnym tempie
 const ZANIK = 1 / 15;          // spadek do zera po ~15 s bezruchu
 const ZANIK_POZA_KADREM = 0.4; // mnożnik: wyjście z kadru zanika WOLNIEJ, bo nie może karać
 
-// Poniżej tej responsywności uznajemy, że gracz STOI - i dopiero wtedy moc opada.
-// To jest kluczowe: zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym"
-// ruchu. Inaczej delikatne kołysanie odbierałoby moc, czyli gra mówiłaby
-// "źle" komuś, kto właśnie robi dokładnie to, o co prosiliśmy.
-const PROG_BEZRUCHU = 0.15;
+// Bezruch mierzymy w m/s, NIE na krzywej responsywności.
+// Krzywa pierwiastkowa podbija małe prędkości, więc drgania trackingu przy
+// staniu w miejscu wyglądałyby na ruch i moc nigdy by nie opadła.
+// Zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym" ruchu - inaczej
+// gra mówi "źle" komuś, kto robi dokładnie to, o co prosiliśmy.
+const PROG_BEZRUCHU_MS = 0.25; // poniżej tylu m/s uznajemy, że gracz stoi
 const ALFA_WYGLADZANIA = 0.1;  // mocne wygładzenie EMA - relaks znaczy gładko, bez skoków
 const MAX_DT = 0.1;            // sufit kroku czasu; bez tego przełączenie karty skacze mocą
 
@@ -66,13 +77,13 @@ export class MotionMeter {
 
         this.predkoscSurowa = this._zmierzPredkosc(pose.worldLandmarks, dt);
         this.predkosc += ALFA_WYGLADZANIA * (this.predkoscSurowa - this.predkosc);
-        this.responsywnosc = Math.min(1, this.predkosc / PROG_PELNEJ_MOCY);
+        this.responsywnosc = Math.min(1, Math.pow(this.predkosc / PROG_PELNEJ_MOCY, KRZYWA));
 
         // Przyrost jest proporcjonalny do ruchu i NIGDY ujemny.
-        // Zanik włącza się dopiero poniżej progu bezruchu i narasta płynnie
-        // do pełnej wartości przy całkowitym zatrzymaniu.
+        // Zanik włącza się dopiero poniżej progu bezruchu (liczonego w m/s,
+        // nie na krzywej) i narasta płynnie do pełnej wartości przy zatrzymaniu.
         const przyrost = PRZYROST * this.responsywnosc;
-        const bezruch = Math.max(0, (PROG_BEZRUCHU - this.responsywnosc) / PROG_BEZRUCHU);
+        const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkosc) / PROG_BEZRUCHU_MS);
         const netto = przyrost - ZANIK * bezruch;
 
         this.moc = this._bezpiecznaMoc(this.moc + netto * dt);

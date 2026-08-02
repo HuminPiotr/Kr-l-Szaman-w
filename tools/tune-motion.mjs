@@ -14,7 +14,8 @@
 import { MotionMeter } from '../js/motionMeter.js';
 
 const DT = 1 / 60;
-const PREDKOSCI = [0.2, 0.3, 0.45, 0.6, 0.9, 1.5]; // m/s - podmień na zmierzone u siebie
+// m/s - wartości zmierzone na żywym tańcu (nakładka debug, klawisz D)
+const PREDKOSCI = [0.1, 0.25, 0.5, 1.0, 1.4, 2.5, 4.0, 6.0];
 
 // Syntetyczne ciało: śledzone kończyny oscylują tak, by średnia |v| ≈ zadanej
 function cialo(t, predkoscMs) {

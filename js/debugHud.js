@@ -18,9 +18,21 @@ export class DebugHud {
         this.lastPanelUpdate = 0;
         this.panel = this._createPanel();
 
+        // Podtrzymanie min/max prędkości. Surowa wartość skacze za bardzo,
+        // żeby dało się ją odczytać z ekranu - a to właśnie te liczby są
+        // potrzebne do strojenia. Reset klawiszem R.
+        this.vMin = Infinity;
+        this.vMax = 0;
+
         window.addEventListener('keydown', (e) => {
             if (e.key === 'd' || e.key === 'D') this.toggle();
+            if (e.key === 'r' || e.key === 'R') this.resetujZakres();
         });
+    }
+
+    resetujZakres() {
+        this.vMin = Infinity;
+        this.vMax = 0;
     }
 
     _createPanel() {
@@ -63,6 +75,13 @@ export class DebugHud {
      * @param {object} stats  { ruch, moc, znaki: {id: wynik}, stan }
      */
     updatePanel(frame, stats = {}) {
+        // Min/max zbieramy CO KLATKĘ, przed odcięciem przez próg odświeżania -
+        // panel rysuje się 10x/s, więc inaczej gubiłby szczyty.
+        if (Number.isFinite(stats.predkosc) && frame.pose) {
+            if (stats.predkosc < this.vMin) this.vMin = stats.predkosc;
+            if (stats.predkosc > this.vMax) this.vMax = stats.predkosc;
+        }
+
         if (!this.visible) return;
 
         const now = performance.now();
@@ -86,10 +105,13 @@ export class DebugHud {
             ''
         ];
 
-        // Surowa prędkość w m/s jest tu po to, żeby stałe w motionMeter.js
-        // stroić z pomiaru, a nie z wyobraźni. Zatańcz i odczytaj zakres.
-        if (stats.predkoscSurowa !== undefined) {
-            lines.push(`v     ${this._num(stats.predkoscSurowa)} m/s  (wygł. ${this._num(stats.predkosc)})`);
+        // Prędkość wygładzona jest tym, co naprawdę steruje grą - surowa tylko
+        // podglądowo. Min/max podtrzymane, bo z chwilowej wartości nic się nie
+        // odczyta. Zatańcz, przeczytaj zakres, zresetuj klawiszem R.
+        if (stats.predkosc !== undefined) {
+            lines.push(`v     ${this._num(stats.predkosc)} m/s  (surowa ${this._num(stats.predkoscSurowa)})`);
+            const min = this.vMin === Infinity ? 0 : this.vMin;
+            lines.push(`      zakres ${this._num(min)} – ${this._num(this.vMax)} m/s   [R = reset]`);
         }
         if (stats.ruch !== undefined) lines.push(`ruch  ${this._num(stats.ruch)}   ${this._bar(stats.ruch)}`);
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
