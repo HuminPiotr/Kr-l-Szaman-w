@@ -224,6 +224,9 @@ function renderLoop(now) {
         plynnosc,
         szarpniecie: plynnoscMiara.szarpniecie,
         aktywnychStawow: plynnoscMiara.aktywnychStawow,
+        zaWolno: plynnoscMiara.zaWolno,
+        oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
+        dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak'
     });

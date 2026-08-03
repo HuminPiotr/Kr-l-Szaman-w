@@ -132,7 +132,15 @@ export class DebugHud {
         if (stats.plynnosc !== undefined) {
             lines.push(`płyn. ${this._num(stats.plynnosc)}   ${this._bar(stats.plynnosc)}`);
             lines.push(`      szarpnięcie ${this._num(stats.szarpniecie)} /s     stawów ${stats.aktywnychStawow ?? 0}/6`);
-            lines.push(`      skala: okrąg 1.5 · gładko 6 · szarpanie 30`);
+            lines.push(`      skala: okrąg 1.5 · gładko 7 · szarpanie 56`);
+            // Miara jest DRUGĄ pochodną pozycji, więc skaluje się jak 1/dt.
+            // Przy załamaniu klatkażu nie szumi - po cichu maleje kilkadziesiąt
+            // razy i udaje "bardzo płynny ruch". Dlatego to ostrzeżenie.
+            if (stats.zaWolno) {
+                lines.push(`      ⚠ KLATKAŻ ZA NISKI - pomiar wstrzymany`);
+            } else if (stats.dt) {
+                lines.push(`      okno ${stats.oknoKlatek} kl. = ${(stats.oknoKlatek * stats.dt * 1000).toFixed(0)} ms`);
+            }
             lines.push(`      tempo ładowania x${this._num(stats.wspPlynnosci)}`);
         }
 

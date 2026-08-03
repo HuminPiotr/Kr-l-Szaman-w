@@ -29,9 +29,15 @@
  *    Kołysanie gładkie i szarpane kreślą tę samą prostą; różni je wyłącznie
  *    czas zwrotu, którego geometria nie widzi.
  *
- * Punkt pracy (okno +-5 klatek, próg 0.20 m/s) wybrany z przemiatania -
- * daje 5.1x rozdziału przy całkowicie wyciszonym bezruchu.
- * tools/test-plynnosc.mjs pilnuje wszystkich czterech pułapek powyżej.
+ * 5. Próg prędkości stosowany do KLATKI - BŁĄD znaleziony na żywym ciele.
+ *    Dla ruchu wahadłowego |v| jest największe w środku wychylenia, a |a_t|
+ *    DOKŁADNIE TAM najmniejsze (v ~ cos, a_t ~ sin). Odsiewanie wolnych klatek
+ *    wyrzucało więc punkty zwrotne - jedyne miejsce, gdzie widać różnicę
+ *    między łukiem a szarpnięciem. Próg idzie teraz do ŚREDNIEJ STAWU:
+ *    nieruchomy staw nie głosuje, ale ruchomemu liczymy wszystkie klatki.
+ *    Rozdział wzrósł z 5.0x na 8.3x.
+ *
+ * tools/test-plynnosc.mjs pilnuje wszystkich pięciu pułapek powyżej.
  */
 
 // Okno filtra podane w SEKUNDACH, nie w klatkach. Przy spadku FPS okno liczone
@@ -48,15 +54,27 @@ const MAX_POL_OKNA = 12;
 // prędkości z samego szumu 0.061 m/s, p99 = 0.160, maksimum 0.226.
 // Przy 0.20 przechodziły 2 próbki na 4260 - rzadko, ale wystarczająco,
 // żeby zbić płynność. Przy 0.25 nie przechodzi żadna.
-const PROG_PREDKOSCI = 0.25;   // m/s
+// Odnosi się teraz do ŚREDNIEJ prędkości stawu, nie do klatki (patrz pułapka 5).
+const PROG_PREDKOSCI = 0.18;   // m/s
 
-// Zgadnięte, WYMAGA POMIARU NA ŻYWYM CIELE. Nakładka debug pokazuje surowe
-// szarpnięcie - stroić z niego. Na sygnałach syntetycznych: okrąg 1.5,
-// kołysanie gładkie 5.8, szarpane 29.7, wyrzut-stop 26.4.
-const PROG_SZARPNIECIA = 22;   // [1/s] -> płynność 0
+// Powyżej tego kroku czasu nie da się uczciwie zmierzyć szarpnięcia.
+// Miara jest DRUGĄ pochodną pozycji, więc skaluje się jak 1/dt - przy
+// załamaniu klatkażu wynik nie tyle szumi, co po cichu maleje kilkadziesiąt
+// razy i wygląda na "bardzo płynny ruch". Lepiej nie mierzyć nic niż zwrócić
+// liczbę, której nie da się odróżnić od prawdziwej.
+const MAX_DT = 0.06;           // s (~17 FPS)
+
+// WYMAGA POTWIERDZENIA NA ŻYWYM CIELE. Nakładka pokazuje surowe szarpnięcie
+// razem ze skalą odniesienia - stroić z niej.
+// Na sygnałach syntetycznych po naprawie progu stawu:
+//   okrąg 1.5 · ósemka ~5 · kołysanie gładkie 6.8 · szarpane 56 · wyrzut-stop 95
+// Próg dobrany tak, żeby GŁADKIE kołysanie dawało ~0.89, a nie 0.69.
+// Tancerz robiący dokładnie to, o co prosimy, nie może widzieć "prawie źle".
+const PROG_SZARPNIECIA = 60;   // [1/s] -> płynność 0
 
 const TAU_WYGLADZANIA = 0.6;   // s - płynność ma się zmieniać spokojnie, nie migotać
 const TAU_POWROTU = 2.0;       // s - powrót do pełnej płynności, gdy nie ma czego mierzyć
+const TAU_SREDNIEJ_V = 0.4;    // s - okno średniej prędkości stawu (decyduje, czy staw głosuje)
 
 const SLEDZONE_PUNKTY = [15, 16, 13, 14, 27, 28]; // nadgarstki, łokcie, kostki
 const PROG_WIDOCZNOSCI = 0.5;
@@ -66,8 +84,10 @@ export class Plynnosc {
         this.plynnosc = 1;        // 0..1 - startujemy od pełnej, nie od kary
         this.szarpniecie = 0;     // [1/s] surowe - do strojenia progu
         this.aktywnychStawow = 0; // ile stawów głosowało w tej klatce
+        this.zaWolno = false;     // klatkaż za niski, żeby uczciwie mierzyć
 
         this._historia = SLEDZONE_PUNKTY.map(() => []);
+        this._srednieV = SLEDZONE_PUNKTY.map(() => 0);
         this._polOkna = 5;
 
         // Akumulatory wygładzane w czasie. Trzymamy je osobno, bo szarpnięcie
@@ -87,7 +107,19 @@ export class Plynnosc {
     update(worldLandmarks, dt) {
         if (!worldLandmarks || dt <= 0) {
             this.aktywnychStawow = 0;
+            this.zaWolno = false;
             return this.plynnosc; // brak danych to nie jest szarpanie
+        }
+
+        // Zbyt rzadkie klatki - pomiar byłby fałszywy, więc go nie robimy.
+        // Historię czyścimy, żeby po powrocie klatkażu nie liczyć pochodnych
+        // z próbek rozstrzelonych w czasie.
+        this.zaWolno = dt > MAX_DT;
+        if (this.zaWolno) {
+            for (const h of this._historia) h.length = 0;
+            this.aktywnychStawow = 0;
+            this.plynnosc += Math.min(1, dt / TAU_POWROTU) * (1 - this.plynnosc);
+            return this.plynnosc;
         }
 
         // Okno dopasowane do rzeczywistego FPS
@@ -102,7 +134,8 @@ export class Plynnosc {
             const hist = this._historia[i];
 
             if (!this._zdrowy(p) || (p.visibility !== undefined && p.visibility < PROG_WIDOCZNOSCI)) {
-                hist.length = 0; // przerwa w danych - zaczynamy okno od nowa
+                hist.length = 0;      // przerwa w danych - zaczynamy okno od nowa
+                this._srednieV[i] = 0;
                 continue;
             }
 
@@ -112,7 +145,23 @@ export class Plynnosc {
 
             const d = this._pochodneSG(hist, dt);
             const predkosc = Math.hypot(d.vx, d.vy);
-            if (!Number.isFinite(predkosc) || predkosc < PROG_PREDKOSCI) continue;
+            if (!Number.isFinite(predkosc)) continue;
+
+            // Średnia prędkość TEGO stawu, wygładzana osobno.
+            this._srednieV[i] += Math.min(1, dt / TAU_SREDNIEJ_V) * (predkosc - this._srednieV[i]);
+
+            // Próg stosujemy do ŚREDNIEJ stawu, nie do wartości chwilowej.
+            //
+            // To jest istotne, nie kosmetyczne: dla ruchu wahadłowego |v| jest
+            // największe w środku wychylenia, a |a_t| DOKŁADNIE TAM najmniejsze
+            // (v ~ cos, a_t ~ sin). Odsiewanie wolnych KLATEK wyrzucało więc
+            // punkty zwrotne - czyli jedyne miejsce, gdzie widać różnicę między
+            // łukiem a szarpnięciem. Zostawał sam gładki środek i wszystko
+            // wyglądało płynnie.
+            //
+            // Odsiewamy więc nieruchome STAWY (ich kierunek to szum), ale
+            // ruchomemu stawowi liczymy WSZYSTKIE klatki, łącznie ze zwrotami.
+            if (this._srednieV[i] < PROG_PREDKOSCI) continue;
 
             // Rozkład przyspieszenia: bierzemy TYLKO składową styczną.
             // Normalna (skręcanie) jest płynna i nie może karać.
