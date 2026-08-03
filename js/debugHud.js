@@ -126,12 +126,13 @@ export class DebugHud {
         if (stats.ruch !== undefined) lines.push(`ruch  ${this._num(stats.ruch)}   ${this._bar(stats.ruch)}`);
 
         // Płynność i jej surowe źródło. PROG_SZARPNIECIA w js/plynnosc.js
-        // jest zgadnięty - to są liczby, z których się go stroi.
-        // Odniesienie z sygnałów syntetycznych: okrąg 1.5, kołysanie gładkie
-        // 6.1, kołysanie szarpane 30.4, wyrzut-stop 27.5.
+        // jest wyprowadzony z sygnałów syntetycznych i wymaga potwierdzenia
+        // na żywym ciele - dlatego SKALA ODNIESIENIA jest wypisana obok
+        // wartości. Sama liczba "9.2" nic nikomu nie mówi.
         if (stats.plynnosc !== undefined) {
             lines.push(`płyn. ${this._num(stats.plynnosc)}   ${this._bar(stats.plynnosc)}`);
-            lines.push(`      szarpnięcie ${this._num(stats.szarpniecie)} /s   stawów ${stats.aktywnychStawow ?? 0}/6`);
+            lines.push(`      szarpnięcie ${this._num(stats.szarpniecie)} /s     stawów ${stats.aktywnychStawow ?? 0}/6`);
+            lines.push(`      skala: okrąg 1.5 · gładko 6 · szarpanie 30`);
             lines.push(`      tempo ładowania x${this._num(stats.wspPlynnosci)}`);
         }
 
