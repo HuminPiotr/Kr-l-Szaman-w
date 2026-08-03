@@ -1,90 +1,104 @@
 # Projekt: Kula Mocy
 
-## 1. Cel Projektu i Opis
+## 1. Cel
 
-Webowa gra ruchowa AR rozpoznająca gesty gracza na kamerze, w klimacie **słowiańskiego szamanizmu**.
+Webowa gra ruchowa AR w klimacie **słowiańskiego szamanizmu**, rozpoznająca ruch gracza na kamerze.
 
-Gracz **tańczy swobodnie** — rozluźnione ciało ładuje moc — a **krótkimi znakami dłońmi** nadaje tej mocy formę (Swaróg = ogień, Stribog = wiatr, docelowo Perun, Weles, Mokosz). Znaki mają się z czasem łączyć w kombosy i techniki, jak pieczęcie ninja, ale w słowiańskiej oprawie.
+Gracz **tańczy swobodnie**, a gra mierzy **PŁYNNOŚĆ jego ruchu** — czy kończyny kreślą łagodne łuki, czy szarpią. Płynny ruch napełnia tancerza mocą, widoczną nie tylko na pasku, ale jako **świetlista aura obrysowująca sylwetkę** na obrazie z kamery.
 
-Cel emocjonalny: gracz ma **całkowicie rozluźnić ciało**, poruszać się swobodnie i czerpać przyjemność z tańca — jak szaman przy ogniu. Nie egzamin, nie wyzwanie zręcznościowe.
+Cel emocjonalny: gracz ma **całkowicie rozluźnić ciało** i czerpać przyjemność z tańca — jak szaman przy ogniu. Nie egzamin, nie wyzwanie zręcznościowe.
 
-- **Pochodzenie:** demo na warsztaty z vibe codingu (funkcja „Power Charge").
+- **Pochodzenie:** demo na warsztaty z vibe codingu.
 - **Grupa docelowa:** studenci, uczestnicy warsztatów.
 
 ## 2. REGUŁA NADRZĘDNA: nic nigdy nie mówi „źle"
 
 Obowiązuje w całym kodzie i wygrywa ze wszystkimi innymi względami.
 
-- Każdy rozpoznawacz gestu zwraca **ciągły wynik 0..1**, nigdy boolean. Częściowe ułożenie dłoni daje słabszy, ale nadal ładny efekt.
-- **Brak punktów, brak timera, brak stanu porażki.** Nagrodą jest sam efekt.
-- Komunikaty mówią, co jest dostępne **dalej**, a nie co gracz robi **źle**.
-- Wyjście z kadru nie karze (zanik wolniejszy niż przy bezruchu).
-- Progi mają histerezę — stan nie może migotać na granicy.
-
-To jest techniczna realizacja celu emocjonalnego. Klasyfikacja tak/nie robi z tego egzamin i niszczy cel — traktować jak wymóg, nie jak detal.
+- Każdy pomiar zwraca **ciągłą wartość 0..1**, nigdy boolean. Płynność steruje TEMPEM ładowania, nigdy go nie zeruje: ruch szarpany ładuje ok. 4x wolniej, ale **ładuje** (`PODLOGA_PLYNNOSCI`).
+- **Brak punktów, timera, stanu porażki.** Nagrodą jest sam efekt.
+- Komunikaty mówią, co jest dostępne **dalej**, nie co gracz robi **źle**.
+- Bezruch i wyjście z kadru **nie karzą** — płynność wraca wtedy do pełnej, bo brak danych to nie jest szarpanie.
+- Progi mają histerezę; nic nie migocze na granicy.
 
 ## 3. Architektura
 
-Front-end only, HTML + CSS + JavaScript (Vanilla, moduły ES). Bez backendu i bez bazy — cały stan żyje w pamięci przeglądarki.
+Front-end only, HTML + CSS + JavaScript (Vanilla, moduły ES). Bez backendu i bazy.
 
-**Tracking:** MediaPipe Tasks Vision 0.10.3 — `HandLandmarker` (`numHands: 2`) **oraz** `PoseLandmarker` (lite, `numPoses: 1`). Obie detekcje co klatkę.
-
-**Rendering:** Canvas 2D (`globalCompositeOperation: 'lighter'`). **Audio:** syntezator Web Audio.
-
-### Przepływ
+**Tracking:** MediaPipe Tasks Vision 0.10.3, `PoseLandmarker` (lite, `numPoses: 1`) z **maską segmentacji**. Śledzenie dłoni jest teraz WYŁĄCZONE.
 
 ```
-kamera → HandTracker ─┐
-                      ├→ frameMapper → frame ─┬→ MotionMeter → moc (0..1)
-kamera → PoseTracker ─┘                       └→ ZnakRegistry → { swarog, stribog }
-                                                          │
-                        energia = moc × wynik znaku ───────┴→ PowerBall / Wiatr → audio, HUD
+kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──┐
+                      │                              ├→ MotionMeter → moc → Aura + HUD
+                      ├→ worldLandmarks → ─────────  ┘
+                      └→ maska sylwetki ───────────────→ Aura
 ```
 
-**Tańczysz → ładujesz moc. Rzucasz znak → moc przybiera formę.**
+**Tańczysz płynnie → moc rośnie → aura rozkwita.**
 
 ### Kontrakt klatki
 
-`main.js` buduje raz na klatkę jeden obiekt `frame` i przekazuje go wszystkim:
+`main.js` buduje raz na klatkę jeden obiekt i przekazuje go wszystkim:
 
 ```js
-{ hands: [{ landmarks, worldLandmarks, handedness }], pose: { landmarks, worldLandmarks } | null,
-  width, height, dt, now }
+{ hands: [], pose: { landmarks, worldLandmarks } | null, width, height, dt, now }
 ```
 
-**Zasada:** `landmarks` (2D, przemapowane) **tylko do rysowania**. `worldLandmarks` (metryczne 3D) **do wszystkich pomiarów** — są niezależne od odległości gracza od kamery.
+`hands` zostaje pustą listą, żeby kontrakt się nie zmienił, gdy dłonie wrócą razem ze znakami.
 
-W tasks-vision 0.10.3 pole nazywa się `handednesses` (liczba mnoga).
+**Zasada:** `landmarks` (2D, przemapowane) **tylko do rysowania**. `worldLandmarks` (metryczne 3D) **do wszystkich pomiarów** — są niezależne od odległości gracza od kamery.
 
 ### Pliki
 
 | Plik | Odpowiedzialność |
 |---|---|
-| `js/handTracker.js`, `js/poseTracker.js` | wrappery MediaPipe |
+| `js/poseTracker.js` | wrapper MediaPipe; detekcja na POMNIEJSZONEJ klatce |
 | `js/frameMapper.js` | cover-fit + mapowanie punktów na płótno |
-| `js/motionMeter.js` | ciągłość ruchu → moc; **jedyne źródło energii** |
-| `js/znaki/registry.js` | rejestr znaków, wyniki surowe i wygładzone |
-| `js/znaki/swarog.js`, `stribog.js` | pojedyncze znaki |
-| `js/powerBall.js` | stan kuli + rendering (bez rozpoznawania) |
-| `js/wiatr.js` | efekt Striboga |
+| `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
+| `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
+| `js/aura.js` | maska sylwetki → poświata |
 | `js/audioEngine.js` | syntezator |
-| `js/debugHud.js` | nakładka diagnostyczna (klawisz `D`, `R` = reset zakresu) |
+| `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu) |
+
+**Odpięte, nie usunięte** (wracają przy znakach): `powerBall.js`, `wiatr.js`, `znaki/*`, `handTracker.js`.
 
 ## 4. Pułapki, w które już wpadliśmy
 
-Zmierzone, nie teoretyczne. Nie cofać tych decyzji bez ponownego pomiaru.
+Wszystkie **zmierzone**, nie teoretyczne. Nie cofać bez ponownego pomiaru.
 
-- **Różniczkowanie wzmacnia szum.** Prędkość liczyć z **wygładzonych** pozycji, nie surowych. Odwrotna kolejność dawała ~1,2 m/s przy nieruchomym staniu. Po poprawce ~0,07 (32× mniej).
-- **Nie przeskalowywać wyniku przez `1/alfa`** „dla przywrócenia skali" — to mnoży szum z powrotem i kasuje cały zysk filtra.
-- **Stała czasowa wygładzania musi być dłuższa niż cykl ruchu tanecznego** (~1 s), inaczej wskaźnik oscyluje i moc w każdym takcie rośnie i opada.
-- **Oś Z z jednej kamery jest zgadywana, nie mierzona** — pomijana (`WAGA_Z = 0`).
-- **Jedna klatka z NaN potrafiła zatruć moc na stałe** (`Math.max(0, Math.min(1, NaN))` to nadal NaN). Stąd osłony w `motionMeter.js`.
-- **`registry.ocen()` zwraca kopię**, nie referencję — silnik kombosów będzie trzymał historię.
-- **Płótno ma CSS `transform: scaleX(-1)`** — tekst rysowany na nim wychodzi lustrzany; trzeba odkręcać odbicie lokalnie.
+### Ruch i płynność
+
+- **Różniczkowanie wzmacnia szum.** Prędkość liczyć z **wygładzonych** pozycji. Odwrotna kolejność dawała ~1,2 m/s przy nieruchomym staniu; po poprawce ~0,07 (32× mniej).
+- **Nie przeskalowywać przez `1/alfa`** „dla przywrócenia skali" — to mnoży szum z powrotem i kasuje cały zysk filtra.
+- **Stała czasowa wygładzania musi być dłuższa niż cykl ruchu tanecznego** (~1 s), inaczej moc w każdym takcie rośnie i opada.
+- **Płynność ≠ mało przyspieszenia.** Okrąg kreślony ze stałą prędkością ma duże przyspieszenie dośrodkowe, a jest wzorcem płynności. Liczy się tylko składowa STYCZNA.
+- **ŚREDNIA(|a_t|)/ŚREDNIA(|v|) daje ODWROTNY ranking** (gładkie 6,3 vs szarpane 3,7). Oba zmieniają prędkość o tyle samo na sekundę; różni je SKUPIENIE w czasie. Stąd **RMS**, czuły na szczyty: 7,0 vs 21,0.
+- **Zwykłe różniczkowanie dwukrotne nie przeżywa szumu** — rozdział spadał z 3,0× do 1,05×. Stąd **Savitzky-Golay**: pochodne z dopasowania wielomianu w oknie.
+- **Miary czysto geometryczne nie działają** — kołysanie gładkie i szarpane kreślą tę samą prostą, różni je wyłącznie czas zwrotu.
+- **Okna filtrów liczyć w SEKUNDACH, nie klatkach** — przy spadku FPS miara musi znaczyć to samo.
+- **Oś Z z jednej kamery jest zgadywana** — pomijana (`WAGA_Z = 0`).
+- **Jedna klatka z NaN potrafiła zatruć moc na stałe** (`Math.max(0, Math.min(1, NaN))` to nadal NaN).
+
+### Aura i rendering
+
+- **Maskę BARWIĆ na płótnie pomocniczym** (`source-in`), nie na głównym. Tint przez `source-atop` na głównym zalewa CAŁY ekran, bo tło gry jest nieprzezroczyste.
+- **Wyciąć ostrą sylwetkę z rozmytej** (`destination-out`), inaczej wnętrze ciała wypala się do bieli i zamiast aury wychodzi świecąca kukła.
+- **Aurę rysować przez `computeCoverFit()`**, tak jak wideo. Zwykłe `drawImage(0,0,canvas.width,canvas.height)` rozciąga ją i aura siada OBOK ciała.
+- **Maski trzeba zwalniać** (`mask.close()`) — inaczej tekstury GPU wyciekają klatka po klatce.
+- **Płótno ma CSS `transform: scaleX(-1)`** — tekst rysowany na nim wychodzi lustrzany.
 
 ## 5. Wydajność
 
-Zmierzone (Chrome, klatka 1280×720, MacBook): pose 10,50 ms + hands 8,28 ms = **18,78 ms/klatkę**. Potwierdzone na żywym ciele: **ani razu poniżej 24 FPS**. Przeplatanie detekcji niepotrzebne.
+Odczyt maski z GPU skaluje się z liczbą pikseli i to ON, nie detekcja, jest kosztem:
+
+| rozdzielczość detekcji | detekcja | odczyt maski | razem |
+|---|---|---|---|
+| 1280×720 | 11,8 | 21,4 | **33,1 ms** — cały budżet 30 FPS |
+| 640×360 | 15,3 | 12,4 | 27,7 ms |
+| **480×270** | ~14 | ~2 | **14,1 ms** ← tu pracujemy |
+| 320×180 | 11,0 | 1,2 | 12,1 ms |
+
+Stąd `SZEROKOSC_DETEKCJI = 480` w `poseTracker.js`. Aura jest rozmyta, więc niska rozdzielczość maski jest niewidoczna. Proporcje bierzemy z **rzeczywistych** `video.videoWidth/Height` — `getUserMedia` prosi przez `ideal` i może oddać 4:3.
 
 ## 6. Testy
 
@@ -95,14 +109,14 @@ node tools/tune-motion.mjs   # strojenie MotionMeter
 
 Testy **nie zastępują** sprawdzenia na żywym ciele — wejściem gry jest strumień z kamery. Do tego służy nakładka debug (`D`).
 
-Strojenie `MotionMeter` opiera się na **zmierzonych** wartościach: stanie w miejscu → 0,00 efektywnych; spokojny taniec → 0,30 zmierzonych (~11 s do pełnej mocy); energiczny → 0,67 (~8 s). Przy zmianie stałych powtórzyć pomiar nakładką.
+Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · kołysanie gładkie 6,1 · kołysanie szarpane 30,4 · wyrzut-stop 27,5. `PROG_SZARPNIECIA` jest z nich wyprowadzony i **wymaga potwierdzenia na żywym ciele**.
+
+**Uwaga przy testach w przeglądarce:** Chrome cache'uje moduły ES heurystycznie po `Last-Modified`. Sam `Cache-Control: no-store` nie unieważnia wpisów zapisanych wcześniej — trzeba wymusić `fetch(url, {cache:'reload'})` albo twarde przeładowanie, inaczej godzinami testuje się stary kod.
 
 ## 7. Dalszy rozwój
 
-1. **Silnik kombosów** — sekwencje znaków w oknie czasowym → techniki
-2. **System efektów** — wiele VFX naraz, wspólny cykl życia
-3. **Rytm i audio** — bęben ~90 BPM, bonus za trafienie w takt
-4. **Oprawa szamańska** — paleta ognia/węgla zamiast obecnego neonu, ognisko u dołu kadru, iskry
-5. **Pełny panteon** — Perun, Weles, Mokosz
+1. **Znaki i kombosy** — moc z płynności jest tym, co je zasila; rejestr czeka odpięty
+2. **Oprawa szamańska** — paleta ognia/węgla, ognisko u dołu kadru
+3. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
 
 *Przy symbolice omijać kołowrót/swarzycę — zostały zawłaszczone przez skrajną prawicę. Celem są i tak autorskie runy.*

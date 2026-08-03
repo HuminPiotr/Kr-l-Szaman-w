@@ -1,14 +1,15 @@
-import { HandTracker } from './handTracker.js';
 import { PoseTracker } from './poseTracker.js';
-import { PowerBall } from './powerBall.js';
-import { Wiatr } from './wiatr.js';
 import { AudioEngine } from './audioEngine.js';
 import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
-import { ZnakRegistry } from './znaki/registry.js';
-import { swarog } from './znaki/swarog.js';
-import { stribog } from './znaki/stribog.js';
+import { Plynnosc } from './plynnosc.js';
+import { Aura } from './aura.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
+
+// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, znaki/*, handTracker.js.
+// Wracają przy znakach i kombosach - moc zbierana tutaj jest właśnie tym,
+// co je zasili. Śledzenie dłoni jest wyłączone, bo ten kawałek go nie
+// potrzebuje, a zwolnione ~8 ms płaci za maskę sylwetki do aury.
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -24,23 +25,20 @@ const video = document.getElementById('webcam');
 const canvas = document.getElementById('output-canvas');
 const ctx = canvas.getContext('2d');
 
-let handTracker = new HandTracker();
 let poseTracker = new PoseTracker();
-let powerBall = null;
-let wiatr = null;
 let audioEngine = new AudioEngine();
 let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
-let znaki = new ZnakRegistry();
+let plynnoscMiara = new Plynnosc();
+let aura = null;
 let lastVideoTime = -1;
 let isRunning = false;
-let lastResults = null;      // wynik HandLandmarker z ostatniej klatki wideo
-let lastPoseResults = null;  // wynik PoseLandmarker z ostatniej klatki wideo
-let lastState = 'CHARGING';
+let lastPoseResults = null;   // wynik PoseLandmarker z ostatniej klatki wideo
 let lastFrameTime = 0;
 
-znaki.zarejestruj(swarog);
-znaki.zarejestruj(stribog);
+// Maska sylwetki, przepisana na CPU. Trzymamy poza wynikiem detekcji, bo
+// obiekt maski trzeba zwolnić od razu po odczycie (patrz pobierzMaske).
+let maskaDane = null, maskaSzer = 0, maskaWys = 0;
 
 // Skalowanie płótna do rozmiarów okna
 function resizeCanvas() {
@@ -58,42 +56,34 @@ startBtn.addEventListener('click', async () => {
     try {
         // 2. Inicjalizacja kamery (WebRTC)
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
+            video: {
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
-                facingMode: 'user' 
+                facingMode: 'user'
             }
         });
         video.srcObject = stream;
-        
+
         // Czekamy na załadowanie metadanych, żeby znać oryginalne wymiary wideo
         await new Promise(resolve => {
             video.onloadedmetadata = () => resolve();
         });
         video.play();
 
-        // 3. Inicjalizacja AI (MediaPipe) - dłonie i ciało równolegle,
-        //    bo to dwa niezależne pobrania modeli
-        await Promise.all([
-            handTracker.initialize(),
-            poseTracker.initialize()
-        ]);
+        // 3. Inicjalizacja AI (MediaPipe)
+        await poseTracker.initialize();
 
-        // 4. Inicjalizacja renderingu Kuli Mocy
-        powerBall = new PowerBall(canvas, ctx);
-        wiatr = new Wiatr(canvas, ctx);
+        // 4. Aura tancerza
+        aura = new Aura(canvas, ctx);
 
         // 5. Inicjalizacja syntezatora audio
         audioEngine.init();
 
-        // Zakończenie ładowania i wyświetlenie HUD-a
         uiLoadingScreen.classList.add('hidden');
         uiInstructionHud.classList.remove('hidden');
         uiEnergyHud.classList.remove('hidden');
 
         isRunning = true;
-        
-        // Startujemy pętlę renderowania (ok. 60 FPS)
         requestAnimationFrame(renderLoop);
 
     } catch (e) {
@@ -105,26 +95,35 @@ startBtn.addEventListener('click', async () => {
 });
 
 /**
- * Buduje kontrakt klatki - jedyny interfejs między trackingiem a resztą gry.
+ * Przepisuje maskę segmentacji z GPU do zwykłej tablicy i ZWALNIA obiekt maski.
  *
- * landmarks     -> przemapowane na płótno, DO RYSOWANIA
- * worldLandmarks-> metryczne 3D, DO WSZYSTKICH POMIARÓW (kształt, prędkość)
- * handedness    -> która to dłoń; dziś nieużywane, ale bez tego lewa i prawa
- *                  nie da się rozróżnić w momencie, gdy zaczną robić różne znaki
+ * Bez close() tekstury GPU zostają przy życiu klatka po klatce - to wyciek,
+ * który przy 30 klatkach na sekundę widać po kilkunastu sekundach.
+ */
+function pobierzMaske(wynik) {
+    const maski = wynik?.segmentationMasks;
+    if (!maski || !maski.length) return;
+    const m = maski[0];
+    try {
+        const dane = m.getAsUint8Array();
+        if (!maskaDane || maskaDane.length !== dane.length) {
+            maskaDane = new Uint8Array(dane.length);
+        }
+        maskaDane.set(dane);
+        maskaSzer = m.width;
+        maskaWys = m.height;
+    } finally {
+        m.close();
+    }
+}
+
+/**
+ * Kontrakt klatki - jedyny interfejs między trackingiem a resztą gry.
+ *
+ * hands zostaje pustą listą, żeby kontrakt się nie zmieniał, gdy dłonie
+ * wrócą razem ze znakami.
  */
 function buildFrame(fit, dt, now) {
-    const hands = [];
-    if (lastResults && lastResults.landmarks) {
-        for (let i = 0; i < lastResults.landmarks.length; i++) {
-            hands.push({
-                landmarks: mapLandmarks(lastResults.landmarks[i], fit),
-                worldLandmarks: lastResults.worldLandmarks?.[i] ?? null,
-                // UWAGA: w tasks-vision 0.10.3 pole nazywa się handednesses (liczba mnoga)
-                handedness: lastResults.handednesses?.[i]?.[0]?.categoryName ?? null
-            });
-        }
-    }
-
     let pose = null;
     if (lastPoseResults?.landmarks?.length) {
         pose = {
@@ -132,155 +131,86 @@ function buildFrame(fit, dt, now) {
             worldLandmarks: lastPoseResults.worldLandmarks?.[0] ?? null
         };
     }
-
-    return { hands, pose, width: canvas.width, height: canvas.height, dt, now };
+    return { hands: [], pose, width: canvas.width, height: canvas.height, dt, now };
 }
 
 function renderLoop(now) {
     if (!isRunning) return;
 
     // Bez wymiarów wideo computeCoverFit dzieli przez zero, ratio robi się
-    // Infinity i WSZYSTKIE przemapowane punkty stają się NaN. Zdarza się zanim
-    // ścieżka kamery się ustabilizuje albo gdy zostanie przerwana.
+    // Infinity i WSZYSTKIE przemapowane punkty stają się NaN.
     if (!video.videoWidth || !video.videoHeight) {
         requestAnimationFrame(renderLoop);
         return;
     }
 
-    // Krok czasu w sekundach - MotionMeter liczy prędkość, więc potrzebuje dt,
-    // a nie założenia o stałych 60 FPS.
     const dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0;
     lastFrameTime = now;
     debugHud.tick(now);
 
-    // --- 1. Rysowanie podglądu z kamery ---
+    // --- 1. Podgląd z kamery ---
     const fit = computeCoverFit(video, canvas);
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Zauważ: canvas jest odwrócony przez CSS (scaleX(-1)),
-    // więc wideo naturalnie działa jak lustro
+    // Płótno jest odwrócone przez CSS (scaleX(-1)), więc wideo działa jak lustro
     drawVideoCover(ctx, video, fit);
 
-    // Nakładamy przyciemniającą nakładkę (overlay) dla kinowego efektu i kontrastu
-    ctx.fillStyle = 'rgba(5, 5, 16, 0.7)';
+    // Przyciemnienie dla kontrastu - aura ma się na czym odcinać
+    ctx.fillStyle = 'rgba(5, 5, 16, 0.55)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // --- 2. Wykrywanie dłoni i ciała ---
-    const startTimeMs = performance.now();
-    // Sprawdzamy nową klatkę wideo
+    // --- 2. Wykrywanie ciała (detekcja idzie na pomniejszonej klatce) ---
     if (video.currentTime !== lastVideoTime) {
         lastVideoTime = video.currentTime;
-        // Synchroniczna detekcja na ramce wideo.
-        // Obie detekcje co klatkę - jeśli pomiar FPS pokaże < 24, dłonie
-        // przechodzą na co 2-3 klatkę (ciało musi zostać co klatkę).
-        lastResults = handTracker.detect(video, startTimeMs);
-        lastPoseResults = poseTracker.detect(video, startTimeMs);
+        lastPoseResults = poseTracker.detect(video, performance.now());
+        pobierzMaske(lastPoseResults);
     }
 
     // --- 3. Kontrakt klatki ---
     const frame = buildFrame(fit, dt, now);
 
-    // --- 4. Ocena znaków ---
-    // Kula czyta wynik SUROWY, bo tak zachowywał się kod przed refaktorem.
-    const wynikiZnakow = znaki.ocen(frame);
+    // --- 4. Płynność ruchu ---
+    // Liczona z SUROWYCH worldLandmarks - filtr Savitzky'ego-Golaya robi
+    // własne wygładzanie. Podanie tu pozycji już wygładzonych przez
+    // MotionMeter zabiłoby sygnał, którego szukamy.
+    const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt);
 
-    // --- 5. Ciągłość ruchu -> moc ---
-    // To jest teraz JEDYNE źródło energii w grze.
-    const moc = motionMeter.update(frame);
+    // --- 5. Ciągłość ruchu razy płynność -> moc ---
+    const moc = motionMeter.update(frame, plynnosc);
 
-    // --- 6. Renderowanie Kuli Mocy ---
-    // Tańczysz -> ładujesz moc. Rzucasz znak -> moc przybiera formę.
-    const mappedLandmarks = frame.hands.map(h => h.landmarks);
-    powerBall.updateAndDraw(mappedLandmarks, canvas.width, canvas.height, moc, wynikiZnakow.swarog);
+    // --- 6. Aura ---
+    aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
+                       moc, plynnosc, fit, dt);
 
-    // --- 6b. Znak Striboga - wiatr. Ta sama zasada: moc x wynik znaku. ---
-    // Wiatr wieje w stronę, w którą wychylona jest dłoń względem środka kadru.
-    const kierunekWiatru = mappedLandmarks.length && mappedLandmarks[0][9].x > 0.5 ? 1 : -1;
-    wiatr.updateAndDraw(moc * wynikiZnakow.stribog, kierunekWiatru);
+    // --- 7. HUD i audio ---
+    const mocPct = Math.round(moc * 100);
+    uiEnergyPercentage.textContent = `${mocPct}%`;
+    uiEnergyFill.style.width = `${mocPct}%`;
+    uiEnergyFill.classList.toggle('charged-glow', moc >= 0.95);
+    document.body.className = moc >= 0.95 ? 'ready-pulse' : '';
 
-    // --- 7. Aktualizacja Interaktywnego HUD oraz Audio ---
-    if (powerBall) {
-        const state = powerBall.state;
-        const energy = powerBall.currentEnergy;
-        // Wynik znaku i liczba dłoni pochodzą teraz wprost z kontraktu klatki
-        // i z rejestru. Wcześniej czytano powerBall.lastEfficiency (nigdy nie
-        // przypisywane) i powerBall.lastHandsLength (właściwość o tej nazwie
-        // nie istnieje - jest lastHandsCount), więc oba były undefined
-        // i trzy komunikaty poniżej były nieosiągalne.
-        const efficiency = wynikiZnakow.swarog;
-        const liczbaDloni = frame.hands.length;
-
-        // Aktualizacja paska postępu
-        const energyPct = Math.round(energy * 100);
-        uiEnergyPercentage.textContent = `${energyPct}%`;
-        uiEnergyFill.style.width = `${energyPct}%`;
-
-        // Kolory i animacje paska
-        if (state === 'READY' || energyPct >= 95) {
-            uiEnergyFill.classList.add('charged-glow');
-        } else {
-            uiEnergyFill.classList.remove('charged-glow');
-        }
-
-        // Efekty tła i winiety
-        if (state === 'READY') {
-            document.body.className = 'ready-pulse';
-        } else if (state === 'COOLDOWN') {
-            document.body.className = 'cooldown-state';
-        } else {
-            document.body.className = '';
-        }
-
-        // Dynamiczne komunikaty instruktażowe.
-        //
-        // REGUŁA: żaden z nich nie może brzmieć jak wytyk. Zamiast mówić, co
-        // gracz robi ŹLE, mówimy, co jest dostępne DALEJ. Nie ma stanu porażki,
-        // więc nie ma komunikatu o porażce.
-        let text = "Tańcz swobodnie — obudź moc 🔥";
-        let icon = "🔥";
-
-        if (state === 'CHARGING') {
-            if (!frame.pose) {
-                text = "Odsuń się, żeby kamera widziała całą sylwetkę 🕺";
-                icon = "🕺";
-            } else if (moc < 0.25) {
-                text = "Tańcz swobodnie — moc budzi się w ruchu 🔥";
-                icon = "🔥";
-            } else if (efficiency < 0.3) {
-                // Moc jest, brakuje formy. To zaproszenie, nie poprawka.
-                text = "Moc płynie! Złóż dłonie w miseczkę, by nadać jej kształt 🙌";
-                icon = "🙌";
-            } else {
-                text = "Kula rośnie! Tańcz dalej 🌀";
-                icon = "🌀";
-            }
-        } else if (state === 'READY') {
-            text = "KULA GOTOWA! Wykonaj zamach i rozszerz dłonie! 💥";
-            icon = "💥";
-        } else if (state === 'FIRING') {
-            text = "WYSTRZAŁ ENERGII! ☄️";
-            icon = "☄️";
-        } else if (state === 'COOLDOWN') {
-            text = "Moc uszła w świat. Tańcz, by zebrać ją na nowo ⏳";
-            icon = "⏳";
-        }
-
-        uiInstructionText.textContent = text;
-        uiInstructionIcon.textContent = icon;
-
-        // Jednorazowe odtworzenie dźwięku wystrzału
-        if (state === 'FIRING' && lastState !== 'FIRING') {
-            audioEngine.playFireSFX(powerBall.flyingBall?.energy ?? energy);
-            // Wystrzał zużywa zapas mocy zebrany tańcem - inaczej można by
-            // strzelać w kółko z jednego naładowania i strzał traci ciężar.
-            motionMeter.zuzyj();
-        }
-        lastState = state;
-
-        // Aktualizacja dźwięków ciągłych
-        audioEngine.update(state, energy, efficiency);
+    // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
+    let text, icon;
+    if (!frame.pose) {
+        text = "Odsuń się, żeby kamera widziała całą sylwetkę 🕺";
+        icon = "🕺";
+    } else if (moc >= 0.95) {
+        text = "Moc wypełniła cię po brzegi ✨";
+        icon = "✨";
+    } else if (plynnoscMiara.aktywnychStawow === 0) {
+        text = "Zacznij się poruszać — moc budzi się w ruchu 🔥";
+        icon = "🔥";
+    } else if (plynnosc > 0.6) {
+        text = "Płyniesz. Moc rośnie 🌀";
+        icon = "🌀";
+    } else {
+        // Zaproszenie, nie poprawka. Nadal ładuje, tylko wolniej.
+        text = "Rozpuść ruch w łagodne łuki, a moc popłynie szybciej 〰️";
+        icon = "〰️";
     }
+    uiInstructionText.textContent = text;
+    uiInstructionIcon.textContent = icon;
+
+    audioEngine.update('CHARGING', moc, plynnosc);
 
     // --- 8. Nakładka diagnostyczna (klawisz D) ---
     debugHud.drawOverlay(ctx, frame);
@@ -290,11 +220,13 @@ function renderLoop(now) {
         predkoscSurowa: motionMeter.predkoscSurowa,
         predkoscEfektywna: motionMeter.predkoscEfektywna,
         szumPunktow: motionMeter.szumPunktow,
-        moc: motionMeter.moc,
-        stan: powerBall ? powerBall.state : '—',
-        znaki: wynikiZnakow
+        moc,
+        plynnosc,
+        szarpniecie: plynnoscMiara.szarpniecie,
+        aktywnychStawow: plynnoscMiara.aktywnychStawow,
+        wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
+        maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak'
     });
 
-    // Zapętlenie
     requestAnimationFrame(renderLoop);
 }

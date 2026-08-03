@@ -55,6 +55,14 @@ const ZANIK_POZA_KADREM = 0.4; // mnożnik: wyjście z kadru zanika WOLNIEJ, bo 
 // na ruch. Zanik ma się włączać przy BEZRUCHU, nie przy "za wolnym" ruchu -
 // inaczej gra mówi "źle" komuś, kto robi dokładnie to, o co prosiliśmy.
 const PROG_BEZRUCHU_MS = 0.08; // poniżej tylu m/s EFEKTYWNYCH gracz stoi
+
+// Udział, jaki ruch szarpany dostaje mimo wszystko. Przy 0.25 szarpany taniec
+// ładuje CZTERY RAZY WOLNIEJ, ale nadal ładuje.
+//
+// To nie jest kara ani próg - to gradient, i tak ma zostać. Zamiana tego na
+// "płynny ruch ładuje, szarpany nie" łamie regułę nadrzędną gry: nic nigdy
+// nie mówi "źle".
+const PODLOGA_PLYNNOSCI = 0.25;
 // Stała czasowa EMA musi być DŁUŻSZA niż jeden cykl ruchu tanecznego (~1 s),
 // inaczej wskaźnik oscyluje wokół podłogi szumu i moc w każdym takcie na
 // przemian rośnie i opada. Przy 60 FPS: tau = dt/alfa ≈ 0.55 s.
@@ -93,13 +101,24 @@ export class MotionMeter {
         this.predkoscSurowa = 0;    // bez wygładzenia - podglądowo
         this.predkoscEfektywna = 0; // po odjęciu podłogi szumu; TA steruje grą
         this.responsywnosc = 0;     // predkoscEfektywna zmapowana na 0..1
+        this.wspolczynnikPlynnosci = 1; // mnożnik tempa ładowania z płynności
         this._wygladzone = null;    // wygładzone pozycje z poprzedniej klatki
         this.szumPunktow = {};      // diagnostyka: prędkość per kończyna [m/s]
     }
 
-    update(frame) {
+    /**
+     * @param {object} frame
+     * @param {number} plynnosc  0..1 z js/plynnosc.js - jak gładki jest ruch.
+     *                           Steruje TEMPEM ładowania, nigdy go nie zeruje.
+     */
+    update(frame, plynnosc = 1) {
         const dt = Math.min(frame.dt, MAX_DT);
         if (dt <= 0) return this.moc;
+
+        // Szarpany ruch ładuje wolniej, nigdy zero.
+        const wsp = PODLOGA_PLYNNOSCI + (1 - PODLOGA_PLYNNOSCI) *
+                    (Number.isFinite(plynnosc) ? Math.max(0, Math.min(1, plynnosc)) : 1);
+        this.wspolczynnikPlynnosci = wsp;
 
         const pose = frame.pose;
 
@@ -126,7 +145,7 @@ export class MotionMeter {
         // Przyrost jest proporcjonalny do ruchu i NIGDY ujemny.
         // Zanik włącza się dopiero poniżej progu bezruchu i narasta płynnie
         // do pełnej wartości przy całkowitym zatrzymaniu.
-        const przyrost = PRZYROST * this.responsywnosc;
+        const przyrost = PRZYROST * this.responsywnosc * wsp;
         const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkoscEfektywna) / PROG_BEZRUCHU_MS);
         const netto = przyrost - ZANIK * bezruch;
 

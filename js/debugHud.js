@@ -124,7 +124,19 @@ export class DebugHud {
             lines.push(`      ${czesci}`);
         }
         if (stats.ruch !== undefined) lines.push(`ruch  ${this._num(stats.ruch)}   ${this._bar(stats.ruch)}`);
+
+        // Płynność i jej surowe źródło. PROG_SZARPNIECIA w js/plynnosc.js
+        // jest zgadnięty - to są liczby, z których się go stroi.
+        // Odniesienie z sygnałów syntetycznych: okrąg 1.5, kołysanie gładkie
+        // 6.1, kołysanie szarpane 30.4, wyrzut-stop 27.5.
+        if (stats.plynnosc !== undefined) {
+            lines.push(`płyn. ${this._num(stats.plynnosc)}   ${this._bar(stats.plynnosc)}`);
+            lines.push(`      szarpnięcie ${this._num(stats.szarpniecie)} /s   stawów ${stats.aktywnychStawow ?? 0}/6`);
+            lines.push(`      tempo ładowania x${this._num(stats.wspPlynnosci)}`);
+        }
+
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
+        if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 
         if (stats.znaki && Object.keys(stats.znaki).length) {
