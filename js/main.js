@@ -257,15 +257,40 @@ function opiszDlonie(frame) {
     return linie;
 }
 
+let bledyPetli = 0, ostatniBladPetli = null;
+
+/**
+ * Pętla renderowania jest ODPORNA na wyjątki i to nie jest ostrożnościowa
+ * ozdoba.
+ *
+ * Wyjątek w dowolnym podsystemie leciał wcześniej przed requestAnimationFrame
+ * na końcu funkcji, więc pętla przestawała się przeplanowywać i CAŁA GRA
+ * zamierała na ostatniej klatce - bez komunikatu, bez śladu na ekranie.
+ * Zdarzyło się to naprawdę: literówka w nazwie metody (motionMeter.pobierz,
+ * której nigdy nie było) zawieszała grę w chwili zapalenia ognia i wyglądało
+ * to jak zwis, a nie jak błąd.
+ *
+ * Teraz błąd jest GŁOŚNY (konsola + nakładka), ale gra żyje dalej.
+ * Przeplanowanie idzie przez finally, więc żadna ścieżka wyjścia go nie omija.
+ */
 function renderLoop(now) {
     if (!isRunning) return;
+    try {
+        klatka(now);
+    } catch (e) {
+        bledyPetli++;
+        ostatniBladPetli = e?.message ?? String(e);
+        if (bledyPetli === 1) console.error('Błąd w pętli renderowania:', e);
+    } finally {
+        if (isRunning) requestAnimationFrame(renderLoop);
+    }
+}
+
+function klatka(now) {
 
     // Bez wymiarów wideo computeCoverFit dzieli przez zero, ratio robi się
     // Infinity i WSZYSTKIE przemapowane punkty stają się NaN.
-    if (!video.videoWidth || !video.videoHeight) {
-        requestAnimationFrame(renderLoop);
-        return;
-    }
+    if (!video.videoWidth || !video.videoHeight) return;
 
     const dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0;
     lastFrameTime = now;
@@ -364,9 +389,12 @@ function renderLoop(now) {
 
     // --- 7b. Płonący palec ---
     // Technika kanałowana: zjada moc tak długo, jak gracz ją prowadzi.
-    // Pobranie idzie przez motionMeter, żeby moc miała JEDNEGO właściciela.
-    const pobor = plonacyPalec.update(frame, moc, dt);
-    if (pobor > 0) motionMeter.pobierz(pobor);
+    // Pobranie idzie przez motionMeter.zuzyj(), żeby moc miała JEDNEGO
+    // właściciela. zuzyj() przyjmuje koszt częściowy, więc nie trzeba tu
+    // osobnej metody - technika zwraca, ile chce pobrać, i nie sięga do
+    // this.moc sama.
+    const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
+    if (pobor > 0) motionMeter.zuzyj(pobor);
 
     ogien.updateAndDraw(
         ctx,
@@ -437,6 +465,7 @@ function renderLoop(now) {
         szarpniecie: plynnoscMiara.szarpniecie,
         aktywnychStawow: plynnoscMiara.aktywnychStawow,
         zaWolno: plynnoscMiara.zaWolno,
+        bledyPetli, ostatniBladPetli,
         ogien: { stan: plonacyPalec.stan, wskazanie: plonacyPalec.wskazanie,
                  czastki: ogien.liczba },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
@@ -452,5 +481,4 @@ function renderLoop(now) {
         bufor: kombosy.bufor.map(w => w.id).join(' → ') || '—'
     });
 
-    requestAnimationFrame(renderLoop);
 }

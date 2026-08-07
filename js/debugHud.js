@@ -98,12 +98,19 @@ export class DebugHud {
             ? hands.map(h => `${h.handedness ?? '?'}${h.worldLandmarks ? '+w' : '-w'}`).join(' ')
             : '—';
 
-        const lines = [
+        const lines = [];
+        // Błąd w pętli jest GŁOŚNY. Wcześniej wyjątek zabijał całą pętlę
+        // w ciszy i wyglądało to jak zwis aplikacji.
+        if (stats.bledyPetli) {
+            lines.push(`⚠ BŁĄD PĘTLI x${stats.bledyPetli}: ${stats.ostatniBladPetli}`);
+            lines.push('');
+        }
+        lines.push(
             `FPS   ${fps.toFixed(1).padStart(5)}   ${this._bar(fps / 60)}${fps < 24 ? '  ⚠ PONIŻEJ 24' : ''}`,
             `pose  ${pose ? 'TAK' : 'NIE '}${pose?.worldLandmarks ? ' +world' : ' -world'}    dłonie ${hands.length}`,
             `ręce  ${rece}`,
             ''
-        ];
+        );
 
         // Prędkość wygładzona jest tym, co naprawdę steruje grą - surowa tylko
         // podglądowo. Min/max podtrzymane, bo z chwilowej wartości nic się nie
