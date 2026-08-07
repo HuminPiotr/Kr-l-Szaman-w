@@ -4,12 +4,19 @@ import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
 import { Aura } from './aura.js';
+import { ZnakRegistry } from './znaki/registry.js';
+import { perun } from './znaki/perun.js';
+import { mokosz } from './znaki/mokosz.js';
+import { weles } from './znaki/weles.js';
+import { SkladaniePieczeci } from './pieczecie.js';
+import { KomboSilnik } from './kombosy.js';
+import { Efekty } from './efekty.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 
-// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, znaki/*, handTracker.js.
-// Wracają przy znakach i kombosach - moc zbierana tutaj jest właśnie tym,
-// co je zasili. Śledzenie dłoni jest wyłączone, bo ten kawałek go nie
-// potrzebuje, a zwolnione ~8 ms płaci za maskę sylwetki do aury.
+// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, handTracker.js.
+// swarog.js i stribog.js też czekają - są dowodem, że rejestr obsługuje
+// wymaga:'hands', i ożyją same, gdy śledzenie dłoni wróci. Dłonie są
+// wyłączone, bo zwolnione ~8 ms płaci za maskę sylwetki do aury.
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -31,6 +38,19 @@ let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
 let plynnoscMiara = new Plynnosc();
 let aura = null;
+
+let znaki = new ZnakRegistry();
+znaki.zarejestruj(perun);
+znaki.zarejestruj(mokosz);
+znaki.zarejestruj(weles);
+let skladanie = new SkladaniePieczeci();
+let kombosy = new KomboSilnik();
+let efekty = new Efekty();
+
+// Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
+// zamiast natychmiast wracać do zaproszenia do tańca.
+let ostatniKomunikat = null, ostatniKomunikatDo = 0;
+
 let lastVideoTime = -1;
 let isRunning = false;
 let lastPoseResults = null;   // wynik PoseLandmarker z ostatniej klatki wideo
@@ -174,12 +194,46 @@ function renderLoop(now) {
     // MotionMeter zabiłoby sygnał, którego szukamy.
     const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt);
 
-    // --- 5. Ciągłość ruchu razy płynność -> moc ---
-    const moc = motionMeter.update(frame, plynnosc);
+    // --- 5. Postawy i składanie pieczęci ---
+    // KOLEJNOŚĆ MA ZNACZENIE: składanie musi policzyć się PRZED mocą, bo
+    // to ono decyduje, czy zanik jest w tej klatce zamrożony.
+    const postawy = znaki.ocen(frame);
+    const skl = skladanie.update(postawy, motionMeter.moc, dt);
 
-    // --- 6. Aura ---
+    // --- 6. Ciągłość ruchu razy płynność -> moc ---
+    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik);
+
+    // --- 6a. Pieczęć się złożyła ---
+    if (skl.zlozona) {
+        motionMeter.zuzyj(skl.zlozona.koszt);
+        efekty.odpal(skl.zlozona.id);
+        aura.rozblysk(1);
+        // playFireSFX, NIE update('FIRING'): 'FIRING' tylko WYCISZA hum
+        // (audioEngine.js:100-103), a klatkę później update('CHARGING') na
+        // dole pętli i tak go przywraca - pieczęć wyszłaby bezgłośna.
+        // Argument steruje wysokością startową, więc pieczęć brzmi lżej
+        // niż technika.
+        audioEngine.playFireSFX(0.3);
+
+        const technika = kombosy.dodaj(skl.zlozona.id, now);
+        if (technika) {
+            efekty.odpal(technika.id);
+            aura.rozblysk(1);
+            audioEngine.playFireSFX(1.0);
+            ostatniKomunikat = `${technika.nazwa} ✨`;
+        } else {
+            const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
+            ostatniKomunikat = `${znak?.nazwa ?? 'Pieczęć'} złożona`;
+        }
+        ostatniKomunikatDo = now + 1600;
+    }
+
+    // --- 7. Aura ---
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
                        moc, plynnosc, fit, dt);
+
+    // --- 7a. Efekty pieczęci i technik ---
+    efekty.updateAndDraw(ctx, frame, dt);
 
     // --- 7. HUD i audio ---
     const mocPct = Math.round(moc * 100);
@@ -190,11 +244,21 @@ function renderLoop(now) {
 
     // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
     let text, icon;
-    if (!frame.pose) {
+    if (ostatniKomunikat && now < ostatniKomunikatDo) {
+        text = ostatniKomunikat;
+        icon = "✨";
+    } else if (!frame.pose) {
         text = "Odsuń się, żeby kamera widziała całą sylwetkę 🕺";
         icon = "🕺";
+    } else if (skl.brakMocy) {
+        // ZAPROSZENIE, nie odmowa. Nigdy "za mało mocy" ani "nie stać cię".
+        text = "Pieczęć czeka — tańcz jeszcze chwilę 🔥";
+        icon = "🔥";
+    } else if (skl.skladana) {
+        text = "Trzymaj — pieczęć się składa 🌀";
+        icon = "🌀";
     } else if (moc >= 0.95) {
-        text = "Moc wypełniła cię po brzegi ✨";
+        text = "Moc wypełniła cię po brzegi — układaj pieczęcie ✨";
         icon = "✨";
     } else if (plynnoscMiara.aktywnychStawow === 0) {
         text = "Zacznij się poruszać — moc budzi się w ruchu 🔥";
@@ -228,7 +292,12 @@ function renderLoop(now) {
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
-        maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak'
+        maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
+        postawy,
+        skladana: skl.skladana,
+        postep: skl.postep,
+        brakMocy: skl.brakMocy,
+        bufor: kombosy.bufor.map(w => w.id).join(' → ') || '—'
     });
 
     requestAnimationFrame(renderLoop);

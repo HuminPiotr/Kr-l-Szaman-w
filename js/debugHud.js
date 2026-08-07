@@ -145,6 +145,18 @@ export class DebugHud {
         }
 
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
+        // Wyniki postaw i stan pierścienia. Progi w pieczecie.js są ZGADNIĘTE
+        // i stroi się je właśnie stąd - liczba "0.62" przy konkretnej pozycji
+        // ciała jest jedynym sposobem, żeby ustawić PROG_POSTAWY sensownie.
+        if (stats.postawy) {
+            const p = Object.entries(stats.postawy)
+                .map(([k, v]) => `${k.slice(0, 3)} ${this._num(v)}`).join('  ');
+            lines.push(`znak  ${p}`);
+            const cel = stats.skladana ?? '—';
+            lines.push(`pieczęć ${cel}  ${this._num(stats.postep ?? 0)}  ${this._bar(stats.postep ?? 0)}${stats.brakMocy ? '  ⏳ brak mocy' : ''}`);
+            lines.push(`kombo ${stats.bufor ?? '—'}`);
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 

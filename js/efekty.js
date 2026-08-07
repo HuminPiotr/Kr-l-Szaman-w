@@ -66,8 +66,15 @@ function rysuj(ctx, def, p, alfa, lm, W, H) {
 
     // Zaczepienia. Bez pozy efekt trafia w środek kadru - lepszy efekt
     // nie na miejscu niż brak efektu i wrażenie, że gest nie zadziałał.
+    //
+    // MNOŻENIE PRZEZ W I H JEST KONIECZNE. mapLandmarks() zwraca wartości
+    // ZNORMALIZOWANE (0..1) względem płótna, nie piksele. Bez tego ctx.arc()
+    // dostawał x=0.5, czyli pół piksela od krawędzi - a przy CSS scaleX(-1)
+    // wszystkie efekty zaczepione w ciele zbierały się w prawym górnym rogu.
+    // Zmyliło to, że fallbacki poniżej są już w pikselach (W * 0.35), więc
+    // kod wyglądał spójnie.
     const p2 = (i, zx, zy) => (lm && lm[i] && Number.isFinite(lm[i].x))
-        ? { x: lm[i].x, y: lm[i].y } : { x: zx, y: zy };
+        ? { x: lm[i].x * W, y: lm[i].y * H } : { x: zx, y: zy };
     const sr = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
     switch (def.ksztalt) {
