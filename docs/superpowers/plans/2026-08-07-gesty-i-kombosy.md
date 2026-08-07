@@ -1288,6 +1288,11 @@ spr(`potrójny rozbłysk nie wychodzi ponad 1 (${a2._impuls.toFixed(2)})`, a2._i
 console.log('\nWYDATEK CZYTA SIĘ JAK WYŁADOWANIE:');
 // Scenariusz właściwy: pełna moc, złożenie pieczęci (moc -10% + rozbłysk).
 // Jasność efektywna zaraz po pieczęci musi być WYŻSZA niż przed nią.
+//
+// Suma _moc + _impuls jest DOKŁADNIE tym, czym steruje renderer - dlatego
+// mocEfektywna w aura.js nie jest clampowana do 1. Gdyby była, ten test
+// mierzyłby liczbę, której rysowanie nigdy nie widzi, i przechodziłby
+// przy zupełnie martwym efekcie.
 const a3 = nowa();
 przepusc(a3, 1.0, 3);                       // aura dogoniła pełną moc
 const przed = a3._moc + a3._impuls;
@@ -1367,7 +1372,17 @@ tym:
 
 ```js
         // Jasnością steruje moc POWIĘKSZONA o impuls, nie moc surowa.
-        const mocEfektywna = Math.min(1, this._moc + this._impuls);
+        //
+        // BEZ CLAMPU DO 1, i to jest celowe. Przy pełnym pasku _moc ≈ 1, więc
+        // Math.min(1, ...) zjadałby CAŁY impuls: pieczęć rzucona z pełnej mocy
+        // dawałaby zmianę jasności o 0.2%, a potem zejście do 0.9. Dokładnie ta
+        // inwersja, przed którą broni impuls - i to w najczęstszym momencie
+        // rzucania, bo HUD wprost zaprasza wtedy do układania pieczęci.
+        //
+        // Sprawdzone przy skrajnej wartości 2.0: jasność HSL 76% (poprawna),
+        // mnożnik rozmycia 1.55 (szersza poświata - o to chodzi), globalAlpha
+        // 0.77 i 0.29 (obie pod 1 i tak już clampowane niżej). Nic nie przepełnia.
+        const mocEfektywna = this._moc + this._impuls;
 
         if (!maska || !szer || !wys || mocEfektywna < 0.01) return;
 ```
