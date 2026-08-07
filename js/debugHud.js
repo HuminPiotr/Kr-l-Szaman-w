@@ -177,6 +177,13 @@ export class DebugHud {
             for (const l of stats.dlonie) lines.push(`  ${l}`);
         }
 
+        // Stan techniki kanałowanej i liczba cząsteczek - ta druga pilnuje
+        // klatkażu, bo ogień jest pierwszą rzeczą w tej grze, która może go zjeść.
+        if (stats.ogien) {
+            lines.push(`ogień ${stats.ogien.stan}  wskazanie ${this._num(stats.ogien.wskazanie)}` +
+                       `  cząstek ${stats.ogien.czastki}`);
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 

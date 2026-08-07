@@ -12,6 +12,8 @@ import { swarogDlon } from './znaki/swarogDlon.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
+import { Ogien } from './ogien.js';
+import { PlonacyPalec } from './plonacyPalec.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
@@ -57,6 +59,8 @@ znaki.zarejestruj(swarogDlon);
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 let efekty = new Efekty();
+let ogien = new Ogien();
+let plonacyPalec = new PlonacyPalec();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -339,6 +343,9 @@ function renderLoop(now) {
         if (technika) {
             efekty.odpal(technika.id);
             aura.rozblysk(1);
+            // Kombos uzbraja płonący palec. Bez licznika ważności - licznik
+            // byłby presją ("szybciej!"), a to ma być relaks.
+            plonacyPalec.uzbrój();
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
         } else {
@@ -354,6 +361,21 @@ function renderLoop(now) {
 
     // --- 7a. Efekty pieczęci i technik ---
     efekty.updateAndDraw(ctx, frame, dt);
+
+    // --- 7b. Płonący palec ---
+    // Technika kanałowana: zjada moc tak długo, jak gracz ją prowadzi.
+    // Pobranie idzie przez motionMeter, żeby moc miała JEDNEGO właściciela.
+    const pobor = plonacyPalec.update(frame, moc, dt);
+    if (pobor > 0) motionMeter.pobierz(pobor);
+
+    ogien.updateAndDraw(
+        ctx,
+        plonacyPalec.zaczep
+            ? { x: plonacyPalec.zaczep.x * canvas.width, y: plonacyPalec.zaczep.y * canvas.height }
+            : null,
+        plonacyPalec.sila,
+        dt
+    );
 
     // --- 7. HUD i audio ---
     const mocPct = Math.round(moc * 100);
@@ -415,6 +437,8 @@ function renderLoop(now) {
         szarpniecie: plynnoscMiara.szarpniecie,
         aktywnychStawow: plynnoscMiara.aktywnychStawow,
         zaWolno: plynnoscMiara.zaWolno,
+        ogien: { stan: plonacyPalec.stan, wskazanie: plonacyPalec.wskazanie,
+                 czastki: ogien.liczba },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,

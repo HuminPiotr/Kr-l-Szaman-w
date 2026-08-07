@@ -14,7 +14,9 @@ To pierwszy efekt w tej grze, który jest **stanem trwałym i interaktywnym**, a
 - **Żar zostaje w powietrzu** za palcem i dopala się ~1,5 s. To jest „malowanie ogniem" i nagradza płynny, zamaszysty ruch — czyli to samo, co gra już mierzy.
 - **Palec ponad barkiem to warunek ZAPŁONU, nie trzymania.** Po zapaleniu można wodzić palcem gdziekolwiek, także nisko. Trzymanie ręki w górze przez 30 s bolałoby, a to ma być relaks.
 - **Kombos nie ma terminu ważności.** Po złożeniu gracz jest „gotowy" bez licznika — licznik to presja, a tego unikamy.
-- **Złożenie palca tylko WSTRZYMUJE płomień.** Podniesienie zapala go z powrotem. Technika kończy się wyłącznie wyczerpaniem mocy, nigdy pomyłką ręki. Reguła nadrzędna (GEMINI.md §2).
+- **Złożenie palca KOŃCZY technikę.** Decyzja właściciela gry, podjęta po pierwszym szkicu, w którym złożenie palca tylko wstrzymywało płomień.
+
+  Uzasadnienie warte zapisania, bo dotyczy reguły nadrzędnej: **zakończenie techniki własnym ruchem to nie kara, to KONTROLA.** Reguła „nic nie mówi źle" chroni gracza przed ocenianiem, a nie przed wpływem na to, co się dzieje. Pauza odbierałaby możliwość zgaszenia ognia, kiedy się chce. Reguła nie jest kartą przebijającą każdy inny wzgląd i nie należy jej tak stosować.
 
 ---
 
@@ -54,17 +56,17 @@ Wymaga obu trackerów naraz — dłoni na palec i pozy na barki. Oba już są w 
 ### Stany
 
 ```
-GOTOWY      (po kombosie, bez licznika)
-  │  palec wysunięty nad bark
+BEZCZYNNY   brak kombosa
+  │  kombos (uzbrojenie, BEZ licznika)
   ▼
-PLONIE  ←──────────────┐  moc spada
-  │  palec złożony     │  łagodne wygaszanie
-  ▼                    │
-WSTRZYMANY ────────────┘
-  │  moc = 0
+GOTOWY
+  │  jeden palec wysunięty, opuszek NAD LINIĄ BARKÓW
   ▼
-WYCZERPANY  (potrzebny nowy kombos)
+PLONIE ──── palec schowany ────▶ BEZCZYNNY
+       ──── moc wyczerpana ────▶ BEZCZYNNY
 ```
+
+Po zapaleniu można wodzić palcem gdziekolwiek — „nad barkiem" dotyczy tylko zapłonu.
 
 ---
 
@@ -87,7 +89,8 @@ Bez kamery (`sh tools/test-wszystko.sh` — 12 istniejących testów musi dalej 
 1. **Bez kombosa palec nad barkiem NIE zapala** ognia.
 2. **Po kombosie zapala**, i to bez względu na to, ile czasu minęło (brak licznika).
 3. **Moc spada w tempie ~1/30 na sekundę** płonięcia; przy zerowej mocy technika się kończy.
-4. **Złożenie palca wstrzymuje, nie kończy** — podniesienie zapala z powrotem, o ile moc została.
+4. **Złożenie palca KOŃCZY technikę** i nie wraca ona sama — potrzebny nowy kombos.
+4b. **Po zapaleniu opuszczenie ręki nie gasi** — „nad barkiem" to warunek zapłonu, nie trzymania.
 5. **Dwa wyprostowane palce nie zapalają** (warunek to DOKŁADNIE jeden).
 6. **Klatka z NaN i brak pozy** — zero, nie wyjątek.
 
