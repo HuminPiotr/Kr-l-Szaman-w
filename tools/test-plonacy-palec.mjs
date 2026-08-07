@@ -20,6 +20,24 @@ const WSKAZUJE = [1, 0, 1, 1, 1];
 const DWA_PALCE = [1, 0, 0, 1, 1];
 const PIESC = [1, 1, 1, 1, 1];
 
+/** Klatka z DWIEMA dłońmi: jedna wysoko, druga nisko przy ciele. */
+function klatkaDwieDlonie({ oyGora = 0.25, oyDol = 0.75, zgieciaGora = WSKAZUJE,
+                            zgieciaDol = WSKAZUJE, barki = 0.5 } = {}) {
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: barki, z: 0, visibility: 0.9 }));
+    lm[BARK_L] = { x: 0.42, y: barki, z: 0, visibility: 0.9 };
+    lm[BARK_P] = { x: 0.58, y: barki, z: 0, visibility: 0.9 };
+    return {
+        hands: [
+            { landmarks: dlon({ ox: 0.62, oy: oyGora, zgiecia: zgieciaGora, skala: S }),
+              worldLandmarks: lm, handedness: 'Right' },
+            { landmarks: dlon({ ox: 0.35, oy: oyDol, zgiecia: zgieciaDol, skala: S }),
+              worldLandmarks: lm, handedness: 'Left' }
+        ],
+        pose: { landmarks: lm, worldLandmarks: lm },
+        width: 1920, height: 1080, dt: DT, now: 0
+    };
+}
+
 /** Klatka BEZ ŻADNEJ dłoni - tak wygląda przeskok trackingu. */
 function klatkaBezDloni(barki = 0.5) {
     const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: barki, z: 0, visibility: 0.9 }));
@@ -68,12 +86,36 @@ for (let i = 0; i < 30; i++) t3.update(klatka({ oy: 0.8 }), 1.0, DT);
 spr(`palec PONIŻEJ barków nie zapala (${t3.stan})`, t3.stan === 'GOTOWY');
 
 // --- 4. Po zapaleniu można opuścić rękę ---
+// Ręka opuszcza się PŁYNNIE, przez pół sekundy. Poprzednia wersja testu
+// teleportowała ją w jednej klatce, czego prawdziwa ręka nie zrobi - i przez
+// to nie wyłapywała, czy ogranicznik przeskoku zaczepu jest sensowny.
 const t4 = new PlonacyPalec();
 t4.uzbrój();
 t4.update(klatka(), 1.0, DT);
-for (let i = 0; i < 60; i++) t4.update(klatka({ oy: 0.8 }), 1.0, DT);
+for (let i = 0; i <= 30; i++) {
+    t4.update(klatka({ oy: 0.25 + (0.8 - 0.25) * (i / 30) }), 1.0, DT);
+}
 spr(`po zapaleniu opuszczenie ręki NIE gasi (${t4.stan}) - "nad barkiem" to warunek zapłonu`,
     t4.stan === 'PLONIE');
+for (let i = 0; i < 30; i++) t4.update(klatka({ oy: 0.8 }), 1.0, DT);
+spr(`  ...i płonie dalej z ręką nisko (${t4.stan})`, t4.stan === 'PLONIE');
+
+// --- 4b. SZYBKI ZAMACH nie zrywa płomienia ---
+// Wodzenie palcem jest sednem tej techniki, więc ogranicznik przeskoku
+// zaczepu musi przepuszczać naprawdę szybki ruch.
+const t4b = new PlonacyPalec();
+t4b.uzbrój();
+t4b.update(klatka(), 1.0, DT);
+let zerwania = 0;
+for (let i = 0; i < 180; i++) {
+    // pełna szerokość kadru w ~0.25 s, tam i z powrotem
+    const faza = Math.sin(i * DT * Math.PI * 4);
+    const f = klatka({ oy: 0.3 });
+    for (const p of f.hands[0].landmarks) p.x += faza * 0.35;
+    t4b.update(f, 1.0, DT);
+    if (t4b.stan !== 'PLONIE') { zerwania++; break; }
+}
+spr(`3 s szybkiego zamachu palcem nie zrywa płomienia (${t4b.stan})`, zerwania === 0);
 
 // --- 5. SCHOWANIE PALCA KOŃCZY - decyzja właściciela gry ---
 const t5 = new PlonacyPalec();
@@ -124,6 +166,39 @@ const sekundy5c = klatekDoZgaszenia * DT;
 console.log(`  schowanie palca gasi po ${sekundy5c.toFixed(2)} s`);
 spr('schowanie palca gasi szybko (< 0.25 s) - nadal czuje się natychmiastowe', sekundy5c < 0.25);
 spr('  ...i wyraźnie szybciej niż zanik trackingu (0.7 s)', sekundy5c < 0.7);
+
+// --- 5d. PŁOMIEŃ TRZYMA SIĘ RĘKI, KTÓRA GO ZAPALIŁA ---
+// Zgłoszone z testu: przy dwóch dłoniach ogień przeskakiwał na palec drugiej,
+// opuszczonej ręki. Zaczep był wybierany od nowa w każdej klatce.
+console.log('\nDWIE DŁONIE W KADRZE:');
+const t5d = new PlonacyPalec();
+t5d.uzbrój();
+
+// Obie ręce wskazują, ale tylko górna jest nad barkiem
+for (let i = 0; i < 5; i++) t5d.update(klatkaDwieDlonie(), 1.0, DT);
+spr(`zapala się od ręki NAD barkiem (${t5d.stan})`, t5d.stan === 'PLONIE');
+const yGora = t5d.zaczep.y;
+spr(`  ...zaczep jest wysoko (y=${yGora.toFixed(2)}), nie przy opuszczonej ręce`, yGora < 0.45);
+
+// 3 sekundy z obiema dłońmi widocznymi - płomień NIE MOŻE przeskoczyć w dół
+let przeskoki = 0;
+for (let i = 0; i < 180; i++) {
+    t5d.update(klatkaDwieDlonie(), 1.0, DT);
+    if (t5d.zaczep && t5d.zaczep.y > 0.55) przeskoki++;
+}
+spr(`3 s z dwiema dłońmi -> ${przeskoki} przeskoków na opuszczoną rękę (ma być 0)`, przeskoki === 0);
+spr(`  ...i ogień nadal płonie (${t5d.stan})`, t5d.stan === 'PLONIE');
+
+// Gdy górna ręka schowa palec, ogień gaśnie - NIE przenosi się na dolną
+const t5e = new PlonacyPalec();
+t5e.uzbrój();
+for (let i = 0; i < 5; i++) t5e.update(klatkaDwieDlonie(), 1.0, DT);
+spr(`(druga próba) płonie (${t5e.stan})`, t5e.stan === 'PLONIE');
+for (let i = 0; i < 60; i++) {
+    t5e.update(klatkaDwieDlonie({ zgieciaGora: PIESC }), 1.0, DT);
+}
+spr(`schowanie GÓRNEGO palca gasi, nie przenosi ognia na dolną rękę (${t5e.stan})`,
+    t5e.stan === 'BEZCZYNNY');
 
 // --- 6. Dwa palce nie zapalają ---
 const t6 = new PlonacyPalec();
