@@ -43,8 +43,20 @@ export const NAZWY_PALCOW = ['kciuk', 'wskazujacy', 'srodkowy', 'serdeczny', 'ma
 // Prostota palca: |nasada→opuszek| / (suma długości członów).
 // 1.0 = idealnie prosty, mniej = zgięty. Ta sama miara, którą perun.js
 // stosuje do ramienia - działa bez znajomości skali i bez osi Z.
-const PROSTY_MIN = 0.80;
-const PROSTY_PELNY = 0.96;
+// Zakres CELOWO szeroki. Wąski (0.80-0.96) dawał skok wyniku 0.48 między
+// krokami zwijania palca - czyli próg, nie rampę. Reguła nadrzędna wymaga,
+// żeby palec zwinięty w połowie dawał połowę wyniku.
+const PROSTY_MIN = 0.62;
+const PROSTY_PELNY = 0.97;
+
+// Ile palców musi być złożonych, żeby uznać dłoń za pięść.
+//
+// Zakres CELOWO szeroki. Przy wąskim (0.45-0.85) wynik trzymał zero do
+// połowy zwinięcia, a potem przeskakiwał o 0.3 na krok - czyli próg, nie
+// rampa. Dłoń zwinięta w połowie ma dawać połowę wyniku (reguła nadrzędna),
+// więc pieczęć składa się wtedy wolniej, a nie wcale.
+const ZWINIETA_MIN = 0.22;
+const ZWINIETA_PELNA = 0.97;
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -106,12 +118,29 @@ export function odlegloscNadgarstkow(a, b) {
     return dist(a[NADGARSTEK], b[NADGARSTEK]) / skala;
 }
 
-/** Średnia odległość opuszek jednej dłoni od odpowiadających opuszek drugiej. */
+/**
+ * Odległość między ŚRODKAMI CIĘŻKOŚCI opuszek obu dłoni, w skalach dłoni.
+ *
+ * Świadomie NIE parujemy palca ze palcem. Kuszące "wskazujący do wskazującego"
+ * jest kruche: w namiocie (pieczęć Konia) dłonie są obrócone palcami ku sobie
+ * i widziane niemal z profilu, więc wachlarz palców schodzi w GŁĘBIĘ, której
+ * nie mierzymy. Sprawdzone na dłoni syntetycznej: przy odbiciu lustrzanym małe
+ * palce niemal się stykały (0.03), a kciuki były 0.23 od siebie - średnia z par
+ * dawała 1.43 i namiot nie dawał się złożyć, mimo że wyglądał poprawnie.
+ *
+ * Środek ciężkości odpowiada wprost na pytanie "czy opuszki zeszły się razem"
+ * i nie zależy od tego, który palec spotyka który.
+ */
 export function zbieznoscOpuszek(a, b) {
     const skala = (skalaDloni(a) + skalaDloni(b)) / 2;
-    let suma = 0;
-    for (const i of OPUSZKI) suma += dist(a[i], b[i]);
-    return (suma / OPUSZKI.length) / skala;
+    return dist(srodekOpuszek(a), srodekOpuszek(b)) / skala;
+}
+
+/** Środek ciężkości pięciu opuszek jednej dłoni. */
+export function srodekOpuszek(lm) {
+    let x = 0, y = 0;
+    for (const i of OPUSZKI) { x += lm[i].x; y += lm[i].y; }
+    return { x: x / OPUSZKI.length, y: y / OPUSZKI.length };
 }
 
 /**
@@ -134,6 +163,29 @@ export function skierowanaWGore(lm) {
 export function rownolegle(a, b) {
     const ka = kierunekDloni(a), kb = kierunekDloni(b);
     return Math.max(0, ka.x * kb.x + ka.y * kb.y);
+}
+
+/**
+ * Ciągłe "mieści się w przedziale", 0..1. Narasta od `od`, spada za `do`.
+ *
+ * Potrzebne, bo część warunków ma DWIE granice, nie jedną. Odległość dłoni
+ * w Tygrysie jest tego przykładem: za blisko i detektor gubi jedną dłoń
+ * (zmierzone: przy maksymalnym ścisku), za daleko i to już nie jest pieczęć.
+ */
+export function pasmo(v, od, doPelni, odSpadku, doZera) {
+    return Math.min(rampa(v, od, doPelni), 1 - rampa(v, odSpadku, doZera));
+}
+
+/**
+ * Zwinięcie dłoni w pięść, 0..1 - odwrotność wyprostowania.
+ *
+ * Kciuk POMIJANY. To najmniej pewny punkt na dłoni, a w pięści bywa i schowany,
+ * i położony na wierzchu palców - oba układy są poprawną pięścią.
+ */
+export function zwinieta(lm) {
+    const w = wzorPalcow(lm);
+    const bezKciuka = (w[1] + w[2] + w[3] + w[4]) / 4;
+    return rampa(1 - bezKciuka, ZWINIETA_MIN, ZWINIETA_PELNA);
 }
 
 /** Rozstaw opuszek w obrębie JEDNEJ dłoni, w skalach dłoni (dla Striboga). */

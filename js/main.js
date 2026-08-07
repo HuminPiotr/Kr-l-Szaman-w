@@ -6,9 +6,9 @@ import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
 import { Aura } from './aura.js';
 import { ZnakRegistry } from './znaki/registry.js';
-import { perun } from './znaki/perun.js';
-import { mokosz } from './znaki/mokosz.js';
-import { weles } from './znaki/weles.js';
+import { welesDlon } from './znaki/welesDlon.js';
+import { perunDlon } from './znaki/perunDlon.js';
+import { swarogDlon } from './znaki/swarogDlon.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -47,9 +47,13 @@ let plynnoscMiara = new Plynnosc();
 let aura = null;
 
 let znaki = new ZnakRegistry();
-znaki.zarejestruj(perun);
-znaki.zarejestruj(mokosz);
-znaki.zarejestruj(weles);
+// Pieczęcie DŁONIOWE. Postawy ciała (perun.js, mokosz.js, weles.js) zostają
+// na dysku - działały, ale wymagały kadru z barkami I biodrami plus zapasem,
+// czego kamera laptopa nie daje. Trójka jest rozdzielana LICZBĄ WYPROSTOWANYCH
+// PALCÓW: Weles 0, Perun 4, Swaróg 10 - nie do pomylenia.
+znaki.zarejestruj(welesDlon);
+znaki.zarejestruj(perunDlon);
+znaki.zarejestruj(swarogDlon);
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 let efekty = new Efekty();

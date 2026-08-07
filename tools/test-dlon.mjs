@@ -19,37 +19,7 @@ import { wzorPalcow, ileWyprostowanych, skalaDloni, skierowanaWGore,
          odlegloscNadgarstkow, rownolegle, pelnaDlon, NAZWY_PALCOW }
   from '../js/znaki/dlon.js';
 import { PALCE, NADGARSTEK } from '../js/znaki/dlon.js';
-
-// Dłoń jako PRAWDZIWY ŁAŃCUCH KINEMATYCZNY: każdy staw wychodzi z poprzedniego,
-// obrócony o kąt zgięcia. Poprzednia wersja rozkładała punkty promieniście od
-// nadgarstka, więc "pięść" w ogóle się nie zwijała i test niczego nie dowodził.
-// zgiecie: 0 = palec prosty, 1 = zwinięty (~90 stopni na staw).
-function dlon({ ox = 0.5, oy = 0.6, zgiecia = [0,0,0,0,0], skala = 0.1, obrot = 0 } = {}) {
-  const lm = Array.from({ length: 21 }, () => ({ x: ox, y: oy, z: 0 }));
-  lm[NADGARSTEK] = { x: ox, y: oy, z: 0 };
-
-  NAZWY_PALCOW.forEach((nazwa, fi) => {
-    const idx = PALCE[nazwa];
-    const bok = (fi - 2) * skala * 0.32;
-    // Nasada palca: odsunięta od nadgarstka w górę i w bok
-    let x = ox + bok * Math.cos(obrot) - skala * 0.9 * Math.sin(obrot);
-    let y = oy + bok * Math.sin(obrot) - skala * 0.9 * Math.cos(obrot);
-    lm[idx[0]] = { x, y, z: 0 };
-
-    let kat = -Math.PI / 2 + obrot;          // -90 stopni = w gore (os Y rosnie w dol)
-    const dlSegm = skala * 0.42;
-    for (let k = 1; k < idx.length; k++) {
-      kat += zgiecia[fi] * (Math.PI / 2);    // zgiecie na KAZDYM stawie
-      x += Math.cos(kat) * dlSegm;
-      y += Math.sin(kat) * dlSegm;
-      lm[idx[k]] = { x, y, z: 0 };
-    }
-  });
-
-  // Nasada srodkowego palca wyznacza skale i kierunek dloni
-  lm[9] = { x: ox - skala * Math.sin(obrot), y: oy - skala * Math.cos(obrot), z: 0 };
-  return lm;
-}
+import { dlon } from './_dlon-syntetyczna.mjs';
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };

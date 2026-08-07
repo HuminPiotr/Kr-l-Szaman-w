@@ -20,8 +20,11 @@
 const OKNO_MS = 4000;
 
 export const KOMBOSY = [
-    { id: 'gromWZiemie',  nazwa: 'Grom w Ziemię',  sekwencja: ['perun', 'mokosz'] },
-    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['mokosz', 'weles'] }
+    // Swaróg -> Perun: ogień, potem piorun. To także najwygodniejsza para do
+    // złożenia po sobie - z namiotu (10 palców) do Tygrysa (4) wystarczy
+    // złożyć kciuk, serdeczny i mały.
+    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun'] },
+    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['weles', 'swarog'] }
 ];
 
 export class KomboSilnik {

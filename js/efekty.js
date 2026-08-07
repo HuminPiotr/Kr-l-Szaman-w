@@ -11,20 +11,35 @@
  * Płótno ma CSS scaleX(-1), więc kształty wychodzą poprawnie, a tekstu
  * tutaj nie rysujemy (wyszedłby lustrzany - GEMINI.md:88).
  */
-import { NADG_L, NADG_P, BARK_L, BARK_P, BIODRO_L, BIODRO_P } from './znaki/postawa.js';
-
-// Punkty MediaPipe używane wyłącznie do zaczepienia efektu.
-const KOSTKA_L = 27, KOSTKA_P = 28;
+// ZACZEPIENIE W DŁONIACH, nie w kostkach.
+//
+// Kostki na kamerze laptopa po prostu nie ma w kadrze, więc efekty spadały na
+// pozycje zastępcze i gracz zgłosił, że "efekt nie powala". Dłonie są zawsze
+// w kadrze, zawsze w centrum uwagi i to z nich składa się pieczęć - efekt
+// wychodzący z palców czyta się nieporównanie lepiej niż elipsa u stóp.
+function srodekDloni(frame, W, H) {
+    const h = (frame.hands ?? []).filter(d => d.landmarks?.[0] && Number.isFinite(d.landmarks[0].x));
+    if (!h.length) return { x: W * 0.5, y: H * 0.45 };
+    let x = 0, y = 0, n = 0;
+    for (const d of h) {
+        // Środek między nadgarstkiem a nasadą środkowego palca - stabilniejszy
+        // niż opuszki, które przy składaniu pieczęci mocno się przemieszczają.
+        x += (d.landmarks[0].x + d.landmarks[9].x) / 2;
+        y += (d.landmarks[0].y + d.landmarks[9].y) / 2;
+        n++;
+    }
+    return { x: (x / n) * W, y: (y / n) * H };
+}
 
 export const TABELA = {
     // Pieczęcie - LEKKIE. Mają być przyjemne, nie efektowne; efektowność
     // jest nagrodą za kombo.
-    perun:  { barwa: '50, 100%, 92%', ksztalt: 'promien',       czas: 0.7 },
-    mokosz: { barwa: '120, 60%, 62%', ksztalt: 'pierscienStop', czas: 0.9 },
-    weles:  { barwa: '280, 70%, 58%', ksztalt: 'sciagniecie',   czas: 0.9 },
+    perun:  { barwa: '50, 100%, 92%',  ksztalt: 'promien',     czas: 0.7 },
+    swarog: { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },
+    weles:  { barwa: '280, 70%, 58%',  ksztalt: 'sciagniecie', czas: 0.9 },
 
     // Techniki - MOCNE. Odpalają się gratis, jako nagroda za ułożenie.
-    gromWZiemie:  { barwa: '50, 100%, 95%', ksztalt: 'blyskIFala', czas: 1.4 },
+    gromWOgniu:   { barwa: '35, 100%, 92%', ksztalt: 'blyskIFala', czas: 1.4 },
     zewPodziemia: { barwa: '285, 75%, 48%', ksztalt: 'mglaIMrok',  czas: 1.8 }
 };
 
@@ -55,13 +70,14 @@ export class Efekty {
             // Postęp 0..1 i obwiednia: szybki narost, powolne wygasanie.
             const p = Math.min(1, e.t / e.czas);
             const alfa = Math.sin(Math.pow(1 - p, 0.6) * Math.PI * 0.5);
-            rysuj(ctx, def, p, alfa, lm, frame.width, frame.height);
+            rysuj(ctx, def, p, alfa, lm, frame.width, frame.height,
+                  srodekDloni(frame, frame.width, frame.height));
         }
         ctx.restore();
     }
 }
 
-function rysuj(ctx, def, p, alfa, lm, W, H) {
+function rysuj(ctx, def, p, alfa, lm, W, H, zaczep) {
     const kolor = (a) => `hsla(${def.barwa}, ${a.toFixed(3)})`;
 
     // Zaczepienia. Bez pozy efekt trafia w środek kadru - lepszy efekt
@@ -75,24 +91,20 @@ function rysuj(ctx, def, p, alfa, lm, W, H) {
     // kod wyglądał spójnie.
     const p2 = (i, zx, zy) => (lm && lm[i] && Number.isFinite(lm[i].x))
         ? { x: lm[i].x * W, y: lm[i].y * H } : { x: zx, y: zy };
-    const sr = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
     switch (def.ksztalt) {
         case 'promien': {
-            // Pionowa smuga wzdłuż WYŻEJ uniesionej dłoni.
-            const a = p2(NADG_L, W * 0.35, H * 0.3);
-            const b = p2(NADG_P, W * 0.65, H * 0.3);
-            const dlon = a.y < b.y ? a : b;
-            const g = ctx.createLinearGradient(dlon.x, 0, dlon.x, dlon.y);
+            // Pionowa smuga w górę od dłoni.
+            const g = ctx.createLinearGradient(zaczep.x, 0, zaczep.x, zaczep.y);
             g.addColorStop(0, kolor(0));
             g.addColorStop(1, kolor(alfa * 0.85));
             ctx.fillStyle = g;
-            ctx.fillRect(dlon.x - W * 0.012, 0, W * 0.024, dlon.y);
+            ctx.fillRect(zaczep.x - W * 0.012, 0, W * 0.024, zaczep.y);
             break;
         }
-        case 'pierscienStop': {
-            // Elipsa rozchodząca się od linii kostek.
-            const s = sr(p2(KOSTKA_L, W * 0.45, H * 0.9), p2(KOSTKA_P, W * 0.55, H * 0.9));
+        case 'pierscien': {
+            // Pierścień rozchodzący się od dłoni.
+            const s = zaczep;
             const r = W * (0.05 + 0.20 * p);
             ctx.strokeStyle = kolor(alfa * 0.7);
             ctx.lineWidth = Math.max(1, H * 0.008 * (1 - p * 0.6));
@@ -102,9 +114,8 @@ function rysuj(ctx, def, p, alfa, lm, W, H) {
             break;
         }
         case 'sciagniecie': {
-            // Pierścień ZBIEGAJĄCY się do środka tułowia - odwrotność Mokoszy.
-            const s = sr(sr(p2(BARK_L, W * 0.45, H * 0.35), p2(BARK_P, W * 0.55, H * 0.35)),
-                         sr(p2(BIODRO_L, W * 0.46, H * 0.6), p2(BIODRO_P, W * 0.54, H * 0.6)));
+            // Pierścień ZBIEGAJĄCY się do dłoni - odwrotność Swaroga.
+            const s = zaczep;
             const r = W * (0.28 * (1 - p) + 0.02);
             ctx.strokeStyle = kolor(alfa * 0.8);
             ctx.lineWidth = Math.max(1, H * 0.012 * p);
@@ -114,10 +125,10 @@ function rysuj(ctx, def, p, alfa, lm, W, H) {
             break;
         }
         case 'blyskIFala': {
-            // Błysk całego kadru gaśnie szybko, fala idzie dalej od stóp.
+            // Błysk całego kadru gaśnie szybko, fala rozchodzi się od dłoni.
             ctx.fillStyle = kolor(alfa * 0.28 * Math.max(0, 1 - p * 3));
             ctx.fillRect(0, 0, W, H);
-            const s = sr(p2(KOSTKA_L, W * 0.45, H * 0.9), p2(KOSTKA_P, W * 0.55, H * 0.9));
+            const s = zaczep;
             const r = W * (0.05 + 0.85 * p);
             ctx.strokeStyle = kolor(alfa * 0.9);
             ctx.lineWidth = Math.max(1, H * 0.02 * (1 - p));
