@@ -26,6 +26,16 @@ const GLEBIA_TETNA = 0.13;      // jak mocno tętno zmienia jasność
 
 const TAU_WYGLADZANIA = 0.5;    // s - wszystkie wielkości sterujące
 
+// IMPULS WYŁADOWANIA. Bez niego każda pieczęć PRZYGASZAŁABY aurę o swój
+// koszt - czyli zabierała dokładnie to, co taniec zarobił, a wielokrotne
+// rzucanie dawałoby coraz ciemniejszego szamana. Aura jest deklarowaną
+// nagrodą całej gry (GEMINI.md:7, 37), więc odwracamy odczyt: wydatek ma
+// wyglądać jak WYŁADOWANIE, po którym aura wraca, nie jak strata.
+//
+// Stała musi być KRÓTSZA niż odbudowa mocy tańcem (~8 s), inaczej impuls
+// przestaje się czytać jako impuls i zlewa się z ładowaniem.
+const TAU_IMPULSU = 0.45;
+
 // Trzy przebiegi. Rozmycie samo w sobie wypuszcza poświatę poza obrys ciała,
 // więc nie trzeba rysować maski powiększonej.
 //
@@ -53,8 +63,15 @@ export class Aura {
         this._pracaCtx = null;
 
         this._moc = 0;
+        this._impuls = 0;
         this._plynnosc = 1;
         this._faza = 0;
+    }
+
+    /** Pieczęć się złożyła - aura wylewa się w efekt i wraca. */
+    rozblysk(sila = 1) {
+        const s = Number.isFinite(sila) ? Math.max(0, sila) : 0;
+        this._impuls = Math.min(1, this._impuls + s);
     }
 
     /**
@@ -74,7 +91,25 @@ export class Aura {
 
         this._faza = (this._faza + dt / OKRES_TETNA_S) % 1;
 
-        if (!maska || !szer || !wys || this._moc < 0.01) return;
+        // Rozpad MUSI być przed wczesnym powrotem niżej - inaczej impuls
+        // zamarza, gdy maski chwilowo nie ma, i wraca jako przebłysk.
+        this._impuls *= Math.max(0, 1 - dt / TAU_IMPULSU);
+        if (!Number.isFinite(this._impuls)) this._impuls = 0;
+
+        // Jasnością steruje moc POWIĘKSZONA o impuls, nie moc surowa.
+        //
+        // BEZ CLAMPU DO 1, i to jest celowe. Przy pełnym pasku _moc ≈ 1, więc
+        // Math.min(1, ...) zjadałby CAŁY impuls: pieczęć rzucona z pełnej mocy
+        // dawałaby zmianę jasności o 0.2%, a potem zejście do 0.9. Dokładnie ta
+        // inwersja, przed którą broni impuls - i to w najczęstszym momencie
+        // rzucania, bo HUD wprost zaprasza wtedy do układania pieczęci.
+        //
+        // Sprawdzone przy skrajnej wartości 2.0: jasność HSL 76% (poprawna),
+        // mnożnik rozmycia 1.55 (szersza poświata - o to chodzi), globalAlpha
+        // 0.77 i 0.29 (obie pod 1 i tak już clampowane niżej). Nic nie przepełnia.
+        const mocEfektywna = this._moc + this._impuls;
+
+        if (!maska || !szer || !wys || mocEfektywna < 0.01) return;
 
         this._przygotujPlotna(szer, wys);
         this._wypelnijMaske(maska, szer, wys);
@@ -91,7 +126,7 @@ export class Aura {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
-        const jasnosc = 40 + this._moc * 18;
+        const jasnosc = 40 + mocEfektywna * 18;
         const kolor = `hsl(${h}, ${s}%, ${jasnosc}%)`;
         const pc = this._pracaCtx;
         const pw = this._praca.width, ph = this._praca.height;
@@ -101,7 +136,7 @@ export class Aura {
             // przeskalowanie na pełny ekran dogładza wynik za darmo.
             pc.globalCompositeOperation = 'source-over';
             pc.clearRect(0, 0, pw, ph);
-            pc.filter = `blur(${(p.rozmycie * (0.45 + this._moc * 0.55)).toFixed(1)}px)`;
+            pc.filter = `blur(${(p.rozmycie * (0.45 + mocEfektywna * 0.55)).toFixed(1)}px)`;
             pc.drawImage(this._maska, 0, 0);
             pc.filter = 'none';
 
@@ -125,7 +160,7 @@ export class Aura {
             // przez zwykłe drawImage(0, 0, canvas.width, canvas.height)
             // rozciągnęłoby ją na całe płótno i aura usiadłaby OBOK ciała -
             // subtelnie przy 16:9, fatalnie przy każdym innym kształcie okna.
-            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * this._moc * tetno));
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * mocEfektywna * tetno));
             ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
         }
 
@@ -139,7 +174,7 @@ export class Aura {
         pc.fillStyle = kolor;
         pc.fillRect(0, 0, pw, ph);
         pc.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * this._moc * tetno));
+        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * mocEfektywna * tetno));
         ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
 
         ctx.globalAlpha = 1;
