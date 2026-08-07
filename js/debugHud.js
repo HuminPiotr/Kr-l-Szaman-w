@@ -187,8 +187,13 @@ export class DebugHud {
         // Stan techniki kanałowanej i liczba cząsteczek - ta druga pilnuje
         // klatkażu, bo ogień jest pierwszą rzeczą w tej grze, która może go zjeść.
         if (stats.ogien) {
-            lines.push(`ogień ${stats.ogien.stan}  wskazanie ${this._num(stats.ogien.wskazanie)}` +
-                       `  cząstek ${stats.ogien.czastki}`);
+            // Dwa RÓŻNE sygnały: "wskazanie" decyduje o ZAPŁONIE (dokładnie
+            // jeden palec), "utrzym." o tym, czy ogień PŁONIE DALEJ (sam palec
+            // nadal wyprostowany). Rozdzielenie ich było naprawą tego, że
+            // płomień gasł za łatwo - iloczyn w ocenie zapłonu jest bezlitosny.
+            lines.push(`ogień ${stats.ogien.stan}  cząstek ${stats.ogien.czastki}`);
+            lines.push(`      zapłon ${this._num(stats.ogien.wskazanie)} (prog 0.55)` +
+                       `   utrzym. ${this._num(stats.ogien.utrzymanie)} (prog 0.30)`);
             // Zwłoka pokazuje, że technika PRZECZEKUJE przeskok trackingu,
             // zamiast się kończyć. Bez tego nie widać, że osłona działa.
             if (stats.ogien.powodZwloki) {

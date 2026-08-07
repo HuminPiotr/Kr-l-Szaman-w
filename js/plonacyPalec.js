@@ -53,8 +53,25 @@ import { pelnaDlon, wzorPalcow, OPUSZKI } from './znaki/dlon.js';
 import { BARK_L, BARK_P } from './znaki/postawa.js';
 
 // ZGADNIĘTE - potwierdzić z nakładki (klawisz D).
-const PROG_WSKAZANIA = 0.55;   // "dokładnie jeden palec wyprostowany"
-const PROG_UTRZYMANIA = 0.35;  // histereza: poniżej tego technika się kończy
+//
+// ZAPŁON i UTRZYMANIE mają RÓŻNE kryteria, i to jest istotne.
+//
+// Zapłon pyta "czy wystawiasz DOKŁADNIE JEDEN palec" - iloczyn wyprostowania
+// najwyższego palca i złożenia pozostałych. To surowe, bo zapłon ma być
+// świadomym gestem.
+//
+// Utrzymanie pyta tylko "czy ten palec NADAL jest wyprostowany". Zgłoszone
+// z testu: płomień gasł za łatwo nawet bez szybkiego ruchu. Powód - iloczyn
+// jest bezlitosny. Przy palcu 0.9 i niedokładnie zwiniętym środkowym 0.6
+// wynik to 0.36, czyli tuż nad starym progiem 0.35; wystarczyło drgnięcie
+// oświetlenia. A prawdziwa dłoń nigdy nie zwija palców idealnie.
+//
+// Raz zapalony ogień gasi więc dopiero ZŁOŻENIE PALCA - nie rozluźnienie
+// pozostałych. Zaciśnięcie dłoni w pięść zbija wyprostowanie do zera i
+// kończy technikę, tak jak ma być.
+const PROG_WSKAZANIA = 0.55;      // zapłon: "dokładnie jeden palec"
+const PROG_UTRZYMANIA = 0.30;     // utrzymanie: sam palec nadal wyprostowany
+const ALFA_UTRZYMANIA = 0.35;     // wygładzanie, żeby jedna klatka szumu nie liczyła się
 const NAD_BARKIEM = 0.02;      // ile ponad linią barków, w wysokościach kadru
 
 // Pełny pasek mocy na 30 s ognia. To ma być hojne: ogień jest nagrodą,
@@ -63,7 +80,11 @@ const KOSZT_NA_SEKUNDE = 1 / 30;
 
 // Zwłoki przed zakończeniem techniki. Rozdzielone, bo rozdzielone są przyczyny.
 const ZWLOKA_BRAK_DLONI = 0.7;   // s - tracking zgubiony, czekamy na powrót
-const ZWLOKA_ZLOZENIA = 0.16;    // s - świadome schowanie palca
+// 0.16 s było za krótkie: każde drgnięcie odczytu gasiło ogień. Ale samo
+// wygładzanie sygnału utrzymania daje już ~0.15 s odporności, więc zwłoka
+// nie musi być długa - razem wychodzi ~0.4 s od zaciśnięcia pięści do
+// zgaszenia, co nadal czyta się jako reakcja na gest, nie jako opóźnienie.
+const ZWLOKA_ZLOZENIA = 0.25;    // s - świadome schowanie palca
 
 // Jak szybko zaczep może się przemieszczać, w znormalizowanych jednostkach
 // kadru na sekundę. Ogranicznik NIE jest po to, żeby spowolnić płomień -
@@ -99,6 +120,7 @@ export class PlonacyPalec {
         this.powodZwloki = null; // 'brak dłoni' | 'palec złożony' - do nakładki
         this._reka = null;       // stronność ręki, która zapaliła ogień
         this._czasNiewidzenia = 0; // ile trwa brak JAKIEJKOLWIEK dłoni [s]
+        this._utrzymanie = 0;      // wygładzone wyprostowanie płonącego palca
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności. */
@@ -147,6 +169,7 @@ export class PlonacyPalec {
                 this.sila = 1;
                 this.zwloka = 0;
                 this.powodZwloki = null;
+                this._utrzymanie = zapalny.wyprost;
             }
             return 0;
         }
@@ -158,12 +181,21 @@ export class PlonacyPalec {
         }
 
         const dalszy = this._kontynuacja(kandydaci, krok);
-        if (dalszy) {
+
+        // Wygładzenie: jedna zaszumiona klatka nie może decydować o zgaszeniu.
+        const alfa = Math.min(1, krok / 0.05) * ALFA_UTRZYMANIA;
+        this._utrzymanie += alfa * ((dalszy ? dalszy.wyprost : 0) - this._utrzymanie);
+
+        if (dalszy || this._utrzymanie >= PROG_UTRZYMANIA) {
             // Palec na miejscu - zerujemy zwłokę i przesuwamy zaczep.
             this.zwloka = 0;
             this.powodZwloki = null;
-            this.zaczep = dalszy.opuszek;
-            if (dalszy.reka) this._reka = dalszy.reka;
+            if (dalszy) {
+                this.zaczep = dalszy.opuszek;
+                if (dalszy.reka) this._reka = dalszy.reka;
+            }
+            // Bez kandydata zaczep zostaje na ostatniej pozycji - wygładzony
+            // sygnał utrzymania niesie technikę przez pojedyncze przeskoki.
         } else {
             // Palca nie widać. ROZRÓŻNIAMY, dlaczego.
             this.powodZwloki = maDlonie ? 'palec złożony' : 'brak dłoni';
@@ -191,6 +223,7 @@ export class PlonacyPalec {
         this.powodZwloki = null;
         this._reka = null;
         this._czasNiewidzenia = 0;
+        this._utrzymanie = 0;
     }
 
     /**
@@ -208,7 +241,8 @@ export class PlonacyPalec {
         let wybrany = null, najlepszaKara = Infinity;
 
         for (const k of kandydaci) {
-            if (k.wynik < PROG_UTRZYMANIA) continue;
+            // UTRZYMANIE patrzy na samo wyprostowanie palca, nie na iloczyn.
+            if (k.wyprost < PROG_UTRZYMANIA) continue;
 
             const d = Math.hypot(k.opuszek.x - this.zaczep.x, k.opuszek.y - this.zaczep.y);
             if (d > limit) continue;   // za daleko - to nie ta sama ręka
@@ -250,7 +284,10 @@ export class PlonacyPalec {
 
             const idx = OPUSZKI[i1];
             out.push({
+                // Do ZAPŁONU: czy wystawiony jest dokładnie jeden palec.
                 wynik: v1 * (1 - v2),
+                // Do UTRZYMANIA: czy ten palec jest nadal wyprostowany.
+                wyprost: v1,
                 opuszek: { x: d.landmarks[idx].x, y: d.landmarks[idx].y },
                 reka: d.handedness ?? null
             });

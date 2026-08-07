@@ -122,7 +122,9 @@ const t5 = new PlonacyPalec();
 t5.uzbrój();
 t5.update(klatka(), 1.0, DT);
 spr(`płonie przed schowaniem (${t5.stan})`, t5.stan === 'PLONIE');
-for (let i = 0; i < 20; i++) t5.update(klatka({ zgiecia: PIESC }), 1.0, DT);
+// 60 klatek = 1 s. Utrzymanie jest wygładzane, więc zgaszenie zajmuje ~0.4 s -
+// celowo, bo przy 0.16 s każde drgnięcie odczytu gasiło ogień.
+for (let i = 0; i < 60; i++) t5.update(klatka({ zgiecia: PIESC }), 1.0, DT);
 spr(`schowanie palca KOŃCZY technikę (${t5.stan})`, t5.stan === 'BEZCZYNNY');
 for (let i = 0; i < 20; i++) t5.update(klatka(), 1.0, DT);
 spr(`  ...i nie wraca samo - potrzebny nowy kombos (${t5.stan})`, t5.stan === 'BEZCZYNNY');
@@ -164,8 +166,10 @@ while (t5c.stan === 'PLONIE' && klatekDoZgaszenia < 120) {
 }
 const sekundy5c = klatekDoZgaszenia * DT;
 console.log(`  schowanie palca gasi po ${sekundy5c.toFixed(2)} s`);
-spr('schowanie palca gasi szybko (< 0.25 s) - nadal czuje się natychmiastowe', sekundy5c < 0.25);
-spr('  ...i wyraźnie szybciej niż zanik trackingu (0.7 s)', sekundy5c < 0.7);
+// Celowo NIE jest to natychmiastowe. Sygnał utrzymania jest wygładzany, bo
+// przy natychmiastowej reakcji płomień gasł od drgnięć odczytu, nie od gestu.
+spr('schowanie palca gasi w rozsądnym czasie (< 0.6 s)', sekundy5c < 0.6);
+spr('  ...i wyraźnie szybciej niż zanik trackingu (0.7 s + wygładzanie)', sekundy5c < 0.75);
 
 // --- 5d. PŁOMIEŃ TRZYMA SIĘ RĘKI, KTÓRA GO ZAPALIŁA ---
 // Zgłoszone z testu: przy dwóch dłoniach ogień przeskakiwał na palec drugiej,
@@ -194,7 +198,7 @@ const t5e = new PlonacyPalec();
 t5e.uzbrój();
 for (let i = 0; i < 5; i++) t5e.update(klatkaDwieDlonie(), 1.0, DT);
 spr(`(druga próba) płonie (${t5e.stan})`, t5e.stan === 'PLONIE');
-for (let i = 0; i < 60; i++) {
+for (let i = 0; i < 90; i++) {
     t5e.update(klatkaDwieDlonie({ zgieciaGora: PIESC }), 1.0, DT);
 }
 spr(`schowanie GÓRNEGO palca gasi, nie przenosi ognia na dolną rękę (${t5e.stan})`,
