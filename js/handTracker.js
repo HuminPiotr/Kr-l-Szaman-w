@@ -17,9 +17,20 @@ export class HandTracker {
             },
             runningMode: "VIDEO",
             numHands: 2, // Potrzebujemy dwóch dłoni do wygenerowania kuli
-            minHandDetectionConfidence: 0.6,
-            minHandPresenceConfidence: 0.6,
-            minTrackingConfidence: 0.6
+            // Progi OBNIŻONE względem pierwotnych 0.6.
+            //
+            // Zgłoszone z testu: przy słabym świetle wykrywanie dłoni
+            // przeskakuje - dłoń znika na moment i wraca. Niższy próg
+            // utrzymania każe trackerowi trzymać się dłoni dłużej, zamiast
+            // porzucać ją przy pierwszym gorszym odczycie.
+            //
+            // Kosztem jest więcej drgań i sporadyczne fałszywe wykrycia, ale
+            // dla tej gry CIĄGŁOŚĆ jest ważniejsza od precyzji: pieczęcie
+            // rozdziela liczba palców (0/4/10), więc drgania ich nie pomylą,
+            // a przeskok trackingu gasił technikę w środku zabawy.
+            minHandDetectionConfidence: 0.45,
+            minHandPresenceConfidence: 0.4,
+            minTrackingConfidence: 0.35
         });
         
         return true;

@@ -25,6 +25,17 @@
  * i słuszna: zakończenie techniki własnym ruchem to nie kara, to KONTROLA.
  * Pauza odbierałaby graczowi możliwość zgaszenia ognia, kiedy chce.
  *
+ * ALE: "palec schowany" i "tracking się zgubił" to DWA RÓŻNE SYGNAŁY i nie
+ * wolno ich mylić. Zgłoszone z testu: przy słabym świetle wykrywanie dłoni
+ * przeskakuje - dłoń znika na moment i wraca. Traktowanie tego jak schowania
+ * palca kończyło technikę bez woli gracza, po kilku sekundach ognia.
+ *
+ *   dłoń widoczna, palec zwinięty  ->  gracz CHCIAŁ skończyć  -> krótka zwłoka
+ *   dłoni nie ma wcale             ->  tracking się ZGUBIŁ    -> długa zwłoka
+ *
+ * Krótka zwłoka istnieje tylko po to, żeby jedna zaszumiona klatka nie gasiła
+ * ognia; jest na tyle mała, że zgaszenie nadal czuje się natychmiastowe.
+ *
  * "Nad barkiem" to warunek ZAPŁONU, nie trzymania. Po zapaleniu można wodzić
  * palcem gdziekolwiek, także nisko - trzymanie ręki w górze przez pół minuty
  * bolałoby, a to ma być relaks.
@@ -41,6 +52,10 @@ const NAD_BARKIEM = 0.02;      // ile ponad linią barków, w wysokościach kadr
 // a nie zasobem do oszczędzania.
 const KOSZT_NA_SEKUNDE = 1 / 30;
 
+// Zwłoki przed zakończeniem techniki. Rozdzielone, bo rozdzielone są przyczyny.
+const ZWLOKA_BRAK_DLONI = 0.7;   // s - tracking zgubiony, czekamy na powrót
+const ZWLOKA_ZLOZENIA = 0.16;    // s - świadome schowanie palca
+
 // Palce liczone bez kciuka - jak we wszystkich pieczęciach. Kciuk jest
 // najmniej pewnym punktem dłoni, a wskazywanie z odstawionym kciukiem
 // jest całkowicie naturalne.
@@ -52,6 +67,8 @@ export class PlonacyPalec {
         this.zaczep = null;      // {x, y} w znormalizowanych koordynatach płótna
         this.sila = 0;           // 0..1 - do sterowania ogniem
         this.wskazanie = 0;      // diagnostyka: jak wyraźnie jeden palec wystaje
+        this.zwloka = 0;         // ile już czekamy na powrót palca [s]
+        this.powodZwloki = null; // 'brak dłoni' | 'palec złożony' - do nakładki
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności. */
@@ -84,22 +101,36 @@ export class PlonacyPalec {
                 this.stan = 'PLONIE';
                 this.zaczep = w.opuszek;
                 this.sila = 1;
+                this.zwloka = 0;
+                this.powodZwloki = null;
             }
             return 0;
         }
 
         // PLONIE
-        if (!w || w.wynik < PROG_UTRZYMANIA) {
-            // Palec schowany - koniec techniki. Reszta mocy zostaje graczowi.
-            this._zgas();
-            return 0;
-        }
         if (!(moc > 0)) {
             this._zgas();
             return 0;
         }
 
-        this.zaczep = w.opuszek;
+        if (w && w.wynik >= PROG_UTRZYMANIA) {
+            // Palec na miejscu - zerujemy zwłokę i przesuwamy zaczep.
+            this.zwloka = 0;
+            this.powodZwloki = null;
+            this.zaczep = w.opuszek;
+        } else {
+            // Palca nie widać. ROZRÓŻNIAMY, dlaczego.
+            const maDlonie = (frame.hands ?? []).some(d => pelnaDlon(d.landmarks));
+            this.powodZwloki = maDlonie ? 'palec złożony' : 'brak dłoni';
+            this.zwloka += krok;
+
+            if (this.zwloka > (maDlonie ? ZWLOKA_ZLOZENIA : ZWLOKA_BRAK_DLONI)) {
+                this._zgas();
+                return 0;
+            }
+            // Zaczep zostaje na ostatniej znanej pozycji - płomień czeka
+            // w miejscu, zamiast skakać albo gasnąć na czas przeskoku trackingu.
+        }
         // Siła słabnie razem z resztką mocy - płomień dopala się, zamiast
         // zniknąć w jednej klatce.
         this.sila = Math.max(0.25, Math.min(1, moc * 3));
@@ -111,6 +142,8 @@ export class PlonacyPalec {
         this.stan = 'BEZCZYNNY';
         this.zaczep = null;
         this.sila = 0;
+        this.zwloka = 0;
+        this.powodZwloki = null;
     }
 
     /**

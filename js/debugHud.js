@@ -189,6 +189,11 @@ export class DebugHud {
         if (stats.ogien) {
             lines.push(`ogień ${stats.ogien.stan}  wskazanie ${this._num(stats.ogien.wskazanie)}` +
                        `  cząstek ${stats.ogien.czastki}`);
+            // Zwłoka pokazuje, że technika PRZECZEKUJE przeskok trackingu,
+            // zamiast się kończyć. Bez tego nie widać, że osłona działa.
+            if (stats.ogien.powodZwloki) {
+                lines.push(`      przeczekuje: ${stats.ogien.powodZwloki} ${stats.ogien.zwloka.toFixed(2)} s`);
+            }
         }
 
         if (stats.maska) lines.push(`maska ${stats.maska}`);

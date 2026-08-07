@@ -20,6 +20,15 @@ const WSKAZUJE = [1, 0, 1, 1, 1];
 const DWA_PALCE = [1, 0, 0, 1, 1];
 const PIESC = [1, 1, 1, 1, 1];
 
+/** Klatka BEZ ŻADNEJ dłoni - tak wygląda przeskok trackingu. */
+function klatkaBezDloni(barki = 0.5) {
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: barki, z: 0, visibility: 0.9 }));
+    lm[BARK_L] = { x: 0.42, y: barki, z: 0, visibility: 0.9 };
+    lm[BARK_P] = { x: 0.58, y: barki, z: 0, visibility: 0.9 };
+    return { hands: [], pose: { landmarks: lm, worldLandmarks: lm },
+             width: 1920, height: 1080, dt: DT, now: 0 };
+}
+
 /** Klatka z dłonią i barkami. oy przesuwa dłoń w pionie względem barków. */
 function klatka({ zgiecia = WSKAZUJE, oy = 0.25, barki = 0.5, brakPozy = false } = {}) {
     const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: barki, z: 0, visibility: 0.9 }));
@@ -75,6 +84,46 @@ for (let i = 0; i < 20; i++) t5.update(klatka({ zgiecia: PIESC }), 1.0, DT);
 spr(`schowanie palca KOŃCZY technikę (${t5.stan})`, t5.stan === 'BEZCZYNNY');
 for (let i = 0; i < 20; i++) t5.update(klatka(), 1.0, DT);
 spr(`  ...i nie wraca samo - potrzebny nowy kombos (${t5.stan})`, t5.stan === 'BEZCZYNNY');
+
+// --- 5b. PRZESKOK TRACKINGU nie kończy techniki ---
+// Zgłoszone z testu: przy słabym świetle dłoń znika na moment i wraca.
+// Traktowanie tego jak schowania palca gasiło ogień bez woli gracza.
+console.log('\nPRZESKOK TRACKINGU (dłoń znika i wraca):');
+const t5b = new PlonacyPalec();
+t5b.uzbrój();
+t5b.update(klatka(), 1.0, DT);
+const zaczepPrzed = { ...t5b.zaczep };
+
+// 0.35 s bez ŻADNEJ dłoni - typowy przeskok
+for (let i = 0; i < 21; i++) t5b.update(klatkaBezDloni(), 1.0, DT);
+spr(`0.35 s bez dłoni NIE gasi (${t5b.stan}, przeczekuje ${t5b.zwloka.toFixed(2)} s jako "${t5b.powodZwloki}")`,
+    t5b.stan === 'PLONIE');
+spr('  ...a płomień czeka na ostatniej znanej pozycji, nie skacze',
+    t5b.zaczep && Math.abs(t5b.zaczep.x - zaczepPrzed.x) < 1e-9);
+
+// Dłoń wraca - ogień płonie dalej, jakby nic się nie stało
+t5b.update(klatka(), 1.0, DT);
+spr(`powrót dłoni kontynuuje ogień (${t5b.stan}, zwłoka ${t5b.zwloka.toFixed(2)})`,
+    t5b.stan === 'PLONIE' && t5b.zwloka === 0);
+
+// Ale DŁUGI brak dłoni już kończy - gracz naprawdę wyszedł z kadru
+for (let i = 0; i < 60; i++) t5b.update(klatkaBezDloni(), 1.0, DT);
+spr(`1 s bez dłoni KOŃCZY (${t5b.stan}) - to już nie przeskok, to wyjście z kadru`,
+    t5b.stan === 'BEZCZYNNY');
+
+// --- 5c. Świadome schowanie palca jest SZYBSZE niż zanik trackingu ---
+const t5c = new PlonacyPalec();
+t5c.uzbrój();
+t5c.update(klatka(), 1.0, DT);
+let klatekDoZgaszenia = 0;
+while (t5c.stan === 'PLONIE' && klatekDoZgaszenia < 120) {
+    t5c.update(klatka({ zgiecia: PIESC }), 1.0, DT);   // dłoń WIDOCZNA, palec zwinięty
+    klatekDoZgaszenia++;
+}
+const sekundy5c = klatekDoZgaszenia * DT;
+console.log(`  schowanie palca gasi po ${sekundy5c.toFixed(2)} s`);
+spr('schowanie palca gasi szybko (< 0.25 s) - nadal czuje się natychmiastowe', sekundy5c < 0.25);
+spr('  ...i wyraźnie szybciej niż zanik trackingu (0.7 s)', sekundy5c < 0.7);
 
 // --- 6. Dwa palce nie zapalają ---
 const t6 = new PlonacyPalec();
