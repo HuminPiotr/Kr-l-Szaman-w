@@ -31,25 +31,32 @@
 
 // Rampa barw od rdzenia do wygaśnięcia. Ostatnia jest ciemnoczerwona, nie
 // szara - patrz punkt 1 wyżej.
+// Pierwsza barwa jest CIEPŁĄ bielą, nie czystą. Czysta biel czyta się jak
+// palnik albo kometa - w prawdziwym płomieniu punkt przegrzania jest mały,
+// a większość objętości jest żółto-pomarańczowa.
 const RAMPA = [
-    [255, 250, 230],  // biel żaru
-    [255, 226, 150],
-    [255, 176, 60],
-    [255, 108, 20],
-    [190, 40, 10]     // dogasająca czerwień
+    [255, 243, 214],  // ciepła biel - tylko sam rdzeń
+    [255, 216, 132],
+    [255, 168, 56],
+    [252, 104, 18],
+    [176, 36, 8]      // dogasająca czerwień
 ];
+
+// Pozycja na rampie rośnie SZYBCIEJ niż wiek cząsteczki: dzięki temu biel
+// zajmuje tylko początek życia, a nie jego pierwszą piątą część.
+const KRZYWA_BARWY = 0.6;
 
 const SPRITE_PX = 48;
 
 // --- płomień ---
 const NA_SEKUNDE = 260;        // cząsteczek na sekundę przy pełnej sile
-const ZYCIE_MIN = 0.35, ZYCIE_MAX = 0.75;   // s
+const ZYCIE_MIN = 0.5, ZYCIE_MAX = 1.05;   // s - dłuższe życie = wyższy, smuklejszy płomień
 const WYPORNOSC = 900;         // px/s^2 w górę
 const DZIEDZICZENIE = 0.45;    // ile prędkości palca przejmuje cząsteczka
 const ROZRZUT = 90;            // px/s losowego rozrzutu
-const TURBULENCJA = 220;       // px/s^2 bocznego chwiania
-const OPOR = 1.6;              // 1/s
-const ROZMIAR_OD = 0.55, ROZMIAR_DO = 1.5;  // mnożnik sprite'a w cyklu życia
+const TURBULENCJA = 300;       // px/s^2 bocznego chwiania (jęzory płomienia)
+const OPOR = 1.15;             // 1/s - mniejszy opór pozwala płomieniowi się wyciągnąć
+const ROZMIAR_OD = 0.38, ROZMIAR_DO = 1.6;  // ciasny rdzeń, szeroki wierzch
 
 // --- żar wiszący w powietrzu ---
 const ZAR_NA_SEKUNDE = 90;
@@ -187,7 +194,7 @@ export class Ogien {
             const p = c.wiek / c.zycie;
 
             // Żar startuje niżej na rampie - już ostygł, gdy się oderwał.
-            const poz = c.zar ? 0.45 + p * 0.55 : p;
+            const poz = c.zar ? 0.45 + p * 0.55 : Math.pow(p, KRZYWA_BARWY);
             const sprite = this._sprites[Math.min(RAMPA.length - 1,
                                         Math.floor(poz * RAMPA.length))];
 
