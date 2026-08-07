@@ -157,6 +157,15 @@ export class DebugHud {
             lines.push(`kombo ${stats.bufor ?? '—'}`);
         }
 
+        // Sylwetka dłoni. Wzór palców w kolejności kciuk-wskazujący-środkowy-
+        // serdeczny-mały: 1 = wyprostowany, ~ = w połowie, 0 = złożony.
+        // Z tych liczb stroi się progi pieczęci.
+        if (stats.dlonie) {
+            lines.push('');
+            lines.push('dłonie  (KWŚSM)');
+            for (const l of stats.dlonie) lines.push(`  ${l}`);
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 

@@ -1,3 +1,4 @@
+import { HandTracker } from './handTracker.js';
 import { PoseTracker } from './poseTracker.js';
 import { AudioEngine } from './audioEngine.js';
 import { DebugHud } from './debugHud.js';
@@ -12,11 +13,16 @@ import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
+import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
+         skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
 
-// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, handTracker.js.
-// swarog.js i stribog.js też czekają - są dowodem, że rejestr obsługuje
-// wymaga:'hands', i ożyją same, gdy śledzenie dłoni wróci. Dłonie są
-// wyłączone, bo zwolnione ~8 ms płaci za maskę sylwetki do aury.
+// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js.
+//
+// Dłonie są WPIĘTE od nowa. Postawy ciała (perun/mokosz/weles) działały, ale
+// wymagały kadru z barkami I biodrami plus zapasem - kamera laptopa tego nie
+// daje. Pieczęcie przechodzą na dłonie, a te wystarczy trzymać przed sobą.
+// Zmierzone na żywym tańcu: ~60 FPS z ciałem i maską, więc 8 ms na dłonie
+// mieści się z ogromnym zapasem.
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -32,6 +38,7 @@ const video = document.getElementById('webcam');
 const canvas = document.getElementById('output-canvas');
 const ctx = canvas.getContext('2d');
 
+let handTracker = new HandTracker();
 let poseTracker = new PoseTracker();
 let audioEngine = new AudioEngine();
 let debugHud = new DebugHud();
@@ -54,6 +61,7 @@ let ostatniKomunikat = null, ostatniKomunikatDo = 0;
 let lastVideoTime = -1;
 let isRunning = false;
 let lastPoseResults = null;   // wynik PoseLandmarker z ostatniej klatki wideo
+let lastHandResults = null;   // wynik HandLandmarker z ostatniej klatki wideo
 let lastFrameTime = 0;
 
 // Maska sylwetki, przepisana na CPU. Trzymamy poza wynikiem detekcji, bo
@@ -91,7 +99,10 @@ startBtn.addEventListener('click', async () => {
         video.play();
 
         // 3. Inicjalizacja AI (MediaPipe)
-        await poseTracker.initialize();
+        await Promise.all([
+            poseTracker.initialize(),
+            handTracker.initialize()
+        ]);
 
         // 4. Aura tancerza
         aura = new Aura(canvas, ctx);
@@ -144,6 +155,18 @@ function pobierzMaske(wynik) {
  * wrócą razem ze znakami.
  */
 function buildFrame(fit, dt, now) {
+    // W tasks-vision 0.10.3 pole nazywa się handednesses (liczba mnoga).
+    const hands = [];
+    if (lastHandResults?.landmarks) {
+        for (let i = 0; i < lastHandResults.landmarks.length; i++) {
+            hands.push({
+                landmarks: mapLandmarks(lastHandResults.landmarks[i], fit),
+                worldLandmarks: lastHandResults.worldLandmarks?.[i] ?? null,
+                handedness: lastHandResults.handednesses?.[i]?.[0]?.categoryName ?? null
+            });
+        }
+    }
+
     let pose = null;
     if (lastPoseResults?.landmarks?.length) {
         pose = {
@@ -151,7 +174,79 @@ function buildFrame(fit, dt, now) {
             worldLandmarks: lastPoseResults.worldLandmarks?.[0] ?? null
         };
     }
-    return { hands: [], pose, width: canvas.width, height: canvas.height, dt, now };
+    return { hands, pose, width: canvas.width, height: canvas.height, dt, now };
+}
+
+// Połączenia między punktami dłoni - pięć łańcuchów palców plus poprzeczka
+// przez nasady, żeby dłoń czytała się jako dłoń, a nie chmura kropek.
+const SZKIELET = [
+    [0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [0, 9, 10, 11, 12],
+    [0, 13, 14, 15, 16], [0, 17, 18, 19, 20], [5, 9, 13, 17]
+];
+
+function rysujDlonie(frame) {
+    if (!frame.hands.length) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const dlon of frame.hands) {
+        const lm = dlon.landmarks;
+        if (!lm || lm.length < 21) continue;
+        const px = (i) => ({ x: lm[i].x * frame.width, y: lm[i].y * frame.height });
+
+        ctx.strokeStyle = 'rgba(150, 220, 255, 0.30)';
+        ctx.lineWidth = 3;
+        for (const lancuch of SZKIELET) {
+            ctx.beginPath();
+            lancuch.forEach((i, k) => {
+                const p = px(i);
+                k === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+        }
+
+        // Opuszki jaśniej - to one niosą znaczenie pieczęci
+        for (let i = 0; i < 21; i++) {
+            const p = px(i);
+            const opuszek = i === 4 || i === 8 || i === 12 || i === 16 || i === 20;
+            ctx.fillStyle = opuszek ? 'rgba(200, 240, 255, 0.85)' : 'rgba(150, 220, 255, 0.45)';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, opuszek ? 5 : 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+
+/**
+ * Podpis sylwetki dłoni do nakładki.
+ *
+ * To NIE jest ozdoba - progi pieczęci są zgadywane, a to jedyne liczby,
+ * z których da się je wystroić. Precedens: PROG_SZARPNIECIA i PROG_POSTAWY
+ * oba były zgadnięte i oba wymagały odczytu z ekranu (GEMINI.md §6).
+ */
+function opiszDlonie(frame) {
+    const h = frame.hands.filter(d => pelnaDlon(d.landmarks));
+    if (!h.length) return null;
+
+    const linie = h.map(d => {
+        const w = wzorPalcow(d.landmarks);
+        const wzor = w.map(v => v > 0.6 ? '1' : (v > 0.25 ? '~' : '0')).join('');
+        const suma = w.reduce((a, b) => a + b, 0);
+        return `${(d.handedness ?? '?').slice(0, 1)} ${wzor} ${suma.toFixed(1)} palc.` +
+               `  góra ${skierowanaWGore(d.landmarks).toFixed(2)}`;
+    });
+
+    if (h.length === 2) {
+        const [a, b] = [h[0].landmarks, h[1].landmarks];
+        linie.push(`nadgarstki ${odlegloscNadgarstkow(a, b).toFixed(2)}` +
+                   `  opuszki ${zbieznoscOpuszek(a, b).toFixed(2)}` +
+                   `  równol. ${rownolegle(a, b).toFixed(2)}`);
+    }
+    return linie;
 }
 
 function renderLoop(now) {
@@ -181,8 +276,10 @@ function renderLoop(now) {
     // --- 2. Wykrywanie ciała (detekcja idzie na pomniejszonej klatce) ---
     if (video.currentTime !== lastVideoTime) {
         lastVideoTime = video.currentTime;
-        lastPoseResults = poseTracker.detect(video, performance.now());
+        const ts = performance.now();
+        lastPoseResults = poseTracker.detect(video, ts);
         pobierzMaske(lastPoseResults);
+        lastHandResults = handTracker.detect(video, ts);
     }
 
     // --- 3. Kontrakt klatki ---
@@ -276,6 +373,12 @@ function renderLoop(now) {
 
     audioEngine.update('CHARGING', moc, plynnosc);
 
+    // --- 7b. Szkielet dłoni ---
+    // Rysowany ZAWSZE, nie tylko w trybie debug. Bez tego gracz nie ma
+    // żadnego potwierdzenia, że palce są w ogóle śledzone - a to była
+    // pierwsza rzecz, o którą zapytał po przejściu na pieczęcie dłoniowe.
+    rysujDlonie(frame);
+
     // --- 8. Nakładka diagnostyczna (klawisz D) ---
     debugHud.drawOverlay(ctx, frame);
     debugHud.updatePanel(frame, {
@@ -293,6 +396,7 @@ function renderLoop(now) {
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
+        dlonie: opiszDlonie(frame),
         postawy,
         skladana: skl.skladana,
         postep: skl.postep,
