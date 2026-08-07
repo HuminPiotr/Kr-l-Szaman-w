@@ -110,8 +110,18 @@ export class MotionMeter {
      * @param {object} frame
      * @param {number} plynnosc  0..1 z js/plynnosc.js - jak gładki jest ruch.
      *                           Steruje TEMPEM ładowania, nigdy go nie zeruje.
+     * @param {boolean} zamrozZanik  true na czas składania pieczęci.
+     *
+     * ZAMROŻENIE JEST WYMOGIEM, NIE OPTYMALIZACJĄ. Trzymanie postawy jest
+     * bezruchem, więc bez niego składanie kosztuje podwójnie: responsywnosc
+     * spada do zera (znika przyrost) I działa ZANIK. Postawa niechlujna, ale
+     * ponad progiem, składa się ~2 s i zjada ~13% mocy - więcej niż kosztuje
+     * sama pieczęć. Cena stałaby się "10% plus kara proporcjonalna do
+     * niedokładności", czyli dokładnie tą stopniowaną karą, której zabrania
+     * reguła nadrzędna. Przyrost nadal nie działa (gracz stoi) - zamrażamy
+     * wyłącznie ZANIK.
      */
-    update(frame, plynnosc = 1) {
+    update(frame, plynnosc = 1, zamrozZanik = false) {
         const dt = Math.min(frame.dt, MAX_DT);
         if (dt <= 0) return this.moc;
 
@@ -147,7 +157,7 @@ export class MotionMeter {
         // do pełnej wartości przy całkowitym zatrzymaniu.
         const przyrost = PRZYROST * this.responsywnosc * wsp;
         const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkoscEfektywna) / PROG_BEZRUCHU_MS);
-        const netto = przyrost - ZANIK * bezruch;
+        const netto = przyrost - (zamrozZanik ? 0 : ZANIK * bezruch);
 
         this.moc = this._bezpiecznaMoc(this.moc + netto * dt);
 
@@ -155,14 +165,18 @@ export class MotionMeter {
     }
 
     /**
-     * Moc została zamieniona na efekt (wystrzał) - zbiornik pusty.
+     * Moc zamieniona na efekt - pieczęć albo wystrzał.
      *
-     * Bez tego wystrzał nic nie kosztuje i traci ciężar: gracz tańczy raz,
-     * a potem strzela w kółko. Tańcz dalej, żeby naładować ponownie.
-     * To NIE jest kara - nic nie mówi "źle", po prostu zaczynasz od nowa.
+     * Wartość domyślna 1 zeruje cały zbiornik i zachowuje zachowanie
+     * odpiętego powerBall.js, który woła zuzyj() bez argumentu.
+     * Pieczęcie podają swój koszt, bo mają go różny: podstawowe ~10%,
+     * przyszłe wielkie techniki nawet większość paska.
+     *
+     * To NIE jest kara - nic nie mówi "źle", po prostu tańczysz dalej.
      */
-    zuzyj() {
-        this.moc = 0;
+    zuzyj(koszt = 1) {
+        const k = Number.isFinite(koszt) ? koszt : 0;
+        this.moc = this._bezpiecznaMoc(this.moc - k);
     }
 
     /**
