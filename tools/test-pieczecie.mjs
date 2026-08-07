@@ -11,6 +11,7 @@
  * ta stopniowana kara, której zabrania reguła nadrzędna (GEMINI.md §2).
  */
 import { MotionMeter } from '../js/motionMeter.js';
+import { SkladaniePieczeci, KOSZT_PODSTAWOWY } from '../js/pieczecie.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -62,5 +63,84 @@ const nan = new MotionMeter();
 nan.moc = 0.5;
 nan.zuzyj(NaN);
 spr(`zuzyj(NaN) nie zatruwa mocy (${nan.moc})`, Number.isFinite(nan.moc));
+
+console.log('\nSKŁADANIE - próg:');
+const DT = 1 / 60;
+// Przepuszcza `sekundy` klatek i zwraca ostatni wynik oraz to, czy
+// pieczęć złożyła się po drodze.
+function trzymaj(sk, wyniki, moc, sekundy) {
+  let zlozona = null, ostatni = null;
+  for (let i = 0; i < Math.round(sekundy / DT); i++) {
+    ostatni = sk.update(wyniki, moc, DT);
+    if (ostatni.zlozona) zlozona = ostatni.zlozona;
+  }
+  return { ostatni, zlozona };
+}
+
+const s1 = new SkladaniePieczeci();
+// Postawa PONIŻEJ progu: cisza. Nie odmowa, nie komunikat - po prostu nic.
+const ponizej = trzymaj(s1, { perun: 0.3, mokosz: 0, weles: 0 }, 1.0, 3);
+spr(`postawa poniżej progu nie napełnia pierścienia (${ponizej.ostatni.postep.toFixed(2)})`,
+    ponizej.ostatni.postep === 0);
+spr('postawa poniżej progu nie składa pieczęci', ponizej.zlozona === null);
+spr('postawa poniżej progu nie zamraża zaniku', s1.zamrazaZanik === false);
+
+console.log('\nSKŁADANIE - tempo:');
+// Postawa IDEALNA składa się w czasie minimalnym.
+const s2 = new SkladaniePieczeci();
+const szybko = trzymaj(s2, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.6);
+spr('idealna postawa składa się w ~0.5 s', szybko.zlozona?.id === 'perun');
+
+// Postawa TUŻ NAD progiem składa się wolniej, ale SKŁADA SIĘ.
+// To jest gradient, nie kara: niedokładność kosztuje czas, nigdy odmowę.
+const s3 = new SkladaniePieczeci();
+const wolno = trzymaj(s3, { perun: 0.55, mokosz: 0, weles: 0 }, 1.0, 0.6);
+spr('postawa tuż nad progiem NIE zdąża w 0.6 s', wolno.zlozona === null);
+spr(`ale pierścień się napełnia (${wolno.ostatni.postep.toFixed(2)})`, wolno.ostatni.postep > 0.1);
+const wolno2 = trzymaj(s3, { perun: 0.55, mokosz: 0, weles: 0 }, 1.0, 3.0);
+spr('i domyka się przed sufitem czasu', wolno2.zlozona?.id === 'perun');
+
+console.log('\nBRAMKA MOCY:');
+const s4 = new SkladaniePieczeci();
+const bezMocy = trzymaj(s4, { perun: 1.0, mokosz: 0, weles: 0 }, 0.05, 2);
+spr(`bez mocy pierścień stoi (${bezMocy.ostatni.postep.toFixed(2)})`, bezMocy.ostatni.postep === 0);
+spr('bez mocy pieczęć się nie składa', bezMocy.zlozona === null);
+spr('bez mocy zgłoszony jest brakMocy', bezMocy.ostatni.brakMocy === true);
+// KLUCZOWE: bez mocy NIE WOLNO zamrażać zaniku. Zamrożenie przy pustym
+// zbiorniku dałoby zakleszczenie - moc nie rośnie (gracz stoi w postawie),
+// nie spada (zamrożona) i pieczęć nigdy nie staje się osiągalna.
+spr('bez mocy zanik NIE jest zamrożony (inaczej zakleszczenie)', s4.zamrazaZanik === false);
+
+console.log('\nKOSZT I ZDARZENIE:');
+const s5 = new SkladaniePieczeci();
+const raz = trzymaj(s5, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.6);
+spr(`złożona pieczęć podaje swój koszt (${raz.zlozona?.koszt})`,
+    raz.zlozona?.koszt === KOSZT_PODSTAWOWY);
+spr(`pierścień wraca do zera po złożeniu (${raz.ostatni.postep.toFixed(2)})`,
+    raz.ostatni.postep < 1);
+
+// Zdarzenie jest JEDNORAZOWE - trzymanie tej samej postawy nie ma
+// produkować pieczęci co klatkę.
+const s6 = new SkladaniePieczeci();
+let ile = 0;
+for (let i = 0; i < Math.round(0.62 / DT); i++) {
+  if (s6.update({ perun: 1.0, mokosz: 0, weles: 0 }, 1.0, DT).zlozona) ile++;
+}
+spr(`0.62 s trzymania daje dokładnie jedną pieczęć (${ile})`, ile === 1);
+
+console.log('\nPRZEŁĄCZENIE POSTAWY:');
+// Zmiana postawy w trakcie to RETARGETOWANIE, nie porażka - pierścień
+// startuje od nowa dla nowego znaku i nic nie miga na czerwono.
+const s7 = new SkladaniePieczeci();
+trzymaj(s7, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.3);
+const po = s7.update({ perun: 0, mokosz: 1.0, weles: 0 }, 1.0, DT);
+spr(`przełączenie celuje w nowy znak (${po.skladana})`, po.skladana === 'mokosz');
+spr(`i zaczyna od początku (${po.postep.toFixed(2)})`, po.postep < 0.1);
+
+console.log('\nODPORNOŚĆ NA NaN:');
+const s8 = new SkladaniePieczeci();
+s8.update({ perun: NaN, mokosz: 0, weles: 0 }, NaN, DT);
+const poNan = trzymaj(s8, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.6);
+spr('klatka z NaN nie zatruwa składania', poNan.zlozona?.id === 'perun');
 
 process.exit(ok ? 0 : 1);
