@@ -11,7 +11,7 @@
  * przy maksymalnym ścisku MediaPipe gubi jedną z dłoni. Wszystkie trzy
  * pieczęcie są zaprojektowane tak, żeby dłonie nigdy nie stykały się płasko.
  */
-import { pelnaDlon, zwinieta, odlegloscNadgarstkow, rampa } from './dlon.js';
+import { zwinieta, odlegloscNadgarstkow, rampa, najlepszaPara } from './dlon.js';
 
 // ZGADNIĘTE - wymagają potwierdzenia z nakładki debug (klawisz D), która
 // pokazuje wzór palców i odległość nadgarstków na żywo. Jednostka odległości:
@@ -25,28 +25,23 @@ export const welesDlon = {
     wymaga: 'hands',
 
     score(frame) {
-        const h = frame.hands.filter(d => pelnaDlon(d.landmarks));
-        if (h.length < 2) return 0;
+        return najlepszaPara(frame, skladnikiPary).wynik;
+    },
 
-        // Bierzemy najlepszą parę - gdyby MediaPipe zwrócił więcej niż dwie
-        // dłonie, nie chcemy, żeby przypadkowa trzecia psuła wynik.
-        let najlepszy = 0;
-        for (let i = 0; i < h.length; i++) {
-            for (let j = i + 1; j < h.length; j++) {
-                najlepszy = Math.max(najlepszy, ocen(h[i].landmarks, h[j].landmarks));
-            }
-        }
-        return najlepszy;
+    /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
+    skladniki(frame) {
+        return najlepszaPara(frame, skladnikiPary).skladniki;
     }
 };
 
-function ocen(a, b) {
-    const rozsuniecie = rampa(odlegloscNadgarstkow(a, b),
-                              ROZSUNIECIE_MIN, ROZSUNIECIE_PELNE);
-
-    // MINIMUM, nie średnia: obie dłonie muszą być zwinięte I rozsunięte
-    // naraz. Średnia dawałaby wynik połowiczny za jedną pięść, co przy
-    // dowolnym machaniu jedną ręką zapalałoby pieczęć.
-    // Minimum jest nadal CIĄGŁE - reguła nadrzędna spełniona.
-    return Math.min(zwinieta(a), zwinieta(b), rozsuniecie);
+// MINIMUM po składnikach (liczone w najlepszaPara), nie średnia: obie dłonie
+// muszą być zwinięte I rozsunięte naraz. Średnia dawałaby wynik połowiczny za
+// jedną pięść, co przy machaniu jedną ręką zapalałoby pieczęć.
+// Minimum jest nadal CIĄGŁE - reguła nadrzędna spełniona.
+function skladnikiPary(a, b) {
+    return {
+        piesci: Math.min(zwinieta(a), zwinieta(b)),
+        rozsuniecie: rampa(odlegloscNadgarstkow(a, b),
+                           ROZSUNIECIE_MIN, ROZSUNIECIE_PELNE)
+    };
 }

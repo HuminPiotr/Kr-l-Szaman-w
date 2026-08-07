@@ -166,6 +166,33 @@ export function rownolegle(a, b) {
 }
 
 /**
+ * Najlepsza para dłoni wraz z ROZBICIEM na składniki.
+ *
+ * Rozbicie nie jest ozdobą. Wszystkie pieczęcie liczą wynik jako MINIMUM
+ * kilku warunków, więc gdy pieczęć nie wychodzi, sam wynik ("0.31") nie mówi
+ * KTÓRY warunek blokuje. Gracz musiał odkrywać metodą prób, jak ułożyć palce -
+ * a to znak, że diagnostyka była niewystarczająca, nie że gracz źle próbował.
+ *
+ * @param {object} frame
+ * @param {(a, b) => object} ocenPary  zwraca mapę nazwa -> 0..1
+ * @returns {{ wynik: number, skladniki: object|null }}
+ */
+export function najlepszaPara(frame, ocenPary) {
+    const h = (frame.hands ?? []).filter(d => pelnaDlon(d.landmarks));
+    if (h.length < 2) return { wynik: 0, skladniki: null };
+
+    let najlepsze = null, najlepszy = -1;
+    for (let i = 0; i < h.length; i++) {
+        for (let j = i + 1; j < h.length; j++) {
+            const s = ocenPary(h[i].landmarks, h[j].landmarks);
+            const w = Math.min(...Object.values(s));
+            if (w > najlepszy) { najlepszy = w; najlepsze = s; }
+        }
+    }
+    return { wynik: Math.max(0, najlepszy), skladniki: najlepsze };
+}
+
+/**
  * Ciągłe "mieści się w przedziale", 0..1. Narasta od `od`, spada za `do`.
  *
  * Potrzebne, bo część warunków ma DWIE granice, nie jedną. Odległość dłoni

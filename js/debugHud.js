@@ -155,6 +155,17 @@ export class DebugHud {
             const cel = stats.skladana ?? '—';
             lines.push(`pieczęć ${cel}  ${this._num(stats.postep ?? 0)}  ${this._bar(stats.postep ?? 0)}${stats.brakMocy ? '  ⏳ brak mocy' : ''}`);
             lines.push(`kombo ${stats.bufor ?? '—'}`);
+
+            // KTÓRY warunek blokuje. Wynik pieczęci to minimum tych wartości,
+            // więc najniższa liczba w tej linijce mówi, co poprawić.
+            // Bez tego zostaje zgadywanie ułożenia palców.
+            if (stats.rozbicie) {
+                const s = stats.rozbicie.sk;
+                const naj = Math.min(...Object.values(s));
+                const opis = Object.entries(s)
+                    .map(([k, v]) => `${k} ${this._num(v)}${v === naj ? '<' : ' '}`).join(' ');
+                lines.push(`  ${stats.rozbicie.id}: ${opis}`);
+            }
         }
 
         // Sylwetka dłoni. Wzór palców w kolejności kciuk-wskazujący-środkowy-

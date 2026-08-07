@@ -14,7 +14,7 @@
  * wyprostowanych). Bez niej te dwie pieczęcie byłyby nieodróżnialne.
  */
 import {
-    pelnaDlon, wzorPalcow, zbieznoscOpuszek, odlegloscNadgarstkow, rampa
+    wzorPalcow, zbieznoscOpuszek, odlegloscNadgarstkow, rampa, najlepszaPara
 } from './dlon.js';
 
 // ZGADNIĘTE - potwierdzić z nakładki (klawisz D). Jednostka: skala dłoni.
@@ -30,16 +30,12 @@ export const swarogDlon = {
     wymaga: 'hands',
 
     score(frame) {
-        const h = frame.hands.filter(d => pelnaDlon(d.landmarks));
-        if (h.length < 2) return 0;
+        return najlepszaPara(frame, skladnikiPary).wynik;
+    },
 
-        let najlepszy = 0;
-        for (let i = 0; i < h.length; i++) {
-            for (let j = i + 1; j < h.length; j++) {
-                najlepszy = Math.max(najlepszy, ocen(h[i].landmarks, h[j].landmarks));
-            }
-        }
-        return najlepszy;
+    /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
+    skladniki(frame) {
+        return najlepszaPara(frame, skladnikiPary).skladniki;
     }
 };
 
@@ -54,11 +50,12 @@ function palceProste(lm) {
     return (wskaz + srodk + serdec + maly) / 4;
 }
 
-function ocen(a, b) {
-    // Zbieżność liczona ODWROTNIE: mała odległość opuszek = wysoki wynik.
-    const zbieznosc = 1 - rampa(zbieznoscOpuszek(a, b), ZBIEZNOSC_PELNA, ZBIEZNOSC_ZERO);
-    const rozsuniecie = rampa(odlegloscNadgarstkow(a, b),
-                              ROZSUNIECIE_MIN, ROZSUNIECIE_PELNE);
-
-    return Math.min(palceProste(a), palceProste(b), zbieznosc, rozsuniecie);
+function skladnikiPary(a, b) {
+    return {
+        palce: Math.min(palceProste(a), palceProste(b)),
+        // Zbieżność liczona ODWROTNIE: mała odległość opuszek = wysoki wynik.
+        opuszki: 1 - rampa(zbieznoscOpuszek(a, b), ZBIEZNOSC_PELNA, ZBIEZNOSC_ZERO),
+        nadgarstki: rampa(odlegloscNadgarstkow(a, b),
+                          ROZSUNIECIE_MIN, ROZSUNIECIE_PELNE)
+    };
 }

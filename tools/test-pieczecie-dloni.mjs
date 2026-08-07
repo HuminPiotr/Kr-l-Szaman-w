@@ -51,6 +51,14 @@ const UKLADY = {
         dlon({ ox: 0.42, oy: 0.62, zgiecia: PROSTE, skala: S, obrot: 0.42, wachlarz: 0.15 }),
         dlon({ ox: 0.42, oy: 0.62, zgiecia: PROSTE, skala: S, obrot: 0.42, wachlarz: 0.15, lustro: true })),
 
+    // AUTENTYCZNY Tygrys: wskazujący i środkowy ZŁĄCZONE (mały wachlarz),
+    // a serdeczny i mały zwinięte tylko CZĘŚCIOWO - tak MediaPipe je zgaduje,
+    // gdy dłonie są splecione i palce się zasłaniają. Gracz zgłosił, że ten
+    // układ nie przechodził i musiał rozszczepiać palce w V.
+    'Perun autentyczny (palce razem, tylne luźne)': klatka(
+        dlon({ ox: 0.455, zgiecia: [0.6, 0, 0, 0.5, 0.5], skala: S, wachlarz: 0.25 }),
+        dlon({ ox: 0.545, zgiecia: [0.6, 0, 0, 0.5, 0.5], skala: S, wachlarz: 0.25 })),
+
     // --- układy, które NIE MOGĄ zapalać niczego ---
     'dłonie płasko przy sobie (ścisk)': klatka(
         dlon({ ox: 0.487, zgiecia: PROSTE, skala: S }),
@@ -88,6 +96,15 @@ for (const [uklad, wlasna] of PARY) {
         spr(`  ...i NIE zapala ${inna} (${o[inna].toFixed(2)})`, o[inna] < 0.25);
     }
 }
+
+// Zgłoszone z testu na żywych dłoniach: autentyczny Tygrys musi przechodzić
+// BEZ rozszczepiania palców w V. Zwinięcie tylnych palców jest tylko wsparciem
+// rozpoznania - rdzeniem jest liczba palców, a ta odcina Peruna od resztek
+// trójki (4 kontra 0 i 10) nawet przy luźnym warunku.
+const aut = wyniki['Perun autentyczny (palce razem, tylne luźne)'];
+spr(`autentyczny Tygrys (palce razem) zapala Peruna (${aut.perun.toFixed(2)})`, aut.perun > 0.6);
+spr(`  ...i nadal nie zapala nic innego (${aut.weles.toFixed(2)}, ${aut.swarog.toFixed(2)})`,
+    aut.weles < 0.25 && aut.swarog < 0.25);
 
 // Wymóg z pomiaru: ścisk dłoni nie może być nagradzany.
 const scisk = wyniki['dłonie płasko przy sobie (ścisk)'];

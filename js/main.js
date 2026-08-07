@@ -299,6 +299,25 @@ function renderLoop(now) {
     // KOLEJNOŚĆ MA ZNACZENIE: składanie musi policzyć się PRZED mocą, bo
     // to ono decyduje, czy zanik jest w tej klatce zamrożony.
     const postawy = znaki.ocen(frame);
+
+    // Rozbicie NAJLEPSZEJ pieczęci na warunki składowe.
+    //
+    // Wynik pieczęci to MINIMUM kilku warunków, więc samo "0.31" nie mówi,
+    // KTÓRY z nich blokuje. Gracz odkrywał metodą prób, jak ułożyć palce,
+    // żeby Perun zadziałał - to znaczy, że diagnostyka była za skąpa,
+    // nie że gracz źle próbował.
+    let rozbicie = null;
+    {
+        let najlepszaNazwa = null, najlepszy = -1;
+        for (const [id, w] of Object.entries(postawy)) {
+            if (w > najlepszy) { najlepszy = w; najlepszaNazwa = id; }
+        }
+        const znak = znaki.znaki.find(z => z.id === najlepszaNazwa);
+        if (znak?.skladniki) {
+            const sk = znak.skladniki(frame);
+            if (sk) rozbicie = { id: najlepszaNazwa, sk };
+        }
+    }
     const skl = skladanie.update(postawy, motionMeter.moc, dt);
 
     // --- 6. Ciągłość ruchu razy płynność -> moc ---
@@ -402,6 +421,7 @@ function renderLoop(now) {
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
         dlonie: opiszDlonie(frame),
         postawy,
+        rozbicie,
         skladana: skl.skladana,
         postep: skl.postep,
         brakMocy: skl.brakMocy,

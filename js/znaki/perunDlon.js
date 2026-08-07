@@ -14,8 +14,8 @@
  * palców: 4 kontra 0 Welesa i 10 Swaroga).
  */
 import {
-    pelnaDlon, wzorPalcow, skierowanaWGore, odlegloscNadgarstkow, rownolegle,
-    rampa, pasmo
+    wzorPalcow, skierowanaWGore, odlegloscNadgarstkow, rownolegle,
+    rampa, pasmo, najlepszaPara
 } from './dlon.js';
 
 // ZGADNIĘTE - potwierdzić z nakładki (klawisz D). Jednostka odległości:
@@ -32,40 +32,53 @@ const ODLEGLOSC_ZERO = 3.2;
 const ROWNOLEGLE_MIN = 0.5;   // dłonie skierowane w tę samą stronę
 const ROWNOLEGLE_PELNE = 0.85;
 
+// Ile ZŁOŻENIA serdecznego i małego wymagamy.
+//
+// Zgłoszone z testu: autentyczny Tygrys (wskazujący i środkowy ZŁĄCZONE) nie
+// przechodził, a rozszczepienie palców w V - owszem. Powód: przy złączonych
+// palcach i splecionych dłoniach MediaPipe ma gorszy odczyt palców zwiniętych
+// i zgaduje je jako CZĘŚCIOWO wyprostowane. Wymóg "wyraźnie złożone" blokował
+// wtedy całe minimum.
+//
+// Zwinięcie serdecznego i małego jest tylko WSPARCIEM rozpoznania, nie jego
+// rdzeniem - trójka rozdziela się liczbą palców (0/4/10), więc Perun nie może
+// się pomylić z niczym nawet przy luźnym warunku. Stąd tolerancja: liczy się,
+// że nie są w pełni wyprostowane, a nie że są idealnie zaciśnięte.
+const ZLOZONE_OD = 0.85;   // powyżej tego wyprostowania zaczynamy odejmować
+const ZLOZONE_DO = 0.35;   // poniżej - warunek w pełni spełniony
+
 export const perunDlon = {
     id: 'perun',
     nazwa: 'Perun',
     wymaga: 'hands',
 
     score(frame) {
-        const h = frame.hands.filter(d => pelnaDlon(d.landmarks));
-        if (h.length < 2) return 0;
+        return najlepszaPara(frame, skladnikiPary).wynik;
+    },
 
-        let najlepszy = 0;
-        for (let i = 0; i < h.length; i++) {
-            for (let j = i + 1; j < h.length; j++) {
-                najlepszy = Math.max(najlepszy, ocen(h[i].landmarks, h[j].landmarks));
-            }
-        }
-        return najlepszy;
+    /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
+    skladniki(frame) {
+        return najlepszaPara(frame, skladnikiPary).skladniki;
     }
 };
 
-/** Dwa palce w górę na jednej dłoni: wskazujący i środkowy proste, dwa ostatnie złożone. */
-function dwaPalce(lm) {
-    const [, wskaz, srodk, serdec, maly] = wzorPalcow(lm);
-    return Math.min(
-        wskaz, srodk,
-        1 - serdec, 1 - maly,
-        skierowanaWGore(lm)
-    );
+/** Ile serdeczny i mały są ZŁOŻONE. Tolerancyjne - patrz komentarz przy stałych. */
+function zlozoneTylne(lm) {
+    const [, , , serdec, maly] = wzorPalcow(lm);
+    const najbardziejWyprostowany = Math.max(serdec, maly);
+    return rampa(najbardziejWyprostowany, ZLOZONE_OD, ZLOZONE_DO);
 }
 
-function ocen(a, b) {
-    const odleglosc = pasmo(odlegloscNadgarstkow(a, b),
-                            ODLEGLOSC_MIN, ODLEGLOSC_PELNA,
-                            ODLEGLOSC_SPADEK, ODLEGLOSC_ZERO);
-    const rownol = rampa(rownolegle(a, b), ROWNOLEGLE_MIN, ROWNOLEGLE_PELNE);
-
-    return Math.min(dwaPalce(a), dwaPalce(b), odleglosc, rownol);
+function skladnikiPary(a, b) {
+    const wa = wzorPalcow(a), wb = wzorPalcow(b);
+    return {
+        // Rdzeń pieczęci: po dwa palce wyprostowane na obu dłoniach.
+        dwaPalce: Math.min(wa[1], wa[2], wb[1], wb[2]),
+        tylne: Math.min(zlozoneTylne(a), zlozoneTylne(b)),
+        wGore: Math.min(skierowanaWGore(a), skierowanaWGore(b)),
+        odleglosc: pasmo(odlegloscNadgarstkow(a, b),
+                         ODLEGLOSC_MIN, ODLEGLOSC_PELNA,
+                         ODLEGLOSC_SPADEK, ODLEGLOSC_ZERO),
+        rownolegle: rampa(rownolegle(a, b), ROWNOLEGLE_MIN, ROWNOLEGLE_PELNE)
+    };
 }
