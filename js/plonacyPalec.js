@@ -74,9 +74,19 @@ const PROG_UTRZYMANIA = 0.30;     // utrzymanie: sam palec nadal wyprostowany
 const ALFA_UTRZYMANIA = 0.35;     // wygładzanie, żeby jedna klatka szumu nie liczyła się
 const NAD_BARKIEM = 0.02;      // ile ponad linią barków, w wysokościach kadru
 
-// Pełny pasek mocy na 30 s ognia. To ma być hojne: ogień jest nagrodą,
-// a nie zasobem do oszczędzania.
-const KOSZT_NA_SEKUNDE = 1 / 30;
+// Pobór MUSI być pokonywalny tańcem, inaczej moc stoi w miejscu i pętla gry
+// się nie zamyka.
+//
+// Zgłoszone z testu: przy ruchu moc się nie odnawiała. Rachunek: przy 1/30
+// pobór to 0.033/s, a przyrost przy tańcu z JEDNĄ RĘKĄ TRZYMANĄ W GÓRZE
+// wychodzi około tyle samo - MotionMeter uśrednia nadgarstki i łokcie, a ręka
+// wskazująca jest z konieczności nieruchoma i obniża średnią o połowę.
+// Wychodził remis, który wygląda jak zastój.
+//
+// 1/50 daje 50 s ognia z pełnego paska i zostawia wyraźny zapas: przy
+// umiarkowanym tańcu przyrost ~0.05/s bije pobór 0.02/s, więc pasek rośnie
+// nawet w trakcie płonięcia.
+const KOSZT_NA_SEKUNDE = 1 / 50;
 
 // Zwłoki przed zakończeniem techniki. Rozdzielone, bo rozdzielone są przyczyny.
 const ZWLOKA_BRAK_DLONI = 0.7;   // s - tracking zgubiony, czekamy na powrót
@@ -102,8 +112,12 @@ const ZWLOKA_ZLOZENIA = 0.25;    // s - świadome schowanie palca
 // i żadna nie pasuje, palec został schowany - rosnący limit pozwalał wtedy
 // płomieniowi przeskoczyć na drugą, opuszczoną rękę po ułamku sekundy.
 const MAX_PREDKOSC_ZACZEPU = 10.0;
-// O ile karzemy kandydata z inną stronnością niż ta, która zapaliła ogień.
-const KARA_ZA_INNA_REKE = 0.06;
+// Kara za inną stronność - używana tylko jako rozstrzygnięcie ostateczne,
+// gdy stronność jest nieznana. Przy znanej stronności filtrujemy TWARDO
+// (patrz _kontynuacja), bo kara 0.06 była zbyt słaba: przy rękach trzymanych
+// blisko siebie druga dłoń mieściła się w limicie przeskoku i płomień
+// przeskakiwał, dając efekt "wystrzeliwanego ognia".
+const KARA_ZA_INNA_REKE = 0.5;
 
 // Palce liczone bez kciuka - jak we wszystkich pieczęciach. Kciuk jest
 // najmniej pewnym punktem dłoni, a wskazywanie z odstawionym kciukiem
@@ -237,18 +251,30 @@ export class PlonacyPalec {
     _kontynuacja(kandydaci, krok) {
         if (!this.zaczep) return null;
 
+        const zdatni = kandydaci.filter(k => k.wyprost >= PROG_UTRZYMANIA);
+        if (!zdatni.length) return null;
+
+        // STRONNOŚĆ NAJPIERW, i to twardo.
+        //
+        // Jeśli wśród kandydatów jest ręka o tej samej stronności co ta, która
+        // zapaliła ogień, rozpatrujemy TYLKO ją. Sama odległość nie wystarczała:
+        // przy rękach trzymanych blisko siebie druga dłoń mieściła się
+        // w limicie przeskoku i płomień na nią przeskakiwał.
+        //
+        // MediaPipe podaje stronność pewnie, dopóki dłonie są rozdzielone,
+        // a gdy ją pomyli albo nie poda - schodzimy na samą odległość.
+        const tejSamejReki = this._reka
+            ? zdatni.filter(k => k.reka === this._reka)
+            : [];
+        const pula = tejSamejReki.length ? tejSamejReki : zdatni;
+
         const limit = MAX_PREDKOSC_ZACZEPU * (krok + this._czasNiewidzenia);
         let wybrany = null, najlepszaKara = Infinity;
 
-        for (const k of kandydaci) {
-            // UTRZYMANIE patrzy na samo wyprostowanie palca, nie na iloczyn.
-            if (k.wyprost < PROG_UTRZYMANIA) continue;
-
+        for (const k of pula) {
             const d = Math.hypot(k.opuszek.x - this.zaczep.x, k.opuszek.y - this.zaczep.y);
             if (d > limit) continue;   // za daleko - to nie ta sama ręka
 
-            // Stronność to MIĘKKA preferencja: MediaPipe potrafi ją pomylić,
-            // więc nie może twardo odrzucać kandydata.
             const kara = d + (this._reka && k.reka && k.reka !== this._reka
                               ? KARA_ZA_INNA_REKE : 0);
             if (kara < najlepszaKara) { najlepszaKara = kara; wybrany = k; }

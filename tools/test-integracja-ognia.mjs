@@ -55,12 +55,12 @@ pp.uzbrój();
 
 let klatek = 0, blad = null;
 try {
-    for (let i = 0; i < 60 * 40 && pp.stan !== 'BEZCZYNNY' || i === 0; i++) {
+    for (let i = 0; i < 60 * 90 && pp.stan !== 'BEZCZYNNY' || i === 0; i++) {
         const f = klatka();
         const pobor = pp.update(f, mm2.moc, DT);
         if (pobor > 0) mm2.zuzyj(pobor);
         klatek++;
-        if (klatek > 60 * 40) break;
+        if (klatek > 60 * 90) break;
     }
 } catch (e) {
     blad = e.message;
@@ -70,7 +70,53 @@ spr(`pętla nie wyrzuca wyjątku (${blad ?? 'brak'})`, blad === null);
 spr(`moc została zużyta (${mm2.moc.toFixed(3)})`, mm2.moc < 0.05);
 spr(`technika zakończyła się po wyczerpaniu mocy (${pp.stan})`, pp.stan === 'BEZCZYNNY');
 console.log(`  ognia było ${(klatek * DT).toFixed(1)} s`);
-spr('ogień trwał 25-35 s', klatek * DT > 25 && klatek * DT < 35);
+spr('ogień trwał 45-55 s', klatek * DT > 45 && klatek * DT < 55);
+
+// --- MOC MUSI ROSNĄĆ, GDY GRACZ TAŃCZY Z ZAPALONYM OGNIEM ---
+//
+// Zgłoszone z testu na żywym ciele: "gdy się ruszam z zapalonym płomieniem
+// moc nie odnawia się". Przy poborze 1/30 wychodził remis z przyrostem, bo
+// ręka wskazująca jest z konieczności nieruchoma i obniża średnią prędkość
+// kończyn o połowę. Ten test pilnuje, żeby pobór został POKONYWALNY.
+console.log('\nTANIEC Z ZAPALONYM OGNIEM:');
+
+const SLEDZONE = [15, 16, 13, 14, 27, 28];
+const NADG_WSKAZUJACY = 16;   // ta ręka trzyma płomień - zostaje nieruchoma
+
+/** Ciało w ruchu, ale z JEDNĄ ręką trzymaną nieruchomo (ta z ogniem). */
+function cialoTanczace(t) {
+    const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
+    for (const i of SLEDZONE) {
+        const nieruchoma = i === NADG_WSKAZUJACY || i === 14;
+        wl[i] = nieruchoma
+            ? { x: 0.25, y: -0.3, z: 0, visibility: 0.9 }
+            : { x: 0.4 * Math.sin(2 * Math.PI * 0.8 * t), y: 0, z: 0, visibility: 0.9 };
+    }
+    return wl;
+}
+
+const mm4 = new MotionMeter();
+const pp4 = new PlonacyPalec();
+mm4.moc = 0.5;
+pp4.uzbrój();
+
+let t = 0;
+// zapalamy
+pp4.update(klatka(), mm4.moc, DT);
+spr(`ogień się zapalił (${pp4.stan})`, pp4.stan === 'PLONIE');
+
+const mocPrzed = mm4.moc;
+for (let i = 0; i < 60 * 8; i++) {          // 8 s tańca z ogniem
+    t += DT;
+    const f = klatka();
+    f.pose.worldLandmarks = cialoTanczace(t);
+    mm4.update(f, 1.0, DT);                  // płynność 1.0 - ruch gładki
+    const pobor = pp4.update(f, mm4.moc, DT);
+    if (pobor > 0) mm4.zuzyj(pobor);
+}
+console.log(`  po 8 s tańca z ogniem: ${mocPrzed.toFixed(3)} -> ${mm4.moc.toFixed(3)}`);
+spr('moc ROŚNIE w trakcie płonięcia, gdy gracz tańczy', mm4.moc > mocPrzed);
+spr(`  ...i ogień nadal płonie (${pp4.stan})`, pp4.stan === 'PLONIE');
 
 // --- Moc nie może rosnąć w trakcie płonięcia bez ruchu ---
 // (gracz stoi i pali; taniec ma być jedynym źródłem doładowania)

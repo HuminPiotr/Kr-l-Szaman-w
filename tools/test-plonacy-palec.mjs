@@ -204,6 +204,39 @@ for (let i = 0; i < 90; i++) {
 spr(`schowanie GÓRNEGO palca gasi, nie przenosi ognia na dolną rękę (${t5e.stan})`,
     t5e.stan === 'BEZCZYNNY');
 
+// --- 5f. RĘCE BLISKO SIEBIE nie powodują przeskoku ---
+// Zgłoszone z testu: przy rękach trzymanych blisko płomień przeskakiwał
+// między nimi, dając efekt "wystrzeliwanego ognia". Sama odległość nie
+// wystarczała jako ochrona - druga dłoń mieściła się w limicie przeskoku.
+console.log('\nRĘCE BLISKO SIEBIE (0.10 kadru od siebie):');
+function klatkaObokSiebie({ zgieciaA = WSKAZUJE, zgieciaB = WSKAZUJE } = {}) {
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 }));
+    lm[BARK_L] = { x: 0.42, y: 0.5, z: 0, visibility: 0.9 };
+    lm[BARK_P] = { x: 0.58, y: 0.5, z: 0, visibility: 0.9 };
+    return {
+        hands: [
+            { landmarks: dlon({ ox: 0.50, oy: 0.25, zgiecia: zgieciaA, skala: S }),
+              worldLandmarks: lm, handedness: 'Right' },
+            { landmarks: dlon({ ox: 0.60, oy: 0.25, zgiecia: zgieciaB, skala: S }),
+              worldLandmarks: lm, handedness: 'Left' }
+        ],
+        pose: { landmarks: lm, worldLandmarks: lm },
+        width: 1920, height: 1080, dt: DT, now: 0
+    };
+}
+const t5f = new PlonacyPalec();
+t5f.uzbrój();
+for (let i = 0; i < 5; i++) t5f.update(klatkaObokSiebie(), 1.0, DT);
+spr(`zapala się (${t5f.stan})`, t5f.stan === 'PLONIE');
+const xStart = t5f.zaczep.x;
+let skoki = 0;
+for (let i = 0; i < 300; i++) {
+    t5f.update(klatkaObokSiebie(), 1.0, DT);
+    if (t5f.zaczep && Math.abs(t5f.zaczep.x - xStart) > 0.05) skoki++;
+}
+spr(`5 s z rękami 0.10 kadru od siebie -> ${skoki} przeskoków (ma być 0)`, skoki === 0);
+spr(`  ...i ogień płonie dalej (${t5f.stan})`, t5f.stan === 'PLONIE');
+
 // --- 6. Dwa palce nie zapalają ---
 const t6 = new PlonacyPalec();
 t6.uzbrój();
@@ -215,14 +248,16 @@ const t7 = new PlonacyPalec();
 t7.uzbrój();
 t7.update(klatka(), 1.0, DT);
 let moc = 1.0, sekundy = 0;
-while (moc > 0 && sekundy < 120) {
+while (moc > 0 && sekundy < 180) {
     const pobor = t7.update(klatka(), moc, DT);
     moc = Math.max(0, moc - pobor);
     sekundy += DT;
     if (t7.stan !== 'PLONIE') break;
 }
 console.log(`\n  pełny pasek wystarczył na ${sekundy.toFixed(1)} s ognia`);
-spr('pełny pasek daje 25-35 s ognia', sekundy > 25 && sekundy < 35);
+// 50 s, nie 30. Pobór musi być POKONYWALNY tańcem, a przy 1/30 wychodził
+// remis z przyrostem i moc stała w miejscu.
+spr('pełny pasek daje 45-55 s ognia', sekundy > 45 && sekundy < 55);
 // Pętla wychodzi przy moc == 0, więc technika dowiaduje się o wyczerpaniu
 // dopiero w NASTĘPNEJ klatce - tak jak w grze.
 t7.update(klatka(), 0, DT);
