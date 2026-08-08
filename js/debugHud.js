@@ -192,8 +192,9 @@ export class DebugHud {
             // nadal wyprostowany). Rozdzielenie ich było naprawą tego, że
             // płomień gasł za łatwo - iloczyn w ocenie zapłonu jest bezlitosny.
             lines.push(`ogień ${stats.ogien.stan}  cząstek ${stats.ogien.czastki}`);
-            lines.push(`      zapłon ${this._num(stats.ogien.wskazanie)} (prog 0.55)` +
-                       `   utrzym. ${this._num(stats.ogien.utrzymanie)} (prog 0.30)`);
+            lines.push(`      zapłon ${this._num(stats.ogien.wskazanie)} (prog 0.40)` +
+                       `   utrzym. ${this._num(stats.ogien.utrzymanie)} (prog 0.30)` +
+                       `${stats.ogien.barkiNiepewne ? '   ⚠ barki niepewne' : ''}`);
             // Zwłoka pokazuje, że technika PRZECZEKUJE przeskok trackingu,
             // zamiast się kończyć. Bez tego nie widać, że osłona działa.
             if (stats.ogien.powodZwloki) {

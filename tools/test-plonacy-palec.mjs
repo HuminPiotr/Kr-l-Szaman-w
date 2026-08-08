@@ -237,6 +237,58 @@ for (let i = 0; i < 300; i++) {
 spr(`5 s z rękami 0.10 kadru od siebie -> ${skoki} przeskoków (ma być 0)`, skoki === 0);
 spr(`  ...i ogień płonie dalej (${t5f.stan})`, t5f.stan === 'PLONIE');
 
+// --- 5g. ZAPALA SIĘ RĘKA PODNIESIONA, nie ta z lepszym układem palców ---
+//
+// Zgłoszone z testu: "wystawiam palec prawej ręki, a zapala mi się palec
+// u opuszczonej ręki lewej". Dwie przyczyny, obie sprawdzane tutaj:
+//   - zapłon wybierał kandydata o najwyższej OCENIE GESTU, więc opuszczona
+//     ręka z przypadkowo czystszym układem palców wygrywała
+//   - warunek "nad barkiem" nie sprawdzał, czy barki są WIDOCZNE; zgadnięte
+//     nisko barki przepuszczały opuszczoną rękę
+console.log('\nPODNIESIONA RĘKA vs OPUSZCZONA Z LEPSZYM UKŁADEM:');
+
+/** Podniesiona ręka ma NIECHLUJNY układ, opuszczona - idealny. */
+function klatkaNiechlujnaWGorze({ barkiWidoczne = true } = {}) {
+    const wid = barkiWidoczne ? 0.9 : 0.1;
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 }));
+    lm[BARK_L] = { x: 0.42, y: 0.5, z: 0, visibility: wid };
+    lm[BARK_P] = { x: 0.58, y: 0.5, z: 0, visibility: wid };
+    return {
+        hands: [
+            // podniesiona, palce niedokładnie zwinięte (tylne na wpół)
+            { landmarks: dlon({ ox: 0.62, oy: 0.20, zgiecia: [1, 0, 0.5, 0.5, 0.5], skala: S }),
+              worldLandmarks: lm, handedness: 'Right' },
+            // opuszczona, układ IDEALNY
+            { landmarks: dlon({ ox: 0.35, oy: 0.80, zgiecia: WSKAZUJE, skala: S }),
+              worldLandmarks: lm, handedness: 'Left' }
+        ],
+        pose: { landmarks: lm, worldLandmarks: lm },
+        width: 1920, height: 1080, dt: DT, now: 0
+    };
+}
+
+const t5g = new PlonacyPalec();
+t5g.uzbrój();
+for (let i = 0; i < 10; i++) t5g.update(klatkaNiechlujnaWGorze(), 1.0, DT);
+spr(`zapaliło się (${t5g.stan})`, t5g.stan === 'PLONIE');
+spr(`zaczep jest na PODNIESIONEJ ręce (y=${t5g.zaczep.y.toFixed(2)}), nie na opuszczonej`,
+    t5g.zaczep.y < 0.4);
+spr(`stronność zablokowana na podniesionej ręce (${t5g._reka})`, t5g._reka === 'Right');
+
+// To samo, ale barki NIEWIDOCZNE - zapas nie może przepuścić opuszczonej ręki
+const t5h = new PlonacyPalec();
+t5h.uzbrój();
+for (let i = 0; i < 10; i++) t5h.update(klatkaNiechlujnaWGorze({ barkiWidoczne: false }), 1.0, DT);
+spr(`przy NIEWIDOCZNYCH barkach też wybiera podniesioną (${t5h.stan}` +
+    `${t5h.zaczep ? ', y=' + t5h.zaczep.y.toFixed(2) : ''})`,
+    t5h.stan === 'PLONIE' && t5h.zaczep.y < 0.4);
+
+// A gdy podniesionej ręki NIE MA - opuszczona sama nie zapala
+const t5i = new PlonacyPalec();
+t5i.uzbrój();
+for (let i = 0; i < 30; i++) t5i.update(klatka({ oy: 0.80 }), 1.0, DT);
+spr(`sama opuszczona ręka NIE zapala (${t5i.stan})`, t5i.stan === 'GOTOWY');
+
 // --- 6. Dwa palce nie zapalają ---
 const t6 = new PlonacyPalec();
 t6.uzbrój();
@@ -264,13 +316,24 @@ t7.update(klatka(), 0, DT);
 spr(`przy wyczerpanej mocy technika się kończy (${t7.stan})`, t7.stan === 'BEZCZYNNY');
 
 // --- 8. Odporność ---
-const t8 = new PlonacyPalec();
-t8.uzbrój();
-spr('brak pozy nie zapala i nie wywraca', t8.update(klatka({ brakPozy: true }), 1.0, DT) === 0);
+// KAŻDY przypadek na świeżej instancji. Wspólna instancja przeciekała stanem:
+// gdy pierwszy przypadek przypadkiem zapalił ogień, kolejne trafiały w gałąź
+// PLONIE i sprawdzały coś innego, niż opisywała ich nazwa.
+const t8a = new PlonacyPalec();
+t8a.uzbrój();
+spr('brak pozy nie zapala', t8a.update(klatka({ brakPozy: true }), 1.0, DT) === 0
+    && t8a.stan === 'GOTOWY');
+
 const nan = Array.from({ length: 21 }, () => ({ x: NaN, y: NaN, z: 0 }));
-const fNan = { hands: [{ landmarks: nan }], pose: null, width: 1920, height: 1080, dt: DT, now: 0 };
-spr('klatka z NaN nie wywraca', t8.update(fNan, 1.0, DT) === 0);
+const t8b = new PlonacyPalec();
+t8b.uzbrój();
+spr('klatka z NaN nie wywraca',
+    t8b.update({ hands: [{ landmarks: nan }], pose: null,
+                 width: 1920, height: 1080, dt: DT, now: 0 }, 1.0, DT) === 0);
+
+const t8c = new PlonacyPalec();
+t8c.uzbrój();
 spr('brak dłoni nie wywraca',
-    t8.update({ hands: [], pose: null, width: 1920, height: 1080, dt: DT, now: 0 }, 1.0, DT) === 0);
+    t8c.update({ hands: [], pose: null, width: 1920, height: 1080, dt: DT, now: 0 }, 1.0, DT) === 0);
 
 process.exit(ok ? 0 : 1);

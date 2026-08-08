@@ -49,7 +49,7 @@
  * palcem gdziekolwiek, także nisko - trzymanie ręki w górze przez pół minuty
  * bolałoby, a to ma być relaks.
  */
-import { pelnaDlon, wzorPalcow, OPUSZKI } from './znaki/dlon.js';
+import { pelnaDlon, wzorPalcow, OPUSZKI, rampa } from './znaki/dlon.js';
 import { BARK_L, BARK_P } from './znaki/postawa.js';
 
 // ZGADNIĘTE - potwierdzić z nakładki (klawisz D).
@@ -69,10 +69,54 @@ import { BARK_L, BARK_P } from './znaki/postawa.js';
 // Raz zapalony ogień gasi więc dopiero ZŁOŻENIE PALCA - nie rozluźnienie
 // pozostałych. Zaciśnięcie dłoni w pięść zbija wyprostowanie do zera i
 // kończy technikę, tak jak ma być.
-const PROG_WSKAZANIA = 0.55;      // zapłon: "dokładnie jeden palec"
+// OBNIŻONY z 0.55. Iloczyn "jeden palec x złożenie pozostałych" jest surowy:
+// przy wskazującym 1.0 i środkowym niedokładnie zwiniętym na 0.5 wynik to
+// tylko 0.50. Podniesiona, CELOWO wystawiona ręka nie przebijała więc progu,
+// a rozluźniona opuszczona - owszem, bo jej palce układały się czyściej.
+// To prawdopodobnie główna przyczyna zgłoszenia "zapala się palec opuszczonej
+// ręki". Ten sam błąd co przy progu utrzymania.
+//
+// Rozróżnianie przeniosło się na WYSOKOŚĆ (nad barkiem + najwyżej podniesiona
+// dłoń), więc warunek kształtu może być łagodniejszy bez utraty pewności:
+// kształt mówi "wskazujesz", wysokość mówi "chcesz tego".
+const PROG_WSKAZANIA = 0.40;      // zapłon: "dokładnie jeden palec"
+
+// Jak surowo drugi palec WETUJE zapłon.
+//
+// Pierwotny wzór v1 * (1 - v2) był bezlitosny: przy wskazującym 1.00 i tylko
+// NA WPÓŁ wyprostowanym środkowym (0.66) ocena spadała do 0.34. A prawdziwa
+// dłoń przy wskazywaniu prawie zawsze trzyma środkowy na wpół wyprostowany.
+//
+// Nie można tu użyć ŚREDNIEJ pozostałych palców zamiast maksimum, bo wtedy
+// DWA palce w górę też zapalałyby ogień - a to pieczęć Peruna i konflikt
+// byłby gwarantowany. Dlatego zostaje maksimum, ale z pasmem tolerancji:
+// weto działa dopiero, gdy drugi palec jest WYRAŹNIE wyprostowany.
+//
+//   drugi palec 0.50 lub mniej -> brak weta      (wskazywanie, luźna dłoń)
+//   drugi palec 0.66           -> ocena x 0.54   (przechodzi)
+//   drugi palec 0.85 lub więcej -> weto pełne    (dwa palce, otwarta dłoń)
+const WETO_DRUGIEGO_OD = 0.85;
+const WETO_DRUGIEGO_DO = 0.50;
 const PROG_UTRZYMANIA = 0.30;     // utrzymanie: sam palec nadal wyprostowany
 const ALFA_UTRZYMANIA = 0.35;     // wygładzanie, żeby jedna klatka szumu nie liczyła się
 const NAD_BARKIEM = 0.02;      // ile ponad linią barków, w wysokościach kadru
+
+// Barki muszą być WIDOCZNE, żeby linia barków cokolwiek znaczyła.
+//
+// Zgłoszone z testu: zapalał się palec opuszczonej ręki, mimo że warunek
+// "nad barkiem" był w kodzie i się wykonywał. Powód: przy kamerze laptopa
+// i graczu blisko obiektywu MediaPipe ZGADUJE pozycję barków. Gdy umieści je
+// nisko albo poza kadrem, opuszczona ręka faktycznie jest "nad linią barków"
+// i warunek przestaje cokolwiek odsiewać.
+const PROG_WIDOCZNOSCI_BARKU = 0.5;
+
+// Zapas na wypadek niepewnych barków: opuszek musi być w GÓRNEJ części kadru.
+// Warunek bezwzględny, niezależny od jakości pozy.
+const GORNA_CZESC_KADRU = 0.45;
+
+// O ile wyżej musi być ręka zapalająca od każdej innej widocznej dłoni.
+// To jest odpowiedź na sedno zgłoszenia: zapala się ta ręka, którą PODNOSISZ.
+const PRZEWAGA_WYSOKOSCI = 0.08;
 
 // Pobór MUSI być pokonywalny tańcem, inaczej moc stoi w miejscu i pętla gry
 // się nie zamyka.
@@ -135,6 +179,7 @@ export class PlonacyPalec {
         this._reka = null;       // stronność ręki, która zapaliła ogień
         this._czasNiewidzenia = 0; // ile trwa brak JAKIEJKOLWIEK dłoni [s]
         this._utrzymanie = 0;      // wygładzone wyprostowanie płonącego palca
+        this.barkiNiepewne = false; // diagnostyka: czy poza dała pewne barki
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności. */
@@ -167,15 +212,22 @@ export class PlonacyPalec {
         if (this.stan === 'GOTOWY') {
             this.sila = 0;
             this.zaczep = null;
-            // Zapłon: NAJLEPSZY kandydat, który jest nad linią barków.
-            // Sprawdzanie tego tylko na najwyżej ocenionej dłoni powodowało,
-            // że opuszczona ręka z lepszym wynikiem blokowała zapłon.
+            // Zapłon: NAJWYŻEJ PODNIESIONY kandydat nad linią barków.
+            //
+            // Wybieramy po WYSOKOŚCI, nie po ocenie gestu. Wcześniej brany był
+            // najlepiej oceniony kandydat, więc opuszczona ręka z przypadkowo
+            // lepszym układem palców wygrywała z ręką celowo podniesioną.
+            // Gracz podnosi rękę, żeby zapalić - to podniesienie ma decydować.
             let zapalny = null;
             for (const k of kandydaci) {
                 if (k.wynik < PROG_WSKAZANIA) continue;
                 if (!this._nadBarkiem(frame, k.opuszek)) continue;
-                if (!zapalny || k.wynik > zapalny.wynik) zapalny = k;
+                // Oś Y rośnie w dół, więc niższe y = wyżej na ekranie.
+                if (!zapalny || k.opuszek.y < zapalny.opuszek.y) zapalny = k;
             }
+
+            // I musi być WYRAŹNIE wyżej niż każda inna widoczna dłoń.
+            if (zapalny && !this._najwyzejPodniesiona(frame, zapalny)) zapalny = null;
             if (zapalny) {
                 this.stan = 'PLONIE';
                 this.zaczep = zapalny.opuszek;
@@ -311,7 +363,7 @@ export class PlonacyPalec {
             const idx = OPUSZKI[i1];
             out.push({
                 // Do ZAPŁONU: czy wystawiony jest dokładnie jeden palec.
-                wynik: v1 * (1 - v2),
+                wynik: v1 * rampa(v2, WETO_DRUGIEGO_OD, WETO_DRUGIEGO_DO),
                 // Do UTRZYMANIA: czy ten palec jest nadal wyprostowany.
                 wyprost: v1,
                 opuszek: { x: d.landmarks[idx].x, y: d.landmarks[idx].y },
@@ -321,12 +373,60 @@ export class PlonacyPalec {
         return out;
     }
 
-    /** Oś Y rośnie W DÓŁ, więc "nad barkami" to y MNIEJSZE od linii barków. */
+    /**
+     * Oś Y rośnie W DÓŁ, więc "nad barkami" to y MNIEJSZE od linii barków.
+     *
+     * Linia barków liczy się tylko wtedy, gdy barki są WIDOCZNE. Przy graczu
+     * blisko kamery laptopa MediaPipe je zgaduje, a zgadnięte nisko barki
+     * przepuszczały opuszczoną rękę. Gdy nie są pewne, schodzimy na warunek
+     * bezwzględny: opuszek w górnej części kadru.
+     */
     _nadBarkiem(frame, opuszek) {
+        if (!Number.isFinite(opuszek.y)) return false;
+
+        // Bez pozy NIE MA zapłonu. Zapas "górna część kadru" jest po to, żeby
+        // ratować niepewne barki, a nie po to, żeby całkiem znieść warunek -
+        // gracz zgłasza, że zapala się ZA ŁATWO, więc rozluźnianie tu byłoby
+        // krokiem w złą stronę.
         const lm = frame.pose?.landmarks;
-        if (!lm || !lm[BARK_L] || !lm[BARK_P]) return false;
-        const yBarkow = (lm[BARK_L].y + lm[BARK_P].y) / 2;
-        if (!Number.isFinite(yBarkow) || !Number.isFinite(opuszek.y)) return false;
-        return opuszek.y < yBarkow - NAD_BARKIEM;
+        if (!lm) return false;
+
+        const bl = lm[BARK_L], bp = lm[BARK_P];
+        const pewneBarki = bl && bp
+            && (bl.visibility ?? 1) >= PROG_WIDOCZNOSCI_BARKU
+            && (bp.visibility ?? 1) >= PROG_WIDOCZNOSCI_BARKU;
+
+        if (pewneBarki) {
+            const yBarkow = (bl.y + bp.y) / 2;
+            if (Number.isFinite(yBarkow)) return opuszek.y < yBarkow - NAD_BARKIEM;
+        }
+        this.barkiNiepewne = true;
+        return opuszek.y < GORNA_CZESC_KADRU;
+    }
+
+    /**
+     * Czy to NAJWYŻEJ PODNIESIONA dłoń w kadrze.
+     *
+     * Sedno zgłoszenia: gracz podnosi prawą rękę, a zapala się palec
+     * opuszczonej lewej. Porównanie z KAŻDĄ widoczną dłonią (nie tylko
+     * z kandydatami na wskazywanie) rozstrzyga to bez oglądania się na jakość
+     * pozy - opuszczona ręka jest po prostu niżej.
+     */
+    _najwyzejPodniesiona(frame, kandydat) {
+        for (const d of (frame.hands ?? [])) {
+            if (!pelnaDlon(d.landmarks)) continue;
+            // Nadgarstek jako reprezentant dłoni - stabilniejszy niż opuszki,
+            // które przy wskazywaniu mocno się przemieszczają.
+            const y = d.landmarks[0].y;
+            if (!Number.isFinite(y)) continue;
+            if (y < kandydat.opuszek.y + PRZEWAGA_WYSOKOSCI) {
+                // Ta dłoń jest wyżej albo na podobnej wysokości. Jeśli to nie
+                // jest dłoń kandydata, zapłon jest niejednoznaczny.
+                const toKandydat = Math.hypot(d.landmarks[0].x - kandydat.opuszek.x,
+                                              d.landmarks[0].y - kandydat.opuszek.y) < 0.25;
+                if (!toKandydat) return false;
+            }
+        }
+        return true;
     }
 }
