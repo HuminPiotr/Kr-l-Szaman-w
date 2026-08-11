@@ -9,7 +9,6 @@ import { ZnakRegistry } from './znaki/registry.js';
 import { welesDlon } from './znaki/welesDlon.js';
 import { perunDlon } from './znaki/perunDlon.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
-import { szczurDlon } from './znaki/szczurDlon.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -21,7 +20,13 @@ import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js'
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
 
-// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js.
+// ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, znaki/szczurDlon.js.
+//
+// Szczur (odpięty 2026-08-11) zawodził przy łapaniu na żywo - zgłoszenie
+// gracza po przeprojektowaniu na "pięść pod, dwa palce nad" wciąż nie
+// łapało pieczęci pewnie. Plik zostaje na dysku i jego testy dalej
+// przechodzą; Aard uzbraja się teraz podwójnym Welesem (kombosy.js), który
+// jest już zweryfikowany jako niezawodny.
 //
 // Dłonie są WPIĘTE od nowa. Postawy ciała (perun/mokosz/weles) działały, ale
 // wymagały kadru z barkami I biodrami plus zapasem - kamera laptopa tego nie
@@ -56,13 +61,7 @@ let znaki = new ZnakRegistry();
 // na dysku - działały, ale wymagały kadru z barkami I biodrami plus zapasem,
 // czego kamera laptopa nie daje. Trójka jest rozdzielana LICZBĄ WYPROSTOWANYCH
 // PALCÓW: Weles 0, Perun 4, Swaróg 10 - nie do pomylenia.
-//
-// Szczur wyłamuje się z tej reguły: też ma 0 palców, więc od Welesa dzieli go
-// WYŁĄCZNIE odległość nadgarstków, z martwą strefą pomiędzy (szczurDlon.js).
-// Zmierzone na dłoni syntetycznej: Szczur gaśnie przy 0.75 skali dłoni, Weles
-// zaczyna punktować od 0.8 - rozsuwane pięści nie punktują obu naraz.
 znaki.zarejestruj(welesDlon);
-znaki.zarejestruj(szczurDlon);
 znaki.zarejestruj(perunDlon);
 znaki.zarejestruj(swarogDlon);
 let skladanie = new SkladaniePieczeci();

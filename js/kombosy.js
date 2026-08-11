@@ -29,13 +29,18 @@ export const KOMBOSY = [
     { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun'], uzbraja: 'ogien' },
     { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['weles', 'swarog'], uzbraja: 'ogien' },
 
-    // Szczur x2 -> Aard. Podwójny Szczur to PRZYTRZYMANIE jednej postawy przez
-    // dwa cykle pierścienia - pieczecie.js po złożeniu zaczyna następny od
-    // nowa przy tej samej postawie, więc rytuał nie wymaga nowej mechaniki.
-    // UWAGA: trzeci szczur z rzędu odpali kombos PONOWNIE (dopasowanie do
+    // Weles x2 -> Aard. Pieczęć Szczura (poprzedni wyzwalacz) okazała się
+    // niepewna w łapaniu na żywo - odpięta na razie (js/znaki/szczurDlon.js
+    // zostaje na dysku). Weles jest już zweryfikowany jako niezawodny, więc
+    // Aard uzbraja się jego podwójnym złożeniem zamiast nowego znaku.
+    // Podwójne złożenie to PRZYTRZYMANIE jednej postawy przez dwa cykle
+    // pierścienia - pieczecie.js po złożeniu zaczyna następny od nowa przy
+    // tej samej postawie, więc rytuał nie wymaga nowej mechaniki.
+    // UWAGA: trzeci Weles z rzędu odpali TEN kombos PONOWNIE (dopasowanie do
     // końcówki bufora) - to celowe zachowanie łańcuchów; ponowne uzbrojenie
-    // uzbrojonej techniki jest no-opem.
-    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['szczur', 'szczur'], uzbraja: 'aard' }
+    // uzbrojonej techniki jest no-opem. Weles -> Swaróg dalej odpala Zew
+    // Podziemia niezależnie - sekwencje mają się nakładać, nie wykluczać.
+    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['weles', 'weles'], uzbraja: 'aard' }
 ];
 
 export class KomboSilnik {

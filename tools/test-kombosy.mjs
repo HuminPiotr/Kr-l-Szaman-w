@@ -63,18 +63,23 @@ spr('nieznane id nie wywraca silnika', k7.dodaj('nieistnieje', 0) === null);
 spr('NaN jako czas nie wywraca silnika', k7.dodaj('swarog', NaN) === null);
 spr('tabela kombosów jest niepusta', KOMBOSY.length >= 2);
 
-// --- SEKWENCJA Z POWTÓRZONYM ID: szczur -> szczur ---
-console.log('\nPOWTÓRZONA PIECZĘĆ W SEKWENCJI (szczur x2):');
+// --- SEKWENCJA Z POWTÓRZONYM ID: weles -> weles ---
+console.log('\nPOWTÓRZONA PIECZĘĆ W SEKWENCJI (weles x2):');
 const k8 = new KomboSilnik();
-spr('pierwszy szczur nie odpala', k8.dodaj('szczur', 0) === null);
-const aard1 = k8.dodaj('szczur', 900);
-spr(`drugi szczur odpala Aard (${aard1?.id})`, aard1?.id === 'aard');
-// Dopasowanie do KOŃCÓWKI bufora: trzeci szczur znów tworzy parę [s,s].
+spr('pierwszy weles nie odpala', k8.dodaj('weles', 0) === null);
+const aard1 = k8.dodaj('weles', 900);
+spr(`drugi weles odpala Aard (${aard1?.id})`, aard1?.id === 'aard');
+// Dopasowanie do KOŃCÓWKI bufora: trzeci weles znów tworzy parę [w,w].
 // To jest CELOWE zachowanie łańcuchów ("nakładające się sekwencje mają się
 // nakładać") - ten assert dokumentuje je jawnie, żeby nikt nie "naprawił"
 // go przypadkiem. Ponowne uzbrojenie uzbrojonej techniki to no-op.
-const aard2 = k8.dodaj('szczur', 1800);
-spr(`trzeci szczur odpala PONOWNIE - jawne zachowanie łańcucha (${aard2?.id})`, aard2?.id === 'aard');
+const aard2 = k8.dodaj('weles', 1800);
+spr(`trzeci weles odpala PONOWNIE - jawne zachowanie łańcucha (${aard2?.id})`, aard2?.id === 'aard');
+
+// Weles -> Swaróg dalej odpala Zew Podziemia NIEZALEŻNIE od podwójnego
+// welesa wcześniej - sekwencje mają się nakładać, nie wykluczać.
+const zewPoAard = k8.dodaj('swarog', 2200);
+spr(`weles x2 -> swaróg odpala DALEJ Zew Podziemia (${zewPoAard?.id})`, zewPoAard?.id === 'zewPodziemia');
 
 // --- POLE uzbraja ---
 // main.js routuje po nim techniki; wiersz bez tego pola uzbroiłby złą technikę.
