@@ -9,7 +9,7 @@
  * Fizykę testujemy przez _ruszaj(dt) bezpośrednio, jak tools/test-aura-impuls.mjs
  * czyta aura._impuls.
  */
-import { Fala, rzutPerspektywiczny, OGNISKO } from '../js/fala.js';
+import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO } from '../js/fala.js';
 
 const DT = 1 / 60;
 
@@ -69,8 +69,31 @@ spr(`bliższa cząstka (z=100) większa niż dalsza (z=500)`,
     rzutPerspektywiczny(100) > rzutPerspektywiczny(500));
 spr(`bardzo daleka cząstka (z=${OGNISKO * 10}) prawie znika (s=${rzutPerspektywiczny(OGNISKO * 10).toFixed(3)})`,
     rzutPerspektywiczny(OGNISKO * 10) < 0.15);
-spr(`bardzo bliska/za kamerą (z=-${OGNISKO}) jest KLAMROWANA, nie ucieka w nieskończoność`,
-    Number.isFinite(rzutPerspektywiczny(-OGNISKO)) && rzutPerspektywiczny(-OGNISKO) <= 3);
+// Górna granica na s wynika WYŁĄCZNIE z klamra na z (zc_min=-OGNISKO*0.6 ->
+// s_max=2.5) - osobny klamr na s byłby martwym kodem, bo nigdy by się nie
+// uaktywnił. Assert na dokładną granicę, nie okrągłe "<=3", żeby test
+// faktycznie coś sprawdzał, a nie przechodził trywialnie.
+spr(`bardzo bliska/za kamerą (z=-${OGNISKO}) jest KLAMROWANA do s=2.5, nie ucieka w nieskończoność`,
+    Number.isFinite(rzutPerspektywiczny(-OGNISKO)) && Math.abs(rzutPerspektywiczny(-OGNISKO) - 2.5) < 1e-9);
+spr(`jeszcze dalej za kamerą (z=-10*OGNISKO) dalej daje s=2.5 - klamr trzyma`,
+    Math.abs(rzutPerspektywiczny(-10 * OGNISKO) - 2.5) < 1e-9);
+
+// --- 7. Rzut pozycji: prawdziwa zbieżność do zaczepu z głębią, nie tylko
+// kurczenie się w miejscu. Bez tego dalekie cząstki rysowałyby się w PEŁNYM
+// bocznym rozstawie, tylko mniejsze - zamiast być ściągnięte bliżej zaczepu,
+// jak wymaga spec (`zaczep_2d + (x,y)·s`). ---
+console.log('\nRZUT POZYCJI (zbieżność perspektywiczna):');
+const zaczep7 = { x: 500, y: 500 };
+const daleko7 = { x: 700, y: 300 };   // 200px w bok, 200px w górę od zaczepu
+const bliskoWynik = rzutujPozycje(zaczep7, daleko7, 1.0);   // s=1 (na miejscu emisji)
+spr(`przy s=1 pozycja to prawdziwa pozycja bez zmian (${bliskoWynik.x}, ${bliskoWynik.y})`,
+    bliskoWynik.x === daleko7.x && bliskoWynik.y === daleko7.y);
+const dalekoWynik = rzutujPozycje(zaczep7, daleko7, 0.0);   // s=0 (nieskończenie daleko)
+spr(`przy s=0 pozycja zbiega DOKŁADNIE do zaczepu (${dalekoWynik.x}, ${dalekoWynik.y})`,
+    dalekoWynik.x === zaczep7.x && dalekoWynik.y === zaczep7.y);
+const posredniWynik = rzutujPozycje(zaczep7, daleko7, 0.5);
+spr(`przy s=0.5 pozycja jest w POŁOWIE drogi do zaczepu (${posredniWynik.x}, ${posredniWynik.y})`,
+    posredniWynik.x === 600 && posredniWynik.y === 400);
 spr('NaN -> skończona wartość, bez wyjątku', Number.isFinite(rzutPerspektywiczny(NaN)));
 
 process.exit(ok ? 0 : 1);

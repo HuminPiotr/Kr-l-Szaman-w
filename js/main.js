@@ -15,7 +15,7 @@ import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
 import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
-import { Podmuch } from './podmuch.js';
+import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA } from './podmuch.js';
 import { Fala } from './fala.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
@@ -505,7 +505,8 @@ function klatka(now) {
                  utrzymanie: plonacyPalec._utrzymanie,
                  barkiNiepewne: plonacyPalec.barkiNiepewne },
         podmuch: { stan: podmuch.stan, diagnostyka: podmuch.diagnostyka,
-                   czastkiFali: fala.liczba },
+                   czastkiFali: fala.liczba,
+                   progPredkosci: PROG_PREDKOSCI, progOtwarcia: PROG_OTWARCIA },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,

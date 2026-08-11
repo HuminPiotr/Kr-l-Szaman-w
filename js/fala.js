@@ -10,9 +10,19 @@
  *
  * ================= RZUT PERSPEKTYWICZNY =================
  * Cząstki żyją w przestrzeni PIKSELOWEJ (x,y,z), z=0 w miejscu zaczepu.
- * Rzut na płótno: s = OGNISKO / (OGNISKO + z) - mniejsze z (bliżej) daje
- * większe s, dalsze cząstki kurczą się i bledną. OGNISKO jest ZGADNIĘTE
+ * `s = OGNISKO / (OGNISKO + z)` - mniejsze/UJEMNE z (bliżej) daje większe s,
+ * większe z (dalej, w głąb ekranu) daje mniejsze s. OGNISKO jest ZGADNIĘTE
  * (jak każda inna stała w tej grze) i wymaga potwierdzenia z nakładki (D).
+ *
+ * KONWENCJA OSI Z JEST WSPÓLNA Z js/podmuch.js: z rośnie W GŁĄB ekranu,
+ * ujemne z jest BLIŻEJ gracza/kamery. `podmuch.js` musi budować `kierunek.z`
+ * zgodnie z tą konwencją (rosnąca dłoń = ruch ku kamerze = ujemne z) -
+ * niezgodność między tymi dwoma plikami sprawiała wcześniej, że pchnięcie
+ * w stronę kamery wizualnie leciało w głąb ekranu.
+ *
+ * Rzut skaluje NIE TYLKO rozmiar/alfa sprite'a, ale i POZYCJĘ na ekranie
+ * (patrz rzutujPozycje): dalsze cząstki są ściągane bliżej zaczepu, dając
+ * prawdziwą zbieżność perspektywiczną, a nie tylko kurczenie się w miejscu.
  *
  * ================= DLACZEGO WYGLĄDA JAK WIATR =================
  * 1. STOŻEK ROSNĄCY Z WIEKIEM. Cząstki startują w wąskim stożku wokół
@@ -34,7 +44,7 @@ const BARWA = [214, 240, 255];     // blady błękit - patrz efekty.js (aard)
 
 const NA_WYSTRZAL = 220;           // cząstek przy pełnej sile (nie na sekundę - jednorazowo)
 const PREDKOSC_BAZOWA = 640;       // px/s wzdłuż kierunku, przy pełnej sile
-const ROZRZUT_PREDKOSCI = 220;     // px/s losowego rozrzutu długości wektora
+const ROZRZUT_PREDKOSCI = 220;     // px/s losowego rozrzutu długości wektora, PRZY PEŁNEJ SILE
 const ROZWARCIE_START = 0.12;      // rad - stożek WĄSKI w chwili emisji
 const ROZPRASZANIE = 260;          // px/s^2 bocznego rozjeżdżania, rośnie z wiekiem
 const OPOR = 0.9;                  // 1/s - hamowanie, fala zwalnia zamiast lecieć bez końca
@@ -43,16 +53,31 @@ const ROZMIAR_OD = 0.5, ROZMIAR_DO = 1.4;
 const MAX_CZASTECZEK = 500;        // sufit bezpieczeństwa dla klatkażu
 
 /**
- * Rzut perspektywiczny: mniejsze z (bliżej kamery) -> większe s.
+ * Rzut perspektywiczny: mniejsze/ujemne z (bliżej kamery) -> większe s.
  *
- * KLAMROWANE z obu stron: z ucieczką w -OGNISKO (cząstka "za kamerą")
- * mianownik dążyłby do zera i s eksplodowałoby - stąd dolna granica na z.
- * Górna granica na s (3) chroni przed jednym gigantycznym sprite'em, gdyby
- * cząstka poleciała wprost na widza.
+ * KLAMROWANE OD DOŁU: z ucieczką w -OGNISKO (cząstka "za kamerą") mianownik
+ * dążyłby do zera i s eksplodowałoby - stąd dolna granica na z. Przy
+ * `zc_min = -ognisko*0.6` daje to `s_max = 1/0.4 = 2.5` - to i tak jest
+ * jedyna górna granica na s, więc osobny klamr na s byłby martwy kod.
  */
 export function rzutPerspektywiczny(z, ognisko = OGNISKO) {
     const zc = Number.isFinite(z) ? Math.max(z, -ognisko * 0.6) : 0;
-    return Math.min(3, ognisko / (ognisko + zc));
+    return ognisko / (ognisko + zc);
+}
+
+/**
+ * Rzutuje pozycję cząstki na ekran: przy s→0 (daleko) zbiega do `zaczep`,
+ * przy s→1 (blisko/w miejscu emisji) zostaje przy prawdziwej pozycji.
+ *
+ * Wydzielona jako czysta funkcja - bez niej test nie mógłby sprawdzić
+ * matematyki rzutu (_rysuj tworzy sprite przez document.createElement,
+ * którego nie ma w Node).
+ */
+export function rzutujPozycje(zaczep, pozycja, s) {
+    return {
+        x: zaczep.x + (pozycja.x - zaczep.x) * s,
+        y: zaczep.y + (pozycja.y - zaczep.y) * s
+    };
 }
 
 function krzyz(a, b) {
@@ -102,8 +127,12 @@ export class Fala {
                 y: os.y * Math.cos(kat) + (p1.y * Math.cos(phi) + p2.y * Math.sin(phi)) * Math.sin(kat),
                 z: os.z * Math.cos(kat) + (p1.z * Math.cos(phi) + p2.z * Math.sin(phi)) * Math.sin(kat),
             };
+            // Rozrzut skalowany przez `s`: przy słabej fali baza (PREDKOSC_
+            // BAZOWA*s) bywa mniejsza niż stały rozrzut, więc część cząstek
+            // dostawałaby UJEMNĄ prędkość wzdłuż kierunku - leciałyby do
+            // tyłu. Rozrzut proporcjonalny do siły to wyklucza.
             const predkosc = (PREDKOSC_BAZOWA * s) * (0.7 + Math.random() * 0.5)
-                            + (Math.random() - 0.5) * ROZRZUT_PREDKOSCI;
+                            + (Math.random() - 0.5) * ROZRZUT_PREDKOSCI * s;
             // Kierunek bocznego rozpraszania - LOSOWY per cząstka, żeby
             // stożek rozjeżdżał się na wszystkie strony, nie w jedną.
             const rozPhi = Math.random() * Math.PI * 2;
@@ -114,6 +143,7 @@ export class Fala {
             };
             this._dodaj({
                 x: zaczep.x, y: zaczep.y, z: 0,
+                zx0: zaczep.x, zy0: zaczep.y,   // zaczep w chwili EMISJI - do rzutu pozycji
                 vx: kier.x * predkosc, vy: kier.y * predkosc, vz: kier.z * predkosc,
                 roz,
                 zycie: ZYCIE_MIN + Math.random() * (ZYCIE_MAX - ZYCIE_MIN),
@@ -156,22 +186,25 @@ export class Fala {
         if (!this.czastki.length) return;
         if (!this._sprite) this._sprite = zrobSprite();
 
-        // DALSZE POD BLIŻSZYMI: sortujemy malejąco po z, więc cząstki
-        // z najmniejszym z (najbliższe) rysują się na końcu, na wierzchu.
-        const posortowane = [...this.czastki].sort((a, b) => b.z - a.z);
+        // DALSZE POD BLIŻSZYMI: sortujemy W MIEJSCU malejąco po z (kolejność
+        // w this.czastki nie ma znaczenia dla niczego innego, więc kopiowanie
+        // tablicy co klatkę byłoby niepotrzebne) - cząstki z najmniejszym z
+        // (najbliższe) rysują się na końcu, na wierzchu.
+        this.czastki.sort((a, b) => b.z - a.z);
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        for (const c of posortowane) {
+        for (const c of this.czastki) {
             const p = c.wiek / c.zycie;
             const s = rzutPerspektywiczny(c.z);
             // Szybki narost, powolne wygaszanie - ten sam kształt obwiedni
             // co w ogien.js, żeby cząstki nie pojawiały się skokowo.
             const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
             const r = SPRITE_PX * c.skala * s;
+            const poz = rzutujPozycje({ x: c.zx0, y: c.zy0 }, { x: c.x, y: c.y }, s);
 
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * s * 0.85));
-            ctx.drawImage(this._sprite, c.x - r / 2, c.y - r / 2, r, r);
+            ctx.drawImage(this._sprite, poz.x - r / 2, poz.y - r / 2, r, r);
         }
         ctx.globalAlpha = 1;
         ctx.restore();

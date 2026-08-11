@@ -133,4 +133,104 @@ const brakDloni = p9.update({ hands: [], pose: null, width: 1920, height: 1080 }
 spr('brak dłoni + NaN dt -> null, bez wyjątku', brakDloni === null);
 spr('  ...i uzbrojenie zostaje (stan nadal UZBROJONY)', p9.stan === 'UZBROJONY');
 
+// --- 10. Konwencja osi Z: ruch KU KAMERZE (rosnąca dłoń) daje UJEMNE z ---
+// Konwencja jest wspólna z fala.js (rzutPerspektywiczny: rosnące z = dalej,
+// ujemne z = bliżej). Wcześniejsza wersja miała tu ODWROTNY znak - pchnięcie
+// w kamerę wizualnie leciało w głąb ekranu. Dłoń rośnie (dSkala>0, ruch "ku
+// kamerze"), zero ruchu bocznego, normalna dokładnie wzdłuż osi Z.
+console.log('\nKONWENCJA OSI Z (ku kamerze = ujemne z):');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let skala = S, wynik = null;
+    for (let i = 0; i < 8 && !wynik; i++) {
+        const f = {
+            hands: [{
+                landmarks: dlon({ ox: 0.5, oy: 0.5, zgiecia: OTWARTA, skala }),
+                worldLandmarks: worldDlon({ zgiecia: OTWARTA, skala, pochylY: 0 }),   // normalna ~(0,0,1)
+                handedness: 'Right'
+            }], pose: null, width: 1920, height: 1080
+        };
+        wynik = p.update(f, 1.0, DT);
+        skala *= 1.15;   // dłoń wyraźnie rośnie każdą klatkę - ruch ku kamerze
+    }
+    spr(`dłoń rosnąca (ruch ku kamerze) odpala falę`, wynik !== null);
+    spr(`  ...kierunek.z jest UJEMNY (${wynik?.kierunek.z.toFixed(2)}), zgodnie z konwencją fala.js`,
+        wynik !== null && wynik.kierunek.z < -0.3);
+}
+
+// --- 11. Ochrona przed jednoklatkowym artefaktem (np. przeskok trackingu) ---
+// Symulacja: dłoń NIERUCHOMA przez kilka klatek, potem JEDNA klatka
+// z dużym skokiem pozycji (jak przy zamianie stronności), potem z powrotem
+// nieruchoma. To NIE JEST prawdziwe machnięcie i nie powinno odpalać.
+console.log('\nOCHRONA PRZED JEDNOKLATKOWYM ARTEFAKTEM:');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let wynik = null;
+    // Kilka klatek nieruchomo przy ox=0.3
+    for (let i = 0; i < 3; i++) wynik = p.update(klatka(0.3, OTWARTA, Math.PI / 2), 1.0, DT) || wynik;
+    // JEDEN skok do ox=0.9 (symulacja artefaktu)
+    wynik = p.update(klatka(0.9, OTWARTA, Math.PI / 2), 1.0, DT) || wynik;
+    // Z powrotem nieruchomo przy ox=0.9 (żeby drugi klatka skoku też nie odpaliła)
+    for (let i = 0; i < 3; i++) wynik = p.update(klatka(0.9, OTWARTA, Math.PI / 2), 1.0, DT) || wynik;
+    spr(`jednoklatkowy skok NIE odpala (stan ${p.stan})`, wynik === null && p.stan === 'UZBROJONY');
+}
+{
+    // Kontrola: PRAWDZIWE machnięcie (przesunięcie utrzymane przez >=2
+    // klatki z rzędu) nadal odpala tak jak wcześniej.
+    const p = new Podmuch(); p.uzbrój();
+    const wynik = machnij(p, 1.0, { pochylY: Math.PI / 2 });
+    spr(`prawdziwe machnięcie (wiele klatek ruchu) nadal odpala`, wynik !== null);
+}
+
+// --- 12. Prędkość liczona względem CAŁEGO czasu od ostatniej detekcji,
+// nie pojedynczej klatki renderowania - main.js woła update() co klatkę
+// requestAnimationFrame, ale frame.hands odświeża się wolniej (tempo
+// detekcji). Symulacja: 2 klatki z IDENTYCZNĄ pozycją (brak nowej detekcji)
+// na 1 klatkę z nową pozycją, przy STAŁYM realnym tempie ruchu. ---
+console.log('\nPRĘDKOŚĆ WZGLĘDEM CZASU AKUMULOWANEGO (throttling detekcji):');
+{
+    const p = new Podmuch();   // NIEuzbrojony - liczy się tylko diagnostyka
+    const KROK_NA_DETEKCJE = 0.3;   // duży, żeby predkosc na pewno przekroczył próg
+    let ox = 0.3;
+    const predkosci = [];
+    // Wzorzec: [nowa pozycja][ta sama][ta sama][nowa pozycja][ta sama][ta sama]...
+    for (let cykl = 0; cykl < 6; cykl++) {
+        ox += KROK_NA_DETEKCJE;
+        p.update(klatka(ox, OTWARTA, Math.PI / 2), 1.0, DT);              // nowa detekcja
+        predkosci.push(p.diagnostyka.predkosc);
+        p.update(klatka(ox, OTWARTA, Math.PI / 2), 1.0, DT);              // brak nowej detekcji
+        predkosci.push(p.diagnostyka.predkosc);
+        p.update(klatka(ox, OTWARTA, Math.PI / 2), 1.0, DT);              // brak nowej detekcji
+        predkosci.push(p.diagnostyka.predkosc);
+    }
+    // Odrzuć pierwsze TRZY próbki (cały pierwszy cykl: rozruch, brak
+    // poprzedniej pozycji -> predkosc=0 na wszystkich trzech push-ach tego
+    // cyklu, nie tylko na pierwszym).
+    const ustabilizowane = predkosci.slice(3);
+    const min = Math.min(...ustabilizowane), max = Math.max(...ustabilizowane);
+    console.log(`  predkosci: ${ustabilizowane.map(v => v.toFixed(1)).join(', ')}`);
+    spr(`odczyt prędkości jest STABILNY, nie miga między ~0 a zawyżoną wartością (min ${min.toFixed(1)}, max ${max.toFixed(1)})`,
+        min > 0 && max / min < 1.5);
+}
+
+// --- 13. Zabezpieczenie przy niejednoznacznym (bliskim zeru) iloczynie
+// skalarnym normalnej i ruchu - dłoń niemal PROSTOPADŁA do machnięcia.
+// Bez zabezpieczenia znak byłby szumem numerycznym; fala mogłaby polecieć
+// w gracza. Bezpieczny domyślny kierunek: OD gracza (kierunek.z > 0). ---
+console.log('\nNIEJEDNOZNACZNY KIERUNEK (dłoń prostopadła do machnięcia):');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let ox = 0.3, wynik = null;
+    // Dłoń frontem do kamery (pochylY=0, normalna ~(0,0,1) - "ku kamerze"),
+    // machnięcie CZYSTO POZIOME (dx duży, dy=0, brak zmiany skali) - niemal
+    // prostopadłe do normalnej, iloczyn skalarny bliski zeru.
+    for (let i = 0; i < 8 && !wynik; i++) {
+        wynik = p.update(klatka(ox, OTWARTA, 0, 0), 1.0, DT);
+        ox += 0.08;
+    }
+    spr(`niejednoznaczny gest nadal odpala (bezpieczny fallback)`, wynik !== null);
+    spr(`  ...kierunek.z jest DODATNI - OD gracza, nigdy w jego stronę (${wynik?.kierunek.z.toFixed(2)})`,
+        wynik !== null && wynik.kierunek.z >= 0);
+}
+
 process.exit(ok ? 0 : 1);

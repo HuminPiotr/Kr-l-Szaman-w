@@ -208,8 +208,8 @@ export class DebugHud {
         if (stats.podmuch) {
             const d = stats.podmuch.diagnostyka;
             lines.push(`podmuch ${stats.podmuch.stan}  cząstek fali ${stats.podmuch.czastkiFali}`);
-            lines.push(`      prędkość ${this._num(d.predkosc)} sk/s (prog 4.0)` +
-                       `   otwarcie ${this._num(d.otwarcie)} (prog 0.55)`);
+            lines.push(`      prędkość ${this._num(d.predkosc)} sk/s (prog ${this._num(stats.podmuch.progPredkosci)})` +
+                       `   otwarcie ${this._num(d.otwarcie)} (prog ${this._num(stats.podmuch.progOtwarcia)})`);
             if (d.kierunek) {
                 lines.push(`      kierunek (${d.kierunek.x.toFixed(2)}, ${d.kierunek.y.toFixed(2)}, ${d.kierunek.z.toFixed(2)})`);
             }
