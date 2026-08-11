@@ -15,7 +15,6 @@ import { welesDlon } from '../js/znaki/welesDlon.js';
 import { perunDlon } from '../js/znaki/perunDlon.js';
 import { swarogDlon } from '../js/znaki/swarogDlon.js';
 import { szczurDlon } from '../js/znaki/szczurDlon.js';
-import { odlegloscNadgarstkow } from '../js/znaki/dlon.js';
 import { dlon } from './_dlon-syntetyczna.mjs';
 
 const W = 1920, H = 1080;
@@ -40,11 +39,12 @@ const UKLADY = {
         dlon({ ox: 0.36, zgiecia: PIESC, skala: S }),
         dlon({ ox: 0.64, zgiecia: PIESC, skala: S })),
 
-    // Szczur: dwie pięści RAZEM (nadgarstki ~0.33 skali dłoni od siebie).
-    // Ta sama para pięści co Weles - rozdziela je wyłącznie odległość.
-    'Szczur (pięści razem)': klatka(
-        dlon({ ox: 0.485, zgiecia: PIESC, skala: S }),
-        dlon({ ox: 0.515, zgiecia: PIESC, skala: S })),
+    // Szczur: dolna dłoń pięść, górna z dwoma palcami (Tygrys), WYRAŹNIE
+    // wyżej i w tej samej kolumnie (ox równe). Asymetryczna - w przeciwieństwie
+    // do reszty trójki obie dłonie robią coś INNEGO.
+    'Szczur (pięść pod, dwa palce nad)': klatka(
+        dlon({ ox: 0.5, oy: 0.70, zgiecia: PIESC, skala: S }),
+        dlon({ ox: 0.5, oy: 0.50, zgiecia: TYGRYS, skala: S })),
 
     // Perun: po dwa palce w górę, dłonie obok siebie z prześwitem
     'Perun (Tygrys)': klatka(
@@ -93,7 +93,7 @@ const spr = (opis, w) => { console.log(`  ${w ? '✓' : '✗'} ${opis}`); if (!w
 // Każda pieczęć zapala SIEBIE i nie zapala pozostałych.
 const PARY = [
     ['Weles (dwie pięści)', 'weles'],
-    ['Szczur (pięści razem)', 'szczur'],
+    ['Szczur (pięść pod, dwa palce nad)', 'szczur'],
     ['Perun (Tygrys)', 'perun'],
     ['Swaróg (Koń)', 'swarog'],
 ];
@@ -102,7 +102,16 @@ for (const [uklad, wlasna] of PARY) {
     spr(`${uklad} zapala ${wlasna} (${o[wlasna].toFixed(2)})`, o[wlasna] > 0.6);
     for (const inna of NAZWY) {
         if (inna === wlasna) continue;
-        spr(`  ...i NIE zapala ${inna} (${o[inna].toFixed(2)})`, o[inna] < 0.25);
+        // Szczur -> Weles jest WYJĄTKIEM od reguły "poniżej 0.25": górna
+        // dłoń Szczura ma DOKŁADNIE dwa z czterech palców (bez kciuka)
+        // zwiniętych (Tygrys), więc zwinieta() - miara Welesa "czy to
+        // pięść" - czyta ją jako w POŁOWIE zwiniętą (~0.37), nie zero.
+        // Bezpieczne mimo to: PROG_POSTAWY w pieczecie.js wynosi 0.5,
+        // a zmierzony szczyt tego przecieku to 0.373 - Weles nigdy się
+        // faktycznie nie złoży przy tym układzie, tylko nie schodzi
+        // do zera na wykresie diagnostycznym.
+        const margines = (inna === 'weles' && wlasna === 'szczur') ? 0.4 : 0.25;
+        spr(`  ...i NIE zapala ${inna} (${o[inna].toFixed(2)})`, o[inna] < margines);
     }
 }
 
@@ -141,34 +150,45 @@ for (let z = 0; z <= 1.001; z += 0.05) {
 console.log('  ' + poziomy.join('  '));
 spr(`największy skok między krokami ${maxSkok.toFixed(3)} - rampa, nie próg`, maxSkok < 0.2);
 
-// PRZEJŚCIE Szczur -> Weles przy rozsuwaniu pięści.
-// Obie pieczęcie to dwie pięści; przy rozsuwaniu wynik Szczura ma zgasnąć
-// ZANIM Weles zacznie punktować (martwa strefa 0.75-0.8 skali dłoni).
-// Bez tej strefy przelot rozsuwających się pięści punktowałby obie naraz.
-// Rozstaw podajemy w SKALACH DŁONI - tej samej jednostce, w której liczą progi
-// obu pieczęci. Wcześniejsza wersja przeliczała go z surowego `ox` i zaczynała
-// wydruk dopiero od 0.9 skali, więc tabelka pokazywała same zera Szczura
-// i niczego nie było widać. Zamiatamy OD ZERA, przez całe pasmo obu pieczęci.
-console.log('\nPRZEJŚCIE SZCZUR -> WELES (rozsuwanie pięści):');
-let obieNaraz = 0, szczurPelny = 0, welesPelny = 0;
-const przejscie = [];
-for (let odl = 0.0; odl <= 0.14001; odl += 0.005) {
-    const a = dlon({ ox: 0.5 - odl, zgiecia: PIESC, skala: S });
-    const b = dlon({ ox: 0.5 + odl, zgiecia: PIESC, skala: S });
-    const f = klatka(a, b);
-    const sk = odlegloscNadgarstkow(a, b);
+// CIĄGŁOŚĆ SZCZURA przy ROSNĄCYM PRZESUNIĘCIU PIONOWYM: dolna dłoń pięść,
+// górna Tygrys, ox stałe (wyrównane w pionie) - podnosimy górną dłoń od
+// "na tej samej wysokości" do "wyraźnie nad". Wynik ma rosnąć płynnie
+// (rampa), nie skokiem, i Weles (obie pięści - tu górna NIGDY nie jest
+// pięścią) nie może się w żadnym momencie odezwać.
+console.log('\nSZCZUR: NARASTAJĄCE PRZESUNIĘCIE PIONOWE (dolna pięść, górna Tygrys):');
+let maxSkokSzczur = 0, poprzSzczur = null, maxWeles = 0;
+const wznoszenie = [];
+for (let doy = 0; doy <= 2.2001; doy += 0.1) {
+    const dolna = dlon({ ox: 0.5, oy: 0.60, zgiecia: PIESC, skala: S });
+    const gorna = dlon({ ox: 0.5, oy: 0.60 - doy * S, zgiecia: TYGRYS, skala: S });
+    const f = klatka(dolna, gorna);
     const sz = szczurDlon.score(f), we = welesDlon.score(f);
-    if (sz > 0.25 && we > 0.25) obieNaraz++;
-    if (sz > 0.99) szczurPelny++;
-    if (we > 0.99) welesPelny++;
-    if (Math.round(odl * 1000) % 20 === 0) przejscie.push(`${sk.toFixed(2)}sk: sz ${sz.toFixed(2)} we ${we.toFixed(2)}`);
+    if (poprzSzczur !== null) maxSkokSzczur = Math.max(maxSkokSzczur, Math.abs(sz - poprzSzczur));
+    poprzSzczur = sz;
+    maxWeles = Math.max(maxWeles, we);
+    if (Math.round(doy * 10) % 4 === 0) wznoszenie.push(`${doy.toFixed(1)}sk: sz ${sz.toFixed(2)}`);
 }
-console.log('  ' + przejscie.join('  |  '));
-// Bez tych dwóch asercji zamiatanie mogłoby ominąć pasmo jednej z pieczęci
-// i "brak nakładania" przechodziłby trywialnie, bo obie byłyby wszędzie zerowe.
-spr(`zamiatanie przechodzi przez pełny wynik Szczura (${szczurPelny} próbek)`, szczurPelny > 0);
-spr(`...i przez pełny wynik Welesa (${welesPelny} próbek)`, welesPelny > 0);
-spr(`żadna odległość nie punktuje OBU pieczęci naraz (${obieNaraz} przypadków)`, obieNaraz === 0);
+console.log('  ' + wznoszenie.join('  |  '));
+spr(`największy skok przy podnoszeniu górnej dłoni ${maxSkokSzczur.toFixed(3)} - rampa, nie próg`,
+    maxSkokSzczur < 0.2);
+// Weles NIE ZNIKA do zera (Tygrys ma dwa z czterech palców zwiniętych, więc
+// zwinieta() czyta go jako w połowie pięść - patrz komentarz przy PARY
+// wyżej), ale musi zostać BEZPIECZNIE pod progiem złożenia z pieczecie.js
+// (PROG_POSTAWY = 0.5) w CAŁYM zamiataniu, żeby Weles nigdy się faktycznie
+// nie złożył przy tym układzie.
+const PROG_POSTAWY_GRY = 0.5;
+spr(`Weles zostaje pod progiem złożenia (0.5) w całym zamiataniu (szczyt ${maxWeles.toFixed(3)})`,
+    maxWeles < PROG_POSTAWY_GRY);
+
+// ROZDZIELNOŚĆ OD ROLI: gdy obie dłonie są NA TEJ SAMEJ WYSOKOŚCI (pięść +
+// Tygrys obok siebie, bez przesunięcia pionowego), Szczur MUSI milczeć -
+// inaczej "dwa palce + pięść gdziekolwiek w kadrze" myliłoby się z niedbale
+// złożonym Tygrysem obok przypadkowej pięści.
+const bezPionu = klatka(
+    dlon({ ox: 0.40, oy: 0.60, zgiecia: PIESC, skala: S }),
+    dlon({ ox: 0.60, oy: 0.60, zgiecia: TYGRYS, skala: S }));
+spr(`pięść i Tygrys OBOK SIEBIE (bez przesunięcia w pionie) NIE zapala Szczura (${szczurDlon.score(bezPionu).toFixed(2)})`,
+    szczurDlon.score(bezPionu) < 0.25);
 
 // Odporność na zepsute dane
 const nan = Array.from({ length: 21 }, () => ({ x: NaN, y: NaN, z: 0 }));
