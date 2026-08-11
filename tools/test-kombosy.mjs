@@ -63,4 +63,22 @@ spr('nieznane id nie wywraca silnika', k7.dodaj('nieistnieje', 0) === null);
 spr('NaN jako czas nie wywraca silnika', k7.dodaj('swarog', NaN) === null);
 spr('tabela kombosów jest niepusta', KOMBOSY.length >= 2);
 
+// --- SEKWENCJA Z POWTÓRZONYM ID: szczur -> szczur ---
+console.log('\nPOWTÓRZONA PIECZĘĆ W SEKWENCJI (szczur x2):');
+const k8 = new KomboSilnik();
+spr('pierwszy szczur nie odpala', k8.dodaj('szczur', 0) === null);
+const aard1 = k8.dodaj('szczur', 900);
+spr(`drugi szczur odpala Aard (${aard1?.id})`, aard1?.id === 'aard');
+// Dopasowanie do KOŃCÓWKI bufora: trzeci szczur znów tworzy parę [s,s].
+// To jest CELOWE zachowanie łańcuchów ("nakładające się sekwencje mają się
+// nakładać") - ten assert dokumentuje je jawnie, żeby nikt nie "naprawił"
+// go przypadkiem. Ponowne uzbrojenie uzbrojonej techniki to no-op.
+const aard2 = k8.dodaj('szczur', 1800);
+spr(`trzeci szczur odpala PONOWNIE - jawne zachowanie łańcucha (${aard2?.id})`, aard2?.id === 'aard');
+
+// --- POLE uzbraja ---
+// main.js routuje po nim techniki; wiersz bez tego pola uzbroiłby złą technikę.
+spr('każdy kombos deklaruje, którą technikę uzbraja',
+    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard'));
+
 process.exit(ok ? 0 : 1);

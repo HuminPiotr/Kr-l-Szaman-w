@@ -9,6 +9,7 @@ import { ZnakRegistry } from './znaki/registry.js';
 import { welesDlon } from './znaki/welesDlon.js';
 import { perunDlon } from './znaki/perunDlon.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
+import { szczurDlon } from './znaki/szczurDlon.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -53,7 +54,13 @@ let znaki = new ZnakRegistry();
 // na dysku - działały, ale wymagały kadru z barkami I biodrami plus zapasem,
 // czego kamera laptopa nie daje. Trójka jest rozdzielana LICZBĄ WYPROSTOWANYCH
 // PALCÓW: Weles 0, Perun 4, Swaróg 10 - nie do pomylenia.
+//
+// Szczur wyłamuje się z tej reguły: też ma 0 palców, więc od Welesa dzieli go
+// WYŁĄCZNIE odległość nadgarstków, z martwą strefą pomiędzy (szczurDlon.js).
+// Zmierzone na dłoni syntetycznej: Szczur gaśnie przy 0.75 skali dłoni, Weles
+// zaczyna punktować od 0.8 - rozsuwane pięści nie punktują obu naraz.
 znaki.zarejestruj(welesDlon);
+znaki.zarejestruj(szczurDlon);
 znaki.zarejestruj(perunDlon);
 znaki.zarejestruj(swarogDlon);
 let skladanie = new SkladaniePieczeci();
@@ -368,9 +375,18 @@ function klatka(now) {
         if (technika) {
             efekty.odpal(technika.id);
             aura.rozblysk(1);
-            // Kombos uzbraja płonący palec. Bez licznika ważności - licznik
-            // byłby presją ("szybciej!"), a to ma być relaks.
-            plonacyPalec.uzbrój();
+            // Kombos uzbraja technikę WSKAZANĄ POLEM `uzbraja`, nie zawsze
+            // płonący palec. Dopóki technika była jedna, bezwarunkowe
+            // uzbrajanie ognia było w porządku; przy Aardzie uzbroiłoby złą.
+            // Bez licznika ważności - licznik byłby presją ("szybciej!"),
+            // a to ma być relaks.
+            if (technika.uzbraja === 'ogien') {
+                plonacyPalec.uzbrój();
+            }
+            // 'aard' NIE MA JESZCZE właściciela - fala jest niezbudowana.
+            // Kombos odpala na razie samą zapowiedź z tabeli efekty.js.
+            // Milczące pominięcie jest tu celowe: reguła nadrzędna zabrania
+            // komunikatu o porażce, a gracz i tak zobaczy pierścień.
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
         } else {

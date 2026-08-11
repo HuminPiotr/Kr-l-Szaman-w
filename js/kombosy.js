@@ -19,12 +19,23 @@
 // wolniejszych, za długie łączy pieczęcie złożone bez związku.
 const OKNO_MS = 4000;
 
+// Pole `uzbraja` mówi, KTÓRĄ technikę kombos przygotowuje - main.js routuje
+// po nim zamiast bezwarunkowo uzbrajać płonący palec (co było w porządku,
+// dopóki technika była jedna).
 export const KOMBOSY = [
     // Swaróg -> Perun: ogień, potem piorun. To także najwygodniejsza para do
     // złożenia po sobie - z namiotu (10 palców) do Tygrysa (4) wystarczy
     // złożyć kciuk, serdeczny i mały.
-    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun'] },
-    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['weles', 'swarog'] }
+    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun'], uzbraja: 'ogien' },
+    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['weles', 'swarog'], uzbraja: 'ogien' },
+
+    // Szczur x2 -> Aard. Podwójny Szczur to PRZYTRZYMANIE jednej postawy przez
+    // dwa cykle pierścienia - pieczecie.js po złożeniu zaczyna następny od
+    // nowa przy tej samej postawie, więc rytuał nie wymaga nowej mechaniki.
+    // UWAGA: trzeci szczur z rzędu odpali kombos PONOWNIE (dopasowanie do
+    // końcówki bufora) - to celowe zachowanie łańcuchów; ponowne uzbrojenie
+    // uzbrojonej techniki jest no-opem.
+    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['szczur', 'szczur'], uzbraja: 'aard' }
 ];
 
 export class KomboSilnik {

@@ -37,10 +37,15 @@ export const TABELA = {
     perun:  { barwa: '50, 100%, 92%',  ksztalt: 'promien',     czas: 0.7 },
     swarog: { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },
     weles:  { barwa: '280, 70%, 58%',  ksztalt: 'sciagniecie', czas: 0.9 },
+    szczur: { barwa: '200, 60%, 80%',  ksztalt: 'pierscien',   czas: 0.7 },
 
     // Techniki - MOCNE. Odpalają się gratis, jako nagroda za ułożenie.
     gromWOgniu:   { barwa: '35, 100%, 92%', ksztalt: 'blyskIFala', czas: 1.4 },
-    zewPodziemia: { barwa: '285, 75%, 48%', ksztalt: 'mglaIMrok',  czas: 1.8 }
+    zewPodziemia: { barwa: '285, 75%, 48%', ksztalt: 'mglaIMrok',  czas: 1.8 },
+    // Zapowiedź uzbrojenia Aard. Sam podmuch jest interaktywny, więc nie
+    // zmieści się w tabeli o stałym `czas` - dostanie własny plik, tak jak
+    // ogień płonącego palca. Projekt tego pliku jeszcze nie zapadł.
+    aard:         { barwa: '200, 70%, 88%', ksztalt: 'pierscien',  czas: 0.8 }
 };
 
 export class Efekty {
