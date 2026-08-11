@@ -15,6 +15,8 @@ import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
 import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
+import { Podmuch } from './podmuch.js';
+import { Fala } from './fala.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
@@ -68,6 +70,8 @@ let kombosy = new KomboSilnik();
 let efekty = new Efekty();
 let ogien = new Ogien();
 let plonacyPalec = new PlonacyPalec();
+let podmuch = new Podmuch();
+let fala = new Fala();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -375,18 +379,16 @@ function klatka(now) {
         if (technika) {
             efekty.odpal(technika.id);
             aura.rozblysk(1);
-            // Kombos uzbraja technikę WSKAZANĄ POLEM `uzbraja`, nie zawsze
-            // płonący palec. Dopóki technika była jedna, bezwarunkowe
-            // uzbrajanie ognia było w porządku; przy Aardzie uzbroiłoby złą.
+            // Kombos uzbraja technikę WSKAZANĄ POLEM `uzbraja` - dopóki
+            // technika była jedna, bezwarunkowe uzbrajanie ognia było
+            // w porządku; przy dwóch trzeba routować.
             // Bez licznika ważności - licznik byłby presją ("szybciej!"),
             // a to ma być relaks.
             if (technika.uzbraja === 'ogien') {
                 plonacyPalec.uzbrój();
+            } else if (technika.uzbraja === 'aard') {
+                podmuch.uzbrój();
             }
-            // 'aard' NIE MA JESZCZE właściciela - fala jest niezbudowana.
-            // Kombos odpala na razie samą zapowiedź z tabeli efekty.js.
-            // Milczące pominięcie jest tu celowe: reguła nadrzędna zabrania
-            // komunikatu o porażce, a gracz i tak zobaczy pierścień.
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
         } else {
@@ -420,6 +422,21 @@ function klatka(now) {
         plonacyPalec.sila,
         dt
     );
+
+    // --- 7c. Podmuch (Aard) ---
+    // Jednorazowe zdarzenie: update() zwraca coś TYLKO w klatce wystrzału.
+    // W przeciwieństwie do płonącego palca, podmuch nie pobiera mocy przez
+    // motionMeter.zuzyj() co klatkę - robi to raz, w momencie odpalenia.
+    const wystrzal = podmuch.update(frame, motionMeter.moc, dt);
+    if (wystrzal) {
+        motionMeter.zuzyj(wystrzal.pobor);
+        fala.wystrzel(
+            { x: wystrzal.zaczep.x * canvas.width, y: wystrzal.zaczep.y * canvas.height },
+            wystrzal.kierunek,
+            wystrzal.sila
+        );
+    }
+    fala.updateAndDraw(ctx, dt);
 
     // --- 7. HUD i audio ---
     const mocPct = Math.round(moc * 100);
@@ -487,6 +504,8 @@ function klatka(now) {
                  powodZwloki: plonacyPalec.powodZwloki,
                  utrzymanie: plonacyPalec._utrzymanie,
                  barkiNiepewne: plonacyPalec.barkiNiepewne },
+        podmuch: { stan: podmuch.stan, diagnostyka: podmuch.diagnostyka,
+                   czastkiFali: fala.liczba },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,

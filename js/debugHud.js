@@ -202,6 +202,19 @@ export class DebugHud {
             }
         }
 
+        // Stan Podmuchu i jego fali. `diagnostyka` to NAJLEPSZY kandydat
+        // w tej klatce, nawet gdy nic się nie odpaliło - bez tego nie da
+        // się wystroić PROG_PREDKOSCI/PROG_OTWARCIA (patrz podmuch.js).
+        if (stats.podmuch) {
+            const d = stats.podmuch.diagnostyka;
+            lines.push(`podmuch ${stats.podmuch.stan}  cząstek fali ${stats.podmuch.czastkiFali}`);
+            lines.push(`      prędkość ${this._num(d.predkosc)} sk/s (prog 4.0)` +
+                       `   otwarcie ${this._num(d.otwarcie)} (prog 0.55)`);
+            if (d.kierunek) {
+                lines.push(`      kierunek (${d.kierunek.x.toFixed(2)}, ${d.kierunek.y.toFixed(2)}, ${d.kierunek.z.toFixed(2)})`);
+            }
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 
