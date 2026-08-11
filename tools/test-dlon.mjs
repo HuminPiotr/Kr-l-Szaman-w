@@ -16,10 +16,11 @@
  * na żywej dłoni z nakładki debug (klawisz D).
  */
 import { wzorPalcow, ileWyprostowanych, skalaDloni, skierowanaWGore,
-         odlegloscNadgarstkow, rownolegle, pelnaDlon, NAZWY_PALCOW }
+         odlegloscNadgarstkow, rownolegle, pelnaDlon, NAZWY_PALCOW,
+         normalnaDloni }
   from '../js/znaki/dlon.js';
 import { PALCE, NADGARSTEK } from '../js/znaki/dlon.js';
-import { dlon } from './_dlon-syntetyczna.mjs';
+import { dlon, worldDlon } from './_dlon-syntetyczna.mjs';
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
@@ -54,4 +55,55 @@ spr(`dłonie równoległe (${rownolegle(waz1, waz2).toFixed(2)})`, rownolegle(wa
 spr('brak punktów -> false, bez wyjątku', pelnaDlon(null) === false);
 const zle = Array.from({length:21}, () => ({x:NaN, y:NaN, z:0}));
 spr('NaN -> false, bez wyjątku', pelnaDlon(zle) === false);
+
+// --- NORMALNA DŁONI: oś z worldLandmarks, znak rozstrzyga dopiero podmuch.js ---
+console.log('\nNORMALNA DŁONI:');
+
+// Bez pochylenia (pochylX=pochylY=0) płaszczyzna dłoni jest prostopadła do
+// kamery - normalna wskazuje wprost w obiektyw, czyli (0,0,±1).
+const wprostKamera = normalnaDloni(worldDlon({}));
+spr(`dłoń wprost do kamery: normalna wzdłuż osi Z (${wprostKamera.z.toFixed(2)})`,
+    Math.abs(wprostKamera.x) < 0.05 && Math.abs(wprostKamera.y) < 0.05 && Math.abs(wprostKamera.z) > 0.95);
+
+// Obrót o 90° wokół osi pionowej (pochylY) kładzie dłoń bokiem do kamery -
+// normalna ucieka w oś X, znika z Z.
+const bokiem = normalnaDloni(worldDlon({ pochylY: Math.PI / 2 }));
+spr(`dłoń bokiem (pochylY=90°): normalna wzdłuż osi X (${bokiem.x.toFixed(2)}, z=${bokiem.z.toFixed(2)})`,
+    Math.abs(bokiem.x) > 0.95 && Math.abs(bokiem.z) < 0.05);
+
+// Obrót o 90° wokół osi poziomej (pochylX) kładzie dłoń poziomo -
+// normalna ucieka w oś Y.
+const poziomo = normalnaDloni(worldDlon({ pochylX: Math.PI / 2 }));
+spr(`dłoń pochylona w pion (pochylX=90°): normalna wzdłuż osi Y (${poziomo.y.toFixed(2)})`,
+    Math.abs(poziomo.y) > 0.95);
+
+// Cztery pochylenia dają CZTERY RÓŻNE osie - dowód, że funkcja niesie
+// prawdziwe 3D, nie tylko dwie wartości brzegowe.
+const cztery = [
+    normalnaDloni(worldDlon({})),
+    normalnaDloni(worldDlon({ pochylY: Math.PI / 2 })),
+    normalnaDloni(worldDlon({ pochylY: -Math.PI / 2 })),
+    normalnaDloni(worldDlon({ pochylX: Math.PI / 2 })),
+];
+const odl3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+let minOdl = Infinity;
+for (let i = 0; i < cztery.length; i++)
+    for (let j = i + 1; j < cztery.length; j++)
+        minOdl = Math.min(minOdl, odl3(cztery[i], cztery[j]));
+spr(`cztery pochylenia dają cztery różne osie (min. odległość ${minOdl.toFixed(2)})`, minOdl > 0.5);
+
+// Normalna nie zależy od zgięcia palców - liczy się z punktów 0/5/17,
+// które nie ruszają się przy zaciskaniu pięści. Bez tego "otwartość dłoni"
+// (osobny warunek w podmuch.js) i "kierunek" mieszałyby się w jedną rzecz.
+const dloniPiesc = normalnaDloni(worldDlon({ zgiecia: [1, 1, 1, 1, 1] }));
+const dloniOtwarta = normalnaDloni(worldDlon({ zgiecia: [0, 0, 0, 0, 0] }));
+spr(`normalna niezależna od zgięcia palców (${odl3(dloniPiesc, dloniOtwarta).toFixed(3)})`,
+    odl3(dloniPiesc, dloniOtwarta) < 0.01);
+
+// Odporność
+spr('normalnaDloni(null) -> null, bez wyjątku', normalnaDloni(null) === null);
+spr('normalnaDloni([]) -> null, bez wyjątku', normalnaDloni([]) === null);
+const zleWl = Array.from({ length: 21 }, () => ({ x: NaN, y: NaN, z: NaN }));
+spr('worldLandmarks z NaN -> null, bez wyjątku', normalnaDloni(zleWl) === null);
+
 process.exit(ok ? 0 : 1);

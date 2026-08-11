@@ -56,3 +56,37 @@ function dlon({ ox = 0.5, oy = 0.6, zgiecia = [0,0,0,0,0], skala = 0.1, obrot = 
   return lm;
 }
 
+/**
+ * Ta sama dłoń co dlon(), ale jako worldLandmarks - punkty 3D wyśrodkowane
+ * na nadgarstku, z możliwością POCHYLENIA płaszczyzny dłoni w głąb.
+ *
+ * dlon() buduje łańcuch kinematyczny w płaszczyźnie z=0 (dłoń wprost do
+ * kamery). worldDlon() bierze DOKŁADNIE ten sam łańcuch (ox=oy=0, więc
+ * wyśrodkowany na nadgarstku) i OBRACA go w 3D:
+ *
+ *   pochylX - obrót wokół osi poziomej: dłoń pochyla się w przód/tył
+ *   pochylY - obrót wokół osi pionowej: dłoń obraca się w bok
+ *
+ * Bez pochylenia normalna dłoni wskazuje wprost w kamerę (0,0,1) - patrz
+ * test w tools/test-dlon.mjs. Potrzebne, żeby przetestować normalnaDloni()
+ * bez kamery: bez tej funkcji dlon() zawsze dawałaby z:0 na każdym punkcie,
+ * więc normalna byłaby zawsze taka sama i cały kierunek 3D byłby
+ * niesprawdzalny testami jednostkowymi.
+ */
+export function worldDlon({ zgiecia = [0, 0, 0, 0, 0], skala = 0.09, obrot = 0,
+                             lustro = false, wachlarz = 1,
+                             pochylX = 0, pochylY = 0 } = {}) {
+  const lm = dlon({ ox: 0, oy: 0, zgiecia, skala, obrot, lustro, wachlarz });
+  const cx = Math.cos(pochylX), sx = Math.sin(pochylX);
+  const cy = Math.cos(pochylY), sy = Math.sin(pochylY);
+  // lm ma z:0 wszędzie (dlon() jest płaska) - to (x,y) traktujemy jako
+  // współrzędne W PŁASZCZYŹNIE dłoni i dopiero tu obracamy do 3D:
+  // najpierw wokół osi X (pochylX), potem wynik wokół osi Y (pochylY).
+  return lm.map(p => {
+    const y1 = p.y * cx, z1 = p.y * sx;
+    const x2 = p.x * cy + z1 * sy;
+    const z2 = -p.x * sy + z1 * cy;
+    return { x: x2, y: y1, z: z2 };
+  });
+}
+

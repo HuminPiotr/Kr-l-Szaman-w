@@ -224,3 +224,39 @@ export function rozstawOpuszek(lm) {
     }
     return (suma / (OPUSZKI.length - 1)) / skala;
 }
+
+/**
+ * Normalna płaszczyzny dłoni z worldLandmarks, znormalizowana.
+ *
+ * Liczona z NADGARSTKA (0) i dwóch stawów PODSTAWY palców - wskazującego (5)
+ * i małego (17). Te trzy punkty nie ruszają się przy zginaniu palców
+ * (zginają się dopiero stawy DALSZE), więc normalna mierzy WYŁĄCZNIE
+ * orientację dłoni w przestrzeni - działa tak samo przy dłoni otwartej
+ * i zaciśniętej w pięść.
+ *
+ * ZNAK JEST NIEJEDNOZNACZNY. Dla lewej i prawej dłoni iloczyn wektorowy
+ * wychodzi w przeciwne strony, a przy obróconej dłoni MediaPipe bywa też
+ * niepewne co do samej stronności. Ta funkcja daje wyłącznie OŚ - zwrot
+ * (który z dwóch kierunków tej osi) rozstrzyga js/podmuch.js wektorem
+ * machnięcia. Zobacz docs/superpowers/specs/2026-08-11-szczur-i-podmuch-design.md §3.
+ *
+ * @param {Array|null} worldLandmarks
+ * @returns {{x:number,y:number,z:number}|null}
+ */
+export function normalnaDloni(worldLandmarks) {
+    const wl = worldLandmarks;
+    if (!wl || !wl[0] || !wl[5] || !wl[17]) return null;
+    const w = wl[0], a = wl[5], b = wl[17];
+    for (const p of [w, a, b]) {
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return null;
+    }
+    const v1 = { x: a.x - w.x, y: a.y - w.y, z: a.z - w.z };
+    const v2 = { x: b.x - w.x, y: b.y - w.y, z: b.z - w.z };
+    const n = {
+        x: v1.y * v2.z - v1.z * v2.y,
+        y: v1.z * v2.x - v1.x * v2.z,
+        z: v1.x * v2.y - v1.y * v2.x
+    };
+    const d = Math.hypot(n.x, n.y, n.z);
+    return d > 1e-9 ? { x: n.x / d, y: n.y / d, z: n.z / d } : null;
+}
