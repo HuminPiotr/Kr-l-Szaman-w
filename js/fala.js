@@ -20,37 +20,59 @@
  * niezgodność między tymi dwoma plikami sprawiała wcześniej, że pchnięcie
  * w stronę kamery wizualnie leciało w głąb ekranu.
  *
- * Rzut skaluje NIE TYLKO rozmiar/alfa sprite'a, ale i POZYCJĘ na ekranie
+ * Rzut skaluje NIE TYLKO rozmiar/alfę sprite'a, ale i POZYCJĘ na ekranie
  * (patrz rzutujPozycje): dalsze cząstki są ściągane bliżej zaczepu, dając
  * prawdziwą zbieżność perspektywiczną, a nie tylko kurczenie się w miejscu.
  *
- * ================= DLACZEGO WYGLĄDA JAK WIATR =================
- * 1. STOŻEK ROSNĄCY Z WIEKIEM. Cząstki startują w wąskim stożku wokół
- *    kierunku i z czasem rozjeżdżają się na boki (pole `roz`, rosnące
- *    w _ruszaj) - to jest "rozpływa się, rozszerzając coraz bardziej".
- * 2. OPÓR. Cząstki zwalniają, więc fala nie leci w nieskończoność.
- * 3. SORTOWANIE PO Z przed rysowaniem - dalsze cząstki pod bliższymi.
- * 4. SPRITE WYPALONY RAZ - ten sam powód co w ogien.js: gradient na
- *    cząstkę na klatkę zabija FPS przy setkach cząstek.
- * 5. JEDNA BARWA. Wiatr sam w sobie jest niewidzialny - widać zaburzenie,
- *    nie powietrze, więc bez rampy barw jak w ogniu (który jest emisyjny).
+ * ================= DLACZEGO WYGLĄDA JAK FALA UDERZENIOWA =================
+ * Pierwsza wersja emitowała WĄSKI STOŻEK wzdłuż kierunku i wyglądała biednie:
+ * rzadka smuga kropek lecąca w bok, bez ciężaru. Aard z Wiedźmina czyta się
+ * jako ŚCIANA POWIETRZA, i biorą się na to cztery rzeczy:
+ *
+ * 1. PIERŚCIEŃ, NIE STOŻEK. Cząstki startują na OKRĘGU prostopadłym do
+ *    kierunku (promień rośnie z czasem), a nie w punkcie. To jest sedno -
+ *    fala ma czoło o określonym kształcie, które się rozszerza, zamiast
+ *    być chmurką rozlatującą się z jednego miejsca.
+ * 2. CZOŁO ZWALNIA, PIERŚCIEŃ ROŚNIE. Ruch do przodu jest silnie tłumiony
+ *    (OPOR_WZDLUZ), a rozszerzanie na boki prawie wcale (OPOR_PROMIEN) -
+ *    dzięki temu fala wytraca pęd, ale nie przestaje się rozchodzić.
+ * 3. ROZBŁYSK RDZENIA. Osobna, krótka warstwa jasnych cząstek w punkcie
+ *    zaczepu (`rdzen: true`), gasnąca ~3x szybciej niż sama fala. Bez niej
+ *    brakuje momentu uderzenia - fala po prostu "pojawia się".
+ * 4. WARSTWY O RÓŻNYM PROMIENIU. Cząstki dostają losowy mnożnik promienia
+ *    (0.55..1.0), więc czoło ma GRUBOŚĆ zamiast być nieskończenie cienką
+ *    obręczą - to daje wrażenie objętości.
+ *
+ * Plus dwie rzeczy wspólne z ogniem: SPRITE WYPALONY RAZ (gradient na
+ * cząstkę na klatkę zabija FPS) i SORTOWANIE PO Z (dalsze pod bliższymi).
  */
 
 const OGNISKO_DOMYSLNE = 900;      // px - ZGADNIĘTE, stroić klawiszem D
 export const OGNISKO = OGNISKO_DOMYSLNE;
 
-const SPRITE_PX = 40;
+const SPRITE_PX = 64;              // większy niż w ogniu - fala to ściana, nie iskry
 const BARWA = [214, 240, 255];     // blady błękit - patrz efekty.js (aard)
+const BARWA_RDZEN = [255, 255, 255];  // rozbłysk uderzenia - czysta biel
 
-const NA_WYSTRZAL = 220;           // cząstek przy pełnej sile (nie na sekundę - jednorazowo)
-const PREDKOSC_BAZOWA = 640;       // px/s wzdłuż kierunku, przy pełnej sile
-const ROZRZUT_PREDKOSCI = 220;     // px/s losowego rozrzutu długości wektora, PRZY PEŁNEJ SILE
-const ROZWARCIE_START = 0.12;      // rad - stożek WĄSKI w chwili emisji
-const ROZPRASZANIE = 260;          // px/s^2 bocznego rozjeżdżania, rośnie z wiekiem
-const OPOR = 0.9;                  // 1/s - hamowanie, fala zwalnia zamiast lecieć bez końca
-const ZYCIE_MIN = 0.9, ZYCIE_MAX = 1.4;      // s
-const ROZMIAR_OD = 0.5, ROZMIAR_DO = 1.4;
-const MAX_CZASTECZEK = 500;        // sufit bezpieczeństwa dla klatkażu
+// --- czoło fali ---
+const NA_WYSTRZAL = 420;           // cząstek przy pełnej sile (jednorazowo)
+const PREDKOSC_BAZOWA = 900;       // px/s wzdłuż kierunku, przy pełnej sile
+const ROZRZUT_PREDKOSCI = 260;     // px/s losowego rozrzutu, PRZY PEŁNEJ SILE
+const PROMIEN_START = 26;          // px - czoło ma szerokość już w chwili emisji
+const PROMIEN_PREDKOSC = 720;      // px/s rozszerzania pierścienia
+const GRUBOSC_MIN = 0.55;          // mnożnik promienia - czoło ma GRUBOŚĆ
+const OPOR_WZDLUZ = 2.4;           // 1/s - ruch do przodu wytraca się szybko
+const OPOR_PROMIEN = 0.35;         // 1/s - ale rozchodzenie się trwa
+const ZYCIE_MIN = 0.75, ZYCIE_MAX = 1.15;    // s
+const ROZMIAR_OD = 0.9, ROZMIAR_DO = 2.2;    // cząstki PUCHNĄ z wiekiem
+
+// --- rozbłysk rdzenia (moment uderzenia) ---
+const RDZEN_NA_WYSTRZAL = 90;
+const RDZEN_PREDKOSC = 420;        // px/s - rozlatuje się na wszystkie strony
+const RDZEN_ZYCIE = 0.32;          // s - gaśnie ~3x szybciej niż fala
+const RDZEN_ROZMIAR = 1.5;
+
+const MAX_CZASTECZEK = 900;        // sufit bezpieczeństwa dla klatkażu
 
 /**
  * Rzut perspektywiczny: mniejsze/ujemne z (bliżej kamery) -> większe s.
@@ -87,7 +109,7 @@ function normalizuj(v) {
     const d = Math.hypot(v.x, v.y, v.z);
     return d > 1e-9 ? { x: v.x / d, y: v.y / d, z: v.z / d } : { x: 1, y: 0, z: 0 };
 }
-/** Dwa jednostkowe wektory prostopadłe do `os` i do siebie - baza stożka. */
+/** Dwa jednostkowe wektory prostopadłe do `os` i do siebie - płaszczyzna pierścienia. */
 function prostopadleDo(os) {
     const pom = Math.abs(os.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
     const p1 = normalizuj(krzyz(os, pom));
@@ -98,7 +120,7 @@ function prostopadleDo(os) {
 export class Fala {
     constructor() {
         this.czastki = [];
-        this._sprite = null;
+        this._sprites = null;
     }
 
     get liczba() { return this.czastki.length; }
@@ -118,37 +140,60 @@ export class Fala {
         if (s <= 0.01) return;
 
         const [p1, p2] = prostopadleDo(os);
-        const n = Math.round(NA_WYSTRZAL * (0.4 + 0.6 * s));   // słabsza fala = mniej, nie zero
+
+        // --- CZOŁO FALI: pierścień prostopadły do kierunku ---
+        const n = Math.round(NA_WYSTRZAL * (0.4 + 0.6 * s));
         for (let i = 0; i < n; i++) {
-            const kat = ROZWARCIE_START * Math.sqrt(Math.random());
-            const phi = Math.random() * Math.PI * 2;
-            const kier = {
-                x: os.x * Math.cos(kat) + (p1.x * Math.cos(phi) + p2.x * Math.sin(phi)) * Math.sin(kat),
-                y: os.y * Math.cos(kat) + (p1.y * Math.cos(phi) + p2.y * Math.sin(phi)) * Math.sin(kat),
-                z: os.z * Math.cos(kat) + (p1.z * Math.cos(phi) + p2.z * Math.sin(phi)) * Math.sin(kat),
-            };
-            // Rozrzut skalowany przez `s`: przy słabej fali baza (PREDKOSC_
-            // BAZOWA*s) bywa mniejsza niż stały rozrzut, więc część cząstek
-            // dostawałaby UJEMNĄ prędkość wzdłuż kierunku - leciałyby do
-            // tyłu. Rozrzut proporcjonalny do siły to wyklucza.
-            const predkosc = (PREDKOSC_BAZOWA * s) * (0.7 + Math.random() * 0.5)
+            // Kąt rozłożony RÓWNOMIERNIE po obwodzie plus drobny jitter -
+            // czysto losowy kąt zostawiałby widoczne dziury w pierścieniu.
+            const kat = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+            // Mnożnik promienia daje czołu GRUBOŚĆ zamiast cienkiej obręczy.
+            const warstwa = GRUBOSC_MIN + Math.random() * (1 - GRUBOSC_MIN);
+            // Wektor "na zewnątrz" w płaszczyźnie pierścienia.
+            const promX = p1.x * Math.cos(kat) + p2.x * Math.sin(kat);
+            const promY = p1.y * Math.cos(kat) + p2.y * Math.sin(kat);
+            const promZ = p1.z * Math.cos(kat) + p2.z * Math.sin(kat);
+
+            const predkosc = (PREDKOSC_BAZOWA * s) * (0.8 + Math.random() * 0.4)
                             + (Math.random() - 0.5) * ROZRZUT_PREDKOSCI * s;
-            // Kierunek bocznego rozpraszania - LOSOWY per cząstka, żeby
-            // stożek rozjeżdżał się na wszystkie strony, nie w jedną.
-            const rozPhi = Math.random() * Math.PI * 2;
-            const roz = {
-                x: p1.x * Math.cos(rozPhi) + p2.x * Math.sin(rozPhi),
-                y: p1.y * Math.cos(rozPhi) + p2.y * Math.sin(rozPhi),
-                z: p1.z * Math.cos(rozPhi) + p2.z * Math.sin(rozPhi),
-            };
+            const vProm = PROMIEN_PREDKOSC * warstwa * (0.75 + Math.random() * 0.5) * s;
+
             this._dodaj({
-                x: zaczep.x, y: zaczep.y, z: 0,
-                zx0: zaczep.x, zy0: zaczep.y,   // zaczep w chwili EMISJI - do rzutu pozycji
-                vx: kier.x * predkosc, vy: kier.y * predkosc, vz: kier.z * predkosc,
-                roz,
+                // Start NA pierścieniu, nie w punkcie - fala ma czoło od razu.
+                x: zaczep.x + promX * PROMIEN_START * warstwa,
+                y: zaczep.y + promY * PROMIEN_START * warstwa,
+                z: promZ * PROMIEN_START * warstwa,
+                zx0: zaczep.x, zy0: zaczep.y,
+                // Prędkość = ruch DO PRZODU + rozchodzenie się NA ZEWNĄTRZ.
+                // Rozdzielone, bo tłumią się z różną siłą (patrz _ruszaj).
+                vx: os.x * predkosc, vy: os.y * predkosc, vz: os.z * predkosc,
+                vpx: promX * vProm, vpy: promY * vProm, vpz: promZ * vProm,
                 zycie: ZYCIE_MIN + Math.random() * (ZYCIE_MAX - ZYCIE_MIN),
                 skala: ROZMIAR_OD + Math.random() * (ROZMIAR_DO - ROZMIAR_OD),
-                wiek: 0
+                wiek: 0,
+                rdzen: false
+            });
+        }
+
+        // --- ROZBŁYSK RDZENIA: moment uderzenia w punkcie zaczepu ---
+        const nr = Math.round(RDZEN_NA_WYSTRZAL * (0.4 + 0.6 * s));
+        for (let i = 0; i < nr; i++) {
+            // Kierunek losowy na pełnej sferze - rozbłysk nie ma kształtu,
+            // ma być błyskiem, nie falą.
+            const u = Math.random() * 2 - 1;
+            const fi = Math.random() * Math.PI * 2;
+            const r = Math.sqrt(1 - u * u);
+            const dir = { x: r * Math.cos(fi), y: r * Math.sin(fi), z: u };
+            const predkosc = RDZEN_PREDKOSC * s * (0.4 + Math.random() * 0.9);
+            this._dodaj({
+                x: zaczep.x, y: zaczep.y, z: 0,
+                zx0: zaczep.x, zy0: zaczep.y,
+                vx: dir.x * predkosc, vy: dir.y * predkosc, vz: dir.z * predkosc,
+                vpx: 0, vpy: 0, vpz: 0,
+                zycie: RDZEN_ZYCIE * (0.7 + Math.random() * 0.6),
+                skala: RDZEN_ROZMIAR * (0.6 + Math.random() * 0.8),
+                wiek: 0,
+                rdzen: true
             });
         }
     }
@@ -166,16 +211,16 @@ export class Fala {
             c.wiek += krok;
             if (c.wiek >= c.zycie) continue;
 
-            const p = c.wiek / c.zycie;
-            // Rozwarcie stożka ROŚNIE z wiekiem - fala rozpływa się,
-            // rozszerzając coraz bardziej, zamiast lecieć wąskim pękiem.
-            c.vx += c.roz.x * ROZPRASZANIE * p * krok;
-            c.vy += c.roz.y * ROZPRASZANIE * p * krok;
-            c.vz += c.roz.z * ROZPRASZANIE * p * krok;
+            // DWA RÓŻNE TŁUMIENIA - to one dają kształt fali uderzeniowej:
+            // czoło wytraca pęd do przodu, ale nie przestaje się rozchodzić.
+            const oporWzdluz = 1 - OPOR_WZDLUZ * krok;
+            const oporProm = 1 - OPOR_PROMIEN * krok;
+            c.vx *= oporWzdluz; c.vy *= oporWzdluz; c.vz *= oporWzdluz;
+            c.vpx *= oporProm; c.vpy *= oporProm; c.vpz *= oporProm;
 
-            const opor = 1 - OPOR * krok;
-            c.vx *= opor; c.vy *= opor; c.vz *= opor;
-            c.x += c.vx * krok; c.y += c.vy * krok; c.z += c.vz * krok;
+            c.x += (c.vx + c.vpx) * krok;
+            c.y += (c.vy + c.vpy) * krok;
+            c.z += (c.vz + c.vpz) * krok;
 
             if (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.z)) zywe.push(c);
         }
@@ -184,7 +229,7 @@ export class Fala {
 
     _rysuj(ctx) {
         if (!this.czastki.length) return;
-        if (!this._sprite) this._sprite = zrobSprite();
+        if (!this._sprites) this._sprites = zrobSprites();
 
         // DALSZE POD BLIŻSZYMI: sortujemy W MIEJSCU malejąco po z (kolejność
         // w this.czastki nie ma znaczenia dla niczego innego, więc kopiowanie
@@ -200,11 +245,15 @@ export class Fala {
             // Szybki narost, powolne wygaszanie - ten sam kształt obwiedni
             // co w ogien.js, żeby cząstki nie pojawiały się skokowo.
             const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
-            const r = SPRITE_PX * c.skala * s;
+            // Cząstki czoła PUCHNĄ z wiekiem (fala się rozrzedza); rdzeń nie -
+            // ma być ostrym błyskiem, nie rozmywającą się chmurą.
+            const rosniecie = c.rdzen ? 1 : (0.6 + 0.8 * p);
+            const r = SPRITE_PX * c.skala * s * rosniecie;
             const poz = rzutujPozycje({ x: c.zx0, y: c.zy0 }, { x: c.x, y: c.y }, s);
 
-            ctx.globalAlpha = Math.max(0, Math.min(1, alfa * s * 0.85));
-            ctx.drawImage(this._sprite, poz.x - r / 2, poz.y - r / 2, r, r);
+            ctx.globalAlpha = Math.max(0, Math.min(1, alfa * s * (c.rdzen ? 1 : 0.7)));
+            ctx.drawImage(c.rdzen ? this._sprites.rdzen : this._sprites.fala,
+                          poz.x - r / 2, poz.y - r / 2, r, r);
         }
         ctx.globalAlpha = 1;
         ctx.restore();
@@ -217,16 +266,19 @@ export class Fala {
     }
 }
 
-/** Sprite wypalony RAZ - patrz ogien.js:215-236 dla tego samego wzorca. */
-function zrobSprite() {
+/** Sprite'y wypalone RAZ - patrz ogien.js:215-236 dla tego samego wzorca. */
+function zrobSprites() {
+    return { fala: sprite(BARWA, 0.85), rdzen: sprite(BARWA_RDZEN, 1.0) };
+}
+
+function sprite([r, g, b], moc) {
     const c = document.createElement('canvas');
     c.width = c.height = SPRITE_PX;
     const x = c.getContext('2d');
-    const [r, g, b] = BARWA;
     const grd = x.createRadialGradient(SPRITE_PX / 2, SPRITE_PX / 2, 0,
                                        SPRITE_PX / 2, SPRITE_PX / 2, SPRITE_PX / 2);
-    grd.addColorStop(0.0, `rgba(${r},${g},${b},0.9)`);
-    grd.addColorStop(0.4, `rgba(${r},${g},${b},0.4)`);
+    grd.addColorStop(0.0, `rgba(${r},${g},${b},${moc})`);
+    grd.addColorStop(0.35, `rgba(${r},${g},${b},${moc * 0.45})`);
     grd.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
     x.fillStyle = grd;
     x.fillRect(0, 0, SPRITE_PX, SPRITE_PX);

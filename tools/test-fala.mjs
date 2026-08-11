@@ -96,4 +96,44 @@ spr(`przy s=0.5 pozycja jest w POŁOWIE drogi do zaczepu (${posredniWynik.x}, ${
     posredniWynik.x === 600 && posredniWynik.y === 400);
 spr('NaN -> skończona wartość, bez wyjątku', Number.isFinite(rzutPerspektywiczny(NaN)));
 
+// --- 8. KSZTAŁT FALI UDERZENIOWEJ: pierścień + rozbłysk rdzenia ---
+// Pierwsza wersja emitowała wąski stożek i wyglądała biednie. Te asercje
+// pilnują struktury, która zastąpiła stożek - żeby nie dało się jej cofnąć
+// przez przypadek przy następnym strojeniu.
+console.log('\nKSZTAŁT FALI UDERZENIOWEJ:');
+const f8 = new Fala();
+f8.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 1 }, 1);
+
+// Rozbłysk rdzenia to OSOBNA warstwa - krótsza i startująca w punkcie.
+const rdzenie = f8.czastki.filter(c => c.rdzen);
+const czolo = f8.czastki.filter(c => !c.rdzen);
+spr(`wystrzał daje OBIE warstwy: czoło (${czolo.length}) i rdzeń (${rdzenie.length})`,
+    czolo.length > 0 && rdzenie.length > 0);
+spr(`rdzeń gaśnie wyraźnie szybciej niż czoło (${Math.max(...rdzenie.map(c => c.zycie)).toFixed(2)} < ${Math.min(...czolo.map(c => c.zycie)).toFixed(2)})`,
+    Math.max(...rdzenie.map(c => c.zycie)) < Math.min(...czolo.map(c => c.zycie)));
+
+// Czoło startuje NA PIERŚCIENIU, nie w punkcie - to jest sedno kształtu.
+const promienie = czolo.map(c => Math.hypot(c.x, c.y, c.z));
+spr(`czoło startuje na PIERŚCIENIU, nie w punkcie (min. promień ${Math.min(...promienie).toFixed(1)} px)`,
+    Math.min(...promienie) > 1);
+// ...a rdzeń przeciwnie: dokładnie w punkcie zaczepu.
+spr(`rdzeń startuje DOKŁADNIE w zaczepie`,
+    rdzenie.every(c => c.x === 0 && c.y === 0 && c.z === 0));
+
+// Pierścień otacza oś ze WSZYSTKICH stron (nie jest jednostronnym wachlarzem).
+// Kierunek wystrzału to +z, więc płaszczyzna pierścienia to (x,y).
+const kwadranty = new Set(czolo.map(c => `${c.x >= 0 ? 'P' : 'L'}${c.y >= 0 ? 'G' : 'D'}`));
+spr(`pierścień otacza oś ze wszystkich stron (${kwadranty.size}/4 kwadrantów)`, kwadranty.size === 4);
+
+// Pierścień ROŚNIE w czasie - fala się rozchodzi, nie tylko leci do przodu.
+const sredniPromien = (f) => {
+    const cz = f.czastki.filter(c => !c.rdzen);
+    return cz.reduce((s, c) => s + Math.hypot(c.x - 0, c.y - 0), 0) / cz.length;
+};
+const promienPrzed = sredniPromien(f8);
+for (let i = 0; i < 18; i++) f8._ruszaj(DT);   // 0.3 s
+const promienPo = sredniPromien(f8);
+spr(`pierścień ROŚNIE w czasie (${promienPrzed.toFixed(0)} -> ${promienPo.toFixed(0)} px)`,
+    promienPo > promienPrzed * 2);
+
 process.exit(ok ? 0 : 1);
