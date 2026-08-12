@@ -40,7 +40,16 @@ export const KOMBOSY = [
     // końcówki bufora) - to celowe zachowanie łańcuchów; ponowne uzbrojenie
     // uzbrojonej techniki jest no-opem. Weles -> Swaróg dalej odpala Zew
     // Podziemia niezależnie - sekwencje mają się nakładać, nie wykluczać.
-    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['weles', 'weles'], uzbraja: 'aard' }
+    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['weles', 'weles'], uzbraja: 'aard' },
+
+    // Splot x3 -> Tecza. TRZY złożenia, nie dwie - dłuższy rytuał niż
+    // Ogień/Aard, bo nagroda jest darmowa przez 30 s (żaden dalszy koszt),
+    // więc próg wejścia jest wyższy. uzbraja: 'tecza' NIE pasuje do wzorca
+    // uzbrój-potem-gest (Ogień/Aard czekają na osobny gest gracza) -
+    // main.js routuje tę gałąź na natychmiastową aktywację, bez drugiego
+    // gestu. Splot to nowy znak z ciała (skrzyżowane ramiona), nie z dłoni -
+    // patrz js/znaki/mokoszSplot.js.
+    { id: 'tecza', nazwa: 'Wstęga Mokoszy', sekwencja: ['splot', 'splot', 'splot'], uzbraja: 'tecza' }
 ];
 
 export class KomboSilnik {

@@ -84,6 +84,23 @@ spr(`weles x2 -> swaróg odpala DALEJ Zew Podziemia (${zewPoAard?.id})`, zewPoAa
 // --- POLE uzbraja ---
 // main.js routuje po nim techniki; wiersz bez tego pola uzbroiłby złą technikę.
 spr('każdy kombos deklaruje, którą technikę uzbraja',
-    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard'));
+    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard' || k.uzbraja === 'tecza'));
+
+// --- SEKWENCJA TRÓJELEMENTOWA: splot x3 -> tecza ---
+console.log('\nTRÓJELEMENTOWA SEKWENCJA (splot x3):');
+const k9 = new KomboSilnik();
+spr('pierwszy splot nie odpala', k9.dodaj('splot', 0) === null);
+spr('drugi splot nie odpala (jeszcze za krótka sekwencja)', k9.dodaj('splot', 500) === null);
+const tecza1 = k9.dodaj('splot', 1000);
+spr(`trzeci splot odpala Teczę (${tecza1?.id})`, tecza1?.id === 'tecza');
+
+// Czwarty splot z rzędu odpala PONOWNIE - dopasowanie do końcówki bufora,
+// to samo celowe zachowanie łańcuchów co przy weles x2 -> aard.
+const tecza2 = k9.dodaj('splot', 1500);
+spr(`czwarty splot odpala PONOWNIE - jawne zachowanie łańcucha (${tecza2?.id})`, tecza2?.id === 'tecza');
+
+// Pole uzbraja obejmuje teraz TRZY wartości, nie dwie.
+spr('każdy kombos deklaruje, którą technikę uzbraja (ogien/aard/tecza)',
+    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard' || k.uzbraja === 'tecza'));
 
 process.exit(ok ? 0 : 1);
