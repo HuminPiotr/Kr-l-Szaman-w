@@ -52,6 +52,34 @@ const PRZEBIEGI = [
 // a nie znikać pod poświatą.
 const ALFA_WNETRZA = 0.13;
 
+// Stała czasowa zaniku śladu - przy TAU=0.5 s ślad dogasa do ~5% po 1.5 s
+// (3 tau), zgodnie ze spec ("dogasające po ~1,5 s"). ZGADNIĘTE - D.
+const TAU_SLADU = 0.5;
+
+// Nasycenie tęczy - dobrane do żywości istniejących barw (70-95).
+// ZGADNIĘTE - potwierdzić z nakładki (D).
+const TECZA_NASYCENIE = 88;
+
+/**
+ * Barwa aury: normalnie interpoluje bursztyn<->fiolet po płynności ruchu.
+ * Gdy `tecza.aktywna`, PRZYKRYWA to i idzie z tecza.barwaHue - to jest
+ * warstwa nagrody z docs/superpowers/specs/2026-08-12-splot-i-tecza-design.md.
+ *
+ * Wydzielona jako czysta funkcja (nie metoda klasy) - żeby dało się ją
+ * przetestować bez document (updateAndDraw() tworzy płótna, których nie
+ * ma w Node), tym samym wzorcem co rzutPerspektywiczny w fala.js.
+ */
+export function barwaAury(plynnosc, tecza) {
+    if (tecza && tecza.aktywna) {
+        return { h: tecza.barwaHue, s: TECZA_NASYCENIE };
+    }
+    const t = Math.max(0, Math.min(1, Number.isFinite(plynnosc) ? plynnosc : 1));
+    return {
+        h: BARWA_SZARPANA.h + (BARWA_PLYNNA.h - BARWA_SZARPANA.h) * t,
+        s: BARWA_SZARPANA.s + (BARWA_PLYNNA.s - BARWA_SZARPANA.s) * t
+    };
+}
+
 export class Aura {
     constructor(canvas, ctx) {
         this.canvas = canvas;
@@ -61,6 +89,8 @@ export class Aura {
         this._maskaCtx = null;
         this._praca = null;     // płótno robocze do rozmycia
         this._pracaCtx = null;
+        this._slad = null;      // bufor akumulacyjny tęczowego śladu
+        this._sladCtx = null;
 
         this._moc = 0;
         this._impuls = 0;
@@ -83,7 +113,7 @@ export class Aura {
      * @param {object} fit   z computeCoverFit() - TA SAMA transformacja co wideo
      * @param {number} dt
      */
-    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt) {
+    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null) {
         // Wygładzanie sterowania. Bez tego aura drga razem z trackingiem.
         const a = Math.min(1, dt / TAU_WYGLADZANIA);
         this._moc += a * ((Number.isFinite(moc) ? moc : 0) - this._moc);
@@ -120,7 +150,7 @@ export class Aura {
         const tetnoSzybkie = Math.sin(this._faza * Math.PI * 2 * 5.5);
         const tetno = 1 + GLEBIA_TETNA * (tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie);
 
-        const { h, s } = this._barwa();
+        const { h, s } = barwaAury(this._plynnosc, tecza);
         const ctx = this.ctx;
 
         ctx.save();
@@ -131,13 +161,38 @@ export class Aura {
         const pc = this._pracaCtx;
         const pw = this._praca.width, ph = this._praca.height;
 
+        // --- Bufor śladu: przygasza się ZAWSZE (nawet po wygaśnięciu tęczy,
+        // żeby stary ślad dogasł, a nie zamarzł), dopisuje nową sylwetkę
+        // TYLKO gdy tecza aktywna. Koszt stały: jeden fillRect na przygaszenie
+        // plus jeden drawImage+fillRect na dopisanie - ZERO dodatkowych
+        // przebiegów rozmycia ponad te trzy z PRZEBIEGI, bo blur niżej i tak
+        // już się wykonywał; zmienia się tylko to, JAKIE płótno rozmywa.
+        const zanik = 1 - Math.exp(-dt / TAU_SLADU);
+        this._sladCtx.globalCompositeOperation = 'destination-out';
+        this._sladCtx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, zanik)).toFixed(3)})`;
+        this._sladCtx.fillRect(0, 0, pw, ph);
+        this._sladCtx.globalCompositeOperation = 'source-over';
+
+        if (tecza && tecza.aktywna) {
+            pc.globalCompositeOperation = 'source-over';
+            pc.clearRect(0, 0, pw, ph);
+            pc.drawImage(this._maska, 0, 0);
+            pc.globalCompositeOperation = 'source-in';
+            pc.fillStyle = `hsla(${tecza.barwaHue}, ${TECZA_NASYCENIE}%, 55%, ${Math.max(0, Math.min(1, tecza.silaSladu))})`;
+            pc.fillRect(0, 0, pw, ph);
+            pc.globalCompositeOperation = 'source-over';
+            this._sladCtx.drawImage(this._praca, 0, 0);
+        }
+
+        const zrodloRozmycia = (tecza && tecza.silaSladu > 0.001) ? this._slad : this._maska;
+
         for (const p of PRZEBIEGI) {
             // Rozmycie robimy na MAŁYM płótnie - jest wtedy tanie, a późniejsze
             // przeskalowanie na pełny ekran dogładza wynik za darmo.
             pc.globalCompositeOperation = 'source-over';
             pc.clearRect(0, 0, pw, ph);
             pc.filter = `blur(${(p.rozmycie * (0.45 + mocEfektywna * 0.55)).toFixed(1)}px)`;
-            pc.drawImage(this._maska, 0, 0);
+            pc.drawImage(zrodloRozmycia, 0, 0);
             pc.filter = 'none';
 
             // Wycięcie ostrej sylwetki zostawia samą krawędź - to ona daje
@@ -151,10 +206,16 @@ export class Aura {
             // kanał alfa niesie kształt sylwetki. Próba tintowania wprost na
             // płótnie głównym przez 'source-atop' zalewała CAŁY ekran, bo tło
             // gry jest w pełni nieprzezroczyste i "atop" trafiało wszędzie.
-            pc.globalCompositeOperation = 'source-in';
-            pc.fillStyle = kolor;
-            pc.fillRect(0, 0, pw, ph);
-            pc.globalCompositeOperation = 'source-over';
+            //
+            // Tylko gdy źródłem jest surowa maska - _slad już niesie kolor
+            // per piksel (dopisaliśmy go wyżej), więc kolorowanie płaskim
+            // `kolor` nadpisałoby tęczowy gradient jednym odcieniem.
+            if (zrodloRozmycia === this._maska) {
+                pc.globalCompositeOperation = 'source-in';
+                pc.fillStyle = kolor;
+                pc.fillRect(0, 0, pw, ph);
+                pc.globalCompositeOperation = 'source-over';
+            }
 
             // TA SAMA transformacja co wideo (computeCoverFit). Rysowanie maski
             // przez zwykłe drawImage(0, 0, canvas.width, canvas.height)
@@ -182,24 +243,18 @@ export class Aura {
         ctx.restore();
     }
 
-    _barwa() {
-        const t = Math.max(0, Math.min(1, this._plynnosc));
-        return {
-            h: BARWA_SZARPANA.h + (BARWA_PLYNNA.h - BARWA_SZARPANA.h) * t,
-            s: BARWA_SZARPANA.s + (BARWA_PLYNNA.s - BARWA_SZARPANA.s) * t
-        };
-    }
-
     _przygotujPlotna(szer, wys) {
         if (!this._maska) {
             this._maska = document.createElement('canvas');
             this._maskaCtx = this._maska.getContext('2d');
             this._praca = document.createElement('canvas');
             this._pracaCtx = this._praca.getContext('2d');
+            this._slad = document.createElement('canvas');
+            this._sladCtx = this._slad.getContext('2d');
         }
         if (this._maska.width !== szer || this._maska.height !== wys) {
-            this._maska.width = this._praca.width = szer;
-            this._maska.height = this._praca.height = wys;
+            this._maska.width = this._praca.width = this._slad.width = szer;
+            this._maska.height = this._praca.height = this._slad.height = wys;
             this._obraz = this._maskaCtx.createImageData(szer, wys);
         }
     }
