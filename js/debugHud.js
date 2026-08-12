@@ -215,6 +215,17 @@ export class DebugHud {
             }
         }
 
+        // Stan Wstęgi Mokoszy - progi Splotu (KRZYZ_MIN/PELNY, WYSOKOSC_*)
+        // widać już przez ogólny mechanizm stats.rozbicie (znak ma
+        // skladniki()), więc tu tylko licznik i barwa samej nagrody.
+        if (stats.tecza) {
+            const t = stats.tecza;
+            lines.push(`tecza ${t.aktywna ? 'AKTYWNA' : 'nieaktywna'}` +
+                       `${t.aktywna ? `  pozostało ${t.pozostaloS.toFixed(1)} s` : ''}` +
+                       `${t.aktywna ? `  hue ${t.barwaHue.toFixed(0)}°` : ''}` +
+                       `${t.aktywna ? `  siła śladu ${this._num(t.silaSladu)}` : ''}`);
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 

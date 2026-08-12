@@ -9,6 +9,7 @@ import { ZnakRegistry } from './znaki/registry.js';
 import { welesDlon } from './znaki/welesDlon.js';
 import { perunDlon } from './znaki/perunDlon.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
+import { splot } from './znaki/mokoszSplot.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -16,6 +17,7 @@ import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
 import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA } from './podmuch.js';
 import { Fala } from './fala.js';
+import { Tecza } from './tecza.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
@@ -64,6 +66,10 @@ let znaki = new ZnakRegistry();
 znaki.zarejestruj(welesDlon);
 znaki.zarejestruj(perunDlon);
 znaki.zarejestruj(swarogDlon);
+// Splot Mokoszy - jedyny znak czytany z POZY w aktywnym zestawie (reszta
+// to pieczęcie dłoniowe). Bez bioder w PUNKTY, więc kamera laptopa mu
+// wystarcza - patrz js/znaki/mokoszSplot.js.
+znaki.zarejestruj(splot);
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 let efekty = new Efekty();
@@ -71,6 +77,7 @@ let ogien = new Ogien();
 let plonacyPalec = new PlonacyPalec();
 let podmuch = new Podmuch();
 let fala = new Fala();
+let tecza = new Tecza();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -387,6 +394,12 @@ function klatka(now) {
                 plonacyPalec.uzbrój();
             } else if (technika.uzbraja === 'aard') {
                 podmuch.uzbrój();
+            } else if (technika.uzbraja === 'tecza') {
+                // Nagroda odpala się NATYCHMIAST, bez drugiego gestu -
+                // inaczej niż 'ogien'/'aard', które tylko UZBRAJAJĄ technikę
+                // czekającą na osobny gest gracza. aktywuj() (re)startuje
+                // licznik do pełnych 30 s bezwarunkowo.
+                tecza.aktywuj();
             }
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
@@ -398,8 +411,12 @@ function klatka(now) {
     }
 
     // --- 7. Aura ---
+    // tecza.update() PRZED aura.updateAndDraw(), żeby aura czytała stan
+    // z tej samej klatki (tempo obrotu barwy zależy od motionMeter.responsywnosc -
+    // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
+    tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt);
+                       moc, plynnosc, fit, dt, tecza);
 
     // --- 7a. Efekty pieczęci i technik ---
     efekty.updateAndDraw(ctx, frame, dt);
@@ -506,6 +523,8 @@ function klatka(now) {
         podmuch: { stan: podmuch.stan, diagnostyka: podmuch.diagnostyka,
                    czastkiFali: fala.liczba,
                    progPredkosci: PROG_PREDKOSCI, progOtwarcia: PROG_OTWARCIA },
+        tecza: { aktywna: tecza.aktywna, pozostaloS: tecza.pozostaloS,
+                 barwaHue: tecza.barwaHue, silaSladu: tecza.silaSladu },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,

@@ -40,13 +40,18 @@ export const TABELA = {
     // szczur celowo NIEOBECNY - pieczęć odpięta (js/main.js), znak
     // js/znaki/szczurDlon.js zostaje na dysku i mógłby dostać ten wpis
     // z powrotem, gdyby wrócił.
+    splot:  { barwa: '270, 65%, 62%',  ksztalt: 'sciagniecie', czas: 0.9 },
 
     // Techniki - MOCNE. Odpalają się gratis, jako nagroda za ułożenie.
     gromWOgniu:   { barwa: '35, 100%, 92%', ksztalt: 'blyskIFala', czas: 1.4 },
     zewPodziemia: { barwa: '285, 75%, 48%', ksztalt: 'mglaIMrok',  czas: 1.8 },
     // Zapowiedź uzbrojenia Aard - rozbłysk w chwili złożenia kombosa.
     // Sama fala jest interaktywna i rysuje ją js/fala.js, nie tabela.
-    aard:         { barwa: '200, 70%, 88%', ksztalt: 'pierscien',  czas: 0.8 }
+    aard:         { barwa: '200, 70%, 88%', ksztalt: 'pierscien',  czas: 0.8 },
+    // Błysk AKTYWACJI nagrody - jednorazowy, jedna barwa (TABELA nie umie
+    // prawdziwej tęczy). Sama tęczowa wstęga żyje w aura.js/tecza.js i
+    // trwa 30 s niezależnie od tego krótkiego błysku.
+    tecza:        { barwa: '0, 0%, 100%',   ksztalt: 'blyskIFala', czas: 1.2 }
 };
 
 export class Efekty {
