@@ -94,4 +94,23 @@ spr(`tecza AKTYWNA -> barwa z barwaHue (${zAktywna1.h}), NIE z płynności`,
 spr(`  ...niezależnie od płynności (${zAktywna1.h} === ${zAktywna0.h})`,
     zAktywna1.h === zAktywna0.h);
 
+console.log('\nZANIK ŚLADU PRZED EARLY-RETURN NIE WYBUCHA NA PIERWSZEJ KLATCE:');
+// Runda naprawy 1: zanik bufora `_slad` przeniesiony PRZED
+// `if (!maska || ...) return;` (ten sam wzorzec co rozpad `_impuls` powyżej -
+// patrz komentarz w aura.js), żeby ślad dogasał nawet podczas przerwy w
+// trackingu, zamiast zamarzać i wracać jako przebłysk-widmo. Na PIERWSZEJ
+// klatce gry `this._slad` jeszcze nie istnieje (powstaje leniwie w
+// _przygotujPlotna(), która siedzi PO guardzie i nigdy się nie wykonuje przy
+// maska=null) - fade musi to bezpiecznie znosić, nie wybuchać na null.
+const a5 = nowa();
+let a5Wybuchla = false;
+try {
+  for (let i = 0; i < 5; i++) {
+    a5.updateAndDraw(null, 0, 0, 0, 1, fit, DT);
+  }
+} catch (e) {
+  a5Wybuchla = true;
+}
+spr('kilka klatek bez maski od startu (this._slad === null) nie wybucha', !a5Wybuchla);
+
 process.exit(ok ? 0 : 1);

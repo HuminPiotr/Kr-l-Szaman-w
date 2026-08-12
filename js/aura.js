@@ -126,6 +126,22 @@ export class Aura {
         this._impuls *= Math.max(0, 1 - dt / TAU_IMPULSU);
         if (!Number.isFinite(this._impuls)) this._impuls = 0;
 
+        // Ten sam powód co komentarz o rozpadzie impulsu tuż wyżej: zanik
+        // bufora śladu MUSI być przed wczesnym powrotem niżej, inaczej ślad
+        // zamarza, gdy maski chwilowo nie ma (albo moc chwilowo spadnie pod
+        // próg), i wraca jako przebłysk-widmo zamiast dogasać. Bramka
+        // `this._slad` jest tu potrzebna, bo bufor powstaje leniwie w
+        // _przygotujPlotna() (ta metoda siedzi PO guardzie) - w pierwszej
+        // klatce gry bufora jeszcze nie ma, więc zanik jest wtedy no-opem
+        // (nie ma czego blaknąć - to poprawne zachowanie).
+        if (this._slad) {
+            const zanikWczesny = 1 - Math.exp(-dt / TAU_SLADU);
+            this._sladCtx.globalCompositeOperation = 'destination-out';
+            this._sladCtx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, zanikWczesny)).toFixed(3)})`;
+            this._sladCtx.fillRect(0, 0, this._slad.width, this._slad.height);
+            this._sladCtx.globalCompositeOperation = 'source-over';
+        }
+
         // Jasnością steruje moc POWIĘKSZONA o impuls, nie moc surowa.
         //
         // BEZ CLAMPU DO 1, i to jest celowe. Przy pełnym pasku _moc ≈ 1, więc
@@ -161,18 +177,12 @@ export class Aura {
         const pc = this._pracaCtx;
         const pw = this._praca.width, ph = this._praca.height;
 
-        // --- Bufor śladu: przygasza się ZAWSZE (nawet po wygaśnięciu tęczy,
-        // żeby stary ślad dogasł, a nie zamarzł), dopisuje nową sylwetkę
-        // TYLKO gdy tecza aktywna. Koszt stały: jeden fillRect na przygaszenie
-        // plus jeden drawImage+fillRect na dopisanie - ZERO dodatkowych
-        // przebiegów rozmycia ponad te trzy z PRZEBIEGI, bo blur niżej i tak
-        // już się wykonywał; zmienia się tylko to, JAKIE płótno rozmywa.
-        const zanik = 1 - Math.exp(-dt / TAU_SLADU);
-        this._sladCtx.globalCompositeOperation = 'destination-out';
-        this._sladCtx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, zanik)).toFixed(3)})`;
-        this._sladCtx.fillRect(0, 0, pw, ph);
-        this._sladCtx.globalCompositeOperation = 'source-over';
-
+        // --- Bufor śladu: zanik (przygaszenie ZAWSZE, nawet po wygaśnięciu
+        // tęczy, żeby stary ślad dogasł, a nie zamarzł) przeniesiony WYŻEJ,
+        // przed early-return - patrz komentarz przy tamtym bloku. Tu zostaje
+        // wyłącznie dopisanie nowej, otagowanej kolorem sylwetki, TYLKO gdy
+        // tecza aktywna - to wymaga `this._maska` (wypełnionej przez
+        // _wypelnijMaske() powyżej) i `pc`/`pw`/`ph`, więc musi zostać tutaj.
         if (tecza && tecza.aktywna) {
             pc.globalCompositeOperation = 'source-over';
             pc.clearRect(0, 0, pw, ph);
