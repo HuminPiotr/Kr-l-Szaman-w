@@ -143,4 +143,25 @@ s8.update({ perun: NaN, mokosz: 0, weles: 0 }, NaN, DT);
 const poNan = trzymaj(s8, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.6);
 spr('klatka z NaN nie zatruwa składania', poNan.zlozona?.id === 'perun');
 
+// --- KOLIZJA SPLOT/WELES: przy remisie Splot ma wygrywać ---
+// Realistyczna postawa (skrzyżowane ramiona + zaciśnięte pięści) daje
+// wysoki wynik obu znakom naraz - bez rozstrzygnięcia pierścień migałby
+// między liderami i żaden nigdy by się nie złożył (retargetowanie zeruje
+// postęp przy każdej zmianie celu).
+console.log('\nKOLIZJA SPLOT/WELES (remis):');
+const kRemis = new SkladaniePieczeci();
+const remis1 = kRemis.update({ splot: 0.95, weles: 1.0, perun: 0, swarog: 0 }, 1.0, DT);
+spr(`przy remisie blisko maksimum Splot wygrywa (${remis1.skladana})`, remis1.skladana === 'splot');
+
+// Gdy Splot NIE jest blisko maksimum, zwykły najwyższy wynik nadal wygrywa -
+// reguła nie ma się aktywować przy przypadkowych, niskich wynikach Splotu.
+const kBezRemisu = new SkladaniePieczeci();
+const bezRemisu = kBezRemisu.update({ splot: 0.3, weles: 1.0, perun: 0, swarog: 0 }, 1.0, DT);
+spr(`gdy Splot nisko, zwykły lider (weles) wygrywa (${bezRemisu.skladana})`, bezRemisu.skladana === 'weles');
+
+// Splot, który JEST liderem, nie potrzebuje reguły remisu - działa jak zawsze.
+const kSplotLider = new SkladaniePieczeci();
+const splotLider = kSplotLider.update({ splot: 1.0, weles: 0.2, perun: 0, swarog: 0 }, 1.0, DT);
+spr(`Splot jako wyraźny lider składa się normalnie (${splotLider.skladana})`, splotLider.skladana === 'splot');
+
 process.exit(ok ? 0 : 1);

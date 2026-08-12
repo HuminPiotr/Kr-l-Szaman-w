@@ -107,6 +107,31 @@ export class SkladaniePieczeci {
             const v = clamp01(wyniki[k]);
             if (v > wynik) { wynik = v; id = k; }
         }
+
+        // PREFERENCJA SPLOTU PRZY REMISIE. Skrzyżowane ramiona z zaciśniętymi
+        // pięściami dają wysoki wynik zarówno Splotowi (poza), jak i Welesowi
+        // (dłonie) naraz - to nie błąd pomiaru, to fizyczna dwuznaczność: ten
+        // sam układ ciała spełnia sygnatury obu znaków. Bez rozstrzygnięcia
+        // pierścień migałby między liderami i ŻADEN nigdy by się nie złożył
+        // (retargetowanie zeruje postęp - patrz wyżej w tym pliku).
+        //
+        // Splot wygrywa remis: skrzyżowanie ramion jest bardziej świadomym,
+        // całocielesnym gestem niż układ dłoni, który mógł powstać przypadkiem
+        // przy zaciśniętych pięściach. Reguła jest OGÓLNA (dowolny znak bliski
+        // Splotowi), nie zaszyta pod konkretnie Welesa - gdyby w przyszłości
+        // pojawił się inny kolidujący znak, ta sama reguła go obejmie.
+        //
+        // ZGADNIĘTE progi - potwierdzić na żywym ciele (klawisz D): czy 0.1
+        // wystarcza, żeby uniknąć migania, i czy 0.9 nie jest za wysoko.
+        const REMIS_PROG = 0.1;
+        const REMIS_MIN_WYNIK = 0.9;
+        const splotWynik = clamp01(wyniki?.splot ?? 0);
+        if (id !== 'splot' && splotWynik >= REMIS_MIN_WYNIK
+            && Math.abs(splotWynik - wynik) < REMIS_PROG) {
+            id = 'splot';
+            wynik = splotWynik;
+        }
+
         return { id, wynik };
     }
 }

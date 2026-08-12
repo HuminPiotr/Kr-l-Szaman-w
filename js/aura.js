@@ -70,14 +70,26 @@ const TECZA_NASYCENIE = 88;
  * ma w Node), tym samym wzorcem co rzutPerspektywiczny w fala.js.
  */
 export function barwaAury(plynnosc, tecza) {
-    if (tecza && tecza.aktywna) {
-        return { h: tecza.barwaHue, s: TECZA_NASYCENIE };
-    }
     const t = Math.max(0, Math.min(1, Number.isFinite(plynnosc) ? plynnosc : 1));
-    return {
+    const normalna = {
         h: BARWA_SZARPANA.h + (BARWA_PLYNNA.h - BARWA_SZARPANA.h) * t,
         s: BARWA_SZARPANA.s + (BARWA_PLYNNA.s - BARWA_SZARPANA.s) * t
     };
+    if (!tecza || !tecza.aktywna) return normalna;
+
+    // silaSladu steruje PRZEJŚCIEM, nie samym "jest/nie ma" - bez tego barwa
+    // skakała z tęczy na normalną w jednej klatce w momencie wygaśnięcia,
+    // mimo że tecza.js już liczy rampę 1->0 w ostatnich 3s właśnie po to.
+    const sila = Math.max(0, Math.min(1, Number.isFinite(tecza.silaSladu) ? tecza.silaSladu : 0));
+
+    // Interpolacja PO KRÓTSZYM ŁUKU koła barw - naiwne mieszanie h wprost
+    // dawałoby skok przez 180°, gdy jedna barwa jest blisko 0/360 a druga
+    // po drugiej stronie koła.
+    let dh = tecza.barwaHue - normalna.h;
+    dh = ((dh + 180) % 360 + 360) % 360 - 180;
+    const h = (normalna.h + dh * sila + 360) % 360;
+    const s = normalna.s + (TECZA_NASYCENIE - normalna.s) * sila;
+    return { h, s };
 }
 
 export class Aura {

@@ -113,4 +113,25 @@ try {
 }
 spr('kilka klatek bez maski od startu (this._slad === null) nie wybucha', !a5Wybuchla);
 
+console.log('\nRAMPA WYGASZANIA BARWY (silaSladu steruje przejściem):');
+// Rampa wygaszania: przy silaSladu POŚREDNIM barwa ma być POMIĘDZY tęczą
+// a normalną, nie równa żadnej z nich - to jest naprawa skoku przy wygaszaniu.
+const teczaPolowa = { aktywna: true, barwaHue: 180, silaSladu: 0.5 };
+const posredniaTecza = barwaAury(1, teczaPolowa);   // plynnosc=1 -> normalna.h=35
+spr(`silaSladu=0.5 daje barwę MIĘDZY tęczą (180) a normalną (35) (h=${posredniaTecza.h.toFixed(1)})`,
+    posredniaTecza.h > 35 && posredniaTecza.h < 180);
+
+// Przy silaSladu=1 zachowanie MUSI zostać identyczne jak wcześniej (test
+// wyżej w tej sekcji już to sprawdza z silaSladu:1 - to potwierdzenie,
+// że refaktor nie zepsuł granicznego przypadku).
+const teczaPelna = { aktywna: true, barwaHue: 180, silaSladu: 1 };
+spr(`silaSladu=1 daje DOKŁADNIE barwę tęczy (h=${barwaAury(1, teczaPelna).h})`,
+    barwaAury(1, teczaPelna).h === 180);
+
+// Przy silaSladu=0 (tuż przed dezaktywacją) barwa jest już PRAKTYCZNIE
+// normalna - potwierdza, że przejście jest ciągłe, nie ma progu.
+const teczaWygasajaca = { aktywna: true, barwaHue: 180, silaSladu: 0 };
+spr(`silaSladu=0 daje barwę PRAKTYCZNIE normalną (h=${barwaAury(1, teczaWygasajaca).h.toFixed(1)} ≈ 35)`,
+    Math.abs(barwaAury(1, teczaWygasajaca).h - 35) < 0.01);
+
 process.exit(ok ? 0 : 1);

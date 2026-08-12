@@ -17,7 +17,16 @@
 
 // ZGADNIĘTE - wymaga potwierdzenia na żywym ciele. Za krótkie okno karze
 // wolniejszych, za długie łączy pieczęcie złożone bez związku.
-const OKNO_MS = 4000;
+//
+// PODNIESIONE z 4000 na 6500 (finalny przegląd Splotu/Tęczy): przy
+// trójelementowej sekwencji splot x3 matematyka składania (pieczecie.js:
+// czas rośnie do 2.5s przy wyniku tuż nad progiem) sprawiała, że wynik
+// Splotu poniżej ~62% nigdy nie mieścił dwóch kolejnych złożeń w oknie -
+// pieczęć się składała, kosztowała moc, ale Tęcza nigdy nie odpalała, bez
+// żadnego sygnału dlaczego. Szersze okno dotyczy WSZYSTKICH kombosów w tej
+// tabeli, nie tylko Tęczy - świadoma decyzja, żeby nie różnicować progów
+// wybaczania między technikami.
+const OKNO_MS = 6500;
 
 // Pole `uzbraja` mówi, KTÓRĄ technikę kombos przygotowuje - main.js routuje
 // po nim zamiast bezwarunkowo uzbrajać płonący palec (co było w porządku,
