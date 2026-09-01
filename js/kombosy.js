@@ -31,34 +31,35 @@ const OKNO_MS = 6500;
 // Pole `uzbraja` mówi, KTÓRĄ technikę kombos przygotowuje - main.js routuje
 // po nim zamiast bezwarunkowo uzbrajać płonący palec (co było w porządku,
 // dopóki technika była jedna).
+//
+// PRZEBUDOWA NA RUNY (docs/superpowers/specs/2026-09-01-runy-i-kwalifikatory-
+// -design.md): pieczęcie dłoniowe (weles/perun/szczur) i Splot z pozy
+// (mokoszSplot.js) odeszły - zastąpione trzema runami kreślonymi w powietrzu
+// (koło/Mokosz, zygzak/Perun, fala/Stribog) x stanem dłoni (otwarta/pięść).
+// Piramidka Swaroga (żywioł ognia) ZOSTAJE bez zmian - jedyna dłoniowa
+// pieczęć, która działała pewnie, bo jej kształt sam wymusza rozsunięcie
+// nadgarstków, czyli prześwit, którego potrzebuje detektor.
 export const KOMBOSY = [
-    // Swaróg -> Perun: ogień, potem piorun. To także najwygodniejsza para do
-    // złożenia po sobie - z namiotu (10 palców) do Tygrysa (4) wystarczy
-    // złożyć kciuk, serdeczny i mały.
-    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun'], uzbraja: 'ogien' },
-    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['weles', 'swarog'], uzbraja: 'ogien' },
+    // Swaróg -> Perun (dający): ogień, potem piorun. Sekwencja wraca do
+    // swojego PIERWOTNEGO znaczenia sprzed przebudowy - piramidka zostaje,
+    // więc znowu mówi to, co jej nazwa.
+    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun-otwarta'], uzbraja: 'ogien' },
 
-    // Weles x2 -> Aard. Pieczęć Szczura (poprzedni wyzwalacz) okazała się
-    // niepewna w łapaniu na żywo - odpięta na razie (js/znaki/szczurDlon.js
-    // zostaje na dysku). Weles jest już zweryfikowany jako niezawodny, więc
-    // Aard uzbraja się jego podwójnym złożeniem zamiast nowego znaku.
-    // Podwójne złożenie to PRZYTRZYMANIE jednej postawy przez dwa cykle
-    // pierścienia - pieczecie.js po złożeniu zaczyna następny od nowa przy
-    // tej samej postawie, więc rytuał nie wymaga nowej mechaniki.
-    // UWAGA: trzeci Weles z rzędu odpali TEN kombos PONOWNIE (dopasowanie do
-    // końcówki bufora) - to celowe zachowanie łańcuchów; ponowne uzbrojenie
-    // uzbrojonej techniki jest no-opem. Weles -> Swaróg dalej odpala Zew
-    // Podziemia niezależnie - sekwencje mają się nakładać, nie wykluczać.
-    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['weles', 'weles'], uzbraja: 'aard' },
+    // Mokosz (biorąca) x2 -> Zew Podziemia. Zbieranie mocy w pięść, dwa razy
+    // pod rząd - czyta się jako rytuał "branie", nie jako lista wejść.
+    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['mokosz-piesc', 'mokosz-piesc'], uzbraja: 'ogien' },
 
-    // Splot x3 -> Tecza. TRZY złożenia, nie dwie - dłuższy rytuał niż
-    // Ogień/Aard, bo nagroda jest darmowa przez 30 s (żaden dalszy koszt),
-    // więc próg wejścia jest wyższy. uzbraja: 'tecza' NIE pasuje do wzorca
-    // uzbrój-potem-gest (Ogień/Aard czekają na osobny gest gracza) -
+    // Stribog (dający) x2 -> Aard. Wiatr kreślony dwa razy pod rząd otwartą
+    // dłonią - "wypuszczenie" pasuje do podmuchu bardziej niż do pięści.
+    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['stribog-otwarta', 'stribog-otwarta'], uzbraja: 'aard' },
+
+    // Mokosz (dająca) x3 -> Tecza. TRZY złożenia, nie dwie - dłuższy rytuał
+    // niż Ogień/Aard, bo nagroda jest darmowa przez 30 s (żaden dalszy
+    // koszt), więc próg wejścia jest wyższy. uzbraja: 'tecza' NIE pasuje do
+    // wzorca uzbrój-potem-gest (Ogień/Aard czekają na osobny gest gracza) -
     // main.js routuje tę gałąź na natychmiastową aktywację, bez drugiego
-    // gestu. Splot to nowy znak z ciała (skrzyżowane ramiona), nie z dłoni -
-    // patrz js/znaki/mokoszSplot.js.
-    { id: 'tecza', nazwa: 'Wstęga Mokoszy', sekwencja: ['splot', 'splot', 'splot'], uzbraja: 'tecza' }
+    // gestu.
+    { id: 'tecza', nazwa: 'Wstęga Mokoszy', sekwencja: ['mokosz-otwarta', 'mokosz-otwarta', 'mokosz-otwarta'], uzbraja: 'tecza' }
 ];
 
 export class KomboSilnik {

@@ -25,42 +25,56 @@ Obowiązuje w całym kodzie i wygrywa ze wszystkimi innymi względami.
 
 Front-end only, HTML + CSS + JavaScript (Vanilla, moduły ES). Bez backendu i bazy.
 
-**Tracking:** MediaPipe Tasks Vision 0.10.3, `PoseLandmarker` (lite, `numPoses: 1`) z **maską segmentacji**. Śledzenie dłoni jest teraz WYŁĄCZONE.
+**Tracking:** MediaPipe Tasks Vision 0.10.3, dwa trackery naraz: `PoseLandmarker` (lite, `numPoses: 1`, z **maską segmentacji**) i `HandLandmarker` (`numHands: 2`). Zmierzone na żywym tańcu: ~60 FPS z obydwoma i maską, budżet 33 ms przy 30 FPS ma spory zapas.
 
 ```
-kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──┐
-                      │                              ├→ MotionMeter → moc → Aura + HUD
-                      ├→ worldLandmarks → ─────────  ┘
-                      └→ maska sylwetki ───────────────→ Aura
+kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────────────────┐
+                      │                                              ├→ MotionMeter → moc → Aura + HUD
+                      ├→ worldLandmarks(15/16) → Ślad run ──┐         │
+                      └→ maska sylwetki ─────────────────── │ ───────┴→ Aura
+       HandTracker ───→ landmarks → kwalifikator + Swaróg ──┤
+                                                             ├→ ZnakRegistry → Pieczęcie → Kombosy → Efekty
 ```
 
-**Tańczysz płynnie → moc rośnie → aura rozkwita.**
+**Tańczysz płynnie → moc rośnie → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
 
 ### Kontrakt klatki
 
 `main.js` buduje raz na klatkę jeden obiekt i przekazuje go wszystkim:
 
 ```js
-{ hands: [], pose: { landmarks, worldLandmarks } | null, width, height, dt, now }
+{ hands: [{ landmarks, worldLandmarks, handedness }], pose: { landmarks, worldLandmarks } | null, width, height, dt, now }
 ```
 
-`hands` zostaje pustą listą, żeby kontrakt się nie zmienił, gdy dłonie wrócą razem ze znakami.
+`hands` niesie realne dane od `HandTracker` (dwie dłonie, każda z `landmarks`/`worldLandmarks`/`handedness`).
 
-**Zasada:** `landmarks` (2D, przemapowane) **tylko do rysowania**. `worldLandmarks` (metryczne 3D) **do wszystkich pomiarów** — są niezależne od odległości gracza od kamery.
+**Zasada:** `landmarks` (2D, przemapowane) **tylko do rysowania**. `worldLandmarks` (metryczne 3D) **do wszystkich pomiarów** — są niezależne od odległości gracza od kamery. Dotyczy to też śladu run: pozycja nadgarstka do dopasowania kształtu idzie z `pose.worldLandmarks[15/16]`, NIGDY z `hands[].landmarks` (zniekształcone przez cover-fit) ani `hands[].worldLandmarks` (metryczne, ale względem środka DŁONI - nie widać w nich ruchu dłoni w przestrzeni).
 
 ### Pliki
 
 | Plik | Odpowiedzialność |
 |---|---|
-| `js/poseTracker.js` | wrapper MediaPipe; detekcja na POMNIEJSZONEJ klatce |
+| `js/poseTracker.js` | wrapper MediaPipe Pose; detekcja na POMNIEJSZONEJ klatce |
+| `js/handTracker.js` | wrapper MediaPipe Hands (`numHands: 2`) |
 | `js/frameMapper.js` | cover-fit + mapowanie punktów na płótno |
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
 | `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
 | `js/aura.js` | maska sylwetki → poświata |
 | `js/audioEngine.js` | syntezator |
-| `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu) |
+| `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu, `N` = zrzuć ślad runy do konsoli) |
+| `js/znaki/registry.js` | rejestr znaków; `score(frame)` → 0..1, nigdy boolean |
+| `js/znaki/dlon.js` | wspólne narzędzia geometrii dłoni (skala, wyprostowanie, zwinięcie w pięść) |
+| `js/znaki/swarogDlon.js` | piramidka Swaroga (żywioł ognia) - jedyna dłoniowa pieczęć, która przeżyła przebudowę na runy |
+| `js/runy/slad.js` | bufor śladu nadgarstka - okno **długością drogi** (nie czasem!), sufit wieku |
+| `js/runy/ksztalt.js` | resampling + normalizacja + dopasowanie kształtu do szablonu |
+| `js/runy/szablony.js` | trzy szablony run (koło/zygzak/fala) - **dziś syntetyczne**, do zastąpienia nagraniem |
+| `js/runy/definicje.js` | sześć znaków-run (kształt x stan dłoni), parowanie dłoni z nadgarstkiem PO POŁOŻENIU |
+| `js/runy/rysujSlad.js` | świecąca wstęga za kreślącym nadgarstkiem |
+| `js/pieczecie.js` | postawa/runa ciągła → zdarzenie: pierścień, zanik, lepki argmax |
+| `js/kombosy.js` | bufor sekwencji pieczęci → technika, okno czasowe |
+| `js/efekty.js` | tabela efektów wizualnych pieczęci i technik |
 
-**Odpięte, nie usunięte** (wracają przy znakach): `powerBall.js`, `wiatr.js`, `znaki/*`, `handTracker.js`.
+**Odpięte, nie usunięte** (wracają, gdyby kamera zewnętrzna albo lepszy tracker to uzasadniły): `powerBall.js`, `wiatr.js`, `znaki/perun.js`, `znaki/mokosz.js`, `znaki/weles.js`, `znaki/postawa.js` (postawy CAŁEGO CIAŁA - wymagają kadru z barkami i biodrami), `znaki/welesDlon.js`, `znaki/perunDlon.js`, `znaki/szczurDlon.js`, `znaki/mokoszSplot.js` (pieczęcie/znaki PALCOWE lub z pozy zastąpione runami 2026-09-01 - patrz §4).
 
 ## 4. Pułapki, w które już wpadliśmy
 
@@ -86,6 +100,20 @@ Wszystkie **zmierzone**, nie teoretyczne. Nie cofać bez ponownego pomiaru.
 - **Aurę rysować przez `computeCoverFit()`**, tak jak wideo. Zwykłe `drawImage(0,0,canvas.width,canvas.height)` rozciąga ją i aura siada OBOK ciała.
 - **Maski trzeba zwalniać** (`mask.close()`) — inaczej tekstury GPU wyciekają klatka po klatce.
 - **Płótno ma CSS `transform: scaleX(-1)`** — tekst rysowany na nim wychodzi lustrzany.
+
+### Runy kreślone w powietrzu (od 2026-09-01)
+
+Zastąpiły pieczęcie palcowe (Wąż/Tygrys/Szczur) - te padały nie na złych progach, tylko na braku informacji w sygnale: jednooczna kamera RGB nie widzi palca schowanego za palcem, tylko go zgaduje. Piramidka Swaroga przeżyła, bo jej kształt sam wymusza prześwit między dłońmi. Pełny kontekst: `docs/superpowers/specs/2026-09-01-runy-i-kwalifikatory-design.md`.
+
+- **Okno śladu liczy się DŁUGOŚCIĄ DROGI, nie czasem** — inaczej tempo kreślenia i czas trwania okna robiłyby dwie sprzeczne rzeczy naraz i runa byłaby osiągalna tylko w wąskim, nienazwanym paśmie tempa. Sufit wieku (osobno, ~4 s) gasi ślad przy bezruchu.
+- **Okno MUSI być NIECO PONIŻEJ jednego obwodu typowej pętli, nigdy powyżej.** Zmierzone: okno 2x za duże (`MAX_DLUGOSC_M` dwa razy większe od obwodu) dawało bufor z ~2 okrążeniami, które po resamplingu do stałej liczby punktów wychodziły jako PRZERZEDZONA, KANCIASTA pętla (próbki co 22,5° zamiast 11,25°) — wynik dopasowania spadał do zera mimo idealnie narysowanego koła. Degradacja jest ASYMETRYCZNA: okno niedopełnione (za mały obwód założony) daje łagodnie schodzący wynik (fragment łuku), okno przepełnione (za duży) daje wynik, który spada STROMO. Bezpieczniej celować niżej.
+- **Skalowanie kształtu MUSI być jednorodne (RMS promienia), nigdy osobno w X i Y.** Osobne skalowanie zamieniłoby pionowy zygzak i poziomą falę w ten sam kształt po normalizacji — dokładnie tę cechę, która je rozróżnia.
+- **Parowanie dłoni z nadgarstkiem po POŁOŻENIU 2D, nie po `handedness`.** MediaPipe bywa niepewne co do stronności (patrz `normalnaDloni()` w `znaki/dlon.js`); błędne parowanie przez string dawałoby objaw "stan dłoni nie działa", nie "strony zamienione" - najgorszy rodzaj błędu do zdiagnozowania.
+- **Trafienie MUSI czyścić ślad.** Bez tego bufor po złożeniu runy dalej trzyma ten sam narysowany kształt i pierścień natychmiast zaczyna napełniać się TĄ SAMĄ runą - jedno przejście dawałoby dwie pieczęcie.
+- **Zanik zamiast zerowania w `pieczecie.js`.** Wynik dopasowania kształtu naturalnie dołkuje w chwili zamykania jednego obrotu i zaczynania następnego (bufor zawiera wtedy ~1,5 kształtu) - natychmiastowe zerowanie postępu kasowałoby całe trzymanie za jedną drgniętą klatkę.
+- **Lepki argmax, remis wygrywa urzędującego.** Bez marginesu i czasu przejęcia dwa znaki o zbliżonym wyniku migają i żaden nigdy się nie składa (to był pierwotny powód hacku "Splot wygrywa remis", teraz zastąpionego regułą ogólną). Margines liczy się na różnicy BEZWZGLĘDNEJ - przy dokładnym remisie (np. `pokrycie=0` dla obu wariantów dłoni) lider musi zostać ten sam, inaczej skacze przy najmniejszym drgnięciu.
+- **Szablony run są DZIŚ SYNTETYCZNE** (`runy/szablony.js`) - ZGADNIĘTE amplitudy/okresy, jak `PROG_SZARPNIECIA` przed nimi. Klawisz `N` w nakładce debug zrzuca znormalizowany ślad jako gotowy do wklejenia literał - stąd bierze się prawdziwy szablon.
+- **Kombo x3 (Wstęga Mokoszy) ma zmierzone ograniczenie tempa** - przy bardzo wolnym i szerokim kreśleniu (promień ~0.22 m, 3,5 s/okrążenie) trzy złożenia nie mieszczą się w `OKNO_MS` kombosów i Tęcza nigdy się nie odpala, mimo że każda pieczęć osobno kosztuje moc. Zostawione świadomie jako znane ograniczenie do potwierdzenia na żywym ciele.
 
 ## 5. Wydajność
 
@@ -115,8 +143,10 @@ Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · koły
 
 ## 7. Dalszy rozwój
 
-1. **Znaki i kombosy** — moc z płynności jest tym, co je zasila; rejestr czeka odpięty
-2. **Oprawa szamańska** — paleta ognia/węgla, ognisko u dołu kadru
-3. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
+1. **Nagrać prawdziwe szablony run** — zastąpić syntetyczne koło/zygzak/falę w `runy/szablony.js` nagraniami z żywego ciała (klawisz `N`). Najwyższy priorytet: to jedyna rzecz, przez którą cała przebudowa na runy może jeszcze zawieść w praktyce.
+2. **Potwierdzić na żywym ciele** — progi `ksztalt.js` (`BLAD_ZERO`/`BLAD_PELNY`), okno śladu (`MAX_DLUGOSC_M`), margines i czas przejęcia lepkiego argmaxu, oraz ograniczenie tempa kombosa x3 (§4).
+3. **Oprawa szamańska** — paleta ognia/węgla, ognisko u dołu kadru
+4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
+5. **Czwarty żywioł/piąty kształt** (np. spirala) — dopiero po potwierdzeniu obecnej czwórki (koło/zygzak/fala/piramidka) na żywo
 
 *Przy symbolice omijać kołowrót/swarzycę — zostały zawłaszczone przez skrajną prawicę. Celem są i tak autorskie runy.*

@@ -1,5 +1,6 @@
 /**
- * Nakładka diagnostyczna. Przełącznik: klawisz D.
+ * Nakładka diagnostyczna. Przełącznik: klawisz D. Reset zakresu v: R.
+ * Zrzut śladu runy do konsoli (Krok 0b, spec run): klawisz N.
  *
  * Nie ma tu testów jednostkowych do napisania - wejściem jest strumień z kamery,
  * a wyjściem wrażenie wzrokowe. Ta nakładka JEST narzędziem weryfikacji.
@@ -7,6 +8,7 @@
  *
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
+import { znormalizujSlad } from './runy/ksztalt.js';
 
 const PANEL_ID = 'debug-hud';
 const UPDATE_HZ = 10; // DOM aktualizowany 10x/s, nie 60x/s - zapis do DOM w pętli klatek to marnotrawstwo
@@ -24,9 +26,15 @@ export class DebugHud {
         this.vMin = Infinity;
         this.vMax = 0;
 
+        this._zrzucSladPrzyNastepnejKlatce = false;
+
         window.addEventListener('keydown', (e) => {
             if (e.key === 'd' || e.key === 'D') this.toggle();
             if (e.key === 'r' || e.key === 'R') this.resetujZakres();
+            // Zrzut na klawisz, nie natychmiast tutaj - w handlerze klawiatury
+            // nie mamy dostępu do bieżącego stanu śladów (przychodzi dopiero
+            // w updatePanel()). Flaga przenosi żądanie do następnej klatki.
+            if (e.key === 'n' || e.key === 'N') this._zrzucSladPrzyNastepnejKlatce = true;
         });
     }
 
@@ -80,6 +88,14 @@ export class DebugHud {
         if (Number.isFinite(stats.predkosc) && frame.pose) {
             if (stats.predkosc < this.vMin) this.vMin = stats.predkosc;
             if (stats.predkosc > this.vMax) this.vMax = stats.predkosc;
+        }
+
+        // Zrzut śladu do konsoli - NIEZALEŻNY od tego, czy panel jest widoczny
+        // (klawisz N ma działać nawet z ukrytą nakładką, tak jak licznik FPS
+        // zbiera dane zawsze).
+        if (this._zrzucSladPrzyNastepnejKlatce) {
+            this._zrzucSladPrzyNastepnejKlatce = false;
+            if (stats.slady) this._zrzucSlad(stats.slady);
         }
 
         if (!this.visible) return;
@@ -163,6 +179,18 @@ export class DebugHud {
             lines.push(`pieczęć ${cel}  ${this._num(stats.postep ?? 0)}  ${this._bar(stats.postep ?? 0)}${stats.brakMocy ? '  ⏳ brak mocy' : ''}`);
             lines.push(`kombo ${stats.bufor ?? '—'}`);
 
+            // Diagnostyka śladu run (spec run, GEMINI.md wzorzec: liczba przy
+            // konkretnym ruchu jest jedynym sposobem wystrojenia progów).
+            // 'N' zrzuca znormalizowany ślad do konsoli jako gotowy do
+            // wklejenia szablon (Krok 0b - zastąpienie syntetycznych
+            // szablonów w runy/szablony.js nagraniem z żywego ciała).
+            if (stats.slady) {
+                const { sladLewy: sl, sladPrawy: sp } = stats.slady;
+                lines.push(`ślad L dł ${this._num(sl.dlugoscDrogi())} m  pokr.dłoni ${this._num(sl.pokrycieDloni())}` +
+                           `   P dł ${this._num(sp.dlugoscDrogi())} m  pokr.dłoni ${this._num(sp.pokrycieDloni())}` +
+                           `   [N = zrzuć do konsoli]`);
+            }
+
             // KTÓRY warunek blokuje. Wynik pieczęci to minimum tych wartości,
             // więc najniższa liczba w tej linijce mówi, co poprawić.
             // Bez tego zostaje zgadywanie ułożenia palców.
@@ -242,6 +270,47 @@ export class DebugHud {
 
     _num(v) {
         return (Number.isFinite(v) ? v : 0).toFixed(2);
+    }
+
+    /**
+     * Zrzut znormalizowanego śladu do konsoli jako GOTOWY DO WKLEJENIA
+     * literał - nie tabela, nie opis. To jest cały sens Kroku 0b (spec run):
+     * szablony w runy/szablony.js są dziś SYNTETYCZNE (ZGADNIĘTE amplitudy,
+     * okresy) i wymagają zastąpienia nagraniem z żywego ciała. Transkrypcja
+     * ręczna z tabeli liczb byłaby na tyle uciążliwa, że nikt by tego nie
+     * zrobił - stąd literał wprost do wklejenia w miejsce `punkty:` szablonu.
+     *
+     * Bierze dowolny ślad z NIEPUSTYM buforem (ten, który akurat coś kreśli) -
+     * przy dwóch dłoniach rysujących naraz zrzuca dłuższy ślad.
+     */
+    _zrzucSlad({ sladLewy, sladPrawy }) {
+        const kandydaci = [
+            { etykieta: 'L', slad: sladLewy },
+            { etykieta: 'P', slad: sladPrawy }
+        ].filter(k => k.slad.punkty().length >= 2);
+
+        if (!kandydaci.length) {
+            console.log('[N] Zrzut śladu: brak narysowanego kształtu (żaden bufor nie ma >= 2 punktów).');
+            return;
+        }
+
+        kandydaci.sort((a, b) => b.slad.dlugoscDrogi() - a.slad.dlugoscDrogi());
+        const { etykieta, slad } = kandydaci[0];
+        const norm = znormalizujSlad(slad.punkty());
+        if (!norm) {
+            console.log(`[N] Zrzut śladu (${etykieta}): kształt zdegenerowany (RMS=0) - narysuj wyraźniejszy kształt.`);
+            return;
+        }
+
+        const literal = norm.map(p => `  { x: ${p.x.toFixed(4)}, y: ${p.y.toFixed(4)} }`).join(',\n');
+        console.log(
+            `[N] Ślad ${etykieta} (${slad.dlugoscDrogi().toFixed(2)} m) - wklej jako 'punkty' szablonu ` +
+            `w js/runy/szablony.js (zamiast wywołania znormalizowanySzablon(generuj...(), {...}) ` +
+            `użyj wprost: { punkty: [...], cykliczny: ?, odwracalny: ? }):
+[
+${literal}
+]`
+        );
     }
 
     _bar(v, width = 14) {

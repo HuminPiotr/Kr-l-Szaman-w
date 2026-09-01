@@ -295,6 +295,25 @@ Uwaga z GEMINI.md §6: Chrome cache'uje moduły ES — przeładowywać twardo.
 
 ---
 
+## Zmierzone ograniczenie: Wstęga Mokoszy (x3) przy bardzo wolnym tempie
+
+Symulacja headless (aktualizujSlady -> znaki.ocen -> skladanie.update ->
+kombosy.dodaj, koło otwartą dłonią, moc zawsze pełna) potwierdza, że
+`mokosz-otwarta x3` odpala się niezawodnie przy tempie szybkim do
+umiarkowanie wolnego (promień 0.15-0.2 m, 1-2.5 s/okrążenie), ale **nigdy**
+przy bardzo wolnym i szerokim kreśleniu (promień 0.22 m, 3.5 s/okrążenie) -
+każda pieczęć osobno się składa i kosztuje moc, ale trzy nigdy nie mieszczą
+się w `OKNO_MS = 6500` z `kombosy.js`. To ten sam cichy tryb awarii, który
+`kombosy.js` już raz opisał przy Splocie (okno podniesione z 4000 na 6500).
+
+**Decyzja właściciela projektu: zostawić jako znane ograniczenie**, nie
+naprawiać teraz. Trafia do listy „do zmierzenia na żywym ciele" w sekcji
+Weryfikacja - dopiero tam okaże się, czy realni tancerze w ogóle kreślą tak
+wolno i szeroko, żeby to miało znaczenie. Jeśli tak, dwie gotowe naprawy to:
+poszerzenie `OKNO_MS` (ten sam ruch co przy Splocie) albo zmniejszenie
+Wstęgi do x2 (kosztem wyższego progu wejścia, który miał odróżniać ją od
+Ognia/Aard).
+
 ## Krok 0
 
 **a. Spec.** Przepisać ten projekt do

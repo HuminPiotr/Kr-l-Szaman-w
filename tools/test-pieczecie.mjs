@@ -1,5 +1,7 @@
 /**
  * Moc jako zasób: koszt częściowy i zamrożenie zaniku.
+ * Składanie: próg/tempo/koszt, ZANIK ZAMIAST ZEROWANIA i LEPKI ARGMAX
+ * (przebudowa na runy, docs/superpowers/specs/2026-09-01-runy-i-kwalifikatory-design.md).
  *
  *   node tools/test-pieczecie.mjs
  *
@@ -128,14 +130,26 @@ for (let i = 0; i < Math.round(0.62 / DT); i++) {
 }
 spr(`0.62 s trzymania daje dokładnie jedną pieczęć (${ile})`, ile === 1);
 
-console.log('\nPRZEŁĄCZENIE POSTAWY:');
-// Zmiana postawy w trakcie to RETARGETOWANIE, nie porażka - pierścień
-// startuje od nowa dla nowego znaku i nic nie miga na czerwono.
+console.log('\nLEPKI ARGMAX - przejęcie wymaga marginesu I czasu:');
+// Zmiana celu jest nadal RETARGETOWANIEM, nie porażką - ale teraz nie
+// wystarcza jedna klatka przewagi. Rywal musi wygrywać WYRAŹNIE i TRWALE.
 const s7 = new SkladaniePieczeci();
 trzymaj(s7, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.3);
-const po = s7.update({ perun: 0, mokosz: 1.0, weles: 0 }, 1.0, DT);
-spr(`przełączenie celuje w nowy znak (${po.skladana})`, po.skladana === 'mokosz');
-spr(`i zaczyna od początku (${po.postep.toFixed(2)})`, po.postep < 0.1);
+
+// Jedna klatka wyraźnej przewagi rywala - za mało, urzędujący (perun) zostaje.
+const jednaKlatka = s7.update({ perun: 0, mokosz: 1.0, weles: 0 }, 1.0, DT);
+spr(`jedna klatka przewagi NIE przejmuje pierścienia (${jednaKlatka.skladana})`,
+    jednaKlatka.skladana === 'perun');
+
+// Ta sama przewaga UTRZYMANA przez ~CZAS_PRZEJECIA_S - w końcu przejmuje,
+// i zaczyna nowy pierścień od zera (retargetowanie).
+let przejal = null;
+for (let i = 0; i < 20; i++) {
+  const w = s7.update({ perun: 0, mokosz: 1.0, weles: 0 }, 1.0, DT);
+  if (w.skladana === 'mokosz') { przejal = w; break; }
+}
+spr('utrzymana przewaga w końcu przejmuje pierścień', przejal !== null);
+spr(`i zaczyna od początku (${(przejal?.postep ?? 1).toFixed(2)})`, (przejal?.postep ?? 1) < 0.1);
 
 console.log('\nODPORNOŚĆ NA NaN:');
 const s8 = new SkladaniePieczeci();
@@ -143,25 +157,76 @@ s8.update({ perun: NaN, mokosz: 0, weles: 0 }, NaN, DT);
 const poNan = trzymaj(s8, { perun: 1.0, mokosz: 0, weles: 0 }, 1.0, 0.6);
 spr('klatka z NaN nie zatruwa składania', poNan.zlozona?.id === 'perun');
 
-// --- KOLIZJA SPLOT/WELES: przy remisie Splot ma wygrywać ---
-// Realistyczna postawa (skrzyżowane ramiona + zaciśnięte pięści) daje
-// wysoki wynik obu znakom naraz - bez rozstrzygnięcia pierścień migałby
-// między liderami i żaden nigdy by się nie złożył (retargetowanie zeruje
-// postęp przy każdej zmianie celu).
-console.log('\nKOLIZJA SPLOT/WELES (remis):');
+// --- LEPKI ARGMAX, wersja ogólna ---
+// Zastępuje dawny hack "Splot wygrywa remis z Welesem" (usunięty z pieczecie.js
+// razem z tą przebudową). Ten sam problem - dwa znaki o zbliżonym wyniku, przez
+// co pierścień migał i nic nigdy się nie składało - jest teraz rozwiązany
+// OGÓLNIE, dla dowolnej pary id, nie tylko zaszytej Splot/Weles.
+console.log('\nLEPKI ARGMAX (uogólnienie dawnego hacku Splot/Weles):');
+
+// Dokładny remis: urzędujący (a) zostaje, niezależnie od kolejności kluczy.
 const kRemis = new SkladaniePieczeci();
-const remis1 = kRemis.update({ splot: 0.95, weles: 1.0, perun: 0, swarog: 0 }, 1.0, DT);
-spr(`przy remisie blisko maksimum Splot wygrywa (${remis1.skladana})`, remis1.skladana === 'splot');
+kRemis.update({ a: 1.0, b: 0 }, 1.0, DT); // ustanawia 'a' jako urzędującego
+for (let i = 0; i < 30; i++) kRemis.update({ a: 0.6, b: 0.6 }, 1.0, DT);
+spr(`dokładny remis - urzędujący (a) zostaje (${kRemis.skladana})`, kRemis.skladana === 'a');
 
-// Gdy Splot NIE jest blisko maksimum, zwykły najwyższy wynik nadal wygrywa -
-// reguła nie ma się aktywować przy przypadkowych, niskich wynikach Splotu.
-const kBezRemisu = new SkladaniePieczeci();
-const bezRemisu = kBezRemisu.update({ splot: 0.3, weles: 1.0, perun: 0, swarog: 0 }, 1.0, DT);
-spr(`gdy Splot nisko, zwykły lider (weles) wygrywa (${bezRemisu.skladana})`, bezRemisu.skladana === 'weles');
+// Przewaga PONIŻEJ marginesu (0.08 < MARGINES 0.12), utrzymana długo -
+// nadal nie przejmuje. Margines liczy się na różnicy bezwzględnej wyników.
+const kMalaPrzewaga = new SkladaniePieczeci();
+kMalaPrzewaga.update({ a: 1.0, b: 0 }, 1.0, DT);
+for (let i = 0; i < 60; i++) kMalaPrzewaga.update({ a: 0.55, b: 0.63 }, 1.0, DT);
+spr(`przewaga poniżej marginesu nie przejmuje nawet po 1 s (${kMalaPrzewaga.skladana})`,
+    kMalaPrzewaga.skladana === 'a');
 
-// Splot, który JEST liderem, nie potrzebuje reguły remisu - działa jak zawsze.
-const kSplotLider = new SkladaniePieczeci();
-const splotLider = kSplotLider.update({ splot: 1.0, weles: 0.2, perun: 0, swarog: 0 }, 1.0, DT);
-spr(`Splot jako wyraźny lider składa się normalnie (${splotLider.skladana})`, splotLider.skladana === 'splot');
+// Wyraźna przewaga (powyżej marginesu), ale PRZERYWANA - znika, zanim minie
+// czas przejęcia, więc licznik kandydata resetuje się i nigdy nie sumuje
+// osobnych odcinków w jeden.
+const kPrzerywana = new SkladaniePieczeci();
+kPrzerywana.update({ a: 1.0, b: 0 }, 1.0, DT);
+for (let i = 0; i < 10; i++) kPrzerywana.update({ a: 0.6, b: 0.85 }, 1.0, DT); // przewaga b, krócej niż czas przejęcia
+kPrzerywana.update({ a: 0.85, b: 0.6 }, 1.0, DT); // przewaga znika - reset licznika kandydata
+for (let i = 0; i < 10; i++) kPrzerywana.update({ a: 0.6, b: 0.85 }, 1.0, DT); // wraca, ale znowu liczy od zera
+spr(`przerywana przewaga nie sumuje się w czasie (${kPrzerywana.skladana})`, kPrzerywana.skladana === 'a');
+
+// Wyraźna I TRWAŁA przewaga - w końcu przejmuje.
+const kWygrywa = new SkladaniePieczeci();
+kWygrywa.update({ a: 1.0, b: 0 }, 1.0, DT);
+let przejeteB = null;
+for (let i = 0; i < 30; i++) {
+  const w = kWygrywa.update({ a: 0.3, b: 0.9 }, 1.0, DT);
+  if (w.skladana === 'b') { przejeteB = w; break; }
+}
+spr('wyraźna i trwała przewaga w końcu przejmuje', przejeteB !== null);
+
+console.log('\nZANIK ZAMIAST ZEROWANIA (jedna klatka poniżej progu):');
+// Budujemy solidny, ale niepełny postęp (mniej niż czasMin, żeby nie złożyć
+// pieczęci przez przypadek w trakcie budowania).
+const sZanik = new SkladaniePieczeci();
+for (let i = 0; i < 15; i++) sZanik.update({ perun: 1.0 }, 1.0, DT);
+const postepPrzed = sZanik.postep;
+spr(`solidny, niepełny postęp zbudowany (${postepPrzed.toFixed(2)})`,
+    postepPrzed > 0.2 && postepPrzed < 0.9);
+
+// Jedna klatka poniżej progu (0.3 < PROG_POSTAWY 0.5).
+const CZAS_ZANIKU_S = 1.5; // musi być zgodne z pieczecie.js - ZGADNIĘTE, do potwierdzenia
+const poDolku = sZanik.update({ perun: 0.3 }, 1.0, DT);
+const oczekiwanyPoDolku = Math.max(0, postepPrzed - DT / CZAS_ZANIKU_S);
+spr(`jedna klatka poniżej progu ZMNIEJSZA postęp o dt/CZAS_ZANIKU, nie zeruje (${poDolku.postep.toFixed(4)} ~ ${oczekiwanyPoDolku.toFixed(4)})`,
+    Math.abs(poDolku.postep - oczekiwanyPoDolku) < 1e-6);
+spr('postęp po dołku nadal bliski temu sprzed dołka (nie zero)', poDolku.postep > postepPrzed - 0.05);
+
+// Powrót nad próg - kontynuacja OD ZDEGRADOWANEJ wartości, nie od zera.
+const poPowrocie = sZanik.update({ perun: 1.0 }, 1.0, DT);
+spr('po powrocie postęp rośnie DALEJ od miejsca dołka, nie od zera',
+    poPowrocie.postep > poDolku.postep);
+
+// Zanik prowadzi w końcu do ciszy (cel zwolniony), gdy dołek trwa długo -
+// to jest ten sam stan końcowy co dawny natychmiastowy reset, tylko rozłożony w czasie.
+const sDlugiDolek = new SkladaniePieczeci();
+for (let i = 0; i < 15; i++) sDlugiDolek.update({ perun: 1.0 }, 1.0, DT);
+let ostatniDlugiDolek = null;
+for (let i = 0; i < 200; i++) ostatniDlugiDolek = sDlugiDolek.update({ perun: 0 }, 1.0, DT);
+spr(`długotrwały dołek w końcu prowadzi do ciszy (${ostatniDlugiDolek.postep.toFixed(3)})`,
+    ostatniDlugiDolek.postep === 0 && ostatniDlugiDolek.skladana === null);
 
 process.exit(ok ? 0 : 1);

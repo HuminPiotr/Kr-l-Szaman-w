@@ -34,13 +34,21 @@ function srodekDloni(frame, W, H) {
 export const TABELA = {
     // Pieczęcie - LEKKIE. Mają być przyjemne, nie efektowne; efektowność
     // jest nagrodą za kombo.
-    perun:  { barwa: '50, 100%, 92%',  ksztalt: 'promien',     czas: 0.7 },
+    //
+    // Sześć run (przebudowa 2026-09-01, docs/superpowers/specs/2026-09-01-
+    // -runy-i-kwalifikatory-design.md): jedna barwa na ŻYWIOŁ (nie na
+    // wariant dłoni), bo to żywioł niesie znaczenie efektu wizualnego -
+    // otwarta/pięść różnią się KIERUNKIEM kształtu (rozchodzi się/zbiega),
+    // tak jak dziś Swaróg (pierścień) i Weles (ściągnięcie) były odwrotnościami.
+    'mokosz-otwarta':  { barwa: '200, 70%, 70%', ksztalt: 'pierscien',   czas: 0.9 },
+    'mokosz-piesc':    { barwa: '200, 70%, 70%', ksztalt: 'sciagniecie', czas: 0.9 },
+    'perun-otwarta':   { barwa: '50, 100%, 92%', ksztalt: 'pierscien',   czas: 0.7 },
+    'perun-piesc':     { barwa: '50, 100%, 92%', ksztalt: 'sciagniecie', czas: 0.7 },
+    'stribog-otwarta': { barwa: '160, 55%, 75%', ksztalt: 'pierscien',   czas: 0.8 },
+    'stribog-piesc':   { barwa: '160, 55%, 75%', ksztalt: 'sciagniecie', czas: 0.8 },
     swarog: { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },
-    weles:  { barwa: '280, 70%, 58%',  ksztalt: 'sciagniecie', czas: 0.9 },
-    // szczur celowo NIEOBECNY - pieczęć odpięta (js/main.js), znak
-    // js/znaki/szczurDlon.js zostaje na dysku i mógłby dostać ten wpis
-    // z powrotem, gdyby wrócił.
-    splot:  { barwa: '270, 65%, 62%',  ksztalt: 'sciagniecie', czas: 0.9 },
+    // szczur, weles, splot celowo NIEOBECNE - znaki odpięte (js/main.js),
+    // pliki zostają na dysku i mogłyby dostać te wpisy z powrotem, gdyby wróciły.
 
     // Techniki - MOCNE. Odpalają się gratis, jako nagroda za ułożenie.
     gromWOgniu:   { barwa: '35, 100%, 92%', ksztalt: 'blyskIFala', czas: 1.4 },
