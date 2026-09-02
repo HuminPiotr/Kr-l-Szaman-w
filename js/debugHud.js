@@ -214,11 +214,19 @@ export class DebugHud {
         const nazwa = this.zapis.nazwaPliku();
 
         // Nagranie jest NIEODTWARZALNE bez powtórnej ~4-minutowej sesji z
-        // kamerą - zanim cokolwiek zrobi przeglądarka, dane lądują w oknie,
-        // żeby nieudane pobranie kosztowało jedną komendę w konsoli
-        // (`copy(JSON.stringify(window._ostatnieProbki))` albo zapis ręczny),
-        // a nie kolejne cztery minuty przed kamerą.
-        window._ostatnieProbki = dane;
+        // kamerą - zanim cokolwiek zrobi przeglądarka, dane trafiają do
+        // window._ostatnieProbki. MAPA kluczowana nazwą pliku, NIE pojedynczy
+        // nadpisywany slot: gdyby był jeden slot, druga sesja z rzędu (choćby
+        // dogrywka zakończona Escape) po cichu skasowałaby pierwszą, jeśli
+        // JEJ pobranie zawiodło niezauważenie - dokładnie ten sam stan
+        // porażki, który naprawia _przerwijSesje(), tylko bez komunikatu.
+        // Cena tego zabezpieczenia to NIE "śmieć w globalnej przestrzeni
+        // nazw" - to retencja sterty: każdy wpis trzyma cały bufor klatek tej
+        // sesji plus (przy próbie odzyskania) string z JSON.stringify.
+        // Akceptowalne, bo dzieje się PO nagrywaniu, poza gorącą pętlą (w
+        // odróżnieniu od throttlingu ekranu niżej), a strona i tak prędzej
+        // czy później zostanie przeładowana.
+        (window._ostatnieProbki ??= {})[nazwa] = dane;
 
         const blob = new Blob([JSON.stringify(dane)], { type: 'application/json' });
         const a = document.createElement('a');
@@ -235,7 +243,7 @@ export class DebugHud {
         }, 0);
         console.log(`[sesja] Zapisano ${dane.liczbaKlatek} klatek w ${Object.keys(dane.kroki).length} powtórzeniach ` +
                     `-> ${nazwa}. PRZENIEŚ ten plik do tools/probki/. ` +
-                    `Kopia zapasowa w window._ostatnieProbki, gdyby pobieranie zawiodło.`);
+                    `Gdyby pobieranie zawiodło: copy(JSON.stringify(window._ostatnieProbki['${nazwa}'])).`);
     }
 
     _createPanel() {
