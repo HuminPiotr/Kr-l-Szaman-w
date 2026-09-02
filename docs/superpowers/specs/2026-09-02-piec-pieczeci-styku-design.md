@@ -260,6 +260,12 @@ więc każdy próg wyrażony w jej wielokrotnościach robi się trzykrotnie za l
 pozy zapalają się od byle czego. Nie jest to hipotetyczne: błyskawica **wymaga**
 stania bokiem.
 
+**Wygładzana jest wyłącznie skala używana do normalizacji odległości.** Warunek
+„stoisz bokiem" w błyskawicy (`obrotBokiem`) liczy iloraz rozstawu 2D do 3D
+z **bieżącej klatki**, nie z wartości wygładzonej — inaczej mianownik zostawałby
+w tyle dokładnie wtedy, gdy gracz się obraca, czyli w jedynym momencie, w którym
+ten warunek cokolwiek znaczy.
+
 Naprawa: `sqrt(dx² + dy² + dz²)`. Rozstaw barków to wymiar sztywnego ciała,
 więc w pełnym 3D jest **niezmiennikiem obrotu**. Do tego **EMA w czasie**: skala
 jest stałą ciała, nie pomiarem z klatki, więc mocne wygładzenie jest tu poprawne
@@ -327,6 +333,26 @@ Konsekwencja Context. Kod rozpoznawania powstaje z **nazwanymi stałymi bez
 wartości domyślnych wpisanych z głowy** — wartości wchodzą po Kroku 0, wraz
 z komentarzem mówiącym, z której próbki pochodzą. Jeśli w kodzie tej generacji
 pojawi się słowo `ZGADNIĘTE`, coś poszło nie tak.
+
+---
+
+## Kolejność wykonania (wiążąca)
+
+Ta kolejność nie jest preferencją — odwrócenie jej kasuje aplikację, w której
+trzeba nagrać sesję:
+
+1. **Harness nagraniowy** w `debugHud.js` + zapis do `tools/probki/`. Powstaje,
+   **gdy gra jeszcze działa na runach**, i nie zależy od żadnego z pięciu nowych
+   modułów znaków. Zapisuje surowe landmarki, nic nie interpretuje.
+2. **Sesja nagraniowa** — właściciel projektu nagrywa scenariusz.
+3. **Naprawa skali** (`postawa.js`, decyzja 3) i weryfikacja na nagraniach, czy
+   rozstaw barków 3D trzyma się stały przy obrocie.
+4. **Progi liczone z nagrań**, pieczęć po pieczęci, wraz z pętlą strojenia niżej.
+5. **Przepisanie pięciu znaków** i przepisanie testów syntetycznych.
+6. **Odpięcie run i Splotu** z `main.js` i `aura.js` — dopiero teraz, na końcu.
+
+Krok 6 przed krokiem 1 znaczyłby usunięcie działającej gry, zanim powstanie
+materiał, dla którego się ją usuwa.
 
 ---
 
@@ -504,6 +530,14 @@ To jest test, którego nie miała żadna z czterech poprzednich generacji.
 
 Punkt 3 jest ważniejszy od punktu 1. Pozy trzymane są rozdzielne z konstrukcji;
 przejścia nie są, a to przez nie gracz przechodzi za każdym razem.
+
+**Nagranie jest wejściem STAŁYM, a progi zmienną.** Test rozdzielności nie jest
+jednym przebiegiem, tylko pętlą strojenia: policz progi z próbek → uruchom test →
+popraw → uruchom ponownie, **bez ponownego nagrywania**. Właściciel projektu
+tańczy raz; iteracje dzieją się offline, na tych samych plikach JSON. To jest
+dokładnie mechanizm, dzięki któremu „żadnej stałej zgadniętej" jest osiągalne,
+a nie tylko deklarowane — bo każda poprawka progu ma natychmiastowy, powtarzalny
+dowód na prawdziwym ciele.
 
 ### Na żywym ciele — `http://localhost:8000`, klawisz `D`
 
