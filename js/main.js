@@ -339,6 +339,11 @@ function klatka(now) {
     // --- 3. Kontrakt klatki ---
     const frame = buildFrame(fit, dt, now);
 
+    // --- 3a. Sesja nagraniowa (klawisz Z) ---
+    // Zaraz po zbudowaniu klatki, przed jakąkolwiek interpretacją: nagranie
+    // ma zawierać SUROWE landmarki, niezależne od tego, jak gra je dziś czyta.
+    debugHud.aktualizujSesje(frame, dt);
+
     // --- 4. Płynność ruchu ---
     // Liczona z SUROWYCH worldLandmarks - filtr Savitzky'ego-Golaya robi
     // własne wygładzanie. Podanie tu pozycji już wygładzonych przez

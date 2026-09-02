@@ -1,6 +1,8 @@
 /**
  * Nakładka diagnostyczna. Przełącznik: klawisz D. Reset zakresu v: R.
  * Zrzut śladu runy do konsoli (Krok 0b, spec run): klawisz N.
+ * Sesja nagraniowa (spec pięciu pieczęci): klawisz Z (od kroku 1) albo
+ * cyfra 1-8 (od wybranego kroku), Escape przerywa.
  *
  * Nie ma tu testów jednostkowych do napisania - wejściem jest strumień z kamery,
  * a wyjściem wrażenie wzrokowe. Ta nakładka JEST narzędziem weryfikacji.
@@ -9,6 +11,8 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
+import { SesjaNagraniowa, SCENARIUSZ } from './nagrywanie/sesja.js';
+import { ZapisProbek } from './nagrywanie/zapis.js';
 
 const PANEL_ID = 'debug-hud';
 const UPDATE_HZ = 10; // DOM aktualizowany 10x/s, nie 60x/s - zapis do DOM w pętli klatek to marnotrawstwo
@@ -28,6 +32,15 @@ export class DebugHud {
 
         this._zrzucSladPrzyNastepnejKlatce = false;
 
+        // --- Sesja nagraniowa (spec pięciu pieczęci, Krok 0) ---
+        // Ekran prowadzący jest OSOBNYM elementem, nie linijką w panelu
+        // diagnostycznym: gracz czyta go z drugiego końca pokoju, a panel
+        // jest monospace 12px pod lewym górnym rogiem.
+        this.sesja = new SesjaNagraniowa();
+        this.zapis = null;
+        this.ekranSesji = this._utworzEkranSesji();
+        this._lastEkranSesjiUpdate = 0;
+
         window.addEventListener('keydown', (e) => {
             if (e.key === 'd' || e.key === 'D') this.toggle();
             if (e.key === 'r' || e.key === 'R') this.resetujZakres();
@@ -35,12 +48,175 @@ export class DebugHud {
             // nie mamy dostępu do bieżącego stanu śladów (przychodzi dopiero
             // w updatePanel()). Flaga przenosi żądanie do następnej klatki.
             if (e.key === 'n' || e.key === 'N') this._zrzucSladPrzyNastepnejKlatce = true;
+
+            // Sesja nagraniowa: Z od początku, cyfra 1-8 od wybranego kroku.
+            // Cyfry, a nie Shift+Z z wyborem - dogranie jednej zepsutej pozy
+            // ma być jednym naciśnięciem, bo gracz stoi wtedy przy klawiaturze
+            // tylko po to i zaraz musi odejść.
+            if (e.key === 'z' || e.key === 'Z') this._startSesji(1);
+            if (/^[1-8]$/.test(e.key)) this._startSesji(Number(e.key));
+            if (e.key === 'Escape' && this.sesja.aktywna) {
+                this.sesja.przerwij();
+                this._ukryjEkranSesji();
+            }
         });
     }
 
     resetujZakres() {
         this.vMin = Infinity;
         this.vMax = 0;
+    }
+
+    _startSesji(odKroku) {
+        if (this.sesja.aktywna) return;      // drugie naciśnięcie nie restartuje
+        this.zapis = new ZapisProbek();
+        this.sesja.start(odKroku);
+        this.ekranSesji.style.display = 'flex';
+        // AudioContext utworzony/wznowiony TU, w prawdziwym geście użytkownika
+        // (naciśnięcie klawisza) - nie w _piknij() 12 s później w pętli rAF.
+        // Kontekst utworzony poza gestem startuje jako 'suspended' i wtedy
+        // _piknij() gra w ciszę bez żadnego wyjątku do złapania - sygnał
+        // startu byłby niesłyszalny bez śladu w konsoli.
+        try {
+            const ctx = (this._audio ??= new (window.AudioContext || window.webkitAudioContext)());
+            if (ctx.state === 'suspended') ctx.resume();
+        } catch (e) {
+            console.warn('[sesja] AudioContext niedostępny:', e.message);
+        }
+        console.log(`[Z] Sesja nagraniowa od kroku ${odKroku}. Escape przerywa.`);
+    }
+
+    /**
+     * Raz na klatkę z main.js, ZAWSZE - tak jak tick(). Sesja musi chodzić
+     * także przy schowanym panelu: gracz nagrywa z drugiego końca pokoju
+     * i nie ma jak włączyć nakładki po drodze.
+     */
+    aktualizujSesje(frame, dt) {
+        if (!this.sesja.aktywna) return;
+
+        const s = this.sesja.tick(dt);
+
+        // Klatki zbierane WYŁĄCZNIE w stanie nagrywania - przerwy i dojście
+        // to spacer i szukanie pozycji, czyli materiał, którego nikt nie użyje.
+        if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame);
+
+        if (s.sygnal === 'start') this._piknij(880, 0.35);
+        if (s.sygnal === 'stop') this._piknij(440, 0.12);
+        if (s.sygnal === 'koniec') {
+            this._piknij(220, 0.6);
+            this._zapiszProbki();
+            this._ukryjEkranSesji();
+            return;
+        }
+
+        // Odświeżanie DOM ograniczone do UPDATE_HZ, tak jak panel diagnostyczny
+        // (ten sam powód: przepisywanie innerHTML w pętli 60 kl/s obok dwóch
+        // modeli MediaPipe kosztowałoby klatkaż DOKŁADNIE w trakcie nagrywania -
+        // czyli w chwili, kiedy najbardziej na nim zależy).
+        const teraz = performance.now();
+        if (teraz - this._lastEkranSesjiUpdate >= 1000 / UPDATE_HZ) {
+            this._lastEkranSesjiUpdate = teraz;
+            this._rysujEkranSesji(s);
+        }
+    }
+
+    /**
+     * Sygnał dźwiękowy przez własny, jednorazowy oscylator.
+     *
+     * NIE przez audioEngine.js: tamten prowadzi ciągłą warstwę muzyczną gry
+     * i jego stan zależy od mocy i płynności. Sygnały sesji muszą być słyszalne
+     * niezależnie od tego, co robi ścieżka dźwiękowa, i nie mogą jej zaburzać.
+     *
+     * Dźwięk jest tu ważniejszy niż ekran: przy błyskawicy gracz stoi bokiem
+     * do kamery i monitora może w ogóle nie widzieć.
+     */
+    _piknij(hz, sekundy) {
+        try {
+            const ctx = (this._audio ??= new (window.AudioContext || window.webkitAudioContext)());
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = hz;
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + sekundy);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + sekundy);
+        } catch (e) {
+            // Brak dźwięku nie może przerwać sesji - gracz ma jeszcze ekran.
+            console.warn('[sesja] sygnał dźwiękowy niedostępny:', e.message);
+        }
+    }
+
+    _utworzEkranSesji() {
+        const el = document.createElement('div');
+        el.style.cssText = `
+            position: fixed; inset: 0; z-index: 1000; display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            gap: 18px; pointer-events: none; text-align: center;
+            font: 600 28px/1.3 system-ui, sans-serif; color: #eafff8;
+            text-shadow: 0 2px 18px rgba(0,0,0,0.9);
+        `;
+        document.body.appendChild(el);
+        return el;
+    }
+
+    _rysujEkranSesji(s) {
+        const szer = Math.round(s.postep * 100);
+        const kolor = s.stan === 'nagrywanie' ? '#00ffcc' : '#ffb347';
+        this.ekranSesji.innerHTML = `
+            <div style="font-size:15px;opacity:0.75">krok ${s.krok.nr}/${SCENARIUSZ.length}
+                 · powtórzenie ${s.powtorzenie}/${s.krok.powtorzenia}</div>
+            <div style="font-size:54px;color:${kolor}">${s.krok.nazwa}</div>
+            <div style="max-width:70vw;font-size:24px;font-weight:400">${s.krok.opis}</div>
+            <div style="font-size:19px;opacity:0.8">${s.wskazowka}</div>
+            <div style="font-size:64px;color:${kolor}">
+                ${s.stan === 'nagrywanie' ? '● NAGRYWAM' : Math.ceil(s.pozostaloS)}
+            </div>
+            <div style="width:60vw;height:10px;background:rgba(255,255,255,0.15);border-radius:5px">
+                <div style="width:${szer}%;height:100%;background:${kolor};border-radius:5px"></div>
+            </div>
+            <div style="font-size:14px;opacity:0.5">Escape przerywa</div>
+        `;
+    }
+
+    _ukryjEkranSesji() {
+        this.ekranSesji.style.display = 'none';
+        this.ekranSesji.innerHTML = '';
+    }
+
+    /**
+     * Pobranie pliku przez <a download>. Przeglądarka nie zapisze do
+     * tools/probki/ sama - plik ląduje w katalogu pobierania i trzeba go
+     * tam przenieść ręcznie. Nazwa pliku niesie datę, więc kolejne sesje
+     * się nie nadpisują.
+     */
+    _zapiszProbki() {
+        const dane = this.zapis.doJson();
+        const nazwa = this.zapis.nazwaPliku();
+
+        // Nagranie jest NIEODTWARZALNE bez powtórnej ~4-minutowej sesji z
+        // kamerą - zanim cokolwiek zrobi przeglądarka, dane lądują w oknie,
+        // żeby nieudane pobranie kosztowało jedną komendę w konsoli
+        // (`copy(JSON.stringify(window._ostatnieProbki))` albo zapis ręczny),
+        // a nie kolejne cztery minuty przed kamerą.
+        window._ostatnieProbki = dane;
+
+        const blob = new Blob([JSON.stringify(dane)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = nazwa;
+        // Zaczepiony w drzewie i z revoke odroczonym na następny tick -
+        // odłączony <a> i revoke tuż po click() zawodzi w części przeglądarek
+        // (Firefox/Safari potrafią nie zdążyć pobrać obiektu przed revoke).
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            URL.revokeObjectURL(a.href);
+            a.remove();
+        }, 0);
+        console.log(`[sesja] Zapisano ${dane.liczbaKlatek} klatek w ${Object.keys(dane.kroki).length} powtórzeniach ` +
+                    `-> ${nazwa}. PRZENIEŚ ten plik do tools/probki/. ` +
+                    `Kopia zapasowa w window._ostatnieProbki, gdyby pobieranie zawiodło.`);
     }
 
     _createPanel() {
