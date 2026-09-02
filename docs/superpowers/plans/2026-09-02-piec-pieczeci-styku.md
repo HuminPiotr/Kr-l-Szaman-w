@@ -52,7 +52,6 @@
 | `js/debugHud.js` | ekran prowadzący sesję, klawisze `Z` i `1`–`8`, pobranie pliku. |
 | `js/main.js` | rejestracja piątki; usunięcie śladów run i `rysujSlady`. |
 | `js/kombosy.js` | nowa tabela kombosów. |
-| `js/aura.js` | usunięcie bufora śladu run. |
 | `tools/test-postawy.mjs`, `tools/test-znaki.mjs` | przepisane pod nowe znaki, dane syntetyczne, sprawdzają **własności**, nie progi. |
 | `tools/test-wszystko.sh` | bez zmian — pętla po `test-*.mjs` łapie nowe testy sama. |
 | `GEMINI.md` | §7 opisuje dziś zrzut śladu runy klawiszem `N`; zastąpić opisem sesji nagraniowej. |
@@ -1355,9 +1354,20 @@ for (const [poza, funkcja] of Object.entries(MIARY)) {
         const zero = percentyl(taniec[miara] ?? [], rosnaca ? 90 : 10);
         const zle = rosnaca ? !(pelny > zero) : !(pelny < zero);
         if (zle) konflikt = true;
-        console.log(`  ${miara.padEnd(16)} poza p${rosnaca ? 25 : 75} = ${pelny.toFixed(3)}` +
-                    `   taniec p${rosnaca ? 90 : 10} = ${Number.isFinite(zero) ? zero.toFixed(3) : 'brak'}` +
-                    `${zle ? '   ⚠ OBSZARY ZACHODZĄ - zmień POZĘ, nie liczbę' : ''}`);
+
+        // LICZBA PRÓBEK jest częścią wyniku, nie ozdobą. `zbierz` odfiltrowuje
+        // wartości nieskończone (brakujący punkt daje Infinity z odleglosc(),
+        // a różnica dwóch takich - NaN), więc miara może po cichu zostać
+        // z garstką próbek. Percentyl z krótkiej tablicy to szum, a zły próg
+        // wyliczony z szumu wygląda dokładnie tak samo jak dobry.
+        const nPoza = wartosci.length, nTaniec = (taniec[miara] ?? []).length;
+        const zaMalo = nTaniec < 300;
+        if (zaMalo) konflikt = true;
+
+        console.log(`  ${miara.padEnd(16)} poza n=${String(nPoza).padStart(4)} p${rosnaca ? 25 : 75} = ${pelny.toFixed(3)}` +
+                    `   taniec n=${String(nTaniec).padStart(4)} p${rosnaca ? 90 : 10} = ${Number.isFinite(zero) ? zero.toFixed(3) : 'brak'}` +
+                    `${zle ? '   ⚠ OBSZARY ZACHODZĄ - zmień POZĘ, nie liczbę' : ''}` +
+                    `${zaMalo ? '   ⚠ ZA MAŁO KLATEK TAŃCA - dograj krok 8' : ''}`);
         const N = miara.toUpperCase();
         pola.push(`        ${N}_PELNY: ${pelny.toFixed(3)},`);
         pola.push(`        ${N}_ZERO: ${Number.isFinite(zero) ? zero.toFixed(3) : (rosnaca ? 0 : 99)},`);
@@ -1395,7 +1405,11 @@ process.exit(konflikt ? 1 : 0);
 - [ ] **Step 2: Uruchom raport na nagraniu**
 
 Run: `node tools/progi.mjs --raport`
-Expected: lista powtórzeń z liczbą klatek i udziałem klatek z pozą, potem progi dla czterech póz. **Jeśli któraś miara zgłasza `OBSZARY ZACHODZĄ`, zatrzymaj się i zgłoś to właścicielowi projektu** — to znaczy, że poza jest za blisko naturalnego tańca i trzeba zmienić pozę, a nie próg. To jest wynik, po który cała ta faza istnieje.
+Expected: lista powtórzeń z liczbą klatek i udziałem klatek z pozą, potem progi dla czterech póz — każda miara z **liczbą próbek** (`poza n=`, `taniec n=`) obok percentyli.
+
+Dwa ostrzeżenia zatrzymują pracę:
+- **`OBSZARY ZACHODZĄ`** — poza jest za blisko naturalnego tańca. Zgłoś właścicielowi projektu; zmienia się wtedy **poza**, nie próg. To jest wynik, po który cała ta faza istnieje.
+- **`ZA MAŁO KLATEK TAŃCA`** — miara ma mniej niż 300 klatek tańca po odfiltrowaniu wartości nieskończonych, więc jej percentyl jest szumem. Dograj krok 8 (klawisz `8` w grze).
 
 - [ ] **Step 3: Wygeneruj plik progów**
 
@@ -1598,7 +1612,7 @@ export const weles = {
     wymaga: 'pose',
 
     score(frame) {
-        const sk = this.skladniki(frame);
+        const sk = skladnikiZ(frame);
         if (!sk) return 0;
         // Minimum, nie średnia: pieczęć jest AND-em warunków, a najsłabszy
         // z nich ma widocznie hamować - inaczej dwa dobre warunki maskują
@@ -1608,6 +1622,16 @@ export const weles = {
 
     /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
     skladniki(frame) {
+        return skladnikiZ(frame);
+    }
+};
+
+/**
+ * Warunki liczone przez FUNKCJĘ MODUŁOWĄ, nie przez `this` w score().
+ * Ten sam wzorzec co mokoszSplot.js:53 - dzięki niemu `score` i `skladniki`
+ * działają także wtedy, gdy ktoś je zdestrukturyzuje z obiektu znaku.
+ */
+function skladnikiZ(frame) {
         const wl = frame.pose?.worldLandmarks;
         if (!widoczne(wl, PUNKTY)) return null;
         const skala = skalaCiala(wl);
@@ -1621,8 +1645,7 @@ export const weles = {
                             P.WYSOKOSC_ZERO, P.WYSOKOSC_PELNY),
             piesci: piesci(frame)
         };
-    }
-};
+}
 
 /** Miękki kwalifikator: średnie zwinięcie widocznych dłoni, bez kary za brak. */
 function piesci(frame) {
@@ -1759,12 +1782,18 @@ export const stribog = {
     wymaga: 'pose',
 
     score(frame) {
-        const sk = this.skladniki(frame);
+        const sk = skladnikiZ(frame);
         if (!sk) return 0;
         return Math.min(sk.lokcie, sk.wysokosc, sk.rozchylenie);
     },
 
     skladniki(frame) {
+        return skladnikiZ(frame);
+    }
+};
+
+/** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
+function skladnikiZ(frame) {
         const wl = frame.pose?.worldLandmarks;
         if (!widoczne(wl, PUNKTY)) return null;
         const skala = skalaCiala(wl);
@@ -1782,8 +1811,7 @@ export const stribog = {
                 (odleglosc(wl, NADG_L, NADG_P) - odleglosc(wl, LOKIEC_L, LOKIEC_P)) / skala,
                 P.ROZCHYLENIE_ZERO, P.ROZCHYLENIE_PELNY)
         };
-    }
-};
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1932,12 +1960,18 @@ export const mokosz = {
     wymaga: 'pose',
 
     score(frame) {
-        const sk = this.skladniki(frame);
+        const sk = skladnikiZ(frame);
         if (!sk) return 0;
         return Math.min(sk.nadgarstki, sk.glebokosc, sk.rozchylenie, sk.palce);
     },
 
     skladniki(frame) {
+        return skladnikiZ(frame);
+    }
+};
+
+/** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
+function skladnikiZ(frame) {
         const wl = frame.pose?.worldLandmarks;
         if (!widoczne(wl, PUNKTY)) return null;
         const skala = skalaCiala(wl);
@@ -1957,8 +1991,7 @@ export const mokosz = {
                 P.ROZCHYLENIE_ZERO, P.ROZCHYLENIE_PELNY),
             palce: palceRozwarte(frame)
         };
-    }
-};
+}
 
 /** Miękki kwalifikator: palce rozwarte, gdy dłoń widać; bez kary za brak. */
 function palceRozwarte(frame) {
@@ -2002,9 +2035,13 @@ Import i rejestracja:
 
 ```javascript
 import { perun } from '../js/znaki/perun.js';
+import { swarogDlon } from '../js/znaki/swarogDlon.js';
 // ...
-rej.zarejestruj(weles); rej.zarejestruj(stribog); rej.zarejestruj(mokosz); rej.zarejestruj(perun);
+rej.zarejestruj(weles); rej.zarejestruj(stribog); rej.zarejestruj(mokosz);
+rej.zarejestruj(perun); rej.zarejestruj(swarogDlon);
 ```
+
+**Po co ogień w teście syntetycznym, skoro nie budujemy syntetycznej piramidki.** Ogień czyta dłonie, a wiarygodna syntetyczna dłoń w piramidce byłaby zmyśleniem — akurat tego sygnału mamy teraz prawdziwe nagranie. Rejestrujemy `swarogDlon`, żeby sprawdzić kierunek, który *da się* sprawdzić uczciwie: pozy z dwiema pełnymi dłońmi w kadrze (ziemia podaje dwie pięści) nie mogą zapalać ognia. **Para ogień↔woda w drugą stronę jest weryfikowana wyłącznie na nagraniach, w Task 12** — i tak ma być.
 
 ```javascript
 // BŁYSKAWICA: gracz stoi BOKIEM (obrot: 90). Jedna ręka górą do przodu,
@@ -2057,6 +2094,12 @@ for (const [nazwa, wynik] of [['ziemia', z], ['powietrze', pw], ['woda', wd], ['
   // MARGINES_LIDERA w pieczecie.js to 0.12 - poniżej tego pierścień miga.
   spr(`${nazwa}: lider wyprzedza drugiego o więcej niż margines`, wNaj - wDrugi > 0.12);
 }
+
+// Ziemia podaje DWIE PEŁNE DŁONIE w kadrze (pięści), czyli dokładnie to,
+// czego potrzebuje swarogDlon, żeby w ogóle policzyć wynik. Jeśli ogień
+// przy zaciśniętych pięściach na barkach cokolwiek pokazuje, to znaczy,
+// że warunek rozsuniętych nadgarstków w piramidce jest za słaby.
+spr(`pięści na barkach NIE zapalają ognia (${z.swarog.toFixed(2)})`, z.swarog < 0.3);
 
 console.log('\nODPORNOŚĆ błyskawicy:');
 const blZepsute = ocen(cialo({
@@ -2126,12 +2169,18 @@ export const perun = {
     wymaga: 'pose',
 
     score(frame) {
-        const sk = this.skladniki(frame);
+        const sk = skladnikiZ(frame);
         if (!sk) return 0;
         return Math.min(sk.profil, sk.pion, sk.poziom, sk.lokcie);
     },
 
     skladniki(frame) {
+        return skladnikiZ(frame);
+    }
+};
+
+/** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
+function skladnikiZ(frame) {
         const wl = frame.pose?.worldLandmarks;
         if (!widoczne(wl, PUNKTY)) return null;
         const skala = skalaCiala(wl);
@@ -2154,8 +2203,7 @@ export const perun = {
                                    katWLokciu(wl, BARK_P, LOKIEC_P, NADG_P)),
                           P.KAT_ZERO, P.KAT_PELNY)
         };
-    }
-};
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -2177,7 +2225,7 @@ git commit -m "Błyskawica: profil, rozjazd rąk i dwa zgięte łokcie; przód-t
 **Files:**
 - Modify: `js/main.js:9-11` (importy), `js/main.js:67-76` (rejestracja), `js/main.js:348-352` (aktualizacja śladów), `js/main.js:515-520` (rysowanie śladu), `js/main.js:558` (`slady` w `updatePanel`)
 - Modify: `js/kombosy.js:29-63` (tabela)
-- Modify: `js/aura.js` (bufor śladu run)
+- **`js/aura.js` NIE jest dotykany** — patrz Step 3
 - Modify: `js/runy/definicje.js`, `js/runy/slad.js`, `js/runy/ksztalt.js`, `js/runy/szablony.js`, `js/runy/rysujSlad.js` (notka w nagłówku), `js/znaki/mokoszSplot.js` (notka)
 - Modify: `tools/test-znaki.mjs`, `tools/test-kombosy.mjs`
 
@@ -2271,9 +2319,9 @@ Usuń linię 520 (`rysujSlady(...)`) i dostosuj komentarz nad nią:
 
 Usuń `slady` z obiektu przekazywanego do `debugHud.updatePanel` (linia 558).
 
-- [ ] **Step 3: Odepnij ślad run z `js/aura.js` i dodaj notki**
+- [ ] **Step 3: Dodaj notki do odpiętych modułów — `aura.js` ZOSTAW W SPOKOJU**
 
-W `js/aura.js` usuń bufor śladu run i jego zanik (wyszukaj `slad` w pliku; blok wprowadzony commitem `e1b63e9` „Aura: bufor śladu i tęczowa barwa dla Wstęgi Mokoszy" — tęczowa **barwa** zostaje, znika samo zbieranie punktów śladu).
+**`js/aura.js` nie jest w tym zadaniu modyfikowany, i to jest decyzja, nie przeoczenie.** Pole `_slad` w tym pliku (`js/aura.js:104`, `145-154`, `203-209`, `274-279`) wygląda na bufor śladu run, ale nim **nie jest** — to płótno akumulacyjne **tęczowej wstęgi**, sterowane przez `tecza.silaSladu` z `js/tecza.js`. To jest nagroda z Wstęgi Mokoszy i zostaje w grze. Ślad run rysuje wyłącznie `js/runy/rysujSlad.js`, wywoływany z `js/main.js:520` — i to wywołanie usuwa Step 2. **Usunięcie `_slad` z aury skasowałoby efekt Tęczy**, czyli jedyną nagrodę w grze.
 
 Na początku każdego z plików `js/runy/*.js` oraz `js/znaki/mokoszSplot.js` dopisz nad istniejącym komentarzem:
 
@@ -2316,7 +2364,7 @@ python3 -m http.server 8000
 - [ ] **Step 7: Commit**
 
 ```bash
-git add js/main.js js/kombosy.js js/aura.js js/runy js/znaki/mokoszSplot.js tools/test-znaki.mjs tools/test-kombosy.mjs
+git add js/main.js js/kombosy.js js/runy js/znaki/mokoszSplot.js tools/test-znaki.mjs tools/test-kombosy.mjs
 git commit -m "Wpięcie pięciu pieczęci; runy i Splot odpięte, nie usunięte"
 ```
 
@@ -2554,7 +2602,7 @@ git commit -m "GEMINI.md: sesja nagraniowa zamiast zrzutu śladu runy"
 
 ## Self-Review
 
-**Pokrycie spec-a:** Kolejność wykonania → Fazy A/B i brama. Pięć pieczęci → Task 7-10 plus `swarogDlon.js` nietknięty. Rozdzielność → Task 10 Step 1 (syntetyczna) i Task 12 (na nagraniach). Decyzja 1 (styk ciągły) → Task 5, test ciągłości. Decyzja 2 (woda z pozy) → Task 9, nagłówek pliku. Decyzja 3 (skala 3D + EMA) → Task 4. Decyzja 4 (przód/tył z x) → Task 10. Decyzja 5 (miękkie kwalifikatory) → Task 7 i 9, `WAGA_BEZ_DLONI`. Decyzja 6 (Splot odchodzi) → Task 11 Step 3. Decyzja 7 (runy odpięte) → Task 11 Step 3. Decyzja 8 (żadna stała zgadnięta) → Task 6, generowany plik. Krok 0 → Task 1-3 plus brama. Kombosy → Task 11 Step 1. Weryfikacja → Task 12 i 13.
+**Pokrycie spec-a:** Kolejność wykonania → Fazy A/B i brama. Pięć pieczęci → Task 7-10 plus `swarogDlon.js` nietknięty. Rozdzielność → Task 10 Step 1 dla czterech póz z ciała (syntetyczna, z marginesem 0.12) i Task 12 dla wszystkich pięciu (na nagraniach). **Para ogień↔woda — ta, którą spec nazywa najbardziej narażoną — jest sprawdzana wyłącznie na nagraniach**, bo ogień czyta dłonie i syntetyczna piramidka byłaby zmyśleniem akurat tam, gdzie mamy prawdziwe dane. Test syntetyczny sprawdza tylko kierunek uczciwie sprawdzalny: pozy z dwiema dłońmi w kadrze nie zapalają ognia. Decyzja 1 (styk ciągły) → Task 5, test ciągłości. Decyzja 2 (woda z pozy) → Task 9, nagłówek pliku. Decyzja 3 (skala 3D + EMA) → Task 4. Decyzja 4 (przód/tył z x) → Task 10. Decyzja 5 (miękkie kwalifikatory) → Task 7 i 9, `WAGA_BEZ_DLONI`. Decyzja 6 (Splot odchodzi) → Task 11 Step 3. Decyzja 7 (runy odpięte) → Task 11 Step 3. Decyzja 8 (żadna stała zgadnięta) → Task 6, generowany plik. Krok 0 → Task 1-3 plus brama. Kombosy → Task 11 Step 1. Weryfikacja → Task 12 i 13.
 
 **Luka domknięta w trakcie przeglądu:** spec wymienia `js/znaki/styk.js` z funkcją `obrotBokiem`, ale `obrotBokiem` czyta wyłącznie barki i jest ściśle związana ze skalą — mieszka więc w `postawa.js` (Task 4), obok `skalaChwilowa`, z której korzysta. `styk.js` zostaje przy geometrii kończyn.
 
