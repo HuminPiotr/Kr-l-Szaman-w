@@ -21,9 +21,17 @@
  * bramka odrzuciła punkt tak samo, jak odrzuciłaby go na żywo. Nagranie
  * jest nieodtwarzalne bez powtórnej sesji, więc to rozróżnienie musi
  * przetrwać cały obieg zapis -> JSON -> odczyt.
+ *
+ * `width`/`height` są stałe przez całą sesję (rozmiar okna przeglądarki,
+ * main.js:102-103), więc lądują RAZ na poziomie pliku, nie w każdej klatce.
+ * Nie są dziś używane przez znaki liczone z pozy, ale są realnie konsumowane
+ * przez swarog.js (normalizacja odległości dłoni w pikselach) - dziś nie
+ * podłączony w main.js, ale format próbek nie może zakładać, że tak zostanie.
+ * Nagranie jest nieodtwarzalne, więc symulowanie tego pola stałą zamiast
+ * zapisania go naprawdę byłoby cichą utratą informacji.
  */
 
-export const WERSJA_FORMATU = 1;
+export const WERSJA_FORMATU = 2;
 const MIEJSC = 3;
 
 const okr = (v) => Number.isFinite(v) ? Number(v.toFixed(MIEJSC)) : 0;
@@ -42,6 +50,10 @@ export class ZapisProbek {
     constructor() {
         this.kroki = {};        // etykieta -> tablica spakowanych klatek
         this.liczbaKlatek = 0;
+        // Rozmiar okna jest stały przez całą sesję - zapamiętany raz,
+        // przy pierwszej klatce, zamiast powtarzany w każdej.
+        this.width = null;
+        this.height = null;
     }
 
     /**
@@ -50,6 +62,10 @@ export class ZapisProbek {
      */
     dodaj(etykieta, frame) {
         if (!etykieta) return;
+        if (this.width === null) {
+            this.width = frame.width ?? null;
+            this.height = frame.height ?? null;
+        }
         (this.kroki[etykieta] ??= []).push({
             dt: okr(frame.dt),
             // null, nie pusta tablica: "poza nie została wykryta" to inna
@@ -72,6 +88,8 @@ export class ZapisProbek {
             wersja: WERSJA_FORMATU,
             utworzono: new Date().toISOString(),
             liczbaKlatek: this.liczbaKlatek,
+            width: this.width,
+            height: this.height,
             kroki: this.kroki
         };
     }
@@ -85,10 +103,15 @@ export class ZapisProbek {
 /**
  * Spakowana klatka -> kontrakt klatki, jakiego oczekuje znak.score().
  *
- * `width`/`height` są stałe i nieużywane przez znaki z pozy; są w kontrakcie,
- * bo `frame` jest tym samym obiektem, który w grze dostaje rysowanie.
+ * `wymiary` to `{ width, height }` zapisane raz na poziomie pliku
+ * (`doJson().width/height`) - podaj je tutaj, żeby odtworzona klatka niosła
+ * PRAWDZIWY rozmiar okna z sesji nagrania, nie zgadywany. Bez tego argumentu
+ * zostaje awaryjne 1920x1080, żeby nie wywrócić wywołań, które go nie znają.
+ *
+ * @param {object} zapisana
+ * @param {{width: number, height: number}} [wymiary]
  */
-export function odtworzKlatke(zapisana) {
+export function odtworzKlatke(zapisana, wymiary) {
     return {
         hands: (zapisana.dlonie ?? []).map(d => ({
             handedness: d.h,
@@ -98,8 +121,8 @@ export function odtworzKlatke(zapisana) {
             worldLandmarks: (zapisana.poza.w ?? []).map(rozpakujPunkt),
             landmarks: (zapisana.poza.l ?? []).map(rozpakujPunkt)
         } : null,
-        width: 1920,
-        height: 1080,
+        width: wymiary?.width ?? 1920,
+        height: wymiary?.height ?? 1080,
         dt: Number.isFinite(zapisana.dt) ? zapisana.dt : 1 / 60,
         now: 0
     };

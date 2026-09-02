@@ -18,7 +18,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 // dt = 0.0234 celowo różne od 1/60 (0.016667...) - to samo 1/60 jest
 // wartością awaryjną w odtworzKlatke(), więc test na dt musi użyć innej
 // liczby, inaczej sprawdzałby fallback zamiast rzeczywistego odtwarzania.
-function klatka({ vis = 1, dlonie = 1, dt = 0.0234 } = {}) {
+function klatka({ vis = 1, dlonie = 1, dt = 0.0234, width = 640, height = 480 } = {}) {
   const wl = Array.from({ length: 33 }, (_, i) => ({
     x: 0.111111 + i / 1000, y: -0.555555, z: 0.123456, visibility: vis
   }));
@@ -27,7 +27,7 @@ function klatka({ vis = 1, dlonie = 1, dt = 0.0234 } = {}) {
     handedness: 'Left',
     landmarks: Array.from({ length: 21 }, () => ({ x: 0.4, y: 0.4, z: 0 }))
   }));
-  return { hands, pose: { landmarks: lm, worldLandmarks: wl }, width: 1920, height: 1080, dt, now: 0 };
+  return { hands, pose: { landmarks: lm, worldLandmarks: wl }, width, height, dt, now: 0 };
 }
 
 console.log('ZAPIS:');
@@ -43,6 +43,10 @@ const json = z.doJson();
 spr('klatki są pogrupowane po etykiecie', Object.keys(json.kroki).sort().join(',') === 'ogien#1,ogien#2');
 spr('grupa ma tyle klatek, ile dodano', json.kroki['ogien#1'].length === 2);
 spr('plik nosi numer wersji formatu', typeof json.wersja === 'number');
+// 640x480, nie 1920x1080 - to druga liczba jest wartością awaryjną w
+// odtworzKlatke(), ta sama pułapka co dt i fallback 1/60.
+spr('plik niesie FAKTYCZNE wymiary klatek z sesji, nie stałą 1920x1080',
+    json.width === 640 && json.height === 480);
 
 console.log('\nROZMIAR:');
 const dlugie = JSON.stringify(json).match(/\d+\.\d{5,}/g);
@@ -67,6 +71,11 @@ spr('landmarks 2D (nie worldLandmarks) wracają jako pose.landmarks, którego wy
 spr('dłonie wracają z landmarkami', odtworzona.hands.length === 1 && odtworzona.hands[0].landmarks.length === 21);
 spr('odtworzone dt to zapisana wartość, nie awaryjne 1/60',
     Number.isFinite(odtworzona.dt) && Math.abs(odtworzona.dt - 0.0234) < 0.001);
+spr('odtworzona klatka BEZ podanych wymiarów spada na awaryjne 1920x1080',
+    odtworzona.width === 1920 && odtworzona.height === 1080);
+const odtworzonaZWymiarami = odtworzKlatke(json.kroki['ogien#1'][0], { width: json.width, height: json.height });
+spr('odtworzona klatka Z podanymi wymiarami niesie PRAWDZIWY rozmiar z sesji, nie 1920x1080',
+    odtworzonaZWymiarami.width === 640 && odtworzonaZWymiarami.height === 480);
 
 console.log('\nBRAK DANYCH:');
 const z2 = new ZapisProbek();
