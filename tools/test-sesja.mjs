@@ -88,6 +88,11 @@ console.log('\nODPORNOŚĆ:');
 const s5 = new SesjaNagraniowa();
 s5.start();
 spr('NaN w dt nie wywraca sesji', s5.tick(NaN).stan === 'dojscie');
-spr('ogromne dt nie przeskakuje kroku', s5.tick(999).stan !== 'bezczynna');
+// Bez sufitu MAX_DT to samo dt=999 zeszłoby poniżej zera i przeskoczyłoby
+// od razu do 'nagrywanie' - stan musi zostać 'dojscie', a pozostało ma
+// spaść dokładnie o MAX_DT (0.1), nie o 999.
+const poOgromnym = s5.tick(999);
+spr('ogromne dt nie przeskakuje kroku - stan zostaje dojście', poOgromnym.stan === 'dojscie');
+spr('ogromne dt jest ucięte do sufitu MAX_DT', Math.abs(poOgromnym.pozostaloS - 11.9) < 0.001);
 
 process.exit(ok ? 0 : 1);
