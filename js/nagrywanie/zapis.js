@@ -12,14 +12,31 @@
  * punktów dłoni - w obiektach z nazwami pól nazwy pól byłyby większością
  * pliku. Zaokrąglenie do 3 miejsc po przecinku to około milimetra przy
  * metrycznych worldLandmarks, czyli poniżej realnej dokładności trackera.
+ *
+ * Współrzędna, która nie jest skończona (NaN, brak punktu) zapisuje się
+ * jako `null`, NIE jako 0 - zero to legalna, zmierzona współrzędna (środek
+ * układu), więc nadpisanie nią braku danych ukryłoby śmieciową geometrię
+ * przed bramką widoczne() w postawa.js (patrz jej komentarz o pomiarze
+ * kontra zgadywaniu). Przy odczycie `null` wraca jako NaN, żeby ta sama
+ * bramka odrzuciła punkt tak samo, jak odrzuciłaby go na żywo. Nagranie
+ * jest nieodtwarzalne bez powtórnej sesji, więc to rozróżnienie musi
+ * przetrwać cały obieg zapis -> JSON -> odczyt.
  */
 
 export const WERSJA_FORMATU = 1;
 const MIEJSC = 3;
 
 const okr = (v) => Number.isFinite(v) ? Number(v.toFixed(MIEJSC)) : 0;
-const spakujPunkt = (p) => [okr(p?.x), okr(p?.y), okr(p?.z), okr(p?.visibility ?? 1)];
-const rozpakujPunkt = ([x, y, z, visibility]) => ({ x, y, z, visibility });
+// Dla współrzędnych - w odróżnieniu od okr() powyżej - brak danych zostaje
+// brakiem danych (null), nie zerem.
+const okrWspolrzedna = (v) => Number.isFinite(v) ? Number(v.toFixed(MIEJSC)) : null;
+const spakujPunkt = (p) => [okrWspolrzedna(p?.x), okrWspolrzedna(p?.y), okrWspolrzedna(p?.z), okr(p?.visibility ?? 1)];
+const rozpakujPunkt = ([x, y, z, visibility]) => ({
+    x: x === null ? NaN : x,
+    y: y === null ? NaN : y,
+    z: z === null ? NaN : z,
+    visibility
+});
 
 export class ZapisProbek {
     constructor() {

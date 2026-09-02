@@ -10,6 +10,7 @@
  * formatu kosztowałaby powtórną sesję.
  */
 import { ZapisProbek, odtworzKlatke } from '../js/nagrywanie/zapis.js';
+import { widoczne } from '../js/znaki/postawa.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -73,6 +74,30 @@ z2.dodaj('taniec#1', { hands: [], pose: null, width: 1920, height: 1080, dt: 1 /
 const bezPozy = odtworzKlatke(z2.doJson().kroki['taniec#1'][0]);
 spr('klatka bez pozy zapisuje się i wraca jako brak pozy', bezPozy.pose === null);
 spr('klatka bez dłoni wraca z pustą tablicą', Array.isArray(bezPozy.hands) && bezPozy.hands.length === 0);
+
+console.log('\nZEPSUTA WSPÓŁRZĘDNA (NaN):');
+// Punkt bez pomiaru (NaN, np. MediaPipe nie wykrył) nie może udawać
+// zmierzonego zera - inaczej przejdzie bramkę widoczne() z postawa.js
+// jako w pełni pewna geometria w środku układu współrzędnych.
+const zepsuta = klatka();
+zepsuta.pose.worldLandmarks[5] = { x: NaN, y: -0.2, z: 0.1, visibility: 1 };
+const z3 = new ZapisProbek();
+z3.dodaj('test#1', zepsuta);
+const odNaN = odtworzKlatke(z3.doJson().kroki['test#1'][0]);
+spr('NaN we współrzędnej przechodzi zapis i odczyt jako NaN, nie jako 0',
+    !Number.isFinite(odNaN.pose.worldLandmarks[5].x));
+// Nie samo "null" - null w arytmetyce cicho przechodzi na 0 (null - x === -x),
+// więc gdyby coś policzyło różnicę zanim sprawdzi widoczne(), błąd by wrócił
+// tylnymi drzwiami. NaN zatruwa każde działanie, więc typeof musi dać
+// 'number', nie 'object' (typeof null).
+spr('to naprawdę NaN, nie null - żeby zatruwało arytmetykę zamiast cicho udawać zero',
+    typeof odNaN.pose.worldLandmarks[5].x === 'number' && Number.isNaN(odNaN.pose.worldLandmarks[5].x));
+spr('klatka z takim punktem NIE przechodzi bramki widoczne() z postawa.js',
+    !widoczne(odNaN.pose.worldLandmarks, [5]));
+spr('zdrowy punkt w tej samej klatce nadal przechodzi widoczne()',
+    widoczne(odNaN.pose.worldLandmarks, [0]));
+spr('zdrowy punkt przechodzi round-trip bez zmiany mimo sąsiedztwa zepsutego',
+    Math.abs(odNaN.pose.worldLandmarks[0].x - 0.111111) < 0.001);
 
 console.log('\nNAZWA PLIKU:');
 spr('nazwa pliku wygląda jak plik próbek', /^probki-.*\.json$/.test(z.nazwaPliku()));
