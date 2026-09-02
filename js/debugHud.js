@@ -55,10 +55,7 @@ export class DebugHud {
             // tylko po to i zaraz musi odejść.
             if (e.key === 'z' || e.key === 'Z') this._startSesji(1);
             if (/^[1-8]$/.test(e.key)) this._startSesji(Number(e.key));
-            if (e.key === 'Escape' && this.sesja.aktywna) {
-                this.sesja.przerwij();
-                this._ukryjEkranSesji();
-            }
+            if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
     }
 
@@ -84,6 +81,28 @@ export class DebugHud {
             console.warn('[sesja] AudioContext niedostępny:', e.message);
         }
         console.log(`[Z] Sesja nagraniowa od kroku ${odKroku}. Escape przerywa.`);
+    }
+
+    /**
+     * Escape PRZERYWA scenariusz, ale nie kasuje już nagranego materiału -
+     * nagranie jest nieodtwarzalne bez powtórnej ~4-minutowej sesji z żywym
+     * ciałem, więc przerwanie musi być tak samo bezpieczne jak naturalny
+     * koniec scenariusza (sygnał 'koniec' w aktualizujSesje). Ta sama ścieżka
+     * zapisu, tylko wyzwolona inaczej - żeby dogranie JEDNEGO kroku cyfrą nie
+     * wymagało doczekania końca całego ogona scenariusza: gracz nagrywa swój
+     * krok, naciska Escape i ma plik. Pusty zapis (Escape zanim cokolwiek się
+     * nagrało) nie generuje pliku - nie ma czego zapisywać.
+     */
+    _przerwijSesje() {
+        const klatek = this.zapis?.liczbaKlatek ?? 0;
+        this.sesja.przerwij();
+        this._ukryjEkranSesji();
+        if (klatek > 0) {
+            console.log(`[Escape] Sesja przerwana - materiał ZAPISANY (${klatek} klatek). Zaraz pobranie pliku.`);
+            this._zapiszProbki();
+        } else {
+            console.log('[Escape] Sesja przerwana - nic jeszcze nie nagrano, brak pliku do zapisania.');
+        }
     }
 
     /**
