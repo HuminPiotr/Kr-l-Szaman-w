@@ -68,4 +68,18 @@ spr('jedna zepsuta klatka nie rusza wygładzonej skali',
 spr('skalaChwilowa (bez EMA) natychmiast pokazuje skok, w przeciwieństwie do skalaCiala',
     Math.abs(skalaChwilowa(skok) - 0.80) < 0.01);
 
+console.log('\nSKALA - reset:');
+// Rozpędzona EMA nie może przeciekać z jednego ciała/nagrania do następnego
+// (tools/probki/: zadania 6 i 12 przetwarzają po kolei kilkanaście próbek
+// w jednym procesie). Rozstawy 0.40 m i 0.20 m są na tyle odległe, że
+// wygładzonej wartości nie da się pomylić z chwilową.
+resetSkali();
+for (let i = 0; i < 60; i++) aktualizujSkale(barki(0), 1 / 60);
+resetSkali();
+const inneCialo = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 1 }));
+inneCialo[BARK_L] = { x: -0.10, y: -0.55, z: 0, visibility: 1 };
+inneCialo[BARK_P] = { x: 0.10, y: -0.55, z: 0, visibility: 1 };
+spr('resetSkali czyści EMA - nowe ciało (0.20 m) liczy się od zera, nie ciągnie poprzedniego rozstawu (0.40 m)',
+    Math.abs(skalaCiala(inneCialo) - 0.20) < 0.01);
+
 process.exit(ok ? 0 : 1);
