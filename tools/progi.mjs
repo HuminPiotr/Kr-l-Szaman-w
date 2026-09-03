@@ -38,10 +38,14 @@
  *
  * Woda jest jedyną pieczęcią, której ŻADNA pojedyncza miara nie rozdziela
  * pozy od tańca - rozdziela je dopiero SPEŁNIENIE WSZYSTKICH NARAZ (patrz
- * komentarz przy `progiWody` niżej). Dlatego próg ZERO każdej miary wody
- * liczy się nie z całego tańca, tylko z klatek tańca, które już przeszły
- * POZOSTAŁE warunki wody - to wciąż ta sama reguła wyprowadzania z góry
- * tego pliku, tylko próbka ZERO jest przefiltrowana, a nie cała.
+ * komentarz przy `progiWody` niżej). Próg ZERO każdej miary wody bierze się
+ * z NAJBLIŻSZEJ populacji, która na tej osi musi milczeć - a to NIE zawsze
+ * jest taniec (ta sama zasada, co przy paśmie ognia). Dla `miska` sąsiadem
+ * jest taniec przesiany resztą warunków wody (percentyl warunkowy). Dla
+ * `glebokosc` i `kierunekPalcow` sąsiadem są POZOSTAŁE CZTERY PIECZĘCIE -
+ * taniec na tych dwóch osiach albo odpowiada na złe pytanie (głębokość:
+ * ręce opuszczone w tańcu schodzą głębiej niż miska), albo po przesianiu
+ * zostawia zbyt mało klatek, żeby cokolwiek znaczyć.
  */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -50,7 +54,7 @@ import { odtworzKlatke } from '../js/nagrywanie/zapis.js';
 import { skalaCiala, aktualizujSkale, resetSkali, widoczne,
          BARK_L, BARK_P, LOKIEC_L, LOKIEC_P, NADG_L, NADG_P } from '../js/znaki/postawa.js';
 import { odleglosc, nadBarkami } from '../js/znaki/styk.js';
-import { pelnaDlon, skierowanaWGore } from '../js/znaki/dlon.js';
+import { pelnaDlon, kierunekDloni } from '../js/znaki/dlon.js';
 
 const KATALOG = join(dirname(fileURLToPath(import.meta.url)), 'probki');
 const WYJSCIE = join(dirname(fileURLToPath(import.meta.url)), '..', 'js', 'znaki', 'progi-zmierzone.js');
@@ -123,20 +127,28 @@ const MIARY = {
     // więc "styk nadgarstków" mierzył coś innego niż zamierzony dotyk dłoni.
     // Ta sama sytuacja co z wysokością w ziemi i rozchyleniem w powietrzu -
     // warunek mierzył odwrotność tego, co miał mierzyć.
-    // `palceWDol` DOŁĄCZONA: `skierowanaWGore` z dlon.js (wektor 2D
-    // nadgarstek->nasada środkowego palca) daje medianę ~0.00 w misce wobec
-    // ~0.97 w ogniu/ziemi/powietrzu - w misce dłonie leżą poziomo, palce idą
-    // w stronę kamery, a nie w górę. To oś, której nie używa ŻADNA inna
-    // pieczęć. Liczona tylko na klatkach z co najmniej jedną PEŁNĄ dłonią
-    // (pelnaDlon) - klatki bez dłoni po prostu nie wchodzą do próbki tej
-    // miary, tak jak dziś nie wchodzą klatki bez pozy.
+    // `kierunekPalcow` DOŁĄCZONA: SUROWY (nieprzycięty) `kierunekDloni(lm).y`
+    // z dlon.js, minimum po widocznych PEŁNYCH dłoniach (pelnaDlon) -
+    // konserwatywnie wymaga, żeby OBIE dłonie leżały poziomo, nie tylko
+    // jedna. Dodatni = palce w dół obrazu, ujemny = w górę. Pierwsza wersja
+    // tej miary (`palceWDol`, USUNIĘTA) brała `skierowanaWGore`, czyli
+    // `Math.max(0, -y)` - PRZYCIĘTY sygnał: każda dłoń nie skierowana w górę
+    // ląduje na tej samej wartości 0, więc `1-x` lądowało na tej samej
+    // wartości 1 i żaden percentyl nie miał czego rozróżniać (PELNY=ZERO=
+    // 1.000 dokładnie, wpięte dawałoby dzielenie przez zero w rampa()).
+    // Surowy `y` nie ma tego przycięcia: zmierzone mediany na tym materiale
+    // - woda +0.707, ogień -0.974, ziemia -0.950, powietrze -0.993. Woda
+    // jest jedyną pieczęcią po DODATNIEJ stronie, z ogromnym marginesem.
+    // Liczona tylko na klatkach z co najmniej jedną pełną dłonią - klatki
+    // bez dłoni po prostu nie wchodzą do próbki tej miary, tak jak dziś nie
+    // wchodzą klatki bez pozy.
     woda: (wl, s, frame) => {
         const dlonie = (frame?.hands ?? []).filter(d => pelnaDlon(d.landmarks));
         return {
             glebokosc: -Math.max(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s)),
             miska: (odleglosc(wl, LOKIEC_L, LOKIEC_P) - odleglosc(wl, NADG_L, NADG_P)) / s,
-            palceWDol: dlonie.length
-                ? 1 - Math.min(...dlonie.map(d => skierowanaWGore(d.landmarks)))
+            kierunekPalcow: dlonie.length
+                ? Math.min(...dlonie.map(d => kierunekDloni(d.landmarks).y))
                 : NaN
         };
     },
@@ -160,7 +172,7 @@ const MIARY = {
 };
 
 /** Które miary rosną przy poprawnej pozie (a nie maleją). */
-const ROSNACE = new Set(['wysokosc', 'glebokosc', 'miska', 'wysNadg', 'wysLok', 'palceWDol']);
+const ROSNACE = new Set(['wysokosc', 'glebokosc', 'miska', 'wysNadg', 'wysLok', 'kierunekPalcow']);
 
 /** Minimalna liczba klatek, poniżej której percentyl to szum, nie pomiar. */
 const MIN_KLATEK = 300;
@@ -241,7 +253,7 @@ function wczytajProbki() {
 /**
  * Klatki jednego powtórzenia -> tablica zestawów miar. Pomija pierwsze 0.5 s.
  * `funkcja` dostaje CAŁĄ odtworzoną klatkę jako trzeci argument, żeby dało
- * się czytać landmarki dłoni (potrzebne przez woda.palceWDol) - miary, które
+ * się czytać landmarki dłoni (potrzebne przez woda.kierunekPalcow) - miary, które
  * jej nie potrzebują, po prostu ją ignorują (JS nie wymaga zadeklarowania
  * parametru, żeby go pominąć).
  */
@@ -397,6 +409,27 @@ function pasmoOgnia(kroki) {
     linie.push(`    ogien: {\n${pola.join('\n')}\n    },`);
 }
 
+/** Cztery pieczęcie inne niż woda - pula, z której woda bierze ZERO na
+ *  osiach, gdzie NIE taniec jest najbliższym sąsiadem (patrz progiWody). */
+const INNE_PIECZECIE = ['ogien', 'ziemia', 'powietrze', 'blyskawica'];
+
+/**
+ * Próbki jednej miary MIARY.woda, zaaplikowanej do klatek POZOSTAŁYCH
+ * czterech pieczęci zamiast do wody - dokładnie ten sam mechanizm, którym
+ * `zbierz(kroki, 'taniec', funkcja)` liczy próg ZERO z tańca gdzie indziej
+ * w tym pliku, tylko inne etykiety wejściowe (cztery pozy, nie taniec).
+ */
+function pulaInnychPieczeci(kroki, pole) {
+    let wartosci = [];
+    let proby = [];
+    for (const poza of INNE_PIECZECIE) {
+        const z = zbierz(kroki, poza, MIARY.woda);
+        wartosci = wartosci.concat(z.wszystkie[pole] ?? []);
+        proby = proby.concat(z.proby);
+    }
+    return { wartosci, proby };
+}
+
 /**
  * ================== WODA - PRZYPADEK SZCZEGÓLNY: KONIUNKCJA ==================
  * Woda jest jedyną pieczęcią w tym zestawie, której ŻADNA pojedyncza miara
@@ -408,29 +441,46 @@ function pasmoOgnia(kroki) {
  * wody trzymają pełne 4 s ciągiem.
  *
  * Generyczna reguła PELNY/ZERO (patrz nagłówek pliku) bierze próg ZERO danej
- * miary z CAŁEGO tańca. Dla pieczęci koniunkcyjnej to złe pytanie: pyta
- * "gdzie ta JEDNA oś zaczyna wyglądać jak taniec", a taniec na pojedynczej
- * osi naprawdę bywa blisko wody (stąd zachodzenie, gdyby liczyć osobno).
- * Właściwe pytanie: "jak daleko musi sięgnąć ta miara, żeby uciszyć taniec,
- * który JUŻ przeszedł resztę sita" - czyli PERCENTYL WARUNKOWY: próg ZERO
- * miary X liczony tylko z klatek tańca, które już spełniają POZOSTAŁE
- * warunki wody (ich własny próg PELNY, w odpowiednim kierunku). PELNY
- * każdej miary liczony jak zawsze, z próbek POZY - warunkowanie dotyczy
- * wyłącznie strony ZERO.
+ * miary z CAŁEGO tańca. Dla pieczęci koniunkcyjnej to bywa złe pytanie:
+ * pyta "gdzie ta JEDNA oś zaczyna wyglądać jak taniec", a taniec na
+ * pojedynczej osi naprawdę bywa blisko wody. Właściwa reguła jest szersza
+ * niż "zawsze bierz taniec" - to ta sama zasada, co w paśmie ognia (patrz
+ * `pasmoOgnia`): próg ZERO danej osi bierze się z NAJBLIŻSZEJ populacji,
+ * która na tej osi MUSI milczeć. Dla wody ta populacja jest RÓŻNA dla
+ * różnych miar:
  *
- * Jeśli mimo warunkowania któraś miara NADAL zachodzi z tańcem, to jest
+ *   - `miska`: sąsiadem jest TANIEC PRZESIANY resztą warunków wody -
+ *     PERCENTYL WARUNKOWY, próg liczony tylko z klatek tańca, które już
+ *     mają POZOSTAŁE dwie miary >= ich własny PELNY. Na tej osi to
+ *     wystarcza: zachodzenie znika (zmierzone niżej).
+ *   - `glebokosc` i `kierunekPalcow`: sąsiadem NIE jest taniec. Taniec z
+ *     rękami opuszczonymi wzdłuż ciała schodzi GŁĘBIEJ niż miska - branie
+ *     go dawało odwróconą parę (PELNY < ZERO, woda punktowałaby tym niżej,
+ *     im głębiej trzymana miska). Nawet przesiany resztą warunków, taniec
+ *     zostawiał na tych dwóch osiach ledwie garstkę klatek (zmierzone: 13 i
+ *     6 na tym materiale) - bo wciąż odpowiada na złe pytanie, nie dlatego,
+ *     że koniunkcja nie działa. NAJBLIŻSZYM sąsiadem, który tu musi
+ *     milczeć, są POZOSTAŁE CZTERY PIECZĘCIE (ogień, ziemia, powietrze,
+ *     błyskawica) - wszystkie płytsze od miski i wszystkie z innym
+ *     kierunkiem dłoni. Próg ZERO to p90 z ich POOLOWANEJ próbki
+ *     (`pulaInnychPieczeci`).
+ *
+ * PELNY każdej z trzech miar liczony jak zawsze - p25 z próbek POZY wody.
+ * Zmienia się WYŁĄCZNIE źródło strony ZERO, per miara.
+ *
+ * Jeśli mimo to któraś miara NADAL zachodzi z odpowiednim sąsiadem, to jest
  * prawdziwy wynik pomiaru, nie usterka reguły - próg zostaje z ostrzeżeniem,
  * nienaginany. Ostateczny werdykt dla wody i tak wyda test rozdzielności na
  * nagraniach (zadanie 12) na prawdziwym silniku składania pieczęci; to
  * narzędzie jest sitem wstępnym, nie ostatecznym.
  */
 function progiWody(kroki) {
-    const NAZWY = ['glebokosc', 'miska', 'palceWDol'];
+    const NAZWY = ['glebokosc', 'miska', 'kierunekPalcow'];
     const zPoza = zbierz(kroki, 'woda', MIARY.woda);
     const zTaniec = zbierz(kroki, 'taniec', MIARY.woda);
     // Per-klatkowe zestawy miar tańca - potrzebne w komplecie (nie osobne
-    // tablice per pole, jak `wszystkie`), żeby warunkować jedną miarę
-    // wartościami POZOSTAŁYCH miar Z TEJ SAMEJ KLATKI.
+    // tablice per pole, jak `wszystkie`), żeby warunkować `miska` wartościami
+    // POZOSTAŁYCH miar Z TEJ SAMEJ KLATKI.
     const klatkiTanca = zTaniec.proby.flatMap(p => p.miary);
 
     const pelny = {};
@@ -438,32 +488,65 @@ function progiWody(kroki) {
         pelny[nazwa] = percentyl(zPoza.wszystkie[nazwa] ?? [], 25);
     }
 
-    console.log(`\nWODA (koniunkcja - przypadek szczególny, ZERO warunkowe):`);
+    // miska: percentyl warunkowy z tańca (patrz komentarz funkcji).
+    const inneDlaMiski = NAZWY.filter(n => n !== 'miska');
+    const tanczecPrzeszedl = klatkiTanca.filter(f =>
+        inneDlaMiski.every(i => Number.isFinite(f[i]) && f[i] >= pelny[i]));
+    const miskaZeroTab = tanczecPrzeszedl.map(f => f.miska).filter(Number.isFinite);
+
+    // glebokosc i kierunekPalcow: pula pozostałych czterech pieczęci.
+    const pulaGlebokosc = pulaInnychPieczeci(kroki, 'glebokosc');
+    const pulaKierunek = pulaInnychPieczeci(kroki, 'kierunekPalcow');
+
+    const zero = {
+        glebokosc: percentyl(pulaGlebokosc.wartosci, 90),
+        miska: percentyl(miskaZeroTab, 90),
+        kierunekPalcow: percentyl(pulaKierunek.wartosci, 90)
+    };
+    const nZero = {
+        glebokosc: pulaGlebokosc.wartosci.length,
+        miska: miskaZeroTab.length,
+        kierunekPalcow: pulaKierunek.wartosci.length
+    };
+    const zrodloZeroPlik = {
+        glebokosc: opisProby(pulaGlebokosc.proby),
+        miska: `taniec warunkowy (spełnia ${inneDlaMiski.join(' i ')} >= PELNY)`,
+        kierunekPalcow: opisProby(pulaKierunek.proby)
+    };
+    const zrodloZeroKonsola = {
+        glebokosc: INNE_PIECZECIE.join('+'),
+        miska: `taniec|${inneDlaMiski.join('+')}`,
+        kierunekPalcow: INNE_PIECZECIE.join('+')
+    };
+    // "warunkowa" = pula z tańca przesianego resztą warunków wody - mała
+    // z natury, bo sito zadziałało (DOBRA wiadomość, tak MA wyglądać dobra
+    // koniunkcja). "surowa" = pula z pozostałych czterech pieczęci wprost -
+    // mała TYLKO jeśli brakuje nagrań (ZŁA wiadomość, trzeba dograć). Ten
+    // sam próg MIN_KLATEK ma więc inną treść ostrzeżenia w każdym przypadku.
+    const typPuli = { glebokosc: 'surowa', miska: 'warunkowa', kierunekPalcow: 'surowa' };
+
+    console.log(`\nWODA (koniunkcja - przypadek szczególny, ZERO od najbliższej milczącej populacji):`);
     const pola = [];
     for (const nazwa of NAZWY) {
-        const inne = NAZWY.filter(n => n !== nazwa);
-        const przechodzace = klatkiTanca.filter(f =>
-            inne.every(i => Number.isFinite(f[i]) && f[i] >= pelny[i]));
-        const wartosciX = przechodzace.map(f => f[nazwa]).filter(Number.isFinite);
-        const zero = percentyl(wartosciX, 90);
-
         const nPoza = (zPoza.wszystkie[nazwa] ?? []).length;
-        const nTaniec = wartosciX.length;
-        const zle = !(pelny[nazwa] > zero);
-        const zaMalo = nTaniec < MIN_KLATEK;
+        const zle = !(pelny[nazwa] > zero[nazwa]);
+        const zaMalo = nZero[nazwa] < MIN_KLATEK;
         if (zle || zaMalo) konflikt = true;
 
+        const komZaMalo = typPuli[nazwa] === 'warunkowa'
+            ? '⚠ MAŁO KLATEK PO WARUNKOWANIU (dobra wiadomość: sito zadziałało) - próg z małej próbki, dograj krok 8 dla pewności'
+            : '⚠ MAŁO KLATEK W PULI POZOSTAŁYCH PIECZĘCI (zła wiadomość: brakuje nagrań) - dograj kroki 1/2/3/4';
+
         console.log(`  ${nazwa.padEnd(16)} poza n=${String(nPoza).padStart(4)} p25 = ${pelny[nazwa].toFixed(3)}` +
-                    `   taniec|${inne.join('+')} n=${String(nTaniec).padStart(4)} p90 = ${Number.isFinite(zero) ? zero.toFixed(3) : 'brak'}` +
+                    `   ${zrodloZeroKonsola[nazwa]} n=${String(nZero[nazwa]).padStart(4)} p90 = ${Number.isFinite(zero[nazwa]) ? zero[nazwa].toFixed(3) : 'brak'}` +
                     `${zle ? '   ⚠ OBSZARY ZACHODZĄ - zmień POZĘ, nie liczbę' : ''}` +
-                    `${zaMalo ? '   ⚠ ZA MAŁO KLATEK TAŃCA (po warunkowaniu) - dograj krok 8' : ''}`);
+                    `${zaMalo ? `   ${komZaMalo}` : ''}`);
 
         const N = nazwa.toUpperCase();
         const ostrzezeniePelny = zle ? `  ${OSTRZEZENIE_ZACHODZENIA}` : '';
-        const ostrzezenieZero = zle ? `  ${OSTRZEZENIE_ZACHODZENIA}` :
-            (zaMalo ? '  ⚠ ZA MAŁO KLATEK TAŃCA (po warunkowaniu) - próg ZERO to szum, dograj krok 8' : '');
+        const ostrzezenieZero = zle ? `  ${OSTRZEZENIE_ZACHODZENIA}` : (zaMalo ? `  ${komZaMalo}` : '');
         pola.push(`        ${N}_PELNY: ${pelny[nazwa].toFixed(3)},  // ${opisProby(zPoza.proby)}, p25, n=${nPoza}${ostrzezeniePelny}`);
-        pola.push(`        ${N}_ZERO: ${Number.isFinite(zero) ? zero.toFixed(3) : 0},  // taniec warunkowy (spełnia ${inne.join(' i ')} >= PELNY), p90, n=${nTaniec}${ostrzezenieZero}`);
+        pola.push(`        ${N}_ZERO: ${Number.isFinite(zero[nazwa]) ? zero[nazwa].toFixed(3) : 0},  // ${zrodloZeroPlik[nazwa]}, p90, n=${nZero[nazwa]}${ostrzezenieZero}`);
     }
     linie.push(`    woda: {\n${pola.join('\n')}\n    },`);
 }

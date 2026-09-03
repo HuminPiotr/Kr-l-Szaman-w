@@ -8,7 +8,7 @@
  * Strojenie = zmiana reguły albo dogranie próbki, NIGDY ręczna poprawka
  * liczby tutaj - poprawiona ręcznie liczba jest znowu ZGADNIĘTA.
  *
- * Wygenerowano: 2026-09-03T19:50:16.582Z
+ * Wygenerowano: 2026-09-03T19:59:04.680Z
  * Powtórzenia w materiale: 22
  */
 export const PROGI = {
@@ -29,12 +29,12 @@ export const PROGI = {
         WYSOKOSC_ZERO: -0.227,  // taniec#1 (probki-2026-09-03-17-59-00.json, probki-2026-09-03-18-04-18.json), p90, n=1500
     },
     woda: {
-        GLEBOKOSC_PELNY: 0.858,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
-        GLEBOKOSC_ZERO: 0.966,  // taniec warunkowy (spełnia miska i palceWDol >= PELNY), p90, n=13  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
+        GLEBOKOSC_PELNY: 0.858,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286
+        GLEBOKOSC_ZERO: 0.467,  // blyskawica#1, blyskawica#2, blyskawica#3, ogien#1, ogien#2, ogien#3, powietrze#1, powietrze#2, powietrze#3, ziemia#1, ziemia#2, ziemia#3 (probki-2026-09-03-18-04-18.json, probki-2026-09-03-18-41-44.json), p90, n=1132
         MISKA_PELNY: 0.607,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286
-        MISKA_ZERO: 0.440,  // taniec warunkowy (spełnia glebokosc i palceWDol >= PELNY), p90, n=55  ⚠ ZA MAŁO KLATEK TAŃCA (po warunkowaniu) - próg ZERO to szum, dograj krok 8
-        PALCEWDOL_PELNY: 1.000,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
-        PALCEWDOL_ZERO: 1.000,  // taniec warunkowy (spełnia glebokosc i miska >= PELNY), p90, n=6  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
+        MISKA_ZERO: 0.048,  // taniec warunkowy (spełnia glebokosc i kierunekPalcow >= PELNY), p90, n=43  ⚠ MAŁO KLATEK PO WARUNKOWANIU (dobra wiadomość: sito zadziałało) - próg z małej próbki, dograj krok 8 dla pewności
+        KIERUNEKPALCOW_PELNY: 0.604,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286
+        KIERUNEKPALCOW_ZERO: -0.910,  // blyskawica#1, blyskawica#2, blyskawica#3, ogien#1, ogien#2, ogien#3, powietrze#1, powietrze#2, powietrze#3, ziemia#1, ziemia#2, ziemia#3 (probki-2026-09-03-18-04-18.json, probki-2026-09-03-18-41-44.json), p90, n=1117
     },
     blyskawica: {
         WYSNADG_PELNY: 1.098,  // blyskawica#1, blyskawica#2, blyskawica#3 (probki-2026-09-03-18-41-44.json), p25, n=294
