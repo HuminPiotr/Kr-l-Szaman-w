@@ -1173,7 +1173,7 @@ git commit -m "Prymitywy styku: odległość 3D, ciągła miara dotyku, wysokoś
 - Create (generowany): `js/znaki/progi-zmierzone.js`
 
 **Interfaces:**
-- Consumes: pliki JSON z `tools/probki/`, `odtworzKlatke` z Task 2, `skalaCiala`/`resetSkali`/`aktualizujSkale`/`obrotBokiem` z Task 4, `odleglosc`/`nadBarkami`/`katWLokciu` z Task 5.
+- Consumes: pliki JSON z `tools/probki/`, `odtworzKlatke` z Task 2, `skalaCiala`/`resetSkali`/`aktualizujSkale` z Task 4, `odleglosc`/`nadBarkami` z Task 5. (`obrotBokiem` i `katWLokciu` NIE ISTNIEJĄ — obie wycięte, bo po przeprojektowaniu błyskawicy straciły konsumentów.)
 - Produces: `js/znaki/progi-zmierzone.js` eksportujący `PROGI` — obiekt `{ ziemia: {...}, powietrze: {...}, woda: {...}, blyskawica: {...} }`. Nazwy pól ustalone w Step 3 poniżej i używane wprost przez Task 7-10.
 
 **Dlaczego generator, a nie ręczne wklejanie:** przepisanie liczb z konsoli do czterech plików jest krokiem, na którym rodzi się `ZGADNIĘTE` — ktoś zaokrągli, ktoś poprawi „na oko". Generowany plik niesie w nagłówku, z której próbki i z którego percentyla pochodzi każda liczba, więc prowenienacja jest maszynowa, a strojenie sprowadza się do zmiany reguły, nie liczby.
@@ -1214,9 +1214,9 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { odtworzKlatke } from '../js/nagrywanie/zapis.js';
-import { skalaCiala, aktualizujSkale, resetSkali, obrotBokiem, widoczne,
+import { skalaCiala, aktualizujSkale, resetSkali, widoczne,
          BARK_L, BARK_P, LOKIEC_L, LOKIEC_P, NADG_L, NADG_P } from '../js/znaki/postawa.js';
-import { odleglosc, nadBarkami, katWLokciu } from '../js/znaki/styk.js';
+import { odleglosc, nadBarkami } from '../js/znaki/styk.js';
 
 const KATALOG = join(dirname(fileURLToPath(import.meta.url)), 'probki');
 const WYJSCIE = join(dirname(fileURLToPath(import.meta.url)), '..', 'js', 'znaki', 'progi-zmierzone.js');
