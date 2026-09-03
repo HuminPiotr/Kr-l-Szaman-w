@@ -8,7 +8,7 @@
  * Strojenie = zmiana reguły albo dogranie próbki, NIGDY ręczna poprawka
  * liczby tutaj - poprawiona ręcznie liczba jest znowu ZGADNIĘTA.
  *
- * Wygenerowano: 2026-09-03T19:43:45.284Z
+ * Wygenerowano: 2026-09-03T19:50:16.582Z
  * Powtórzenia w materiale: 22
  */
 export const PROGI = {
@@ -29,12 +29,12 @@ export const PROGI = {
         WYSOKOSC_ZERO: -0.227,  // taniec#1 (probki-2026-09-03-17-59-00.json, probki-2026-09-03-18-04-18.json), p90, n=1500
     },
     woda: {
-        STYK_PELNY: 0.864,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p75, n=286  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
-        STYK_ZERO: 0.364,  // taniec#1 (probki-2026-09-03-17-59-00.json, probki-2026-09-03-18-04-18.json), p10, n=1500  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
         GLEBOKOSC_PELNY: 0.858,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
-        GLEBOKOSC_ZERO: 0.908,  // taniec#1 (probki-2026-09-03-17-59-00.json, probki-2026-09-03-18-04-18.json), p90, n=1500  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
+        GLEBOKOSC_ZERO: 0.966,  // taniec warunkowy (spełnia miska i palceWDol >= PELNY), p90, n=13  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
         MISKA_PELNY: 0.607,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286
-        MISKA_ZERO: 0.561,  // taniec#1 (probki-2026-09-03-17-59-00.json, probki-2026-09-03-18-04-18.json), p90, n=1500
+        MISKA_ZERO: 0.440,  // taniec warunkowy (spełnia glebokosc i palceWDol >= PELNY), p90, n=55  ⚠ ZA MAŁO KLATEK TAŃCA (po warunkowaniu) - próg ZERO to szum, dograj krok 8
+        PALCEWDOL_PELNY: 1.000,  // woda#1, woda#2, woda#3 (probki-2026-09-03-18-04-18.json), p25, n=286  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
+        PALCEWDOL_ZERO: 1.000,  // taniec warunkowy (spełnia glebokosc i miska >= PELNY), p90, n=6  ⚠ OBSZARY ZACHODZĄ - PELNY i ZERO NIE rozdzielają pozy od tańca (patrz task-6-report.md). NIE WPINAĆ bez zmiany POZY.
     },
     blyskawica: {
         WYSNADG_PELNY: 1.098,  // blyskawica#1, blyskawica#2, blyskawica#3 (probki-2026-09-03-18-41-44.json), p25, n=294
