@@ -136,4 +136,14 @@ spr('styk z brakującym punktem to 0 ("brak danych"), NIE 1 ("pełny dotyk")',
 spr('nadBarkami z brakującym punktem to 0, nie fałszywa wysokość',
     nadBarkami(bezPunktu, 15, 0.40) === 0);
 
+// DODATKOWE (poza briefem, przegląd Task 5) - skala niedodatnia/nieskończona
+// nie jest sensowną jednostką odniesienia. Bez jawnego strażnika skala
+// ujemna dawałaby ujemny iloraz, rampa() przycinałaby go do 0, a styk()
+// zwracałby 1 - fałszywy pełny dotyk z braku sensownych danych, mimo że
+// punkty w `c` faktycznie się stykają.
+console.log('  odporność na skalę niedodatnią/nieskończoną (brak jednostki odniesienia):');
+spr('skala ujemna daje 0, nie fałszywy pełny dotyk', styk(c, 15, 11, -0.40, 0.15, 0.60) === 0);
+spr('skala zerowa daje 0', styk(c, 15, 11, 0, 0.15, 0.60) === 0);
+spr('skala nieskończona daje 0', styk(c, 15, 11, Infinity, 0.15, 0.60) === 0);
+
 process.exit(ok ? 0 : 1);

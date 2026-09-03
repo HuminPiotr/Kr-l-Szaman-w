@@ -44,7 +44,14 @@ export function odleglosc(wl, i, j) {
  * @param {number} zero   odległość, przy której wynik = 0. Musi być > pelny.
  */
 export function styk(wl, i, j, skala, pelny, zero) {
-    const d = odleglosc(wl, i, j) / (skala > 1e-6 ? skala : 1e-6);
+    // Skala niedodatnia, NaN albo nieskończona to brak sensownej jednostki
+    // odniesienia - nie da się nią zmierzyć dotyku. Wynik to "brak danych"
+    // (0), NIGDY przypadkowy pełny dotyk. Bez tego strażnika skala ujemna
+    // dawałaby d < 0, rampa przycinałaby to do 0, a styk() zwracałby 1 -
+    // czyli fałszywe trafienie z braku sensownych danych (znalezione
+    // mutation testingiem, patrz task-5-report.md).
+    if (!Number.isFinite(skala) || skala <= 0) return 0;
+    const d = odleglosc(wl, i, j) / skala;
     if (!Number.isFinite(d)) return 0;
     return 1 - rampa(d, pelny, zero);
 }
