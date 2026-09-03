@@ -1226,41 +1226,74 @@ const WYJSCIE = join(dirname(fileURLToPath(import.meta.url)), '..', 'js', 'znaki
  * w wygenerowanym pliku: `styk` -> `STYK_PELNY` / `STYK_ZERO`.
  */
 const MIARY = {
-    // ziemia: obie pięści przy przeciwnych barkach
-    ziemia: (wl, s) => ({
-        styk: Math.max(odleglosc(wl, NADG_L, BARK_P), odleglosc(wl, NADG_P, BARK_L)) / s,
-        wysokosc: Math.min(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s))
+    // ================== ZESTAW PO POMIARZE ==================
+    // Ten zestaw NIE jest tym, co pierwotnie opisywał spec. Każda różnica
+    // wynika z nagrania na żywym ciele (tools/probki/, 2026-09-03) i jest
+    // uzasadniona w sekcji "Poprawki po pomiarze" przy zadaniach 7-10.
+    // Miary, które nie rozdzielały pozy od tańca, zostały USUNIĘTE, a nie
+    // przestrojone - próg nie naprawia warunku mierzącego nie to, co trzeba.
+
+    // ogień: jedyna nowa miara to WYSOKOŚĆ. Warunki dłoni (palce, opuszki,
+    // rozstaw nadgarstków) zostają w swarogDlon.js ze swoimi stałymi.
+    // Bez wysokości ogień zapalał się na misce wody częściej niż na własnej
+    // piramidce - 179/322 klatek wobec 107/299 (zmierzone).
+    // UWAGA: wysokość ognia to PASMO, nie rampa - jedyna taka miara w tym
+    // narzędziu. Sama podłoga nie wystarcza, bo piramidka NAD GŁOWĄ (iglica
+    // błyskawicy) też jest "wysoko": zmierzono, że przy samej podłodze ogień
+    // zapala się na 223 z 333 klatek iglicy. Pasmo zeruje to całkowicie
+    // i przy okazji usuwa 8 przypadkowych klatek tańca.
+    //
+    // Cztery progi pasma, wszystkie z danych, żaden z sufitu:
+    //   DOL_PELNY  = p05 próbek ognia        GORA_PELNY = p95 próbek ognia
+    //   DOL_ZERO   = p50 próbek WODY         GORA_ZERO  = p25 próbek BŁYSKAWICY
+    // Czyli: ogień milczy dokładnie tam, gdzie mieszkają jego dwaj sąsiedzi
+    // na tej osi. To uogólnienie zasady "rozdziela oś, której nie używa nic
+    // innego" - tu oś jest wspólna, więc granice bierzemy od sąsiadów.
+    ogien: (wl, s) => ({
+        wysokosc: Math.max(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s))
     }),
-    // powietrze: łokcie razem, nadgarstki nad barkami i szerzej niż łokcie
+
+    // ziemia: sam styk pięści z przeciwnym barkiem. Pierwotny warunek
+    // "nadgarstki na wysokości barków lub wyżej" USUNIĘTY: zmierzono, że
+    // przy pięściach na barkach nadgarstki leżą 0.5 szerokości barków PONIŻEJ
+    // linii barków, a taniec sięga wyżej (p90 -0.21). Warunek mierzył
+    // odwrotność tego, co miał mierzyć. Sam styk daje 0.99 we własnym kroku
+    // i 0 klatek tańca nad progiem.
+    ziemia: (wl, s) => ({
+        styk: Math.max(odleglosc(wl, NADG_L, BARK_P), odleglosc(wl, NADG_P, BARK_L)) / s
+    }),
+
+    // powietrze: styk łokci plus wysokość nadgarstków. Pierwotny warunek
+    // "rozchylenie" (nadgarstki szerzej niż łokcie) USUNIĘTY: zmierzono
+    // wartość UJEMNĄ (-0.43), czyli gracz trzyma nadgarstki BLIŻEJ siebie
+    // niż łokcie - dokładnie odwrotnie, niż zakładał projekt.
     powietrze: (wl, s) => ({
         styk: odleglosc(wl, LOKIEC_L, LOKIEC_P) / s,
-        wysokosc: Math.min(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s)),
-        rozchylenie: (odleglosc(wl, NADG_L, NADG_P) - odleglosc(wl, LOKIEC_L, LOKIEC_P)) / s
+        wysokosc: Math.min(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s))
     }),
-    // woda: nadgarstki razem i nisko, łokcie szerzej niż nadgarstki
+
+    // woda: styk nadgarstków, głębokość i kształt miski. Warunek miski
+    // ZOSTAJE - zmierzono, że zmniejsza wyciek do tańca z 37 do 14 klatek.
     woda: (wl, s) => ({
         styk: odleglosc(wl, NADG_L, NADG_P) / s,
         glebokosc: -Math.max(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s)),
-        rozchylenie: (odleglosc(wl, LOKIEC_L, LOKIEC_P) - odleglosc(wl, NADG_L, NADG_P)) / s
+        miska: (odleglosc(wl, LOKIEC_L, LOKIEC_P) - odleglosc(wl, NADG_L, NADG_P)) / s
     }),
-    // błyskawica: profil, rozjazd pionowy i poziomy, zgięte łokcie
-    blyskawica: (wl, s) => {
-        const gora = nadBarkami(wl, NADG_L, s) >= nadBarkami(wl, NADG_P, s) ? NADG_L : NADG_P;
-        const dol = gora === NADG_L ? NADG_P : NADG_L;
-        return {
-            obrot: obrotBokiem(wl),
-            rozjazdPionowy: nadBarkami(wl, gora, s) - nadBarkami(wl, dol, s),
-            rozjazdPoziomy: Math.abs(wl[gora].x - wl[dol].x) / s,
-            // Kąt: bierzemy WIĘKSZY z dwóch, bo warunkiem jest "OBA zgięte" -
-            // czyli najgorszy z łokci decyduje.
-            kat: Math.max(katWLokciu(wl, BARK_L, LOKIEC_L, NADG_L),
-                          katWLokciu(wl, BARK_P, LOKIEC_P, NADG_P))
-        };
-    }
+
+    // błyskawica: DWIE miary, obie z pozy. Trzecia poza tej pieczęci -
+    // dwie poprzednie (zygzak bokiem, chwyt za łokieć) padły na pomiarze.
+    // Oś nośna to WYSOKOŚĆ ŁOKCI: +0.13 w tej pozie wobec -0.65..-0.72
+    // u wszystkich pozostałych pieczęci i -0.70 w tańcu. Piramidka nad głową
+    // jest kwalifikatorem z dłoni i NIE MA TU SWOJEGO PROGU - liczy ją
+    // swarogDlon ze swoimi stałymi.
+    blyskawica: (wl, s) => ({
+        wysNadg: Math.min(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s)),
+        wysLok: Math.min(nadBarkami(wl, LOKIEC_L, s), nadBarkami(wl, LOKIEC_P, s))
+    })
 };
 
 /** Które miary rosną przy poprawnej pozie (a nie maleją). */
-const ROSNACE = new Set(['wysokosc', 'rozchylenie', 'glebokosc', 'obrot', 'rozjazdPionowy', 'rozjazdPoziomy']);
+const ROSNACE = new Set(['wysokosc', 'glebokosc', 'miska', 'wysNadg', 'wysLok']);
 
 function wczytajProbki() {
     let pliki;
@@ -1590,8 +1623,17 @@ Expected: FAIL — stary `weles` liczy skrzyżowanie na wysokości piersi, więc
  * barku i odwrotnie) IMPLIKUJĄ skrzyżowanie i robią to bez ani jednej
  * operacji wrażliwej na lustro. Cała klasa błędów znika razem z formułą.
  *
- * Warunek wysokości odcina ręce splecione na piersi albo w pasie - układ,
- * który w tańcu bywa naturalny.
+ * ================== POPRAWKA PO POMIARZE ==================
+ *
+ * Pierwotny projekt miał trzeci warunek: "oba nadgarstki na wysokości linii
+ * barków lub wyżej". USUNIĘTY po nagraniu z żywego ciała. Zmierzono, że przy
+ * pięściach na barkach nadgarstki leżą 0.5 szerokości barków PONIŻEJ linii
+ * barków (landmark nadgarstka siedzi w stawie, więc przy pięści na barku
+ * wypada nisko), a swobodny taniec sięga wyżej - p90 wynosi -0.21. Warunek
+ * mierzył więc odwrotność tego, co miał mierzyć.
+ *
+ * Sam styk wystarcza z zapasem: 0.99 wyniku we własnym kroku i ZERO z 763
+ * klatek tańca nad progiem składania.
  */
 import { NADG_L, NADG_P, BARK_L, BARK_P, widoczne, skalaCiala, rampa } from './postawa.js';
 import { styk, nadBarkami } from './styk.js';
@@ -1617,7 +1659,7 @@ export const weles = {
         // Minimum, nie średnia: pieczęć jest AND-em warunków, a najsłabszy
         // z nich ma widocznie hamować - inaczej dwa dobre warunki maskują
         // trzeci zupełnie niespełniony.
-        return Math.min(sk.stykL, sk.stykP, sk.wysokosc, sk.piesci);
+        return Math.min(sk.stykL, sk.stykP, sk.piesci);
     },
 
     /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
@@ -1641,8 +1683,6 @@ function skladnikiZ(frame) {
             // skrzyżowanie, wyrażone odległościami.
             stykL: styk(wl, NADG_L, BARK_P, skala, P.STYK_PELNY, P.STYK_ZERO),
             stykP: styk(wl, NADG_P, BARK_L, skala, P.STYK_PELNY, P.STYK_ZERO),
-            wysokosc: rampa(Math.min(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
-                            P.WYSOKOSC_ZERO, P.WYSOKOSC_PELNY),
             piesci: piesci(frame)
         };
 }
@@ -1764,9 +1804,16 @@ Expected: FAIL — stary `stribog` to postawa „ręce szeroko w bok", nie zapal
  * nadgarstkach rozsuniętych. Te same dwie osie w odwrotnych rolach,
  * więc dwie pieczęcie nie mogą jednocześnie siedzieć wysoko.
  *
- * WARUNEK ROZCHYLENIA NIE JEST OZDOBĄ. Bez niego poza degeneruje się do
- * "ręce w górze" - czyli do ruchu, który w swobodnym tańcu zdarza się
- * nieustannie. Rozchylenie jest tym, co zamienia uniesione ręce w gest.
+ * ================== POPRAWKA PO POMIARZE ==================
+ *
+ * Pierwotny projekt miał trzeci warunek: "nadgarstki dalej od siebie niż
+ * łokcie" (rozchylone dłonie). USUNIĘTY po nagraniu. Zmierzona wartość jest
+ * UJEMNA (-0.43): gracz trzyma nadgarstki BLIŻEJ siebie niż łokcie, czyli
+ * dokładnie odwrotnie, niż zakładał projekt. Wykonanie na żywym ciele to
+ * raczej "dłonie razem przed sobą, łokcie na zewnątrz" niż "gałęzie".
+ *
+ * Zostają dwa warunki i wystarczają: 0.75 wyniku we własnym kroku, ZERO
+ * z 763 klatek tańca nad progiem, maksimum w tańcu 0.12.
  */
 import { NADG_L, NADG_P, LOKIEC_L, LOKIEC_P, BARK_L, BARK_P,
          widoczne, skalaCiala, rampa } from './postawa.js';
@@ -1784,7 +1831,7 @@ export const stribog = {
     score(frame) {
         const sk = skladnikiZ(frame);
         if (!sk) return 0;
-        return Math.min(sk.lokcie, sk.wysokosc, sk.rozchylenie);
+        return Math.min(sk.lokcie, sk.wysokosc);
     },
 
     skladniki(frame) {
@@ -1804,12 +1851,6 @@ function skladnikiZ(frame) {
             // to nie jest ta poza.
             wysokosc: rampa(Math.min(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
                             P.WYSOKOSC_ZERO, P.WYSOKOSC_PELNY),
-            // O ile nadgarstki są dalej od siebie niż łokcie, w szerokościach
-            // barków. Ujemne (nadgarstki węziej niż łokcie) wpada w zero
-            // przez rampę - to wtedy nie gałęzie, tylko ręce złożone.
-            rozchylenie: rampa(
-                (odleglosc(wl, NADG_L, NADG_P) - odleglosc(wl, LOKIEC_L, LOKIEC_P)) / skala,
-                P.ROZCHYLENIE_ZERO, P.ROZCHYLENIE_PELNY)
         };
 }
 ```
@@ -1962,7 +2003,7 @@ export const mokosz = {
     score(frame) {
         const sk = skladnikiZ(frame);
         if (!sk) return 0;
-        return Math.min(sk.nadgarstki, sk.glebokosc, sk.rozchylenie, sk.palce);
+        return Math.min(sk.nadgarstki, sk.glebokosc, sk.miska, sk.palce);
     },
 
     skladniki(frame) {
@@ -1985,10 +2026,11 @@ function skladnikiZ(frame) {
                 -Math.max(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
                 P.GLEBOKOSC_ZERO, P.GLEBOKOSC_PELNY),
             // Łokcie szerzej niż nadgarstki - to jest różnica między MISKĄ
-            // a rękami po prostu splecionymi przy brzuchu.
-            rozchylenie: rampa(
+            // a rękami po prostu splecionymi przy brzuchu. ZMIERZONE: ten
+            // warunek zmniejsza wyciek wody do tańca z 37 do 14 klatek.
+            miska: rampa(
                 (odleglosc(wl, LOKIEC_L, LOKIEC_P) - odleglosc(wl, NADG_L, NADG_P)) / skala,
-                P.ROZCHYLENIE_ZERO, P.ROZCHYLENIE_PELNY),
+                P.MISKA_ZERO, P.MISKA_PELNY),
             palce: palceRozwarte(frame)
         };
 }
@@ -2019,101 +2061,104 @@ git commit -m "Woda: miska czytana z nadgarstków pozy, rozdzielona z ogniem wys
 
 ---
 
-### Task 10: Błyskawica — zygzak bokiem
+### Task 10: Błyskawica (iglica) oraz pasmo wysokości ognia
 
 **Files:**
 - Modify: `js/znaki/perun.js` (przepisany w całości)
+- Modify: `js/znaki/swarogDlon.js` (dochodzi warunek wysokości z pozy)
 - Modify: `tools/test-postawy.mjs` (dopisanie sekcji)
 
 **Interfaces:**
-- Consumes: `PROGI.blyskawica`; `nadBarkami`, `katWLokciu`; `obrotBokiem` z Task 4.
-- Produces: `perun` — `id: 'perun'`, `wymaga: 'pose'`, `score(frame)`, `skladniki(frame)`.
+- Consumes: `PROGI.blyskawica` i `PROGI.ogien` z Task 6; `nadBarkami` z Task 5; `pasmo` z `dlon.js`; `swarogDlon` (jako kwalifikator w perun).
+- Produces: `perun` — `id: 'perun'`, `wymaga: 'pose'`; `swarogDlon` — bez zmiany sygnatury, ale `wymaga` zmienia się z `'hands'` na `'both'`.
+
+**Dlaczego dwa pliki w jednym zadaniu.** Piramidka nad głową jest kwalifikatorem iglicy, a to znaczy, że gracz robiący błyskawicę wykonuje **ten sam układ dłoni co ogień**. Zmierzone: bez warunku wysokości ogień zapala się na **223 z 333 klatek iglicy**. Tych dwóch zmian nie da się rozdzielić — wprowadzenie jednej bez drugiej zostawia grę w stanie gorszym niż przed zadaniem.
 
 - [ ] **Step 1: Dopisz test przed `process.exit` w `tools/test-postawy.mjs`**
 
-Import i rejestracja:
+Import i rejestracja (`swarogDlon` jest już zarejestrowany z Task 7):
 
 ```javascript
 import { perun } from '../js/znaki/perun.js';
-import { swarogDlon } from '../js/znaki/swarogDlon.js';
 // ...
-rej.zarejestruj(weles); rej.zarejestruj(stribog); rej.zarejestruj(mokosz);
-rej.zarejestruj(perun); rej.zarejestruj(swarogDlon);
+rej.zarejestruj(perun);
 ```
 
-**Po co ogień w teście syntetycznym, skoro nie budujemy syntetycznej piramidki.** Ogień czyta dłonie, a wiarygodna syntetyczna dłoń w piramidce byłaby zmyśleniem — akurat tego sygnału mamy teraz prawdziwe nagranie. Rejestrujemy `swarogDlon`, żeby sprawdzić kierunek, który *da się* sprawdzić uczciwie: pozy z dwiema pełnymi dłońmi w kadrze (ziemia podaje dwie pięści) nie mogą zapalać ognia. **Para ogień↔woda w drugą stronę jest weryfikowana wyłącznie na nagraniach, w Task 12** — i tak ma być.
-
 ```javascript
-// BŁYSKAWICA: gracz stoi BOKIEM (obrot: 90). Jedna ręka górą do przodu,
-// druga dołem do tyłu, OBA łokcie zgięte.
-const BLYSKAWICA = cialo({
-  obrot: 90,
-  nadgP: [0.30, -1.00], lokP: [0.05, -0.80],    // górna: przód, łokieć złamany
-  nadgL: [-0.30, -0.10], lokL: [-0.05, -0.35]   // dolna: tył, łokieć złamany
+// BŁYSKAWICA (iglica): obie ręce w górę, ŁOKCIE nad linią barków.
+// Oś nośna to wysokość łokci - zmierzona mediana +0.13 w tej pozie wobec
+// -0.65..-0.72 we wszystkich pozostałych i -0.70 w tańcu.
+const IGLICA = cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+  lokL:  [-0.34, -0.85], lokP:  [0.34, -0.85]
 });
 
-console.log('\nBŁYSKAWICA:');
-const bl = ocen(BLYSKAWICA);
-spr(`zygzak bokiem zapala błyskawicę (${bl.perun.toFixed(2)})`, bl.perun > 0.7);
+console.log('\nBŁYSKAWICA (iglica):');
+const ig = ocen(IGLICA);
+spr(`ręce w górze z łokciami nad barkami zapalają błyskawicę (${ig.perun.toFixed(2)})`, ig.perun > 0.7);
 
-// TA SAMA geometria rąk, ale gracz stoi PRZODEM. Warunek profilu ma to odciąć.
-const przodem = ocen(cialo({
-  obrot: 0,
-  nadgP: [0.30, -1.00], lokP: [0.05, -0.80],
-  nadgL: [-0.30, -0.10], lokL: [-0.05, -0.35]
+// KLUCZOWE ROZRÓŻNIENIE: ręce w górze, ale łokcie NISKO (opuszczone wzdłuż
+// ciała, przedramiona w górę). W tańcu zdarza się nieustannie.
+const lokcieNisko = ocen(cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+  lokL:  [-0.30, -0.40], lokP:  [0.30, -0.40]
 }));
-spr(`ta sama poza PRZODEM nie zapala błyskawicy (${przodem.perun.toFixed(2)})`, przodem.perun < 0.4);
+spr(`ręce w górze z łokciami POD barkami NIE zapalają błyskawicy (${lokcieNisko.perun.toFixed(2)})`,
+    lokcieNisko.perun < 0.3);
 
-// Bokiem, ręka w górę i ręka w dół, ale OBIE WYPROSTOWANE. To jest ruch,
-// który w tańcu zdarza się co chwilę - warunek zgiętych łokci go odcina.
-// TO JEST NAJWAŻNIEJSZA ASERCJA CAŁEJ TEJ PIECZĘCI.
-const proste = ocen(cialo({
-  obrot: 90,
-  nadgP: [0.32, -1.05], lokP: [0.16, -0.80],    // łokieć na linii bark-nadgarstek
-  nadgL: [-0.32, -0.05], lokL: [-0.16, -0.30]
-}));
-spr(`bokiem z WYPROSTOWANYMI rękami nie zapala błyskawicy (${proste.perun.toFixed(2)})`,
-    proste.perun < 0.4);
+spr(`iglica NIE zapala ziemi (${ig.weles.toFixed(2)})`, ig.weles < 0.3);
+spr(`iglica NIE zapala powietrza (${ig.stribog.toFixed(2)})`, ig.stribog < 0.3);
+spr(`iglica NIE zapala wody (${ig.mokosz.toFixed(2)})`, ig.mokosz < 0.3);
+spr(`ziemia NIE zapala błyskawicy (${z.perun.toFixed(2)})`, z.perun < 0.3);
+spr(`powietrze NIE zapala błyskawicy (${pw.perun.toFixed(2)})`, pw.perun < 0.3);
+spr(`woda NIE zapala błyskawicy (${wd.perun.toFixed(2)})`, wd.perun < 0.3);
 
-// Bokiem, oba łokcie zgięte, ale ręce po tej samej stronie i na tej samej
-// wysokości - brak zygzaka.
-const bezRozjazdu = ocen(cialo({
-  obrot: 90,
-  nadgP: [0.30, -0.60], lokP: [0.05, -0.50],
-  nadgL: [0.28, -0.55], lokL: [0.05, -0.45]
-}));
-spr(`bokiem bez rozjazdu rąk nie zapala błyskawicy (${bezRozjazdu.perun.toFixed(2)})`,
-    bezRozjazdu.perun < 0.4);
+const igL = ocen(odbij(IGLICA));
+spr(`odbita iglica = ta sama (${igL.perun.toFixed(2)})`, Math.abs(igL.perun - ig.perun) < 0.02);
 
-console.log('\nROZDZIELNOŚĆ CAŁEJ PIĄTKI (bez ognia - ten czyta dłonie):');
-for (const [nazwa, wynik] of [['ziemia', z], ['powietrze', pw], ['woda', wd], ['błyskawica', bl]]) {
-  const pary = Object.entries(wynik).sort((a, b) => b[1] - a[1]);
-  const [najlepszy, wNaj] = pary[0];
-  const [drugi, wDrugi] = pary[1];
-  console.log(`  ${nazwa.padEnd(11)} lider ${najlepszy} ${wNaj.toFixed(2)}, drugi ${drugi} ${wDrugi.toFixed(2)}`);
-  // MARGINES_LIDERA w pieczecie.js to 0.12 - poniżej tego pierścień miga.
-  spr(`${nazwa}: lider wyprzedza drugiego o więcej niż margines`, wNaj - wDrugi > 0.12);
+// Brak dłoni NIE KARZE - piramidka jest kwalifikatorem miękkim. To nie jest
+// detal: w nagraniu z żywego ciała jedno z trzech powtórzeń miało ZERO klatek
+// z obiema wykrytymi dłońmi, a pieczęć i tak wyszła.
+const igBezDloni = ocen(IGLICA, []);
+spr(`brak dłoni nie zeruje iglicy (${igBezDloni.perun.toFixed(2)})`, igBezDloni.perun > 0.5);
+
+console.log('\nOGIEŃ - PASMO WYSOKOŚCI:');
+// Piramidka NAD GŁOWĄ to wciąż piramidka dla swarogDlon. Bez pasma ogień
+// zapalał się na 223 z 333 klatek iglicy (zmierzone na nagraniu).
+const piramidkaNadGlowa = ocen(IGLICA, [piramidka(), piramidka()]);
+spr(`piramidka NAD GŁOWĄ nie zapala ognia (${piramidkaNadGlowa.swarog.toFixed(2)})`,
+    piramidkaNadGlowa.swarog < 0.3);
+
+// Ta sama piramidka na wysokości klatki - ogień ma się zapalić.
+const NA_KLATCE = cialo({
+  nadgL: [-0.10, -0.35], nadgP: [0.10, -0.35],
+  lokL:  [-0.28, -0.15], lokP:  [0.28, -0.15]
+});
+const piramidkaNaKlatce = ocen(NA_KLATCE, [piramidka(), piramidka()]);
+spr(`piramidka na wysokości klatki zapala ogień (${piramidkaNaKlatce.swarog.toFixed(2)})`,
+    piramidkaNaKlatce.swarog > 0.7);
+```
+
+Dopisz też pomocniczą dłoń w piramidce obok istniejącej `piesc()`:
+
+```javascript
+/** Dłoń w piramidce: palce wyprostowane, opuszki zbiegają się w jednym punkcie. */
+export function piramidka() {
+  const lm = Array.from({ length: 21 }, () => ({ x: 0.50, y: 0.50, z: 0 }));
+  lm[0] = { x: 0.50, y: 0.70, z: 0 };                       // nadgarstek nisko
+  lm[5] = { x: 0.47, y: 0.58, z: 0 }; lm[17] = { x: 0.53, y: 0.58, z: 0 };
+  lm[9] = { x: 0.49, y: 0.57, z: 0 }; lm[13] = { x: 0.51, y: 0.57, z: 0 };
+  lm[1] = { x: 0.46, y: 0.65, z: 0 };
+  // opuszki wysoko i blisko siebie - namiot
+  for (const i of [4, 8, 12, 16, 20]) lm[i] = { x: 0.50, y: 0.40, z: 0 };
+  return { handedness: 'Left', landmarks: lm };
 }
-
-// Ziemia podaje DWIE PEŁNE DŁONIE w kadrze (pięści), czyli dokładnie to,
-// czego potrzebuje swarogDlon, żeby w ogóle policzyć wynik. Jeśli ogień
-// przy zaciśniętych pięściach na barkach cokolwiek pokazuje, to znaczy,
-// że warunek rozsuniętych nadgarstków w piramidce jest za słaby.
-spr(`pięści na barkach NIE zapalają ognia (${z.swarog.toFixed(2)})`, z.swarog < 0.3);
-
-console.log('\nODPORNOŚĆ błyskawicy:');
-const blZepsute = ocen(cialo({
-  obrot: 90,
-  nadgP: [NaN, NaN], lokP: [0.05, -0.80],
-  nadgL: [-0.30, -0.10], lokL: [-0.05, -0.35]
-}));
-spr(`NaN w punkcie -> 0 (${blZepsute.perun})`, blZepsute.perun === 0);
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `node tools/test-postawy.mjs`
-Expected: FAIL — stary `perun` to „jedna ręka wyprostowana nad głowę", więc test profilu i zgiętych łokci nie przechodzi
+Expected: FAIL — `perun` w obecnej postaci to stara postawa „ręka nad głową", a `swarogDlon` nie zna jeszcze wysokości
 
 - [ ] **Step 3: Przepisz `js/znaki/perun.js`**
 
@@ -2121,47 +2166,58 @@ Expected: FAIL — stary `perun` to „jedna ręka wyprostowana nad głowę", wi
 /**
  * Błyskawica - Perun: grom, dąb, władca burzy.
  *
- * Gracz stoi BOKIEM do kamery. Jedna ręka wysoko nad głowę i do PRZODU,
- * druga w dół i do TYŁU, oba łokcie wyraźnie zgięte. Ciało rysuje zygzak.
+ * IGLICA: obie ręce w górę, ŁOKCIE nad linią barków, opuszki złączone
+ * w piramidkę nad głową.
  *
- * JEDYNA PIECZĘĆ BEZ STYKU - i dlatego jedyna, która potrzebuje czterech
- * warunków naraz.
+ * ================== TRZECIA POZA TEJ PIECZĘCI ==================
  *
- * ================== DLACZEGO PRZÓD/TYŁ Z OSI X ==================
+ * Dwie poprzednie padły na nagraniach z żywego ciała, i obie z tego samego
+ * powodu: opisywały precyzyjny układ kończyn, którego człowiek mający 12 s
+ * na ustawienie się i nie widzący ekranu po prostu nie przyjmuje.
  *
- * Oś z jest najmniej pewnym sygnałem, jaki daje ten tracker, więc czytanie
- * z niej warunku "ręka do przodu, ręka do tyłu" byłoby powtórzeniem błędu,
- * który ten projekt diagnozuje od miesięcy ("awarie nie wynikały ze złych
- * progów, tylko z braku informacji w sygnale").
+ *   1. Zygzak bokiem - z 327 klatek ANI JEDNA nie osiągnęła profilu.
+ *      Kąt w łokciu wyszedł PROSTSZY niż w swobodnym tańcu (137 vs 127 st.),
+ *      więc warunek "zgięte łokcie" działał w drugą stronę. Pieczęć zapalała
+ *      się mocniej w tańcu (0.37) niż we własnej pozie (0.22).
+ *   2. Chwyt za łokieć - dłoń zatrzymała się 1.14 szerokości barków od celu
+ *      (dla porównania pięść na barku osiąga 0.32). Wada była w PROJEKCIE:
+ *      żeby chwycić uniesiony łokieć, druga ręka też musi pójść w górę, więc
+ *      towarzyszący warunek "jedna ręka wysoko, druga nisko" był z tą pozą
+ *      wewnętrznie sprzeczny.
  *
- * Ale STANIE BOKIEM ODWRACA TO NA NASZĄ KORZYŚĆ: gdy gracz stoi bokiem,
- * "przód" i "tył" leżą w poziomie obrazu, czyli w x - najpewniejszej osi,
- * jaką mamy. A samo "stoję bokiem" wykrywamy jako mały rozstaw barków
- * w obrazie przy niezmienionym rozstawie 3D (postawa.js:obrotBokiem) -
- * dokładnie ten sygnał, który psuł starą skalę, użyty jako pomiar.
+ * Nieudana próba 2 okazała się rozstrzygająca, bo pokazała, co ciało robi
+ * NAPRAWDĘ: unosi łokcie NAD linię barków. Mediany wysokości łokci względem
+ * tej linii: błyskawica +0.13, taniec -0.70, ziemia -0.65, powietrze -0.67,
+ * woda -0.72, ogień -0.65. Zapas ponad pół szerokości barków.
  *
- * ================== DLACZEGO ZGIĘTE ŁOKCIE ==================
+ * ================== DLACZEGO BEZ STYKU ==================
  *
- * Warunki 2 i 3 same to "ręka w górę, ręka w dół, na skos" - czyli ruch,
- * który w swobodnym tańcu zdarza się co chwilę. Dwa RÓWNOCZEŚNIE złamane
- * łokcie już nie. Warunek kąta wykonuje całą pracę "nie wyjdzie w tańcu".
+ * Jedyna pieczęć bez punktu dotyku - i jedyna, która go nie potrzebuje.
+ * Cztery pozostałe stoją na styku, bo dotyk jest rzadki i łatwo go zmierzyć,
+ * ale tym, co naprawdę rozdziela, jest OŚ, KTÓREJ NIE UŻYWA NIC INNEGO.
+ * Wysokość łokci jest taką osią. Styk był drogą do niej, nie warunkiem.
  *
- * ================== DLACZEGO BEZ ZNAKU ==================
+ * ================== PIRAMIDKA JEST MIĘKKA ==================
  *
- * Warunek rozjazdu poziomego jest BEZZNAKOWY: wymaga rozsunięcia, nie
- * konkretnej strony. "Górą-tyłem / dołem-przodem" też przejdzie. Jest to
- * świadomie wielkoduszne - pozwala wykonać pieczęć obrócony w dowolną
- * stronę. Domknięcie kierunkiem zwrotu ciała (nos, landmark 0) jest opisane
- * w spec i wchodzi TYLKO, jeśli próbka tańca pokaże, że to za szeroko -
- * bo nos przestaje odróżniać kierunek, gdy gracz odwróci głowę do ekranu.
+ * Propozycja właściciela projektu: skoro to iglica, niech gracz złoży opuszki
+ * w namiot nad głową. Przyjęta JAKO KWALIFIKATOR, nie jako warunek konieczny -
+ * przy rękach nad głową MediaPipe widzi obie dłonie tylko w 31% klatek.
+ * Potwierdziło się to eksperymentem, którego nikt nie planował: w nagraniu
+ * kontrolnym jedno z trzech powtórzeń miało ZERO klatek z obiema dłońmi,
+ * a pieczęć i tak wyszła w 100% klatek, bo stoi na łokciach.
  */
 import { NADG_L, NADG_P, LOKIEC_L, LOKIEC_P, BARK_L, BARK_P,
-         widoczne, skalaCiala, rampa, obrotBokiem } from './postawa.js';
-import { nadBarkami, katWLokciu } from './styk.js';
+         widoczne, skalaCiala, rampa } from './postawa.js';
+import { nadBarkami } from './styk.js';
+import { pelnaDlon } from './dlon.js';
+import { swarogDlon } from './swarogDlon.js';
 import { PROGI } from './progi-zmierzone.js';
 
 const PUNKTY = [BARK_L, BARK_P, NADG_L, NADG_P, LOKIEC_L, LOKIEC_P];
 const P = PROGI.blyskawica;
+
+// Ten sam wzorzec i ta sama wartość co w ziemi i wodzie.
+const WAGA_BEZ_DLONI = 0.7;
 
 export const perun = {
     id: 'perun',
@@ -2171,7 +2227,7 @@ export const perun = {
     score(frame) {
         const sk = skladnikiZ(frame);
         if (!sk) return 0;
-        return Math.min(sk.profil, sk.pion, sk.poziom, sk.lokcie);
+        return Math.min(sk.nadgarstki, sk.lokcie, sk.piramidka);
     },
 
     skladniki(frame) {
@@ -2181,41 +2237,124 @@ export const perun = {
 
 /** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
 function skladnikiZ(frame) {
-        const wl = frame.pose?.worldLandmarks;
-        if (!widoczne(wl, PUNKTY)) return null;
-        const skala = skalaCiala(wl);
+    const wl = frame.pose?.worldLandmarks;
+    if (!widoczne(wl, PUNKTY)) return null;
+    const skala = skalaCiala(wl);
 
-        // Która ręka jest górna, ustalamy z DANYCH, nie z etykiety strony -
-        // pieczęć ma wychodzić obrócona w obie strony.
-        const wysL = nadBarkami(wl, NADG_L, skala);
-        const wysP = nadBarkami(wl, NADG_P, skala);
-        const gora = wysL >= wysP ? NADG_L : NADG_P;
-        const dol = gora === NADG_L ? NADG_P : NADG_L;
+    return {
+        // Niższy z dwóch nadgarstków decyduje - jedna ręka w górze to nie iglica.
+        nadgarstki: rampa(Math.min(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
+                          P.WYSNADG_ZERO, P.WYSNADG_PELNY),
+        // Warunek nośny. Niższy łokieć decyduje z tego samego powodu.
+        lokcie: rampa(Math.min(nadBarkami(wl, LOKIEC_L, skala), nadBarkami(wl, LOKIEC_P, skala)),
+                      P.WYSLOK_ZERO, P.WYSLOK_PELNY),
+        piramidka: piramidkaNadGlowa(frame)
+    };
+}
 
-        return {
-            profil: rampa(obrotBokiem(wl), P.OBROT_ZERO, P.OBROT_PELNY),
-            pion: rampa(Math.abs(wysL - wysP), P.ROZJAZDPIONOWY_ZERO, P.ROZJAZDPIONOWY_PELNY),
-            poziom: rampa(Math.abs(wl[gora].x - wl[dol].x) / skala,
-                          P.ROZJAZDPOZIOMY_ZERO, P.ROZJAZDPOZIOMY_PELNY),
-            // Gorszy (bardziej wyprostowany) łokieć decyduje - warunkiem
-            // jest OBA zgięte. Rampa MALEJĄCA: mały kąt = mocno zgięty = 1.
-            lokcie: rampa(Math.max(katWLokciu(wl, BARK_L, LOKIEC_L, NADG_L),
-                                   katWLokciu(wl, BARK_P, LOKIEC_P, NADG_P)),
-                          P.KAT_ZERO, P.KAT_PELNY)
-        };
+/**
+ * Miękki kwalifikator: ten sam namiot z opuszek co w ogniu, oceniony
+ * PRZEZ SAM swarogDlon - żeby istniała jedna definicja piramidki, nie dwie.
+ *
+ * Wywoływana jest funkcja `skladniki`, nie `score`: `score` ognia zawiera
+ * od tego zadania warunek WYSOKOŚCI (pasmo na wysokości klatki), który nad
+ * głową jest z definicji niespełniony. Tutaj interesuje nas wyłącznie kształt
+ * dłoni, bez tego, gdzie się znajduje.
+ */
+function piramidkaNadGlowa(frame) {
+    const dlonie = (frame.hands ?? []).filter(d => pelnaDlon(d.landmarks));
+    if (dlonie.length < 2) return WAGA_BEZ_DLONI;
+    const sk = swarogDlon.skladniki(frame);
+    if (!sk) return WAGA_BEZ_DLONI;
+    const ksztalt = Math.min(sk.palce, sk.opuszki, sk.nadgarstki);
+    // Ta sama podłoga co w pozostałych kwalifikatorach: dłoń widoczna, ale
+    // nieułożona, osłabia pieczęć - nigdy bardziej, niż zrobiłby to jej brak.
+    return Math.max(WAGA_BEZ_DLONI * ksztalt, Math.min(WAGA_BEZ_DLONI, ksztalt));
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Dodaj pasmo wysokości do `js/znaki/swarogDlon.js`**
+
+Zmień `wymaga` na `'both'` (znak potrzebuje teraz i dłoni, i pozy), dopisz import i warunek:
+
+```javascript
+import { NADG_L, NADG_P, BARK_L, BARK_P, widoczne, skalaCiala } from './postawa.js';
+import { nadBarkami } from './styk.js';
+import { PROGI } from './progi-zmierzone.js';
+
+const PO = PROGI.ogien;
+```
+
+W obiekcie znaku:
+
+```javascript
+    wymaga: 'both',
+
+    score(frame) {
+        const sk = this.skladniki(frame);
+        if (!sk) return 0;
+        return Math.min(sk.palce, sk.opuszki, sk.nadgarstki, sk.wysokosc);
+    },
+
+    skladniki(frame) {
+        const sk = najlepszaPara(frame, skladnikiPary).skladniki;
+        if (!sk) return null;
+        return { ...sk, wysokosc: wysokoscPiramidki(frame) };
+    }
+```
+
+I funkcja modułowa:
+
+```javascript
+/**
+ * ================== PASMO WYSOKOŚCI PIRAMIDKI ==================
+ *
+ * Dodane po pomiarze na nagraniu z 2026-09-03. Wcześniejsze wersje spec-u
+ * pięciokrotnie powtarzały, że ten plik zostaje bez jednej linijki zmiany.
+ * Pomiar to obalił dwukrotnie:
+ *
+ *   1. Bez ŻADNEGO warunku wysokości ogień zapalał się na MISCE WODY
+ *      częściej (179/322 klatek) niż na własnej piramidce (107/299).
+ *      Miska ma palce proste, opuszki zbieżne i nadgarstki rozsunięte
+ *      w skali dłoni - komplet warunków ognia. A Tęcza to ogień -> woda ->
+ *      powietrze, więc gracz przechodził przez tę kolizję ZA KAŻDYM RAZEM.
+ *   2. Sama PODŁOGA wysokości tego nie domyka, bo piramidka NAD GŁOWĄ
+ *      (iglica błyskawicy) też jest "wysoko" - ogień zapalał się wtedy na
+ *      223 z 333 klatek iglicy.
+ *
+ * Stąd PASMO, nie rampa: piramidka liczy się na wysokości klatki, a milczy
+ * i nisko (woda), i wysoko (iglica). Zmierzony efekt pasma: woda 179 -> 0,
+ * iglica 223 -> 0, taniec 8 -> 0, ogień 107 -> 107. Zero kosztu dla własnej
+ * pozy.
+ *
+ * Ogólniejsza lekcja, warta zapamiętania poza tym plikiem: KOLIZJĘ TRZEBA
+ * SPRAWDZAĆ W OBIE STRONY. Spec przewidział parę ogień-woda jako najbardziej
+ * narażoną, ale założył, że to woda udaje ognia, i przeniósł wodę na
+ * landmarki pozy. Kolizja biegła odwrotnie i tamta zmiana nie mogła jej
+ * naprawić.
+ */
+function wysokoscPiramidki(frame) {
+    const wl = frame.pose?.worldLandmarks;
+    if (!widoczne(wl, [BARK_L, BARK_P, NADG_L, NADG_P])) return 0;
+    const skala = skalaCiala(wl);
+    const wys = Math.max(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala));
+    return pasmo(wys, PO.WYSOKOSC_DOL_ZERO, PO.WYSOKOSC_DOL_PELNY,
+                      PO.WYSOKOSC_GORA_PELNY, PO.WYSOKOSC_GORA_ZERO);
+}
+```
+
+`pasmo` jest już eksportowane z `dlon.js:202` — dopisz je do istniejącego importu z tego pliku.
+
+- [ ] **Step 5: Run test to verify it passes**
 
 Run: `node tools/test-postawy.mjs && sh tools/test-wszystko.sh`
-Expected: PASS. `test-znaki.mjs` może jeszcze zawodzić — naprawiany w Task 11.
+Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add js/znaki/perun.js tools/test-postawy.mjs
-git commit -m "Błyskawica: profil, rozjazd rąk i dwa zgięte łokcie; przód-tył z osi x"
+git add js/znaki/perun.js js/znaki/swarogDlon.js tools/test-postawy.mjs
+git commit -m "Iglica na osi łokci; ogień dostaje pasmo wysokości piramidki"
 ```
 
 ---
