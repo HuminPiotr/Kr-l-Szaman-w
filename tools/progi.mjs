@@ -69,10 +69,19 @@ const MIARY = {
     //
     // Cztery progi pasma, wszystkie z danych, żaden z sufitu:
     //   DOL_PELNY  = p05 próbek ognia        GORA_PELNY = p95 próbek ognia
-    //   DOL_ZERO   = p50 próbek WODY         GORA_ZERO  = p25 próbek BŁYSKAWICY
-    // Czyli: ogień milczy dokładnie tam, gdzie mieszkają jego dwaj sąsiedzi
-    // na tej osi. To uogólnienie zasady "rozdziela oś, której nie używa nic
-    // innego" - tu oś jest wspólna, więc granice bierzemy od sąsiadów.
+    //   DOL_ZERO   = p50 próbek WODY         GORA_ZERO  = p90 próbek TAŃCA
+    // Zasada: ogień milczy dokładnie tam, gdzie mieszka NAJBLIŻSZY BYT, który
+    // musi milczeć po tej stronie osi - "sąsiad" to nie zawsze ta sama poza
+    // z obu stron. Od dołu sąsiadem jest woda (miska leży niżej niż taniec
+    // - taniec.p10 wysokości to ok. -1.44, więc wzięcie go dałoby ogniowi
+    // ~0.6 NA MISCE WODY, czyli dokładnie kolizję, którą pasmo ma naprawić;
+    // p50 wody zostaje). Od góry NAJBLIŻSZYM sąsiadem jest sam TANIEC, nie
+    // iglica błyskawicy: p90 wysokości tańca (~0.38) leży bliżej pasma niż
+    // p25 błyskawicy (1.098) - branie iglicy jako sufitu zostawiało rampę
+    // górną ~8x szerszą niż plateau pełni, więc ogień punktował ~0.5 przy
+    // rękach uniesionych ot tak, w zakresie zwykłego tańca (0 klatek tańca
+    // nad progiem przy suficie ~0.0-0.3, ale 8 klatek wracało przy suficie
+    // ~1.1). Taniec jako sufit usuwa to całkowicie.
     ogien: (wl, s) => ({
         wysokosc: Math.max(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s))
     }),
@@ -281,29 +290,44 @@ let konflikt = false;
  * ================== PASMO OGNIA - PRZYPADEK SZCZEGÓLNY ==================
  * ogien.wysokosc nie rozdziela pozy od tańca parą (PELNY, ZERO) jak każda
  * inna miara w tym narzędziu - musi milczeć PO OBU STRONACH: nisko (miska
- * wody) i wysoko (iglica błyskawicy nad głową). Stąd cztery progi zamiast
- * dwóch, wszystkie z danych:
+ * wody) i wysoko (ręce uniesione w tańcu). Stąd cztery progi zamiast dwóch,
+ * wszystkie z danych:
  *
  *   DOL_PELNY  = p05 próbek ognia   GORA_PELNY = p95 próbek ognia
- *   DOL_ZERO   = p50 próbek wody    GORA_ZERO  = p25 próbek błyskawicy
+ *   DOL_ZERO   = p50 próbek wody    GORA_ZERO  = p90 próbek TAŃCA
  *
- * "próbki wody" i "próbki błyskawicy" liczone TĄ SAMĄ funkcją co ogień
- * (MIARY.ogien zaaplikowane do klatek etykietowanych 'woda#'/'blyskawica#'),
+ * Zasada "milczy tam, gdzie mieszka sąsiad" zostaje - zmienia się tylko to,
+ * KTO jest sąsiadem od góry. Pierwsza wersja brała p25 błyskawicy (iglica
+ * nad głową) jako sufit: dawało to rampę górną ~8x szerszą niż plateau
+ * pełni (sufit 1.098 wobec plateau -0.542..-0.351), więc ogień punktował
+ * ~0.5 przy rękach uniesionych na wysokość zwykłego tańca - w zakresie,
+ * w którym gracz zwyczajnie się rusza, nie tylko w pieczęci. Zmierzone:
+ * przy suficie ~0.0-0.3 ogień miał 0 klatek tańca nad progiem; dopiero
+ * sufit rzędu 1.1 (iglica) przywracał 8. Taniec sam jest BLIŻSZYM sąsiadem
+ * od góry niż iglica (p90 wysokości tańca ~0.38 wobec p25 błyskawicy
+ * 1.098), więc to on musi wyznaczać granicę - dokładnie tak samo, jak
+ * dolna granica bierze wodę, a NIE taniec (taniec.p10 wysokości ~-1.44 dałby
+ * ogniowi ~0.6 na misce wody, czyli kolizję, którą pasmo ma naprawić).
+ * "Sąsiad" znaczy więc: najbliższy byt, który musi milczeć po TEJ stronie
+ * osi - nie zawsze ta sama poza z obu stron.
+ *
+ * "próbki wody" i "próbki tańca" liczone TĄ SAMĄ funkcją co ogień
+ * (MIARY.ogien zaaplikowane do klatek etykietowanych 'woda#'/'taniec#'),
  * dokładnie tak, jak `zbierz(kroki, 'taniec', funkcja)` liczy próg tańca dla
  * każdej innej miary - to ten sam mechanizm, inne etykiety wejściowe.
  */
 function pasmoOgnia(kroki) {
     const zOgnia = zbierz(kroki, 'ogien', MIARY.ogien);
     const zWody = zbierz(kroki, 'woda', MIARY.ogien);
-    const zBlyskawicy = zbierz(kroki, 'blyskawica', MIARY.ogien);
+    const zTaniec = zbierz(kroki, 'taniec', MIARY.ogien);
     const wOgnia = zOgnia.wszystkie.wysokosc ?? [];
     const wWody = zWody.wszystkie.wysokosc ?? [];
-    const wBlyskawicy = zBlyskawicy.wszystkie.wysokosc ?? [];
+    const wTaniec = zTaniec.wszystkie.wysokosc ?? [];
 
     const dolPelny = percentyl(wOgnia, 5);
     const goraPelny = percentyl(wOgnia, 95);
     const dolZero = percentyl(wWody, 50);
-    const goraZero = percentyl(wBlyskawicy, 25);
+    const goraZero = percentyl(wTaniec, 90);
 
     // Brak zachodzenia = ZERO leży NA ZEWNĄTRZ pasma PELNY z każdej strony:
     // dolny zero musi być niższy niż dolny pełny, górny zero wyższy niż
@@ -324,7 +348,7 @@ function pasmoOgnia(kroki) {
     console.log(`\nOGIEN (pasmo wysokości - przypadek szczególny):`);
     console.log(`  wysokosc         ogien n=${String(wOgnia.length).padStart(4)} p05=${dolPelny.toFixed(3)} p95=${goraPelny.toFixed(3)}` +
                 `   woda n=${String(wWody.length).padStart(4)} p50=${Number.isFinite(dolZero) ? dolZero.toFixed(3) : 'brak'}` +
-                `   błyskawica n=${String(wBlyskawicy.length).padStart(4)} p25=${Number.isFinite(goraZero) ? goraZero.toFixed(3) : 'brak'}` +
+                `   taniec n=${String(wTaniec.length).padStart(4)} p90=${Number.isFinite(goraZero) ? goraZero.toFixed(3) : 'brak'}` +
                 `${zle ? '   ⚠ OBSZARY ZACHODZĄ - zmień POZĘ, nie liczbę' : ''}`);
 
     if (zle) konflikt = true;
@@ -334,7 +358,7 @@ function pasmoOgnia(kroki) {
         `        WYSOKOSC_DOL_PELNY: ${dolPelny.toFixed(3)},  // ${opisProby(zOgnia.proby)}, p05, n=${wOgnia.length}${ostrzezenie}`,
         `        WYSOKOSC_GORA_PELNY: ${goraPelny.toFixed(3)},  // ${opisProby(zOgnia.proby)}, p95, n=${wOgnia.length}${ostrzezenie}`,
         `        WYSOKOSC_DOL_ZERO: ${Number.isFinite(dolZero) ? dolZero.toFixed(3) : 0},  // ${opisProby(zWody.proby)}, p50, n=${wWody.length}${ostrzezenie}`,
-        `        WYSOKOSC_GORA_ZERO: ${Number.isFinite(goraZero) ? goraZero.toFixed(3) : 99},  // ${opisProby(zBlyskawicy.proby)}, p25, n=${wBlyskawicy.length}${ostrzezenie}`
+        `        WYSOKOSC_GORA_ZERO: ${Number.isFinite(goraZero) ? goraZero.toFixed(3) : 99},  // ${opisProby(zTaniec.proby)}, p90, n=${wTaniec.length}${ostrzezenie}`
     ];
     linie.push(`    ogien: {\n${pola.join('\n')}\n    },`);
 }
