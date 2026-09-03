@@ -64,9 +64,9 @@ błyskawica — jest jedyna bez dotyku i dlatego wymaga najwięcej warunków nar
 
 | żywioł | bóstwo | id | styk | poza |
 |---|---|---|---|---|
-| **ogień** | Swaróg (kuźnia) | `swarog` | opuszki o opuszki | piramidka z dłoni — **bez zmian** |
+| **ogień** | Swaróg (kuźnia) | `swarog` | opuszki o opuszki | piramidka z dłoni, na wysokości klatki |
 | **ziemia** | Weles (podziemie) | `weles` | nadgarstek o przeciwny bark | pięści skrzyżowane na barkach |
-| **błyskawica** | Perun (grom) | `perun` | *brak — oś łokci* | iglica: obie ręce w górę, łokcie nad linią barków |
+| **błyskawica** | Perun (grom) | `perun` | *oś łokci* + piramidka (miękko) | iglica: obie ręce w górę, łokcie nad barkami, opuszki złączone nad głową |
 | **powietrze** | Stribog (wiatr) | `stribog` | łokieć o łokieć | gałęzie: łokcie razem, przedramiona pionowo w górę, dłonie rozchylone |
 | **woda** | Mokosz (splot losu) | `mokosz` | nadgarstek o nadgarstek | miska: dłonie złożone nisko, przy pępku |
 
@@ -84,10 +84,37 @@ barków**, żeby gest działał tak samo u osoby wysokiej i niskiej.
 
 ### Ogień — Swaróg, piramidka
 
-`js/znaki/swarogDlon.js` **bez jednej linijki zmiany**. Czytana z landmarków
-dłoni: palce proste, zbieżność opuszek, nadgarstki rozsunięte. Jedyna pieczęć
-w tym zestawie czytana z dłoni, a nie z pozy — i jedyna, której to nigdy nie
-zaszkodziło, bo jej kształt sam wymusza prześwit między dłońmi.
+Czytana z landmarków dłoni: palce proste, zbieżność opuszek, nadgarstki
+rozsunięte. Jedyna pieczęć w tym zestawie czytana z dłoni, a nie z pozy.
+
+**Dochodzi jeden warunek z pozy: wyższy nadgarstek musi być powyżej −0.6
+szerokości barków od linii barków** (piramidka na wysokości klatki, nie brzucha).
+Wcześniejsze wersje tego spec-u pięciokrotnie powtarzały, że `swarogDlon.js`
+zostaje bez jednej linijki zmiany. **Pomiar to obalił.**
+
+Prawdziwy `swarogDlon.score()` puszczony na nagraniu z 2026-09-03 zapala się
+**częściej na misce wody (179 z 322 klatek) niż na własnej piramidce (107 z 299)**.
+Miska ma palce proste, opuszki zbieżne i nadgarstki rozsunięte w skali dłoni —
+czyli komplet warunków ognia — bo `swarogDlon` w ogóle nie mierzy wysokości.
+A sekwencja Tęczy to ogień → woda → powietrze, więc gracz przechodzi przez tę
+kolizję **za każdym razem**.
+
+To jest ta sama kolizja, którą przewiduje decyzja 2 — ale biegnie w **drugą
+stronę**, niż tam założono: nie woda udaje ognia, tylko **ogień zapala się na
+wodzie**. Przeniesienie wody na landmarki pozy tego nie rozwiązało, bo problem
+siedział po stronie ognia. Lekcja jest ogólniejsza od tej pary: **kolizję trzeba
+sprawdzać w obie strony**, a jedynym sposobem, żeby to zobaczyć, było puszczenie
+prawdziwego znaku po prawdziwym nagraniu.
+
+Zmierzony efekt warunku wysokości: woda **179 → 0** klatek, ogień **107 → 107**.
+Zero kosztu dla samej piramidki.
+
+**Znane ograniczenie, do pilnowania po wpięciu:** ogień jest krucha. Obie dłonie
+są widoczne tylko w 39% klatek, a pierwsze z trzech nagranych powtórzeń
+utrzymało wynik powyżej progu przez 0,72 s przy wymaganych ~0,9 s (pozostałe dwa
+wystarczyły). Założenie „piramidka działa pewnie", na którym opiera się cały ten
+spec, jest słabsze, niż zakładano — jeśli po wpięciu okaże się to problemem,
+ogień wymaga własnego przeglądu.
 
 ### Ziemia — Weles, pięści na barkach
 
@@ -161,8 +188,17 @@ Warunki:
 1. **Oba nadgarstki wyraźnie nad linią barków.**
 2. **Oba łokcie nad linią barków.** To jest warunek nośny.
 
-Dwa warunki, nie cztery — najprostsza pieczęć w zestawie, i jedyna, której
-nie trzeba się uczyć.
+Miękki kwalifikator z dłoni: **opuszki złączone w piramidkę nad głową** — ten
+sam namiot co w ogniu, tylko wysoko, przez co iglica dosłownie wygląda jak iglica.
+Propozycja właściciela projektu, przyjęta z jedną zmianą: **jako kwalifikator,
+nie jako warunek konieczny.** Zmierzone na nagraniu: przy rękach nad głową
+MediaPipe widzi **obie dłonie tylko w 31% klatek**. Twardy warunek oparty na tym
+sygnale uczyniłby błyskawicę tak samo kruchą, jak dziś jest ogień. Jako
+kwalifikator robi dokładnie to, o co chodziło — obniża wynik, gdy dłonie widać
+i nie są złożone — a gdy ich nie widać, nie karze (wzorzec `WAGA_BEZ_DLONI`).
+
+Dwa warunki nośne plus jeden miękki — najprostsza pieczęć w zestawie i jedyna,
+której nie trzeba się uczyć.
 
 **Zweryfikowane na nagraniach:** komplet warunków spełnia **zero z 763 klatek
 tańca** i **zero klatek każdej z czterech pozostałych pieczęci**, przy każdym
@@ -236,8 +272,11 @@ nie odwołuje się do bioder.
 | **tułów** | dowolnie | przodem | przodem | przodem | przodem |
 | **łokcie** | — | pod barkami | **NAD barkami** | pod barkami | pod barkami |
 
-- **ogień ↔ woda** — wysokość. Ogień w ogóle nie mierzy wysokości, woda wymaga
-  nadgarstków przy pępku. Patrz decyzja 2, to jest para najbardziej narażona.
+- **ogień ↔ woda** — wysokość, i to teraz po OBU stronach. Ogień pierwotnie
+  w ogóle nie mierzył wysokości, przez co zapalał się na misce częściej niż na
+  własnej piramidce (179/322 wobec 107/299, zmierzone). Warunek wysokości
+  w ogniu sprowadza to do zera. Para najbardziej narażona — i jedyna, w której
+  kolizja biegła w stronę odwrotną do przewidywanej.
 - **ziemia ↔ powietrze** — co się styka (nadgarstek z barkiem vs łokieć
   z łokciem) oraz gdzie są nadgarstki (na barkach vs nad barkami i rozchylone).
   Druga najbardziej narażona para, obie to „ręce splecione z przodu".

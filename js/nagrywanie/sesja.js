@@ -38,7 +38,7 @@ export const SCENARIUSZ = [
     },
     {
         nr: 3, id: 'blyskawica', nazwa: 'BŁYSKAWICA',
-        opis: 'OBIE ręce w górę, łokcie WYŻEJ NIŻ BARKI - sylwetka jak iglica',
+        opis: 'OBIE ręce w górę, łokcie WYŻEJ NIŻ BARKI, opuszki złączone w piramidkę nad głową',
         powtorzenia: 3, czasS: 4,
         wskazowki: ['obie ręce w górę, symetrycznie', 'to samo, łokcie jeszcze wyżej', 'to samo, krok dalej']
     },
