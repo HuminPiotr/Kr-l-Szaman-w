@@ -10,6 +10,22 @@
  * gracza. To narzędzie zamienia nagranie w liczby, a strojenie - w zmianę
  * REGUŁY wyprowadzania, nie w poprawianie liczby ręcznie.
  *
+ * ================== KODY WYJŚCIA ==================
+ *
+ * 0 = wszystko w porządku - łącznie z sytuacją, gdy narzędzie wypisało
+ *     ostrzeżenie o MAŁEJ PRÓBCE (⚠ MAŁO KLATEK...). Mała próbka jest
+ *     KOMUNIKATEM, nie usterką: czasem znaczy "sito zadziałało dobrze"
+ *     (dobra wiadomość), czasem "brakuje nagrania danego kroku" (zła
+ *     wiadomość, ale nie awaria narzędzia) - treść ostrzeżenia mówi które.
+ *     Skrypt `--zapisz && cokolwiek_dalej` ma działać mimo takiego
+ *     ostrzeżenia.
+ * 1 = BLOKUJE - albo OBSZARY ZACHODZĄ (poza i taniec/sąsiad nie dają się
+ *     rozdzielić żadnym progiem - trzeba zmienić POZĘ), albo całkowity
+ *     BRAK PRÓBEK dla jakiejś pozy (zero klatek, nie da się policzyć
+ *     żadnego percentyla). Plik i tak się zapisuje przy `--zapisz` (są w
+ *     nim potrzebne inne poprawne progi), ale exit 1 ma zatrzymać
+ *     automatyzację, która na ślepo ufałaby wynikowi.
+ *
  * ================== REGUŁA WYPROWADZANIA ==================
  *
  * Dla miary, która przy poprawnej pozie jest MAŁA (każdy styk):
@@ -74,28 +90,45 @@ const MIARY = {
     // ogień: jedyna nowa miara to WYSOKOŚĆ. Warunki dłoni (palce, opuszki,
     // rozstaw nadgarstków) zostają w swarogDlon.js ze swoimi stałymi.
     // Bez wysokości ogień zapalał się na misce wody częściej niż na własnej
-    // piramidce - 179/322 klatek wobec 107/299 (zmierzone).
-    // UWAGA: wysokość ognia to PASMO, nie rampa - jedyna taka miara w tym
-    // narzędziu. Sama podłoga nie wystarcza, bo piramidka NAD GŁOWĄ (iglica
-    // błyskawicy) też jest "wysoko": zmierzono, że przy samej podłodze ogień
-    // zapala się na 223 z 333 klatek iglicy. Pasmo zeruje to całkowicie
-    // i przy okazji usuwa 8 przypadkowych klatek tańca.
+    // piramidce - 179/322 klatek wobec 107/299. UWAGA: wysokość ognia to
+    // PASMO, nie rampa - jedyna taka miara w tym narzędziu. Sama podłoga
+    // nie wystarcza, bo piramidka NAD GŁOWĄ (iglica błyskawicy) też jest
+    // "wysoko": przy samej podłodze ogień zapalał się na 223 z 333 klatek
+    // iglicy, a pasmo to zeruje i przy okazji usuwa 8 przypadkowych klatek
+    // tańca. Te cztery liczby (179/322, 107/299, 223/333, 8 klatek) zgłosił
+    // właściciel projektu z wcześniejszego przebiegu, sprzed istnienia tego
+    // narzędzia - dotyczą AKTYWACJI PEŁNEJ PIECZĘCI (dłonie z swarogDlon.js
+    // + wysokość razem), której `progi.mjs` nie liczy samo i nie odtwarza
+    // jako `--raport`. Przytoczone jako źródło DECYZJI o dodaniu wysokości,
+    // nie jako coś zweryfikowane tym narzędziem.
     //
     // Cztery progi pasma, wszystkie z danych, żaden z sufitu:
     //   DOL_PELNY  = p05 próbek ognia        GORA_PELNY = p95 próbek ognia
     //   DOL_ZERO   = p50 próbek WODY         GORA_ZERO  = p90 próbek TAŃCA
     // Zasada: ogień milczy dokładnie tam, gdzie mieszka NAJBLIŻSZY BYT, który
     // musi milczeć po tej stronie osi - "sąsiad" to nie zawsze ta sama poza
-    // z obu stron. Od dołu sąsiadem jest woda (miska leży niżej niż taniec
-    // - taniec.p10 wysokości to ok. -1.44, więc wzięcie go dałoby ogniowi
-    // ~0.6 NA MISCE WODY, czyli dokładnie kolizję, którą pasmo ma naprawić;
-    // p50 wody zostaje). Od góry NAJBLIŻSZYM sąsiadem jest sam TANIEC, nie
-    // iglica błyskawicy: p90 wysokości tańca (~0.38) leży bliżej pasma niż
-    // p25 błyskawicy (1.098) - branie iglicy jako sufitu zostawiało rampę
-    // górną ~8x szerszą niż plateau pełni, więc ogień punktował ~0.5 przy
-    // rękach uniesionych ot tak, w zakresie zwykłego tańca (0 klatek tańca
-    // nad progiem przy suficie ~0.0-0.3, ale 8 klatek wracało przy suficie
-    // ~1.1). Taniec jako sufit usuwa to całkowicie.
+    // z obu stron. Od dołu sąsiadem jest woda: taniec.p10 wysokości to
+    // -0.908 (zmierzone TYM narzędziem - poprzednia wersja komentarza
+    // podawała -1.44 z doraźnego skryptu bez resetSkali() między nagraniami,
+    // ten sam błąd co przy suficie niżej, poprawiony po zgłoszeniu). Ta
+    // poprawiona wartość leży PRAWIE DOKŁADNIE tam, gdzie własny p50 wody
+    // (-0.895) - na tym materiale użycie taniec.p10 zamiast wody dałoby na
+    // medianie miski wynik ~0.04 (rampa(-0.895, -0.908, -0.542)), nie ~0.6
+    // jak sugerował błędny numer. Różnica między "woda" a "taniec" jako
+    // sąsiadem od dołu jest więc na TYM materiale mała - ale wybór wody
+    // zostaje, bo ona jest właściwym POJĘCIOWO sąsiadem (miska trzymana
+    // świadomie), nie przypadkową bliskością dwóch liczb, która przy innym
+    // materiale tańca mogłaby się rozjechać w dowolną stronę. Od góry
+    // NAJBLIŻSZYM sąsiadem jest sam TANIEC, nie
+    // iglica błyskawicy: p90 wysokości tańca = 0.234 (zmierzone tym
+    // narzędziem) leży bliżej pasma niż p25 błyskawicy (1.098) - branie
+    // iglicy jako sufitu zostawiało rampę górną ~8x szerszą niż plateau
+    // pełni, więc ogień punktował ~0.5 przy rękach uniesionych ot tak,
+    // w zakresie zwykłego tańca. Aktywację pełnej pieczęci przy takim
+    // suficie (0 klatek tańca nad progiem przy ~0.0-0.3, 8 klatek wracało
+    // przy ~1.1) zgłosił właściciel projektu z wcześniejszego przebiegu -
+    // to narzędzie tej liczby nie liczy samo, patrz komentarz przy
+    // `pasmoOgnia`. Taniec jako sufit usuwa problem sufitu 1.098 całkowicie.
     ogien: (wl, s) => ({
         wysokosc: Math.max(nadBarkami(wl, NADG_L, s), nadBarkami(wl, NADG_P, s))
     }),
@@ -347,13 +380,28 @@ let konflikt = false;
  * nad głową) jako sufit: dawało to rampę górną ~8x szerszą niż plateau
  * pełni (sufit 1.098 wobec plateau -0.542..-0.351), więc ogień punktował
  * ~0.5 przy rękach uniesionych na wysokość zwykłego tańca - w zakresie,
- * w którym gracz zwyczajnie się rusza, nie tylko w pieczęci. Zmierzone:
- * przy suficie ~0.0-0.3 ogień miał 0 klatek tańca nad progiem; dopiero
- * sufit rzędu 1.1 (iglica) przywracał 8. Taniec sam jest BLIŻSZYM sąsiadem
- * od góry niż iglica (p90 wysokości tańca ~0.38 wobec p25 błyskawicy
- * 1.098), więc to on musi wyznaczać granicę - dokładnie tak samo, jak
- * dolna granica bierze wodę, a NIE taniec (taniec.p10 wysokości ~-1.44 dałby
- * ogniowi ~0.6 na misce wody, czyli kolizję, którą pasmo ma naprawić).
+ * w którym gracz zwyczajnie się rusza, nie tylko w pieczęci. Aktywację
+ * pełnej pieczęci (dłonie + wysokość razem) przy suficie ~0.0-0.3 wobec
+ * ~1.1 zgłosił właściciel projektu z wcześniejszego przebiegu - TEGO
+ * narzędzie nie liczy samo (aktywacja pełnej pieczęci wymaga też warunków
+ * dłoni z swarogDlon.js, poza tym plikiem), więc liczba jest tu przytoczona
+ * jako źródło decyzji, nie jako coś, co `--raport` odtwarza.
+ *
+ * Taniec sam jest BLIŻSZYM sąsiadem od góry niż iglica (p90 wysokości
+ * tańca = 0.234, zmierzone TYM narzędziem, wobec p25 błyskawicy 1.098) -
+ * więc to on musi wyznaczać granicę. Dolna granica bierze wodę, a NIE
+ * taniec: taniec.p10 wysokości = -0.908 (też zmierzone tym narzędziem;
+ * WCZEŚNIEJSZA wersja tego komentarza podawała -1.44 i ~0.38 dla obu
+ * percentyli tańca - liczby z doraźnego skryptu właściciela projektu bez
+ * resetSkali() między nagraniami, poprawione po zgłoszeniu rozbieżności
+ * przy tej samej okazji, co pierwotny sufit 1.098 -> 0.234). Poprawiona
+ * wartość -0.908 leży PRAWIE DOKŁADNIE tam, gdzie własny p50 wody (-0.895)
+ * - na tym materiale taniec.p10 i woda.p50 są niemal nierozróżnialne jako
+ * dolna granica (na medianie miski dają odpowiednio ~0.04 i ~0.00, nie
+ * ~0.6 jak sugerował błędny stary numer -1.44). Wybór wody jako sąsiada
+ * zostaje mimo to: to ONA jest właściwym POJĘCIOWO sąsiadem (miska trzymana
+ * świadomie), nie przypadkowa bliskość dwóch liczb, która przy innym
+ * materiale tańca mogłaby się rozjechać w dowolną stronę.
  * "Sąsiad" znaczy więc: najbliższy byt, który musi milczeć po TEJ stronie
  * osi - nie zawsze ta sama poza z obu stron.
  *
@@ -531,7 +579,9 @@ function progiWody(kroki) {
         const nPoza = (zPoza.wszystkie[nazwa] ?? []).length;
         const zle = !(pelny[nazwa] > zero[nazwa]);
         const zaMalo = nZero[nazwa] < MIN_KLATEK;
-        if (zle || zaMalo) konflikt = true;
+        // Tylko ZACHODZENIE blokuje kod wyjścia - patrz "KODY WYJŚCIA"
+        // w nagłówku pliku. Mała próbka jest komunikatem, nie usterką.
+        if (zle) konflikt = true;
 
         const komZaMalo = typPuli[nazwa] === 'warunkowa'
             ? '⚠ MAŁO KLATEK PO WARUNKOWANIU (dobra wiadomość: sito zadziałało) - próg z małej próbki, dograj krok 8 dla pewności'
@@ -588,7 +638,9 @@ for (const [poza, funkcja] of Object.entries(MIARY)) {
         // wyliczony z szumu wygląda dokładnie tak samo jak dobry.
         const nPoza = wartosci.length, nTaniec = (taniec[miara] ?? []).length;
         const zaMalo = nTaniec < MIN_KLATEK;
-        if (zaMalo) konflikt = true;
+        // Tylko ZACHODZENIE blokuje kod wyjścia - mała próbka informuje,
+        // patrz "KODY WYJŚCIA" w nagłówku pliku.
+        // (zaMalo samo w sobie NIE ustawia konflikt - por. `zle` wyżej.)
 
         console.log(`  ${miara.padEnd(16)} poza n=${String(nPoza).padStart(4)} p${rosnaca ? 25 : 75} = ${pelny.toFixed(3)}` +
                     `   taniec n=${String(nTaniec).padStart(4)} p${rosnaca ? 90 : 10} = ${Number.isFinite(zero) ? zero.toFixed(3) : 'brak'}` +

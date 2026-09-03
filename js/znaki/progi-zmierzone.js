@@ -8,7 +8,7 @@
  * Strojenie = zmiana reguły albo dogranie próbki, NIGDY ręczna poprawka
  * liczby tutaj - poprawiona ręcznie liczba jest znowu ZGADNIĘTA.
  *
- * Wygenerowano: 2026-09-03T19:59:04.680Z
+ * Wygenerowano: 2026-09-03T20:22:20.787Z
  * Powtórzenia w materiale: 22
  */
 export const PROGI = {
