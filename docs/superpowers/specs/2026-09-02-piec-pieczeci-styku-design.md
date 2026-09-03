@@ -66,7 +66,7 @@ błyskawica — jest jedyna bez dotyku i dlatego wymaga najwięcej warunków nar
 |---|---|---|---|---|
 | **ogień** | Swaróg (kuźnia) | `swarog` | opuszki o opuszki | piramidka z dłoni — **bez zmian** |
 | **ziemia** | Weles (podziemie) | `weles` | nadgarstek o przeciwny bark | pięści skrzyżowane na barkach |
-| **błyskawica** | Perun (grom) | `perun` | dłoń o przeciwny łokieć | zygzak: ręka w górę z załamanym łokciem, druga dłoń chwyta ten łokieć w poprzek |
+| **błyskawica** | Perun (grom) | `perun` | *brak — oś łokci* | iglica: obie ręce w górę, łokcie nad linią barków |
 | **powietrze** | Stribog (wiatr) | `stribog` | łokieć o łokieć | gałęzie: łokcie razem, przedramiona pionowo w górę, dłonie rozchylone |
 | **woda** | Mokosz (splot losu) | `mokosz` | nadgarstek o nadgarstek | miska: dłonie złożone nisko, przy pępku |
 
@@ -115,56 +115,75 @@ szerokości barków *pod* linią barków (`mokoszSplot.js:30`). Splot i tak odch
 (decyzja niżej), ale warunek zostaje, bo odcina też zwykłe „ręce splecione na
 piersi", które w tańcu się zdarza.
 
-### Błyskawica — Perun, zygzak
+### Błyskawica — Perun, iglica
 
-Ręka w górę z **załamanym łokciem nad głową**, druga dłoń sięga w poprzek
-i **chwyta ten łokieć**. Punkt styku: dłoń o przeciwny łokieć.
+**Obie ręce w górę, łokcie powyżej linii barków.** Sylwetka jak iglica albo
+uderzenie pioruna w górę.
 
-**Ta poza zastąpiła pierwotną — stanie bokiem, ręka górą-przodem, ręka
-dołem-tyłem — po pomiarze na nagraniu z 2026-09-03.** Wymiana jest
-udokumentowanym wynikiem, nie zmianą zdania:
+Jedyna pieczęć bez punktu styku — i jedyna, która go nie potrzebuje, bo stoi
+na osi, której nie używa nic innego w tym słowniku: **wysokości łokci**.
 
-- Z 327 klatek pierwotnej pozy **ani jedna** nie miała realnego profilu
-  (obrót > 0.5); mediana obrotu wyniosła 0.14, czyli gracz stał praktycznie
-  przodem. Warunek „stoisz bokiem" był niewykonalny w praktyce, mimo że
-  instrukcja mówiła go wprost.
-- Kąt w łokciu wyszedł w tej pozie **prostszy niż podczas swobodnego tańca**
-  (mediana 137° wobec 127°), więc warunek „oba łokcie zgięte" — ten, który
-  miał wykonywać całą pracę „nie wyjdzie w tańcu" — działał w drugą stronę.
-- Efekt łączny: pieczęć zapalała się **mocniej w tańcu (0.37) niż we własnej
-  pozie (0.22)**, a 272 z 763 klatek tańca przebijało próg składania.
+**To trzecia poza błyskawicy, i pierwsza wyprowadzona z pomiaru, a nie
+z wyobraźni.** Dwie poprzednie padły na nagraniach:
 
-Wniosek, który z tego płynie, jest szerszy niż jedna poza i potwierdza tezę
-całej tej generacji: **cztery pieczęcie zbudowane wokół styku rozdzieliły się
-czysto, a jedyna zaprojektowana bez styku nie rozdzieliła się wcale.**
+1. *Zygzak bokiem* (ręka górą-przodem, ręka dołem-tyłem, zgięte łokcie).
+   Z 327 klatek ani jedna nie osiągnęła realnego profilu; kąt w łokciu wyszedł
+   prostszy niż podczas swobodnego tańca. Pieczęć zapalała się mocniej w tańcu
+   (0.37) niż we własnej pozie (0.22).
+2. *Chwyt za łokieć.* Dłoń nie zbliżyła się do łokcia — mediana 1.14 szerokości
+   barków, podczas gdy pięść na barku (ziemia) osiąga 0.32. Przyczyna była
+   w projekcie, nie w wykonaniu: **żeby chwycić uniesiony łokieć, druga ręka
+   też musi pójść w górę**, więc towarzyszący warunek „jedna ręka wysoko, druga
+   nisko" był z tą pozą wewnętrznie sprzeczny. Kandydat został sprawdzony pod
+   kątem „czy taniec go zapala", ale nigdy pod kątem „czy sama poza może go
+   spełnić" — bo w chwili sprawdzania nie istniały jeszcze jej próbki.
+   **Weryfikacja jednostronna jest w tym projekcie błędem metody, nie detalem.**
 
-Warunki nowej pozy:
+Nieudana próba 2 okazała się rozstrzygająca, bo pokazała, co ciało robi
+naprawdę: unosi łokcie **nad** linię barków. Zmierzone mediany wysokości łokci
+względem tej linii:
 
-1. **Styk** — odległość nadgarstka ręki dolnej od łokcia ręki górnej, mała.
-2. **Rozjazd pionowy nadgarstków** — duży. Jedyny warunek zachowany
-   z pierwotnej pozy, bo jako jedyny działał: 1.60 w kroku 3 wobec 0.38
-   w tańcu (mediany, w szerokościach barków).
-3. **Górny nadgarstek nad linią barków.**
-4. **Kąt w łokciu górnej ręki** — zgięty. Wymuszony geometrycznie przez
-   chwyt (bez zgięcia nie sięgniesz), więc mierzony jako potwierdzenie,
-   a nie jako bariera do pokonania. To jest różnica względem pierwotnej
-   pozy, gdzie zgięcie było wymaganiem, o którym gracz musiał pamiętać.
+| | łokcie |
+|---|---|
+| **błyskawica (nagranie)** | **+0.13** |
+| taniec | −0.70 |
+| ziemia | −0.65 |
+| powietrze | −0.67 |
+| woda | −0.72 |
+| ogień | −0.65 |
 
-**Która ręka jest górna, ustalamy z danych, nie z etykiety strony** — pieczęć
-ma wychodzić z obu stron. Nagranie kontrolne ma to sprawdzić: wskazówki kroku 3
-proszą o prawą rękę w pierwszym powtórzeniu i **lewą w drugim**.
+Cała czwórka pozostałych pieczęci i całe trzydzieści sekund swobodnego tańca
+trzymają łokcie **pod** barkami, i to z zapasem ponad pół szerokości barków.
+Uniesienie łokci powyżej barków jest ruchem świadomym — nie zdarza się mimochodem.
 
-**Zweryfikowane na materiale, który już mamy, przed ponownym nagraniem.**
-Kandydat przepuszczony przez nagranie z 2026-09-03: **zero z 763 klatek tańca**
-spełnia komplet warunków (nawet przy hojnym progu styku 0.70), i **zero klatek
-każdej z pozostałych czterech pieczęci**. Sam styk **koliduje** z ziemią —
-pięść na przeciwnym barku leży blisko przeciwnego łokcia (mediana 0.32 wobec
-1.72 w tańcu) — ale rozjazd pionowy rozdziela te dwie pozy bez śladu: ziemia
-ma 0.07, błyskawica wymaga powyżej 1.0. Bez warunku styku te same dwa
-pozostałe warunki przepuszczają 59 klatek tańca; styk jest tym, co je zeruje.
+Warunki:
 
-Brakuje wyłącznie próbek samej nowej pozy — do wyprowadzenia jej progów
-i potwierdzenia, że gracz wykonuje ją powtarzalnie.
+1. **Oba nadgarstki wyraźnie nad linią barków.**
+2. **Oba łokcie nad linią barków.** To jest warunek nośny.
+
+Dwa warunki, nie cztery — najprostsza pieczęć w zestawie, i jedyna, której
+nie trzeba się uczyć.
+
+**Zweryfikowane na nagraniach:** komplet warunków spełnia **zero z 763 klatek
+tańca** i **zero klatek każdej z czterech pozostałych pieczęci**, przy każdym
+progu z zakresu, jaki sprawdzono. W nagraniu próby 2 pierwsze powtórzenie
+utrzymało komplet przez **3,98 s bez przerwy** — pieczęć potrzebuje ~0,9 s,
+więc zapas jest czterokrotny. Powtórzenia 2 i 3 wypadły krócej, bo instrukcja
+prosiła wtedy o **asymetrię** („prawa ręka w górze", „lewa ręka w górze"),
+a czysta jest właśnie poza **symetryczna**. Instrukcja kroku 3 została
+poprawiona.
+
+### Refleksja nad tezą styku
+
+Cztery pieczęcie zbudowane wokół dotyku rozdzieliły się czysto, a pierwsze dwie
+próby błyskawicy — bez dotyku — nie rozdzieliły się wcale. To kusi, żeby uznać
+styk za warunek konieczny. **Iglica pokazuje, że tak nie jest.**
+
+Tym, co naprawdę rozdziela, jest **oś, której nie używa nic innego w słowniku**.
+Styk był dobrym sposobem znajdowania takich osi, bo dotyk jest rzadki i łatwo go
+zmierzyć. Wysokość łokci okazała się równie dobrą osią, a przy tym daje pozę
+prostszą do wykonania niż którakolwiek z pozostałych. Teza brzmi więc dokładniej:
+**pieczęć potrzebuje własnej osi, a styk jest jedną z dróg do niej — nie jedyną.**
 
 ### Powietrze — Stribog, gałęzie
 
@@ -215,13 +234,14 @@ nie odwołuje się do bioder.
 | **nadgarstki** | rozsunięte | na barkach | jeden górą, drugi dołem | nad barkami, rozchylone | razem, nisko |
 | **łokcie** | — | — | zgięte, w kontrze | razem | szerzej niż nadgarstki |
 | **tułów** | dowolnie | przodem | przodem | przodem | przodem |
+| **łokcie** | — | pod barkami | **NAD barkami** | pod barkami | pod barkami |
 
 - **ogień ↔ woda** — wysokość. Ogień w ogóle nie mierzy wysokości, woda wymaga
   nadgarstków przy pępku. Patrz decyzja 2, to jest para najbardziej narażona.
 - **ziemia ↔ powietrze** — co się styka (nadgarstek z barkiem vs łokieć
   z łokciem) oraz gdzie są nadgarstki (na barkach vs nad barkami i rozchylone).
   Druga najbardziej narażona para, obie to „ręce splecione z przodu".
-- **błyskawica ↔ reszta** — jedyna asymetryczna: jedna ręka wysoko, druga nisko. Rozjazd pionowy nadgarstków wynosi u niej ponad 1.0, a u każdej z pozostałych czterech poniżej 0.1 (zmierzone).
+- **błyskawica ↔ reszta** — jedyna z łokciami NAD linią barków (+0.13 wobec −0.65…−0.72 u pozostałych i −0.70 w tańcu, mediany zmierzone). Rozdziela ją oś, której nie dotyka żadna inna pieczęć.
 - **woda ↔ powietrze** — odwrotna relacja łokci i nadgarstków, plus wysokość.
 
 Rozdzielność nie jest deklaracją. Jest sprawdzana testem na nagraniach

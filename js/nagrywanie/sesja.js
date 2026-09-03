@@ -38,9 +38,9 @@ export const SCENARIUSZ = [
     },
     {
         nr: 3, id: 'blyskawica', nazwa: 'BŁYSKAWICA',
-        opis: 'Ręka w górę, łokieć złamany nad głową - druga dłoń chwyta ten łokieć w poprzek',
+        opis: 'OBIE ręce w górę, łokcie WYŻEJ NIŻ BARKI - sylwetka jak iglica',
         powtorzenia: 3, czasS: 4,
-        wskazowki: ['PRAWA ręka w górze', 'LEWA ręka w górze', 'prawa, krok dalej']
+        wskazowki: ['obie ręce w górę, symetrycznie', 'to samo, łokcie jeszcze wyżej', 'to samo, krok dalej']
     },
     {
         nr: 4, id: 'powietrze', nazwa: 'POWIETRZE',
