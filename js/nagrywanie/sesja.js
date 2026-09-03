@@ -38,9 +38,9 @@ export const SCENARIUSZ = [
     },
     {
         nr: 3, id: 'blyskawica', nazwa: 'BŁYSKAWICA',
-        opis: 'Stań BOKIEM: ręka górą do przodu, ręka dołem do tyłu, oba łokcie zgięte',
+        opis: 'Ręka w górę, łokieć złamany nad głową - druga dłoń chwyta ten łokieć w poprzek',
         powtorzenia: 3, czasS: 4,
-        wskazowki: ['bokiem, jak Ci wygodnie', 'bokiem w DRUGĄ stronę', 'bokiem, krok dalej']
+        wskazowki: ['PRAWA ręka w górze', 'LEWA ręka w górze', 'prawa, krok dalej']
     },
     {
         nr: 4, id: 'powietrze', nazwa: 'POWIETRZE',

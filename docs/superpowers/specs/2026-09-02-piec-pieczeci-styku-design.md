@@ -66,7 +66,7 @@ błyskawica — jest jedyna bez dotyku i dlatego wymaga najwięcej warunków nar
 |---|---|---|---|---|
 | **ogień** | Swaróg (kuźnia) | `swarog` | opuszki o opuszki | piramidka z dłoni — **bez zmian** |
 | **ziemia** | Weles (podziemie) | `weles` | nadgarstek o przeciwny bark | pięści skrzyżowane na barkach |
-| **błyskawica** | Perun (grom) | `perun` | *brak* | zygzak: stoisz bokiem, ręka górą-przodem, ręka dołem-tyłem, oba łokcie zgięte |
+| **błyskawica** | Perun (grom) | `perun` | dłoń o przeciwny łokieć | zygzak: ręka w górę z załamanym łokciem, druga dłoń chwyta ten łokieć w poprzek |
 | **powietrze** | Stribog (wiatr) | `stribog` | łokieć o łokieć | gałęzie: łokcie razem, przedramiona pionowo w górę, dłonie rozchylone |
 | **woda** | Mokosz (splot losu) | `mokosz` | nadgarstek o nadgarstek | miska: dłonie złożone nisko, przy pępku |
 
@@ -117,36 +117,54 @@ piersi", które w tańcu się zdarza.
 
 ### Błyskawica — Perun, zygzak
 
-Stoisz **bokiem** do kamery. Jedna ręka wysoko nad głowę i **do przodu**, druga
-w dół i **do tyłu**, obie z wyraźnie **zgiętym łokciem**. Ciało rysuje zygzak.
+Ręka w górę z **załamanym łokciem nad głową**, druga dłoń sięga w poprzek
+i **chwyta ten łokieć**. Punkt styku: dłoń o przeciwny łokieć.
 
-Jedyna pieczęć bez styku — i dlatego jedyna, która potrzebuje czterech warunków:
+**Ta poza zastąpiła pierwotną — stanie bokiem, ręka górą-przodem, ręka
+dołem-tyłem — po pomiarze na nagraniu z 2026-09-03.** Wymiana jest
+udokumentowanym wynikiem, nie zmianą zdania:
 
-1. **Stoisz bokiem.** Liczone jako `1 − sqrt(dx² + dy²) / sqrt(dx² + dy² + dz²)`
-   na barkach z `worldLandmarks`. Przodem do kamery ten iloraz jest bliski 1,
-   więc warunek bliski 0; bokiem rozstaw ucieka do osi `z`, iloraz spada,
-   warunek rośnie.
-2. **Jeden nadgarstek wyraźnie nad linią barków, drugi wyraźnie pod.**
-3. **Nadgarstki po przeciwnych stronach tułowia w poziomie** — odległość
-   `|x_góra − x_dół| / skala` duża, liczona z `worldLandmarks.x` jak wszystko
-   inne w tym pliku (osie `worldLandmarks` są zgodne z obrazem: `x` w prawo,
-   `y` w dół). Patrz decyzja 4: przód/tył czytamy z `x`, nie z `z`.
-4. **Oba łokcie zgięte** — kąt bark–łokieć–nadgarstek wyraźnie poniżej prostej,
-   liczony z wektorów 3D.
+- Z 327 klatek pierwotnej pozy **ani jedna** nie miała realnego profilu
+  (obrót > 0.5); mediana obrotu wyniosła 0.14, czyli gracz stał praktycznie
+  przodem. Warunek „stoisz bokiem" był niewykonalny w praktyce, mimo że
+  instrukcja mówiła go wprost.
+- Kąt w łokciu wyszedł w tej pozie **prostszy niż podczas swobodnego tańca**
+  (mediana 137° wobec 127°), więc warunek „oba łokcie zgięte" — ten, który
+  miał wykonywać całą pracę „nie wyjdzie w tańcu" — działał w drugą stronę.
+- Efekt łączny: pieczęć zapalała się **mocniej w tańcu (0.37) niż we własnej
+  pozie (0.22)**, a 272 z 763 klatek tańca przebijało próg składania.
 
-**Warunek 4 wykonuje całą pracę „nie wyjdzie w tańcu".** Same warunki 2 i 3 to
-„ręka w górę, ręka w dół, na skos" — czyli ruch, który w tańcu robisz co chwilę.
-Dwa równocześnie złamane łokcie w przeciwnych kierunkach już nie.
+Wniosek, który z tego płynie, jest szerszy niż jedna poza i potwierdza tezę
+całej tej generacji: **cztery pieczęcie zbudowane wokół styku rozdzieliły się
+czysto, a jedyna zaprojektowana bez styku nie rozdzieliła się wcale.**
 
-Warunek 3 jest **bezznakowy**: wymaga rozsunięcia, nie konkretnej strony. To
-znaczy, że „górą-tyłem / dołem-przodem" też przejdzie. Jest to świadomie
-wielkoduszne — pozwala wykonać pieczęć obrócony w dowolną stronę i nie zależy od
-kierunku patrzenia. Jeśli próbka tańca pokaże, że to za szeroko, dostępne jest
-domknięcie: kierunek zwrotu ciała z landmarka nosa (0) względem środka barków,
-i wymóg, żeby wysoka ręka była po stronie twarzy. **Nie wprowadzamy tego
-zawczasu** — nos przestaje odróżniać kierunek, gdy gracz stojąc bokiem odwróci
-głowę do ekranu, więc to zabezpieczenie ma własny tryb awarii i zasługuje na
-dowód z nagrań, zanim wejdzie.
+Warunki nowej pozy:
+
+1. **Styk** — odległość nadgarstka ręki dolnej od łokcia ręki górnej, mała.
+2. **Rozjazd pionowy nadgarstków** — duży. Jedyny warunek zachowany
+   z pierwotnej pozy, bo jako jedyny działał: 1.60 w kroku 3 wobec 0.38
+   w tańcu (mediany, w szerokościach barków).
+3. **Górny nadgarstek nad linią barków.**
+4. **Kąt w łokciu górnej ręki** — zgięty. Wymuszony geometrycznie przez
+   chwyt (bez zgięcia nie sięgniesz), więc mierzony jako potwierdzenie,
+   a nie jako bariera do pokonania. To jest różnica względem pierwotnej
+   pozy, gdzie zgięcie było wymaganiem, o którym gracz musiał pamiętać.
+
+**Która ręka jest górna, ustalamy z danych, nie z etykiety strony** — pieczęć
+ma wychodzić z obu stron. Nagranie kontrolne ma to sprawdzić: wskazówki kroku 3
+proszą o prawą rękę w pierwszym powtórzeniu i **lewą w drugim**.
+
+**Zweryfikowane na materiale, który już mamy, przed ponownym nagraniem.**
+Kandydat przepuszczony przez nagranie z 2026-09-03: **zero z 763 klatek tańca**
+spełnia komplet warunków (nawet przy hojnym progu styku 0.70), i **zero klatek
+każdej z pozostałych czterech pieczęci**. Sam styk **koliduje** z ziemią —
+pięść na przeciwnym barku leży blisko przeciwnego łokcia (mediana 0.32 wobec
+1.72 w tańcu) — ale rozjazd pionowy rozdziela te dwie pozy bez śladu: ziemia
+ma 0.07, błyskawica wymaga powyżej 1.0. Bez warunku styku te same dwa
+pozostałe warunki przepuszczają 59 klatek tańca; styk jest tym, co je zeruje.
+
+Brakuje wyłącznie próbek samej nowej pozy — do wyprowadzenia jej progów
+i potwierdzenia, że gracz wykonuje ją powtarzalnie.
 
 ### Powietrze — Stribog, gałęzie
 
@@ -196,14 +214,14 @@ nie odwołuje się do bioder.
 | **styk** | opuszki | nadgarstek–bark | brak | łokieć–łokieć | nadgarstek–nadgarstek |
 | **nadgarstki** | rozsunięte | na barkach | jeden górą, drugi dołem | nad barkami, rozchylone | razem, nisko |
 | **łokcie** | — | — | zgięte, w kontrze | razem | szerzej niż nadgarstki |
-| **tułów** | dowolnie | przodem | **bokiem** | przodem | przodem |
+| **tułów** | dowolnie | przodem | przodem | przodem | przodem |
 
 - **ogień ↔ woda** — wysokość. Ogień w ogóle nie mierzy wysokości, woda wymaga
   nadgarstków przy pępku. Patrz decyzja 2, to jest para najbardziej narażona.
 - **ziemia ↔ powietrze** — co się styka (nadgarstek z barkiem vs łokieć
   z łokciem) oraz gdzie są nadgarstki (na barkach vs nad barkami i rozchylone).
   Druga najbardziej narażona para, obie to „ręce splecione z przodu".
-- **błyskawica ↔ reszta** — jedyna asymetryczna i jedyna bokiem.
+- **błyskawica ↔ reszta** — jedyna asymetryczna: jedna ręka wysoko, druga nisko. Rozjazd pionowy nadgarstków wynosi u niej ponad 1.0, a u każdej z pozostałych czterech poniżej 0.1 (zmierzone).
 - **woda ↔ powietrze** — odwrotna relacja łokci i nadgarstków, plus wysokość.
 
 Rozdzielność nie jest deklaracją. Jest sprawdzana testem na nagraniach
@@ -258,13 +276,15 @@ przenosi się w oś `z`, `dx`/`dy` schodzą do zera, wynik ląduje na podłodze 
 podczas gdy realny rozstaw to ~0.38 m. **Skala robi się trzykrotnie za mała,
 więc każdy próg wyrażony w jej wielokrotnościach robi się trzykrotnie za luźny** —
 pozy zapalają się od byle czego. Nie jest to hipotetyczne: błyskawica **wymaga**
-stania bokiem.
+stania bokiem — a choć nowa poza błyskawicy tego nie wymaga, gracz i tak obraca się swobodnie podczas tańca, więc skala musi to znosić.
 
 **Wygładzana jest wyłącznie skala używana do normalizacji odległości.** Warunek
 „stoisz bokiem" w błyskawicy (`obrotBokiem`) liczy iloraz rozstawu 2D do 3D
 z **bieżącej klatki**, nie z wartości wygładzonej — inaczej mianownik zostawałby
 w tyle dokładnie wtedy, gdy gracz się obraca, czyli w jedynym momencie, w którym
 ten warunek cokolwiek znaczy.
+
+Zmierzone na nagraniu z 2026-09-03: przy pozach wykonywanych przodem 3D i 2D pokrywają się co do trzeciego miejsca, a przy próbie stania bokiem rozjeżdżają się na 0.322 wobec 0.277 — czyli mechanizm jest realny, tylko rzadziej uruchamiany, niż zakładał pierwotny projekt.
 
 Naprawa: `sqrt(dx² + dy² + dz²)`. Rozstaw barków to wymiar sztywnego ciała,
 więc w pełnym 3D jest **niezmiennikiem obrotu**. Do tego **EMA w czasie**: skala
@@ -280,17 +300,22 @@ Pierwsza rzecz liczona z nagrań: **czy rozstaw barków 3D faktycznie trzyma si�
 stały, gdy gracz się obraca.** Jeśli nie — to jest wynik, nie porażka; wtedy
 skala schodzi na estymatę długo-czasową (mediana z okna), a nie na pomiar z klatki.
 
-### 4. Błyskawica czyta przód/tył z `x`, a nie z `z`
+### 4. Wycofane: przód/tył z osi `x` przy staniu bokiem
 
-Oś `z` jest najmniej pewnym sygnałem, jaki daje ten tracker, więc czytanie
-z niej warunku „ręka do przodu, ręka do tyłu" byłoby powtórzeniem błędu
-diagnozowanego w tym projekcie od miesięcy.
+**Ta decyzja odeszła razem z pierwotną pozą błyskawicy** (patrz sekcja
+„Błyskawica"). Zostaje zapisana, bo jej przesłanka nadal obowiązuje i wróci
+przy każdym przyszłym geście kuszącym osią głębokości.
 
-Ale **stanie bokiem odwraca to na naszą korzyść**: gdy gracz stoi bokiem do
-kamery, „przód" i „tył" leżą w poziomie obrazu, czyli w `x` — najpewniejszej
-osi, jaką mamy. Więc przód/tył czytamy z `x`. A samo „stoję bokiem" wykrywamy
-jako **mały rozstaw barków w obrazie przy niezmienionym rozstawie 3D** —
-dokładnie ten sygnał, który psuł skalę (decyzja 3), staje się tu warunkiem pozy.
+Brzmiała tak: oś `z` jest najmniej pewnym sygnałem tego trackera, więc warunku
+„ręka do przodu, ręka do tyłu" nie wolno z niej czytać. Stanie bokiem miało to
+odwrócić na naszą korzyść — u gracza stojącego profilem przód i tył leżą
+w poziomie obrazu, czyli w `x`, najpewniejszej osi, jaką mamy.
+
+Rozumowanie było poprawne, a mimo to nie zadziałało, i to jest tu lekcja:
+**gracz nie stanął bokiem.** Z 327 nagranych klatek ani jedna nie osiągnęła
+realnego profilu. Sprytna konstrukcja pomiarowa nie pomaga, jeśli opiera się
+na ułożeniu ciała, którego człowiek pod presją czasu nie przyjmuje. Nowa poza
+nie odwołuje się do osi `z` ani do obrotu tułowia w ogóle.
 
 ### 5. Kwalifikatory z dłoni są miękkie, nigdy blokujące
 
@@ -437,7 +462,7 @@ i mówię, co dograć.
 
 - `js/znaki/postawa.js` — skala w pełnym 3D + EMA (decyzja 3).
 - `js/znaki/weles.js` — przepisany: pięści na barkach.
-- `js/znaki/perun.js` — przepisany: zygzak bokiem.
+- `js/znaki/perun.js` — przepisany: zygzak z chwytem za łokieć.
 - `js/znaki/stribog.js` — przepisany: łokcie razem.
 - `js/znaki/mokosz.js` — przepisany: miska z pozy.
 - `js/main.js` — rejestruje piątkę; znikają `stworzSlady`/`aktualizujSlady`/
