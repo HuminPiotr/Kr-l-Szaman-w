@@ -82,4 +82,58 @@ inneCialo[BARK_P] = { x: 0.10, y: -0.55, z: 0, visibility: 1 };
 spr('resetSkali czyści EMA - nowe ciało (0.20 m) liczy się od zera, nie ciągnie poprzedniego rozstawu (0.40 m)',
     Math.abs(skalaCiala(inneCialo) - 0.20) < 0.01);
 
+console.log('\nPRYMITYWY STYKU:');
+// Bez katWLokciu: patrz nagłówek js/znaki/styk.js - poza błyskawicy straciła
+// jedynego konsumenta tej funkcji po dwóch iteracjach na żywym ciele.
+const { odleglosc, styk, nadBarkami } = await import('../js/znaki/styk.js');
+
+function cialo(punkty) {
+  const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 1 }));
+  wl[11] = { x: -0.20, y: -0.55, z: 0, visibility: 1 };
+  wl[12] = { x: 0.20, y: -0.55, z: 0, visibility: 1 };
+  for (const [i, p] of Object.entries(punkty)) wl[i] = { x: p[0], y: p[1], z: p[2] ?? 0, visibility: 1 };
+  return wl;
+}
+
+const c = cialo({ 15: [-0.20, -0.55], 16: [0.20, -0.15] });
+spr('odległość liczy się w 3D', Math.abs(odleglosc(cialo({ 15: [0, 0, 0], 16: [0, 0, 0.5] }), 15, 16) - 0.5) < 1e-9);
+
+console.log('  styk (1 = dotyk, 0 = daleko):');
+const s0 = styk(c, 15, 11, 0.40, 0.15, 0.60);     // nadgarstek dokładnie na barku
+spr(`dotyk daje pełny wynik (${s0.toFixed(2)})`, s0 > 0.99);
+const s1 = styk(cialo({ 15: [0.30, -0.15] }), 15, 11, 0.40, 0.15, 0.60);
+spr(`daleko daje zero, nie liczbę ujemną (${s1.toFixed(2)})`, s1 === 0);
+
+// REGUŁA NADRZĘDNA: styk NIE JEST binarny. Pięść BLISKO barku ma dawać
+// słabszy, ale niezerowy wynik - inaczej pieczęć zamienia się w egzamin.
+console.log('  ciągłość styku przy zbliżaniu ręki:');
+let poprz = 0, maxSkok = 0;
+for (let i = 0; i <= 40; i++) {
+  const d = 0.30 - i * 0.0075;
+  const v = styk(cialo({ 15: [-0.20 + d, -0.55] }), 15, 11, 0.40, 0.15, 0.60);
+  maxSkok = Math.max(maxSkok, Math.abs(v - poprz)); poprz = v;
+}
+spr(`największy skok = ${maxSkok.toFixed(3)} (rampa, nie próg)`, maxSkok < 0.15);
+
+console.log('  nadBarkami (dodatnie w górę, w szerokościach barków):');
+spr('nadgarstek nad barkami dodatni', nadBarkami(cialo({ 15: [0, -0.95] }), 15, 0.40) > 0.9);
+spr('nadgarstek pod barkami ujemny', nadBarkami(cialo({ 15: [0, -0.15] }), 15, 0.40) < -0.9);
+spr('nadgarstek na linii barków ~0', Math.abs(nadBarkami(cialo({ 15: [0, -0.55] }), 15, 0.40)) < 0.01);
+
+// DODATKOWE (poza briefem) - znalezione mutation testingiem: usunięcie strażnika
+// isFinite w styk() albo zamiana odleglosc()'s Infinity na 0 dla brakującego
+// punktu przechodziło WSZYSTKIE powyższe asercje z briefu, a jednocześnie
+// odwracało wynik z "brak danych" na "pełny dotyk" - dokładnie odwrotność
+// reguły nadrzędnej (brak danych ≠ sukces, GEMINI.md §2). Gracz poza kadrem
+// dostawałby fałszywy trafiony gest zamiast braku wyniku.
+console.log('  odporność na brakujący punkt (poza kadrem, nie "dotyk"):');
+const bezPunktu = cialo({});
+bezPunktu[15] = undefined;
+spr('odległość do brakującego punktu to Infinity, nie 0 ani NaN',
+    odleglosc(bezPunktu, 15, 11) === Infinity);
+spr('styk z brakującym punktem to 0 ("brak danych"), NIE 1 ("pełny dotyk")',
+    styk(bezPunktu, 15, 11, 0.40, 0.15, 0.60) === 0);
+spr('nadBarkami z brakującym punktem to 0, nie fałszywa wysokość',
+    nadBarkami(bezPunktu, 15, 0.40) === 0);
+
 process.exit(ok ? 0 : 1);
