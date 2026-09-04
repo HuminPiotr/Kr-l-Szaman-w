@@ -17,7 +17,7 @@
  * Barki mają y ujemne (~-0.55), dłoń opuszczona poniżej bioder - dodatnie.
  */
 import { ZnakRegistry } from '../js/znaki/registry.js';
-import { resetSkali, skalaCiala } from '../js/znaki/postawa.js';
+import { resetSkali, skalaCiala, aktualizujSkale } from '../js/znaki/postawa.js';
 import { weles } from '../js/znaki/weles.js';
 
 let ok = true;
@@ -111,7 +111,12 @@ const ZIEMIA = cialo({
 
 console.log('ZIEMIA:');
 const z = ocen(ZIEMIA, [piesc(), piesc()]);
-spr(`pięści na barkach zapalają ziemię (${z.weles.toFixed(2)})`, z.weles > 0.7);
+// Próg PODNIESIONY z briefu (>0.7) na >0.9 po przeglądzie: 0.7 pokrywa się
+// liczbowo z WAGA_BEZ_DLONI, więc mutant "piesci() zawsze zwraca
+// WAGA_BEZ_DLONI" (czyli kwalifikator pięści całkowicie wyłączony) był
+// łapany wyłącznie zbiegiem okoliczności na granicy. Realny wynik to 1.00,
+// więc 0.9 nic nie kosztuje, a odcina tę furtkę z zapasem.
+spr(`pięści na barkach zapalają ziemię (${z.weles.toFixed(2)})`, z.weles > 0.9);
 
 const opuszczone = ocen(cialo({
   nadgL: [-0.22, 0.30], lokL: [-0.21, -0.15],
@@ -135,8 +140,40 @@ console.log('\nLUSTRO:');
 // Odległości są niezmiennikiem odbicia - to jest cały powód, dla którego
 // nowy weles.js nie potrzebuje formuły ze znakiem iloczynu (stary weles.js:46).
 const odbij = (wl) => wl.map(p => ({ ...p, x: -p.x }));
-const zL = ocen(odbij(ZIEMIA), [piesc(), piesc()]);
-spr(`odbita ziemia = ta sama (${zL.weles.toFixed(2)})`, Math.abs(zL.weles - z.weles) < 0.02);
+
+// POPRAWKA PO PRZEGLĄDZIE: `ZIEMIA` (pełny styk, dystans 0) jest
+// NASYCONA - stykL i stykP są przypięte do sufitu 1.0 przed i po odbiciu,
+// więc test porównywał 1.00 z 1.00 niezależnie od tego, CO liczy score().
+// Funkcja zwracająca stałą przeszłaby to sprawdzenie. Nowa poza trzyma
+// obie pięści W POŁOWIE rampy styku (nadgarstki 0.15+0.32 m od barku, czyli
+// znormalizowane 1.1775 szerokości barków - między STYK_PELNY=0.941 a
+// STYK_ZERO=1.416), więc błąd MAGNITUDY (zła skala, zamieniony próg,
+// błędny znak we wzorze na odległość) ma tu miejsce, żeby się objawić.
+const ZIEMIA_POL_RAMPY = cialo({
+  nadgL: [0.20, -0.079], lokL: [-0.10, -0.30],
+  nadgP: [-0.20, -0.079], lokP: [0.10, -0.30]
+});
+const polRampy = ocen(ZIEMIA_POL_RAMPY, [piesc(), piesc()]);
+spr(`fixture lustra faktycznie leży w połowie rampy (${polRampy.weles.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    polRampy.weles > 0.4 && polRampy.weles < 0.6);
+const polRampyL = ocen(odbij(ZIEMIA_POL_RAMPY), [piesc(), piesc()]);
+spr(`odbita ziemia (połowa rampy) = ta sama (${polRampyL.weles.toFixed(2)})`,
+    Math.abs(polRampyL.weles - polRampy.weles) < 0.02);
+
+// GRANICA TEGO, CO LUSTRO MOŻE UDOWODNIĆ (zweryfikowana mutation testingiem,
+// patrz raport zadania). Odbicie x -> -x jest IZOMETRIĄ: dla KAŻDEJ pary
+// punktów dist(odbicie(A), odbicie(B)) = dist(A, B), niezależnie od tego,
+// KTÓRE punkty formuła akurat porówna. Efekt: żadna formuła zbudowana
+// WYŁĄCZNIE z odległości (jak styk() tutaj) nie może złamać niezmienniczości
+// lustra - nawet jeśli sparuje ZŁE punkty (np. nadgarstek z barkiem PO TEJ
+// SAMEJ stronie zamiast przeciwnej). Zmierzone: podmiana BARK_P->BARK_L w
+// stykL daje 0.000 PRZED i 0.000 PO odbiciu - lustro milczy, bo obie wersje
+// są sobie równe, tylko obie błędne. Tę klasę błędu łapie WYŁĄCZNIE
+// podniesiony próg głównej asercji ZIEMI (>0.9) na oryginalnym `ZIEMIA` -
+// tam wynik spada z 1.00 do 0.00. Lustro udowadnia coś WĘŻSZEGO i wciąż
+// realnego: że we wzorze NIE MA odczytu surowej WSPÓŁRZĘDNEJ czy ZNAKU
+// (jak w dawnym `Math.sign(roznicaBark)`, stary weles.js:46) - dokładnie
+// klasę błędu, przed którą ostrzega docstring na górze tego pliku.
 
 console.log('\nGŁĘBIA (oś z) - tułów obrócony bokiem:');
 // Test celowy PONAD brief. skalaCiala() liczy rozstaw barków w pełnym 3D
@@ -275,5 +312,40 @@ spr(`największy skok przy zwijaniu dłoni = ${maxSkokD.toFixed(3)} (rampa, nie 
 // przypadkowej niskiej wartości - inaczej powyższy test niczego by nie
 // dowodził o samej podłodze.
 spr(`start pętli = podłoga bez dłoni (${poziomyD[0]})`, Math.abs(parseFloat(poziomyD[0].split(':')[1]) - bezDloni.weles) < 0.01);
+
+console.log('\nŚCIEŻKA PRODUKCYJNA (aktualizujSkale + EMA), nie tylko resetSkali+chwilowa:');
+// POPRAWKA PO PRZEGLĄDZIE. `ocen()` (helper na górze tego pliku) woła
+// resetSkali() PRZED każdą oceną - więc skalaCiala() w środku weles.js
+// ZAWSZE spada na skalaChwilowa(), bo `_skalaEma` jest w tym momencie
+// zawsze null (postawa.js: `if (_skalaEma !== null) return _skalaEma;`).
+// Cały ten plik do tej pory nigdy nie wywołał weles ze stanem, w którym
+// `_skalaEma !== null` - a to jest ŚCIEŻKA, którą naprawdę biegnie gra:
+// main.js woła aktualizujSkale() RAZ NA KLATKĘ, PRZED znaki.ocen(), nigdy
+// resetSkali(). To ta sama kategoria ślepoty co z=0 przed poprawką sekcji
+// GŁĘBIA wyżej - tym razem znaleziona w przeglądzie, nie przeze mnie.
+//
+// UŻYWA `ZIEMIA_POL_RAMPY`, NIE `ZIEMIA`. Pierwsza wersja tego testu
+// oceniała pełny styk (`ZIEMIA`, dystans 0) - a przy dystansie DOKŁADNIE
+// 0 wynik stykL/stykP wychodzi 1.0 dla KAŻDEJ dodatniej skali (0/skala=0
+// niezależnie od wartości skali), więc test nigdy by nie zauważył, gdyby
+// gałąź EMA zwracała skalę przemnożoną przez dowolną stałą. Zmierzone
+// mutation testingiem (patrz raport): z fixture `ZIEMIA` mutacja
+// "skalaCiala() w gałęzi EMA zwraca _skalaEma*0.5" przechodziła ten test
+// BEZ CZERWIENI. `ZIEMIA_POL_RAMPY` ma niezerowy dystans, więc skala
+// realnie wchodzi do mianownika.
+resetSkali();
+for (let i = 0; i < 60; i++) aktualizujSkale(ZIEMIA_POL_RAMPY, 1 / 60);
+// Ocena BEZ resetSkali() między rozgrzewką a pomiarem - dokładnie sekwencja
+// z main.js. `rej` jest tym samym rejestrem, którego używa `ocen()` gdzie
+// indziej w pliku (dzieli EMA wygładzonych WYNIKÓW - bez znaczenia tutaj,
+// bo czytamy tylko `surowe`/`this.surowe`, kopiowane świeżo z każdego
+// wywołania, patrz registry.js).
+const zEma = rej.ocen({
+  hands: [piesc(), piesc()], pose: { landmarks: [], worldLandmarks: ZIEMIA_POL_RAMPY },
+  width: 1920, height: 1080, dt: 1 / 60, now: 0
+});
+spr(`ziemia (połowa rampy) liczy się poprawnie przez ścieżkę EMA, nie tylko reset+chwilowa (${zEma.weles.toFixed(2)})`,
+    zEma.weles > 0.4 && zEma.weles < 0.6);
+resetSkali();
 
 process.exit(ok ? 0 : 1);
