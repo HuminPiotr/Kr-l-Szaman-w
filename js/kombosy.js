@@ -10,9 +10,10 @@
  * Technika odpala się GRATIS - składowe już zapłaciły. To nagroda za
  * ułożenie, nie kolejny rachunek.
  *
- * ŁAŃCUCHY SĄ CELOWE. perun -> mokosz -> weles daje oba kombosy po kolei,
- * bo dopasowujemy KOŃCÓWKĘ bufora i nie czyścimy go po trafieniu. Gracz nie
- * może zmarnować pieczęci, więc nakładające się sekwencje mają się nakładać.
+ * ŁAŃCUCHY SĄ CELOWE. swarog -> perun -> stribog -> stribog daje oba kombosy
+ * po kolei (Grom w Ogniu, potem Aard), bo dopasowujemy KOŃCÓWKĘ bufora i nie
+ * czyścimy go po trafieniu. Gracz nie może zmarnować pieczęci, więc
+ * nakładające się sekwencje mają się nakładać.
  */
 
 // ZGADNIĘTE - wymaga potwierdzenia na żywym ciele. Za krótkie okno karze
@@ -29,38 +30,38 @@
 const OKNO_MS = 6500;
 
 // Pole `uzbraja` mówi, KTÓRĄ technikę kombos przygotowuje - main.js routuje
-// po nim zamiast bezwarunkowo uzbrajać płonący palec (co było w porządku,
-// dopóki technika była jedna).
+// po nim zamiast bezwarunkowo uzbrajać płonący palec.
 //
-// PRZEBUDOWA NA RUNY (docs/superpowers/specs/2026-09-01-runy-i-kwalifikatory-
-// -design.md): pieczęcie dłoniowe (weles/perun/szczur) i Splot z pozy
-// (mokoszSplot.js) odeszły - zastąpione trzema runami kreślonymi w powietrzu
-// (koło/Mokosz, zygzak/Perun, fala/Stribog) x stanem dłoni (otwarta/pięść).
-// Piramidka Swaroga (żywioł ognia) ZOSTAJE bez zmian - jedyna dłoniowa
-// pieczęć, która działała pewnie, bo jej kształt sam wymusza rozsunięcie
-// nadgarstków, czyli prześwit, którego potrzebuje detektor.
+// PIĄTA GENERACJA ZNAKÓW (docs/superpowers/specs/2026-09-02-piec-pieczeci-
+// -styku-design.md): runy kreślone w powietrzu i Splot Mokoszy odeszły,
+// zastąpione pięcioma pieczęciami STYKU - ogień (piramidka, bez zmian),
+// ziemia (pięści na barkach), błyskawica (zygzak bokiem), powietrze
+// (łokcie razem), woda (miska).
+//
+// BUDŻET CZASOWY. Pieczęć na styku trafia wynik ~0.9, a wtedy pieczecie.js
+// składa ją w ~0.9 s. Trzy złożenia to ~2.7 s plus przejścia - mieści się
+// w OKNO_MS z zapasem. Runy trafiały ~0.7, czyli 1.7 s na złożenie, i stąd
+// brało się zmierzone ograniczenie Wstęgi w poprzedniej generacji.
 export const KOMBOSY = [
-    // Swaróg -> Perun (dający): ogień, potem piorun. Sekwencja wraca do
-    // swojego PIERWOTNEGO znaczenia sprzed przebudowy - piramidka zostaje,
-    // więc znowu mówi to, co jej nazwa.
-    { id: 'gromWOgniu',   nazwa: 'Grom w Ogniu',   sekwencja: ['swarog', 'perun-otwarta'], uzbraja: 'ogien' },
+    // Ogień -> woda -> powietrze. Sekwencja wybrana przez właściciela
+    // projektu. Aktywacja NATYCHMIASTOWA, bez drugiego gestu - main.js
+    // routuje tę gałąź osobno.
+    { id: 'tecza', nazwa: 'Wstęga Mokoszy',
+      sekwencja: ['swarog', 'mokosz', 'stribog'], uzbraja: 'tecza' },
 
-    // Mokosz (biorąca) x2 -> Zew Podziemia. Zbieranie mocy w pięść, dwa razy
-    // pod rząd - czyta się jako rytuał "branie", nie jako lista wejść.
-    { id: 'zewPodziemia', nazwa: 'Zew Podziemia',  sekwencja: ['mokosz-piesc', 'mokosz-piesc'], uzbraja: 'ogien' },
+    // Ogień -> błyskawica. Nazwa mówi to, co robi sekwencja.
+    { id: 'gromWOgniu', nazwa: 'Grom w Ogniu',
+      sekwencja: ['swarog', 'perun'], uzbraja: 'ogien' },
 
-    // Stribog (dający) x2 -> Aard. Wiatr kreślony dwa razy pod rząd otwartą
-    // dłonią - "wypuszczenie" pasuje do podmuchu bardziej niż do pięści.
-    { id: 'aard', nazwa: 'Podmuch Striboga', sekwencja: ['stribog-otwarta', 'stribog-otwarta'], uzbraja: 'aard' },
-
-    // Mokosz (dająca) x3 -> Tecza. TRZY złożenia, nie dwie - dłuższy rytuał
-    // niż Ogień/Aard, bo nagroda jest darmowa przez 30 s (żaden dalszy
-    // koszt), więc próg wejścia jest wyższy. uzbraja: 'tecza' NIE pasuje do
-    // wzorca uzbrój-potem-gest (Ogień/Aard czekają na osobny gest gracza) -
-    // main.js routuje tę gałąź na natychmiastową aktywację, bez drugiego
-    // gestu.
-    { id: 'tecza', nazwa: 'Wstęga Mokoszy', sekwencja: ['mokosz-otwarta', 'mokosz-otwarta', 'mokosz-otwarta'], uzbraja: 'tecza' }
+    // Powietrze x2 -> Aard. Wiatr złożony dwa razy pod rząd.
+    { id: 'aard', nazwa: 'Podmuch Striboga',
+      sekwencja: ['stribog', 'stribog'], uzbraja: 'aard' }
 ];
+
+// ZIEMIA nie wchodzi na razie w żaden kombos - zostaje pieczęcią
+// samodzielną, dającą swój błysk. Kombos bez techniki, którą miałby
+// uzbrajać, byłby wymyślaniem na zapas; ziemia wejdzie, gdy powstanie
+// technika ziemi.
 
 export class KomboSilnik {
     constructor({ okno = OKNO_MS, kombosy = KOMBOSY } = {}) {

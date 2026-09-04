@@ -1,4 +1,18 @@
 /**
+ * ================== ODPIĘTE OD GRY (2026-09-02) ==================
+ *
+ * Ten moduł NIE jest zarejestrowany w main.js. Runy kreślone w powietrzu
+ * przegrały jako PIECZĘCIE - kształt kreślony rzadko wychodzi daleko
+ * powyżej progu, więc składa się wolno i nie mieści kombosów w oknie
+ * czasowym. Silnik jest jednak sprawny i został ŚWIADOMIE ZACHOWANY jako
+ * materiał na przyszłe TECHNIKI (kreślony kształt jako sposób RZUCANIA,
+ * nie składania). tools/test-runy.mjs nadal go pilnuje.
+ *
+ * Zastąpiony przez pięć pieczęci styku:
+ * docs/superpowers/specs/2026-09-02-piec-pieczeci-styku-design.md
+ */
+
+/**
  * Świecąca wstęga za nadgarstkiem kreślącym runę.
  *
  * TO NIE JEST DEBUG - to jedyne sprzężenie zwrotne, dzięki któremu kreślenia

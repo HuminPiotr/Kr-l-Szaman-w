@@ -1,7 +1,24 @@
 /**
+ * ================== ODPIĘTE OD GRY (2026-09-02) ==================
+ *
+ * Ten moduł NIE jest zarejestrowany w main.js. Runy kreślone w powietrzu
+ * przegrały jako PIECZĘCIE - kształt kreślony rzadko wychodzi daleko
+ * powyżej progu, więc składa się wolno i nie mieści kombosów w oknie
+ * czasowym. Silnik jest jednak sprawny i został ŚWIADOMIE ZACHOWANY jako
+ * materiał na przyszłe TECHNIKI (kreślony kształt jako sposób RZUCANIA,
+ * nie składania). tools/test-runy.mjs nadal go pilnuje.
+ *
+ * Zastąpiony przez pięć pieczęci styku:
+ * docs/superpowers/specs/2026-09-02-piec-pieczeci-styku-design.md
+ */
+
+/**
  * Sześć znaków-run dla ZnakRegistry: trzy kształty (koło/Mokosz, zygzak/Perun,
  * fala/Stribog) x dwa stany dłoni (otwarta/pięść). Piramidka Swaroga (ogień)
- * NIE jest tutaj - zostaje własnym plikiem, znaki/swarogDlon.js, bez zmian.
+ * NIE jest tutaj - zostaje własnym plikiem, znaki/swarogDlon.js. Ten plik
+ * BYŁ z nim spójny, ale swarogDlon.js zmienił się w zadaniu 10 (`wymaga`
+ * z 'hands' na 'both' - patrz jego docstring); ta zmiana dotyczy TYLKO
+ * swarogDlon.js, nic tutaj się nie zmieniło.
  *
  * BEZ POLA `wymaga`. Pozostałe znaki (postawa/dłoń) czytają geometrię z
  * BIEŻĄCEJ klatki - brak danych w tej klatce prawomocnie znaczy "wynik zero

@@ -35,24 +35,35 @@ export const TABELA = {
     // Pieczęcie - LEKKIE. Mają być przyjemne, nie efektowne; efektowność
     // jest nagrodą za kombo.
     //
-    // Sześć run (przebudowa 2026-09-01, docs/superpowers/specs/2026-09-01-
-    // -runy-i-kwalifikatory-design.md): jedna barwa na ŻYWIOŁ (nie na
-    // wariant dłoni), bo to żywioł niesie znaczenie efektu wizualnego -
-    // otwarta/pięść różnią się KIERUNKIEM kształtu (rozchodzi się/zbiega),
-    // tak jak dziś Swaróg (pierścień) i Weles (ściągnięcie) były odwrotnościami.
+    // PIĘĆ PIECZĘCI STYKU (2026-09-02, docs/superpowers/specs/2026-09-02-
+    // -piec-pieczeci-styku-design.md) - jedna barwa na ŻYWIOŁ, wiersz na
+    // id znaku ze znaki/*.js (weles/perun/stribog/mokosz czytają teraz
+    // POZĘ, nie mają już wariantu otwarta/pięść).
+    swarog:  { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },  // ogień
+    weles:   { barwa: '280, 70%, 58%',  ksztalt: 'sciagniecie', czas: 0.9 },  // ziemia
+    perun:   { barwa: '50, 100%, 92%',  ksztalt: 'pierscien',   czas: 0.7 },  // błyskawica
+    stribog: { barwa: '160, 55%, 75%',  ksztalt: 'pierscien',   czas: 0.8 },  // powietrze
+    mokosz:  { barwa: '200, 70%, 70%',  ksztalt: 'pierscien',   czas: 0.9 },  // woda
+    // szczur, splot celowo NIEOBECNE - znaki odpięte (js/main.js), pliki
+    // zostają na dysku i mogłyby dostać te wpisy z powrotem, gdyby wróciły.
+    //
+    // Sześć wierszy RUNOWYCH niżej ZOSTAJĄ, mimo że runy są odpięte od
+    // main.js (js/runy/*, ODPIĘTE OD GRY): tools/test-runy.mjs importuje tę
+    // tabelę wprost i sprawdza jej KOMPLETNOŚĆ względem DEFINICJE run - ten
+    // test ma dalej świecić zielono, bo silnik run żyje jako materiał na
+    // przyszłe TECHNIKI. Usunięcie tych wierszy zdjęłoby mu siatkę regresji.
     'mokosz-otwarta':  { barwa: '200, 70%, 70%', ksztalt: 'pierscien',   czas: 0.9 },
     'mokosz-piesc':    { barwa: '200, 70%, 70%', ksztalt: 'sciagniecie', czas: 0.9 },
     'perun-otwarta':   { barwa: '50, 100%, 92%', ksztalt: 'pierscien',   czas: 0.7 },
     'perun-piesc':     { barwa: '50, 100%, 92%', ksztalt: 'sciagniecie', czas: 0.7 },
     'stribog-otwarta': { barwa: '160, 55%, 75%', ksztalt: 'pierscien',   czas: 0.8 },
     'stribog-piesc':   { barwa: '160, 55%, 75%', ksztalt: 'sciagniecie', czas: 0.8 },
-    swarog: { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },
-    // szczur, weles, splot celowo NIEOBECNE - znaki odpięte (js/main.js),
-    // pliki zostają na dysku i mogłyby dostać te wpisy z powrotem, gdyby wróciły.
 
     // Techniki - MOCNE. Odpalają się gratis, jako nagroda za ułożenie.
+    // zewPodziemia CELOWO NIEOBECNA - ten kombos odszedł razem z runami
+    // z tabeli js/kombosy.js, więc nie odpala się już nigdy; wiersz TABELA
+    // dla niego byłby martwym kodem, nie zabezpieczeniem.
     gromWOgniu:   { barwa: '35, 100%, 92%', ksztalt: 'blyskIFala', czas: 1.4 },
-    zewPodziemia: { barwa: '285, 75%, 48%', ksztalt: 'mglaIMrok',  czas: 1.8 },
     // Zapowiedź uzbrojenia Aard - rozbłysk w chwili złożenia kombosa.
     // Sama fala jest interaktywna i rysuje ją js/fala.js, nie tabela.
     aard:         { barwa: '200, 70%, 88%', ksztalt: 'pierscien',  czas: 0.8 },

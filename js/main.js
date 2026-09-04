@@ -7,8 +7,11 @@ import { Plynnosc } from './plynnosc.js';
 import { Aura } from './aura.js';
 import { ZnakRegistry } from './znaki/registry.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
-import { stworzSlady, stworzZnakiRun, aktualizujSlady } from './runy/definicje.js';
-import { rysujSlady } from './runy/rysujSlad.js';
+import { weles } from './znaki/weles.js';
+import { perun } from './znaki/perun.js';
+import { stribog } from './znaki/stribog.js';
+import { mokosz } from './znaki/mokosz.js';
+import { aktualizujSkale } from './znaki/postawa.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -22,25 +25,24 @@ import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
 
 // ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, znaki/szczurDlon.js,
-// znaki/welesDlon.js, znaki/perunDlon.js, znaki/mokoszSplot.js.
+// znaki/welesDlon.js, znaki/perunDlon.js, znaki/mokoszSplot.js, js/runy/*
+// (definicje.js/slad.js/ksztalt.js/szablony.js/rysujSlad.js).
 //
-// PRZEBUDOWA NA RUNY (2026-09-01, docs/superpowers/specs/2026-09-01-runy-i-
-// -kwalifikatory-design.md): pieczęcie palcowe (Wąż/Tygrys/Szczur) padały nie
-// na złych progach, tylko na braku informacji w sygnale - jednooczna kamera
-// RGB nie widzi palca schowanego za palcem, tylko go zgaduje. Weles i Perun
-// odchodzą razem z resztą (Szczur już był odpięty 2026-08-11). Splot Mokoszy
-// (postawa ciała, skrzyżowane ramiona) też odchodzi - jego rolę w kombosie
-// Wstęgi przejmuje runa mokosz-otwarta.
+// PIĘĆ PIECZĘCI STYKU (2026-09-02, docs/superpowers/specs/2026-09-02-piec-
+// -pieczeci-styku-design.md): runy kreślone nadgarstkiem w powietrzu (koło/
+// Mokosz, zygzak/Perun, fala/Stribog) x stan dłoni odchodzą razem ze Splotem
+// Mokoszy - kształt kreślony rzadko wychodzi daleko powyżej progu, więc
+// kombosy nie mieściły się w oknie czasowym (patrz js/kombosy.js). W ich
+// miejsce piątka znaków czytanych ze STYKU części ciała: Weles (ziemia,
+// pięści na barkach), Stribog (powietrze, łokcie razem), Mokosz (woda,
+// miska), Perun (błyskawica, iglica) - wszystkie cztery z pozy. Piramidka
+// Swaroga (ogień) zostaje jedynym znakiem dłoniowym i od zadania 10 CZYTA
+// TAKŻE POZĘ (`wymaga: 'both'`) - warunek wysokości odróżnia ją od iglicy
+// Peruna, patrz znaki/swarogDlon.js.
 //
-// W ich miejsce: trzy KSZTAŁTY kreślone nadgarstkiem w powietrzu (koło/
-// Mokosz, zygzak/Perun, fala/Stribog) x stan dłoni (otwarta/pięść) - patrz
-// runy/definicje.js. PIRAMIDKA SWAROGA ZOSTAJE BEZ ZMIAN - jedyna dłoniowa
-// pieczęć, która działała pewnie, bo jej kształt sam wymusza rozsunięcie
-// nadgarstków, czyli prześwit, którego potrzebuje detektor.
-//
-// Dłonie są WPIĘTE - i piramidka, i kwalifikator stanu dłoni dla run go
-// potrzebują. Zmierzone na żywym tańcu: ~60 FPS z ciałem i maską, więc 8 ms
-// na dłonie mieści się z ogromnym zapasem.
+// Dłonie są WPIĘTE - piramidka Swaroga ich potrzebuje. Zmierzone na żywym
+// tańcu: ~60 FPS z ciałem i maską, więc 8 ms na dłonie mieści się z ogromnym
+// zapasem.
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -65,15 +67,16 @@ let plynnoscMiara = new Plynnosc();
 let aura = null;
 
 let znaki = new ZnakRegistry();
-// Piramidka Swaroga (żywioł ognia) - jedyna dłoniowa pieczęć, która działała
-// pewnie na żywym ciele. Zostaje bez jednej linijki zmiany.
-znaki.zarejestruj(swarogDlon);
-// Sześć znaków-run (trzy kształty x dwa stany dłoni) dzielą DWA bufory
-// śladu (lewy/prawy nadgarstek) - trzymane tutaj, aktualizowane raz na
-// klatkę w klatka() PRZED znaki.ocen(), wyczyszczone przy każdym trafieniu
-// (decyzja 9 w spec) - patrz runy/definicje.js.
-let slady = stworzSlady();
-for (const znak of stworzZnakiRun(slady)) znaki.zarejestruj(znak);
+// Pięć pieczęci STYKU. Ogień czyta dłonie I pozę (piramidka - jedyna
+// dłoniowa pieczęć, która działała pewnie, bo jej kształt sam wymusza
+// prześwit między dłońmi; od zadania 10 dorzuca warunek wysokości z pozy,
+// więc NIE JEST już "bez zmian" - patrz znaki/swarogDlon.js), pozostałe
+// cztery czytają wyłącznie pozę.
+znaki.zarejestruj(swarogDlon);   // ogień
+znaki.zarejestruj(weles);        // ziemia
+znaki.zarejestruj(perun);        // błyskawica
+znaki.zarejestruj(stribog);      // powietrze
+znaki.zarejestruj(mokosz);       // woda
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 let efekty = new Efekty();
@@ -350,11 +353,11 @@ function klatka(now) {
     // MotionMeter zabiłoby sygnał, którego szukamy.
     const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt);
 
-    // --- 4a. Aktualizacja śladów dłoni (runy) ---
-    // RAZ NA KLATKĘ, PRZED znaki.ocen() - sześć znaków-run czyta te same dwa
-    // bufory; gdyby każdy dopisywał punkt przy własnym score(), ten sam ruch
-    // trafiałby do bufora sześć razy na klatkę (runy/definicje.js).
-    aktualizujSlady(frame, dt, slady);
+    // --- 4a. Skala ciała ---
+    // RAZ NA KLATKĘ, PRZED znaki.ocen() - pięć znaków dzieli jedną wygładzoną
+    // skalę barków; gdyby każdy liczył ją we własnym score(), wygładzanie
+    // biegłoby pięć razy szybciej niż zakłada jego stała czasowa.
+    aktualizujSkale(frame.pose?.worldLandmarks ?? null, dt);
 
     // --- 5. Postawy i składanie pieczęci ---
     // KOLEJNOŚĆ MA ZNACZENIE: składanie musi policzyć się PRZED mocą, bo
@@ -386,13 +389,6 @@ function klatka(now) {
 
     // --- 6a. Pieczęć się złożyła ---
     if (skl.zlozona) {
-        // Trafienie CZYŚCI ślad (decyzja 9, spec run) - inaczej bufor dalej
-        // trzyma ten sam narysowany kształt i pierścień natychmiast
-        // zaczynałby napełniać się TĄ SAMĄ runą. Bezpieczne wołanie nawet
-        // gdy trafienie przyszło z piramidki (swarog), bo wtedy ślad i tak
-        // jest pusty lub zanikł z wiekiem.
-        slady.sladLewy.wyczysc();
-        slady.sladPrawy.wyczysc();
         motionMeter.zuzyj(skl.zlozona.koszt);
         efekty.odpal(skl.zlozona.id);
         aura.rozblysk(1);
@@ -517,12 +513,7 @@ function klatka(now) {
 
     audioEngine.update('CHARGING', moc, plynnosc);
 
-    // --- 7b. Świecąca wstęga śladu i szkielet dłoni ---
-    // Wstęga PRZED szkieletem, żeby dłoń (kropki i palce) była zawsze na
-    // wierzchu - to ona niesie znaczenie pieczęci, ślad jest tłem. Rysowana
-    // ZAWSZE, nie tylko w trybie debug: to jedyne sprzężenie zwrotne, dzięki
-    // któremu kreślenia da się w ogóle nauczyć (runy/rysujSlad.js).
-    rysujSlady(ctx, slady.sladLewy, slady.sladPrawy, frame.width, frame.height);
+    // --- 7b. Szkielet dłoni ---
     rysujDlonie(frame);
 
     // --- 8. Nakładka diagnostyczna (klawisz D) ---
@@ -559,8 +550,7 @@ function klatka(now) {
         skladana: skl.skladana,
         postep: skl.postep,
         brakMocy: skl.brakMocy,
-        bufor: kombosy.bufor.map(w => w.id).join(' → ') || '—',
-        slady
+        bufor: kombosy.bufor.map(w => w.id).join(' → ') || '—'
     });
 
 }
