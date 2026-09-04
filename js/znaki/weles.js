@@ -1,66 +1,95 @@
 /**
- * Pieczęć Welesa - podziemie, bydło, brama.
+ * Ziemia - Weles: podziemie, bydło, brama.
  *
- * Ręce skrzyżowane na piersi.
+ * Ramiona skrzyżowane na krzyż, każda ZACIŚNIĘTA PIĘŚĆ dotyka PRZECIWNEGO
+ * barku. Punkt styku: nadgarstek o bark.
  *
- * SKRZYŻOWANIE liczone jako ZNAK iloczynu, nie jako kolejność x. MediaPipe
- * podaje lewo/prawo względem OBRAZU, a płótno ma scaleX(-1) (GEMINI.md:88).
- * Przy odbiciu lustrzanym NEGUJĄ SIĘ oba czynniki - różnica nadgarstków
- * i różnica barków - więc iloczyn zostaje bez zmian. Sprawdzenie samej
- * kolejności x dawałoby wynik odwrotny w lustrze.
+ * DLACZEGO BEZ FORMUŁY ZE ZNAKIEM ILOCZYNU. Poprzednia wersja tego pliku
+ * liczyła skrzyżowanie jako znak iloczynu różnic x, bo sprawdzanie samej
+ * kolejności x dawało wynik odwrotny w lustrze płótna (scaleX(-1),
+ * GEMINI.md:88). Ta ostrożność jest tu niepotrzebna: ODLEGŁOŚĆ między dwoma
+ * landmarkami jest niezmiennikiem odbicia, a MediaPipe etykietuje strony
+ * CIAŁA, nie strony obrazu. Dwa warunki styku (lewy nadgarstek przy prawym
+ * barku i odwrotnie) IMPLIKUJĄ skrzyżowanie i robią to bez ani jednej
+ * operacji wrażliwej na lustro. Cała klasa błędów znika razem z formułą.
  *
- * Wysokość piersi odcina Mokosz (dłonie poniżej bioder) i Peruna
- * (dłoń nad barkami), więc trójka jest rozdzielna.
+ * ================== POPRAWKA PO POMIARZE ==================
+ *
+ * Pierwotny projekt miał trzeci warunek: "oba nadgarstki na wysokości linii
+ * barków lub wyżej". USUNIĘTY po nagraniu z żywego ciała. Zmierzono, że przy
+ * pięściach na barkach nadgarstki leżą 0.5 szerokości barków PONIŻEJ linii
+ * barków (landmark nadgarstka siedzi w stawie, więc przy pięści na barku
+ * wypada nisko), a swobodny taniec sięga wyżej - p90 wynosi -0.21. Warunek
+ * mierzył więc odwrotność tego, co miał mierzyć.
+ *
+ * Sam styk wystarcza z zapasem: 0.99 wyniku we własnym kroku i ZERO z 763
+ * klatek tańca nad progiem składania.
  */
-import {
-    BARK_L, BARK_P, NADG_L, NADG_P, BIODRO_L, BIODRO_P,
-    widoczne, skalaCiala, rampa, poziom
-} from './postawa.js';
+import { NADG_L, NADG_P, BARK_L, BARK_P, widoczne, skalaCiala } from './postawa.js';
+import { styk } from './styk.js';
+import { zwinieta, pelnaDlon } from './dlon.js';
+import { PROGI } from './progi-zmierzone.js';
 
-const PUNKTY = [BARK_L, BARK_P, NADG_L, NADG_P, BIODRO_L, BIODRO_P];
+const PUNKTY = [BARK_L, BARK_P, NADG_L, NADG_P];
+const P = PROGI.ziemia;
 
-// ZGADNIĘTE - wymagają potwierdzenia na żywym ciele (nakładka debug, D).
-const KRZYZ_MIN = 0.05;    // nadgarstki ledwo minęły się w poprzek tułowia
-const KRZYZ_PELNY = 0.5;   // wyraźnie po przeciwnych stronach, w szerokościach barków
-
-// Wysokość piersi jako ułamek odcinka barki -> biodra. 0 = linia barków,
-// 1 = linia bioder.
-const PIERS_IDEALNA = 0.45;
-const PIERS_TOLERANCJA = 0.5;
+// Brak dłoni w kadrze NIE KARZE (GEMINI.md §2). Ciało prowadzi, dłonie
+// doprecyzowują - ten sam wzorzec i ta sama wartość co w dawnym
+// runy/definicje.js:25, gdzie sprawdził się w praktyce.
+const WAGA_BEZ_DLONI = 0.7;
 
 export const weles = {
     id: 'weles',
-    nazwa: 'Weles',
+    nazwa: 'Weles (ziemia)',
     wymaga: 'pose',
 
     score(frame) {
-        const wl = frame.pose?.worldLandmarks;
-        if (!widoczne(wl, PUNKTY)) return 0;
+        const sk = skladnikiZ(frame);
+        if (!sk) return 0;
+        // Minimum, nie średnia: pieczęć jest AND-em warunków, a najsłabszy
+        // z nich ma widocznie hamować - inaczej dwa dobre warunki maskują
+        // trzeci zupełnie niespełniony.
+        return Math.min(sk.stykL, sk.stykP, sk.piesci);
+    },
 
-        const skala = skalaCiala(wl);
-        const yBarkow = poziom(wl, BARK_L, BARK_P);
-        const yBioder = poziom(wl, BIODRO_L, BIODRO_P);
-        const rozpietosc = yBioder - yBarkow;
-        if (!(Math.abs(rozpietosc) > 1e-6)) return 0;
-
-        // Dodatnie, gdy nadgarstki leżą po stronach PRZECIWNYCH niż barki.
-        const roznicaNadg = wl[NADG_L].x - wl[NADG_P].x;
-        const roznicaBark = wl[BARK_L].x - wl[BARK_P].x;
-        const krzyz = rampa(-(roznicaNadg * Math.sign(roznicaBark)) / skala,
-                            KRZYZ_MIN, KRZYZ_PELNY);
-
-        const wysL = wysokoscPiersi(wl[NADG_L].y, yBarkow, rozpietosc);
-        const wysP = wysokoscPiersi(wl[NADG_P].y, yBarkow, rozpietosc);
-
-        // Minimum, nie średnia - patrz komentarz w perun.js.
-        return Math.min(krzyz, wysL, wysP);
+    /** Rozbicie na warunki - do nakładki, żeby było widać KTÓRY blokuje. */
+    skladniki(frame) {
+        return skladnikiZ(frame);
     }
 };
 
-function wysokoscPiersi(y, yBarkow, rozpietosc) {
-    const t = (y - yBarkow) / rozpietosc;
-    if (!Number.isFinite(t)) return 0;
-    // Trójkątna rampa wokół wysokości piersi: ciągła w obie strony,
-    // więc dłoń wędrująca w górę albo w dół gaśnie płynnie, nie skokiem.
-    return Math.max(0, 1 - Math.abs(t - PIERS_IDEALNA) / PIERS_TOLERANCJA);
+/**
+ * Warunki liczone przez FUNKCJĘ MODUŁOWĄ, nie przez `this` w score().
+ * Ten sam wzorzec co mokoszSplot.js:53 - dzięki niemu `score` i `skladniki`
+ * działają także wtedy, gdy ktoś je zdestrukturyzuje z obiektu znaku.
+ */
+function skladnikiZ(frame) {
+        const wl = frame.pose?.worldLandmarks;
+        if (!widoczne(wl, PUNKTY)) return null;
+        const skala = skalaCiala(wl);
+
+        return {
+            // Lewy nadgarstek przy PRAWYM barku i odwrotnie - to jest samo
+            // skrzyżowanie, wyrażone odległościami.
+            stykL: styk(wl, NADG_L, BARK_P, skala, P.STYK_PELNY, P.STYK_ZERO),
+            stykP: styk(wl, NADG_P, BARK_L, skala, P.STYK_PELNY, P.STYK_ZERO),
+            piesci: piesci(frame)
+        };
+}
+
+/** Miękki kwalifikator: średnie zwinięcie widocznych dłoni, bez kary za brak. */
+function piesci(frame) {
+    const dlonie = (frame.hands ?? []).filter(d => pelnaDlon(d.landmarks));
+    if (!dlonie.length) return WAGA_BEZ_DLONI;
+    const suma = dlonie.reduce((acc, d) => acc + zwinieta(d.landmarks), 0);
+    const srednia = suma / dlonie.length;
+    // Podłoga na WAGA_BEZ_DLONI, ROSNĄCA do 1.0: dłoń widoczna, ale otwarta
+    // (srednia = 0), daje dokładnie tyle, ile dałby brak dłoni w kadrze -
+    // NIGDY mniej, inaczej wejście dłoni w kadr byłoby KARĄ względem stania
+    // poza nim (patrz test "dłonie otwarte -> nie gorzej niż brak dłoni").
+    // Dłoń w pełni zaciśnięta (srednia = 1) podnosi wynik do 1.0. Liniowa
+    // interpolacja między tymi dwoma punktami jest ciągła w całym zakresie -
+    // reguła nadrzędna: pięść zaciśnięta w połowie ma dawać wynik w połowie
+    // między podłogą a pełnią, nie skok.
+    return WAGA_BEZ_DLONI + (1 - WAGA_BEZ_DLONI) * srednia;
 }
