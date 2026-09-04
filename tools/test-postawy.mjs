@@ -20,6 +20,9 @@ import { ZnakRegistry } from '../js/znaki/registry.js';
 import { resetSkali, skalaCiala, aktualizujSkale } from '../js/znaki/postawa.js';
 import { weles } from '../js/znaki/weles.js';
 import { stribog } from '../js/znaki/stribog.js';
+import { mokosz } from '../js/znaki/mokosz.js';
+import { kierunekDloni } from '../js/znaki/dlon.js';
+import { PROGI } from '../js/znaki/progi-zmierzone.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -48,7 +51,7 @@ export function cialo({ nadgL, nadgP, lokL, lokP, vis = 1, obrot = 0 }) {
 }
 
 const rej = new ZnakRegistry();
-rej.zarejestruj(weles); rej.zarejestruj(stribog);
+rej.zarejestruj(weles); rej.zarejestruj(stribog); rej.zarejestruj(mokosz);
 export const ocen = (wl, hands = []) => {
   resetSkali();
   return rej.ocen({ hands, pose: { landmarks: [], worldLandmarks: wl }, width: 1920, height: 1080, dt: 1 / 60, now: 0 });
@@ -616,4 +619,370 @@ console.log('  ' + poziomyPw.join('  '));
 // Ten sam ujednolicony próg 0.1 co obie pętle ciągłości ziemi wyżej.
 spr(`największy skok powietrza = ${maxSkokPw.toFixed(3)} (rampa, nie próg)`, maxSkokPw < 0.1);
 
+// ================== WODA (Mokosz) ==================
+//
+// PROGI.woda ma TRZY grupy progów: GLEBOKOSC, MISKA, KIERUNEKPALCOW. Woda
+// jest jedyną z pięciu pieczęci, w której żaden z trzech warunków osobno nie
+// rozdziela pozy od tańca - dopiero ich KONIUNKCJA (minimum). Szczegółowa
+// argumentacja jest w js/znaki/mokosz.js; tu tylko to, co dotyczy fixture'ów:
+//
+//   - `glebokosc` i `kierunekPalcow` czytają WYŁĄCZNIE oś y (nadBarkami,
+//     surowy kierunekDloni().y) - żadna z nich nie ma operacji czułej na
+//     znak x.
+//   - `miska` czyta odleglosc() między parami tej SAMEJ roli (łokieć-łokieć,
+//     nadgarstek-nadgarstek) - odległość jest izometrią lustra z definicji,
+//     a zamiana L<->P w parze tej samej roli daje identyczną liczbę
+//     (dist(A,B)=dist(B,A)), więc nie ma tu nawet klasy błędu "złe
+//     sparowanie stron", jaką łapie lustro w ziemi.
+//
+// Konsekwencja dla testów LUSTRA niżej: żadna z trzech formuł wody nie ma
+// ŻADNEJ operacji czułej na znak x - test lustra dowodzi więc tylko tyle,
+// że żadna z nich nie czyta znaku x wprost (np. Math.sign różnicy). Resztę
+// gwarantuje sama budowa modułu, nie test - ta sama granica co przy
+// powietrzu wyżej, tu dotyczy WSZYSTKICH TRZECH warunków naraz, nie jednego.
+//
+// STYK (odległość samych nadgarstków, osobny próg) USUNIĘTY z generatora
+// (tools/progi.mjs) po pomiarze na żywym ciele: w tańcu nadgarstki bywają
+// BLIŻEJ siebie niż w samej misce, więc mierzył odwrotność zamierzonego
+// kierunku - ta sama klasa błędu co wysokość w ziemi i rozchylenie
+// w powietrzu. Rozstaw nadgarstków ZOSTAJE w formule jako część RÓŻNICY
+// warunku MISKA, tylko bez własnego, osobnego progu.
 
+/**
+ * Dłoń pozioma, palce w stronę kamery (dodatni SUROWY kierunekDloni().y,
+ * dlon.js) - jedyna orientacja, jaką woda uznaje za swoją. To otwartaDlon()
+ * ODBITA wzdłuż osi Y względem nadgarstka: ten sam wachlarz palców, tylko
+ * obrócony tak, żeby wektor nadgarstek->nasada środkowego palca mierzył
+ * w DÓŁ obrazu zamiast w górę (otwartaDlon ma go w górę - piesc() dla wody
+ * jest niepotrzebna, bo kierunekPalcow nie patrzy na zwinięcie palców,
+ * tylko na kierunek dłoni jako całości).
+ */
+function dlonWody(reka = 'Left') {
+  const otw = otwartaDlon(reka).landmarks;
+  const wrist = otw[0];
+  const lm = otw.map(p => ({ x: p.x, y: wrist.y - (p.y - wrist.y), z: p.z }));
+  return { handedness: reka, landmarks: lm };
+}
+
+/**
+ * Dłoń z WYMUSZONYM składnikiem y wektora kierunekDloni() - do testowania
+ * rampy KIERUNEKPALCOW w dowolnym punkcie, nie tylko na suficie/podłodze.
+ * `kierunekDloni` czyta WYŁĄCZNIE nadgarstek (0) i nasadę środkowego palca
+ * (9) - reszta punktów zostaje z otwartaDlon() (ważna tylko dla pelnaDlon(),
+ * która wymaga wszystkich 21 punktów skończonych).
+ */
+function dlonKierunek(reka, y) {
+  const lm = otwartaDlon(reka).landmarks.map(p => ({ ...p }));
+  const x = Math.sqrt(Math.max(0, 1 - y * y));
+  lm[0] = { x: 0.50, y: 0.50, z: 0 };
+  lm[9] = { x: 0.50 + 0.20 * x, y: 0.50 + 0.20 * y, z: 0 };
+  return { handedness: reka, landmarks: lm };
+}
+
+/** Odbicie lustrzane dłoni - ta sama operacja jak odbij() dla pozy wyżej. */
+const odbijDlon = (d) => ({
+  handedness: d.handedness === 'Left' ? 'Right' : d.handedness === 'Right' ? 'Left' : d.handedness,
+  landmarks: d.landmarks.map(p => ({ ...p, x: -p.x }))
+});
+
+// WODA: miska nisko przy pępku - nadgarstki blisko siebie, łokcie szerzej,
+// dłonie poziome (palce w stronę kamery).
+//
+// POPRAWKA WZGLĘDEM BRIEFU. Brief trzymał nadgarstki niemal stykające się
+// (rozstaw 0.08 m, ±0.04) - przy tym rozstawie odległość NADG_L do
+// PRZECIWNEGO barku (ta, którą weles.js czyta jako skrzyżowanie rąk ziemi)
+// wychodzi 0.4924 m / skala 0.40 m = 1.231 znormalizowane - WEWNĄTRZ rampy
+// styku ziemi (0.941..1.416), więc `weles` dostawał częściowy kredyt (0.39,
+// ZMIERZONE node -e) z tej samej pozy, którą test miał pokazać jako
+// WYŁĄCZNIE wodę - dokładnie awaria kolizji, przed którą ostrzega docstring
+// mokosz.js. Rozstaw PODNIESIONY do 0.24 m (±0.12): nadal wyraźnie mniejszy
+// niż rozstaw łokci (0.52 m, MISKA zostaje w pełni nasycona), ale odsuwa
+// nadgarstek od przeciwnego barku na tyle, że styk ziemi spada do 0.16 -
+// bezpiecznie pod progiem kolizji tego testu (< 0.3).
+const WODA = cialo({
+  nadgL: [-0.12, -0.12], nadgP: [0.12, -0.12],
+  lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+});
+const RECE_WODY = [dlonWody('Left'), dlonWody('Right')];
+
+console.log('\nWODA:');
+const wd = ocen(WODA, RECE_WODY);
+// Próg PODNIESIONY z briefu (>0.7) na >0.9, ten sam zabieg co w ziemi
+// (task 8, przegląd zadania 7): 0.7 pokrywa się liczbowo z WAGA_BEZ_DLONI,
+// więc mutant "kierunekPalcow() zawsze zwraca WAGA_BEZ_DLONI" (dłonie
+// całkowicie zignorowane) przechodziłby wyłącznie zbiegiem okoliczności na
+// granicy. Realny wynik to 1.00.
+spr(`miska nisko zapala wodę (${wd.mokosz.toFixed(2)})`, wd.mokosz > 0.9);
+
+// Ta sama miska PODNIESIONA pod brodę - za płytko, to już nie woda.
+const miskaWysoko = ocen(cialo({
+  nadgL: [-0.12, -0.80], nadgP: [0.12, -0.80],
+  lokL: [-0.26, -0.60], lokP: [0.26, -0.60]
+}));
+spr(`miska pod brodą NIE zapala wody (${miskaWysoko.mokosz.toFixed(2)})`, miskaWysoko.mokosz < 0.3);
+
+// Ręce nisko, ale ROZSTAWIONE (nadgarstki szerzej niż łokcie) - to nie miska.
+const receNisko = ocen(cialo({
+  nadgL: [-0.30, -0.12], nadgP: [0.30, -0.12],
+  lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+}));
+spr(`ręce nisko rozstawione NIE zapalają wody (${receNisko.mokosz.toFixed(2)})`, receNisko.mokosz < 0.3);
+
+console.log('\nOGIEŃ vs WODA - para z sekwencji Tęczy:');
+// Ogień czyta DŁONIE i w ogóle nie mierzy wysokości; woda czyta POZĘ (plus
+// kierunek dłoni) i wymaga nadgarstków nisko. Kolizja rozpada się na osi,
+// której ogień nie dotyka - i dlatego przejście ogień->woda w Tęczy nie miga.
+spr(`woda NIE zapala powietrza (${wd.stribog.toFixed(2)})`, wd.stribog < 0.3);
+spr(`woda NIE zapala ziemi (${wd.weles.toFixed(2)})`, wd.weles < 0.3);
+spr(`powietrze NIE zapala wody (${pw.mokosz.toFixed(2)})`, pw.mokosz < 0.3);
+spr(`ziemia NIE zapala wody (${z.mokosz.toFixed(2)})`, z.mokosz < 0.3);
+
+console.log('\nBRAK DANYCH i KIERUNEK DŁONI:');
+// REGUŁA NADRZĘDNA: brak dłoni w kadrze NIE KARZE.
+const wodaBezDloni = ocen(WODA, []);
+spr(`brak dłoni nie zeruje wody (${wodaBezDloni.mokosz.toFixed(2)})`, wodaBezDloni.mokosz > 0.5);
+spr(`podłoga bez dłoni = WAGA_BEZ_DLONI (${wodaBezDloni.mokosz.toFixed(2)})`,
+    Math.abs(wodaBezDloni.mokosz - 0.7) < 0.01);
+
+// ODSTĘPSTWO OD WZORCA piesci() z weles.js - CELOWE, udokumentowane też
+// w mokosz.js. Tam dłoń widoczna nigdy nie schodzi PONIŻEJ podłogi braku
+// dłoni, bo zwinięcie pięści jest premią BEZ WŁASNEGO progu w PROGI.
+// `kierunekPalcow` to inna sytuacja: ma WŁASNY, zmierzony próg
+// (KIERUNEKPALCOW_ZERO/PELNY) i jest jednym z warunków, które KONIUNKCJA
+// potrzebuje, żeby odróżnić wodę od tańca (patrz w progi.mjs komentarz
+// o MISKA_ZERO liczonym z "tańca warunkowego: spełnia glebokosc
+// i kierunekPalcow"). Floor-blendowanie tej miary jak w weles.js
+// zniweczyłoby jej rolę dyskryminatora: dłoń widoczna, ale skierowana
+// PIONOWO (nie w stronę kamery) MUSI móc obniżyć wynik PONIŻEJ podłogi
+// braku dłoni - inaczej taniec z rękami nisko i szeroko rozstawionymi
+// łokciami, ale dłońmi pionowymi, i tak zapalałby wodę do poziomu podłogi.
+const zlyKierunek = ocen(WODA, [otwartaDlon('Left'), otwartaDlon('Right')]);
+spr(`dłonie widoczne, ale PIONOWE - GORZEJ niż brak dłoni, celowo (${zlyKierunek.mokosz.toFixed(2)} < ${wodaBezDloni.mokosz.toFixed(2)})`,
+    zlyKierunek.mokosz < wodaBezDloni.mokosz - 0.1);
+
+console.log('\nMIN, NIE MAX / FILTR DŁONI / WIDOCZNOŚĆ:');
+// Cztery fixture'y niżej łapią mutacje, których żadna asercja wyżej nie
+// widzi (ZMIERZONE mutation testingiem - patrz raport zadania): wszystkie
+// dotychczasowe fixture'y trzymają obie ręce/dłonie SYMETRYCZNIE, więc
+// Math.min<->Math.max w dowolnym z trzech warunków przechodziłby niezauważony.
+
+// Jedna ręka głęboko (jak w WODA), druga ledwo pod barkami (y=-0.50, blisko
+// linii barków -0.55) - to NIE jest jeszcze miska. `glebokosc` bierze
+// Math.max z nadBarkami() obu nadgarstków (najwyższy = najpłytszy rządzi) -
+// mutacja na Math.min dawałaby tu 0.23 zamiast 0 (ZMIERZONE), bo brałaby
+// głębszą, "lepszą" rękę zamiast płytszej.
+const jednaRekaPlytko = ocen(cialo({
+  nadgL: [-0.12, -0.12], nadgP: [0.12, -0.50],
+  lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+}), RECE_WODY);
+spr(`jedna ręka głęboko, druga płytko NIE zapala wody - MAX niższej ręki, nie MIN (${jednaRekaPlytko.mokosz.toFixed(2)})`,
+    jednaRekaPlytko.mokosz < 0.1);
+
+// Jedna dłoń pozioma (dobra), druga pionowa (zła) - `kierunekPalcow` bierze
+// Math.min po dłoniach, więc gorsza dłoń rządzi. Mutacja na Math.max dawałaby
+// tu 1.00 zamiast 0.00 (ZMIERZONE) - obie ręce w WODA (poza) zostają
+// nasycone, więc to WYŁĄCZNIE ta asercja odróżnia MIN od MAX w tym warunku.
+const jednaDlonZla = ocen(WODA, [dlonWody('Left'), otwartaDlon('Right')]);
+spr(`jedna dłoń pozioma, druga pionowa NIE zapala wody - MIN gorszej dłoni, nie MAX (${jednaDlonZla.mokosz.toFixed(2)})`,
+    jednaDlonZla.mokosz < 0.3);
+
+// Jedna dłoń DOBRA, druga ZEPSUTA (NaN w jednym landmarku - nie przechodzi
+// pelnaDlon()) - filtr `pelnaDlon` musi odsiać zepsutą dłoń, zanim
+// kierunekDloni() dostanie do niej dostęp, inaczej NaN zatruwa Math.min()
+// całego warunku mimo że DRUGA dłoń jest w pełni poprawna. Bez filtra wynik
+// spada do 0.00 (ZMIERZONE) - dokładnie objaw, przed którym ostrzega reguła
+// nadrzędna (jedna zepsuta dłoń w kadrze nie może zgasić poprawnej drugiej).
+const zepsutaDlon = dlonWody('Left');
+zepsutaDlon.landmarks = zepsutaDlon.landmarks.map((p, i) => i === 9 ? { x: NaN, y: NaN, z: 0 } : p);
+const mixHands = ocen(WODA, [zepsutaDlon, dlonWody('Right')]);
+spr(`dłoń zepsuta (NaN) obok poprawnej nie zatruwa wyniku - filtr pelnaDlon (${mixHands.mokosz.toFixed(2)})`,
+    mixHands.mokosz > 0.7);
+
+// Łokieć NISKO PEWNY (visibility poniżej progu, współrzędne skończone) - ten
+// sam wzorzec co w powietrzu wyżej. `mokosz.PUNKTY` obejmuje LOKIEC_L/P,
+// inaczej niż weles.PUNKTY - bez tej asercji mutacja usuwająca łokcie
+// z PUNKTY przechodzi niezauważona (ZMIERZONE: mokosz=1.00 zamiast 0.00).
+const lokNiewidoczny = ocen((() => {
+  const wl = cialo({
+    nadgL: [-0.12, -0.12], nadgP: [0.12, -0.12],
+    lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+  });
+  wl[13] = { ...wl[13], visibility: 0.1 }; // LOKIEC_L, poniżej PROG_WIDOCZNOSCI (0.5)
+  return wl;
+})(), RECE_WODY);
+spr(`łokieć niepewny (visibility niska) -> woda = 0, nie śmieć (${lokNiewidoczny.mokosz})`,
+    lokNiewidoczny.mokosz === 0);
+
+console.log('\nLUSTRO:');
+const wdL = ocen(odbij(WODA), RECE_WODY.map(odbijDlon));
+spr(`odbita woda = ta sama (${wdL.mokosz.toFixed(2)})`, Math.abs(wdL.mokosz - wd.mokosz) < 0.02);
+
+// POPRAWKA PO PRZEGLĄDZIE ZADAŃ 7-8. `WODA` ma WSZYSTKIE TRZY składniki
+// NASYCONE - mirror porównywałby 1.00 z 1.00 niezależnie od formuły. Woda ma
+// TRZY warunki (nie dwa jak powietrze), więc potrzeba TRZECH fixture'ów,
+// każdy w połowie SWOJEJ rampy, z pozostałymi dwoma bezpiecznie w suficie -
+// inaczej minimum() mogłoby wybrać niewłaściwy składnik i zamaskować błąd
+// w tym, który akurat testujemy. Zobacz komentarz o granicy tego, co lustro
+// dowodzi, w sekcji WODA wyżej - dotyczy wszystkich trzech fixture'ów niżej.
+const GLEB_MID = (PROGI.woda.GLEBOKOSC_ZERO + PROGI.woda.GLEBOKOSC_PELNY) / 2;
+const NADG_Y_GLEB_MID = -0.55 + GLEB_MID * 0.40; // v = (yBarkow - y)/skala
+const GLEB_POL_RAMPY = cialo({
+  nadgL: [-0.12, NADG_Y_GLEB_MID], nadgP: [0.12, NADG_Y_GLEB_MID],
+  lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+});
+const polRampyGleb = ocen(GLEB_POL_RAMPY, RECE_WODY);
+spr(`fixture lustra (głębokość) faktycznie leży w połowie rampy (${polRampyGleb.mokosz.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    polRampyGleb.mokosz > 0.4 && polRampyGleb.mokosz < 0.6);
+const polRampyGlebL = ocen(odbij(GLEB_POL_RAMPY), RECE_WODY.map(odbijDlon));
+spr(`odbita woda (połowa rampy głębokości) = ta sama (${polRampyGlebL.mokosz.toFixed(2)})`,
+    Math.abs(polRampyGlebL.mokosz - polRampyGleb.mokosz) < 0.02);
+
+const MISK_MID = (PROGI.woda.MISKA_ZERO + PROGI.woda.MISKA_PELNY) / 2;
+const WRIST_DIST = 0.24; // ten sam rozstaw nadgarstków co w WODA (±0.12)
+const ELBOW_DIST_MID = WRIST_DIST + MISK_MID * 0.40; // (lok-nadg)/skala = MISK_MID
+const MISK_POL_RAMPY = cialo({
+  nadgL: [-0.12, -0.12], nadgP: [0.12, -0.12],
+  lokL: [-ELBOW_DIST_MID / 2, -0.25], lokP: [ELBOW_DIST_MID / 2, -0.25]
+});
+const polRampyMisk = ocen(MISK_POL_RAMPY, RECE_WODY);
+spr(`fixture lustra (miska) faktycznie leży w połowie rampy (${polRampyMisk.mokosz.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    polRampyMisk.mokosz > 0.4 && polRampyMisk.mokosz < 0.6);
+const polRampyMiskL = ocen(odbij(MISK_POL_RAMPY), RECE_WODY.map(odbijDlon));
+spr(`odbita woda (połowa rampy miski) = ta sama (${polRampyMiskL.mokosz.toFixed(2)})`,
+    Math.abs(polRampyMiskL.mokosz - polRampyMisk.mokosz) < 0.02);
+
+const KIER_MID = (PROGI.woda.KIERUNEKPALCOW_ZERO + PROGI.woda.KIERUNEKPALCOW_PELNY) / 2;
+const RECE_POL_RAMPY = [dlonKierunek('Left', KIER_MID), dlonKierunek('Right', KIER_MID)];
+// Asercja-precondycja na SUROWEJ wartości kierunekDloni(), nie tylko na
+// wyniku score() - dowodzi, że fixture trafia dokładnie środek rampy, zanim
+// rampa() i minimum() zdążą go przyciąć albo zamaskować.
+spr(`fixture kierunku dłoni ma surowy y w połowie rampy (${kierunekDloni(RECE_POL_RAMPY[0].landmarks).y.toFixed(3)} ≈ ${KIER_MID.toFixed(3)})`,
+    Math.abs(kierunekDloni(RECE_POL_RAMPY[0].landmarks).y - KIER_MID) < 1e-6);
+const polRampyKier = ocen(WODA, RECE_POL_RAMPY);
+spr(`fixture lustra (kierunek palców) faktycznie leży w połowie rampy (${polRampyKier.mokosz.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    polRampyKier.mokosz > 0.4 && polRampyKier.mokosz < 0.6);
+const polRampyKierL = ocen(odbij(WODA), RECE_POL_RAMPY.map(odbijDlon));
+spr(`odbita woda (połowa rampy kierunku palców) = ta sama (${polRampyKierL.mokosz.toFixed(2)})`,
+    Math.abs(polRampyKierL.mokosz - polRampyKier.mokosz) < 0.02);
+
+console.log('\nGŁĘBIA (oś z) - miska z tułowiem obróconym bokiem:');
+// Ten sam cel co sekcje GŁĘBIA w ziemi i powietrzu wyżej, ale w PRZECIWNYM
+// kierunku. `glebokosc` i `miska` są ROSNĄCE (progi.mjs: ROSNACE) - gdy ktoś
+// usunie dz z skalaCiala(), skala ZAPADA SIĘ do podłogi 0.12 (jak tam), ale
+// tu każda odległość podzielona przez MNIEJSZĄ skalę wychodzi WIĘKSZA: błąd
+// nie ZANIŻA wyniku (jak w ziemi/powietrzu), tylko go ZAWYŻA. Bez tej sekcji
+// woda zapalałaby się ŁATWIEJ niż powinna przy każdym obrocie tułowia -
+// odwrotny objaw niż ten, przed którym ostrzega postawa.js.
+//
+// Dlatego fixture NIE MOŻE być nasycony jak ZIEMIA_BOKIEM/POWIETRZE_BOKIEM -
+// zawyżenie nie miałoby dokąd urosnąć, skoro już siedzi na suficie 1.0.
+// Ponownie użyte są GLEB_POL_RAMPY / MISK_POL_RAMPY z sekcji LUSTRA (już
+// w połowie swojej rampy z definicji), z dodanym obrotem tułowia.
+//
+// `GLEB_POL_RAMPY_BOKIEM` obraca WYŁĄCZNIE barki (`cialo({obrot})` robi to
+// automatycznie) - nadgarstek zostaje tam, gdzie fixture go postawił.
+// Wystarcza to w zupełności: `nadBarkami()` czyta WYŁĄCZNIE y (styk.js),
+// więc obrót WŁASNEJ pozycji nadgarstka nigdy nie mógłby ujawnić błędu w dz -
+// jedyną rzeczą, przez którą dz w ogóle wchodzi do formuły głębokości, jest
+// MIANOWNIK, skalaCiala(barki). Obracanie nadgarstka nie dodałoby tu żadnej
+// nowej ścieżki do przetestowania.
+//
+// `MISK_POL_RAMPY_BOKIEM` jest INNA: `miska` czyta odleglosc(łokieć,łokieć)
+// i odleglosc(nadgarstek,nadgarstek), a odleglosc() SAMA liczy pełne 3D
+// (styk.js: `Math.hypot(dx,dy,dz)`) - ma więc WŁASNE dz, niezależne od
+// skalaCiala(). Obrócenie samych barków (jak w GŁĘBOKOŚCI) zostawiłoby tę
+// drugą ścieżkę nieprzetestowaną - błąd w dz WEWNĄTRZ odleglosc() przeszedłby
+// niezauważony, mimo że dz w MIANOWNIKU byłby pokryty. Dlatego łokcie
+// i nadgarstki tego fixture'a dostają WŁASNY obrót, tym samym przekształceniem
+// (x,y,0) -> (x·cosθ, y, x·sinθ) co barki - IZOMETRIA, więc obie prawdziwe
+// odległości (łokieć-łokieć, nadgarstek-nadgarstek) zostają identyczne jak
+// bez obrotu, niezależnie od tego, czy skala jest poprawna.
+const KAT_WD = 75;
+const RAD_WD = KAT_WD * Math.PI / 180;
+const COS_WD = Math.cos(RAD_WD), SIN_WD = Math.sin(RAD_WD);
+
+const GLEB_POL_RAMPY_BOKIEM = cialo({
+  obrot: KAT_WD,
+  nadgL: [-0.12, NADG_Y_GLEB_MID], nadgP: [0.12, NADG_Y_GLEB_MID],
+  lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+});
+const glebBokiem = ocen(GLEB_POL_RAMPY_BOKIEM, RECE_WODY);
+// ZMIERZONE (node -e, mutacja "dz usunięte z skalaCiala"): skala poprawna
+// 0.400 m, skala bez dz spada do podłogi 0.120 m. glebokosc wtedy skacze
+// z 0.50 na 1.00 (nasyca się), a mokosz razem z nim - wyraźnie SPOZA pasma
+// 0.4-0.6, więc próg tego testu łapie błąd bez balansowania na granicy.
+spr(`woda (głębokość) z realną głębią tułowia zostaje w połowie rampy, nie skacze przy błędnej skali (${glebBokiem.mokosz.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    glebBokiem.mokosz > 0.4 && glebBokiem.mokosz < 0.6);
+
+const MISK_POL_RAMPY_BOKIEM = cialo({
+  obrot: KAT_WD,
+  nadgL: [-0.12 * COS_WD, -0.12, -0.12 * SIN_WD], nadgP: [0.12 * COS_WD, -0.12, 0.12 * SIN_WD],
+  lokL: [-(ELBOW_DIST_MID / 2) * COS_WD, -0.25, -(ELBOW_DIST_MID / 2) * SIN_WD],
+  lokP: [(ELBOW_DIST_MID / 2) * COS_WD, -0.25, (ELBOW_DIST_MID / 2) * SIN_WD]
+});
+const miskBokiem = ocen(MISK_POL_RAMPY_BOKIEM, RECE_WODY);
+// ZMIERZONE (node -e, mutacja "dz usunięte z odleglosc() w styk.js" - NIE
+// skalaCiala): wynik poprawny 0.50 spada do 0.066 - łokcie zbliżają się do
+// siebie w rzucie x,y bez dz, więc `miska` (różnica dwóch odległości) traci
+// swój dodatni margines. Ta mutacja jest NIEWIDOCZNA dla fixture'a głębokości
+// wyżej (który obraca tylko barki) - stąd osobny, w pełni obrócony fixture.
+spr(`woda (miska) z realną głębią tułowia zostaje w połowie rampy, nie skacze przy błędnej skali ani błędnej odleglosc() (${miskBokiem.mokosz.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    miskBokiem.mokosz > 0.4 && miskBokiem.mokosz < 0.6);
+
+resetSkali();
+const skalaProstoWd = skalaCiala(WODA);
+resetSkali();
+const skalaBokiemWd = skalaCiala(GLEB_POL_RAMPY_BOKIEM);
+console.log(`  skala prosto=${skalaProstoWd.toFixed(3)} m   skala bokiem=${skalaBokiemWd.toFixed(3)} m`);
+spr(`skala barków jest niezmiennikiem obrotu (różnica ${Math.abs(skalaProstoWd - skalaBokiemWd).toFixed(3)} m)`,
+    Math.abs(skalaProstoWd - skalaBokiemWd) < 0.01);
+const bzWd = 0.20 * Math.sin(RAD_WD);
+spr(`fixture rzeczywiście ma niezerową głębię (bz=${bzWd.toFixed(3)})`, Math.abs(bzWd) > 0.05);
+resetSkali();
+
+console.log('\nŚCIEŻKA PRODUKCYJNA (aktualizujSkale + EMA), nie tylko resetSkali+chwilowa:');
+// Ten sam cel i ta sama luka co w sekcji ZIEMIA wyżej (POPRAWKA PO
+// PRZEGLĄDZIE, ~linia 375): `ocen()` woła resetSkali() PRZED każdą oceną,
+// więc skalaCiala() w mokosz.js zawsze spada na skalaChwilowa() w TYM pliku -
+// nigdy na ścieżkę main.js (aktualizujSkale() raz na klatkę, bez resetu).
+// UŻYWA `MISK_POL_RAMPY`, NIE nasyconej `WODA`: przy nasyceniu skala
+// pomnożona przez dowolną stałą i tak dałaby wynik przycięty do 1.0 -
+// mutacja w gałęzi EMA (np. `_skalaEma * 0.5`) przeszłaby niezauważona.
+resetSkali();
+for (let i = 0; i < 60; i++) aktualizujSkale(MISK_POL_RAMPY, 1 / 60);
+const wdEma = rej.ocen({
+  hands: RECE_WODY, pose: { landmarks: [], worldLandmarks: MISK_POL_RAMPY },
+  width: 1920, height: 1080, dt: 1 / 60, now: 0
+});
+spr(`woda (połowa rampy miski) liczy się poprawnie przez ścieżkę EMA, nie tylko reset+chwilowa (${wdEma.mokosz.toFixed(2)})`,
+    wdEma.mokosz > 0.4 && wdEma.mokosz < 0.6);
+resetSkali();
+// GRANICA TEGO, CO TEN TEST MOŻE UDOWODNIĆ (ZMIERZONE mutation testingiem,
+// patrz raport zadania - ta sama luka istnieje w analogicznym teście ZIEMI
+// powyżej, nie jest wprowadzona tutaj). Fixture rozgrzewkowy i fixture
+// pomiaru to TA SAMA statyczna poza (MISK_POL_RAMPY) - EMA zdąża zbiec się
+// dokładnie do wartości, jaką dałaby skalaChwilowa() z tej samej klatki.
+// Test łapie więc mutację W SAMEJ formule EMA (np. `_skalaEma *= 0.5`,
+// ZWERYFIKOWANE), ale NIE odróżnia "skalaCiala() czyta _skalaEma" od
+// "skalaCiala() zawsze przelicza skalaChwilowa() na nowo" - przy stałej
+// pozie obie ścieżki zbiegają do tej samej liczby. Odróżnienie tych dwóch
+// wymagałoby fixture'a rozgrzewkowego o INNEJ szerokości barków niż fixture
+// pomiaru - poza zakresem tego zadania.
+
+console.log('\nCIĄGŁOŚĆ przy schodzeniu nadgarstków do siebie:');
+let poprzWd = 0, maxSkokWd = 0;
+const poziomyWd = [];
+for (let i = 0; i <= 60; i++) {
+  const d = 0.30 - i * 0.005;
+  const s = ocen(cialo({
+    nadgL: [-d, -0.12], nadgP: [d, -0.12],
+    lokL: [-0.26, -0.25], lokP: [0.26, -0.25]
+  }), RECE_WODY).mokosz;
+  maxSkokWd = Math.max(maxSkokWd, Math.abs(s - poprzWd)); poprzWd = s;
+  if (i % 12 === 0) poziomyWd.push(`${(2 * d).toFixed(2)}:${s.toFixed(2)}`);
+}
+console.log('  ' + poziomyWd.join('  '));
+// Ten sam ujednolicony próg 0.1 co pętle ciągłości ziemi i powietrza wyżej.
+spr(`największy skok wody = ${maxSkokWd.toFixed(3)} (rampa, nie próg)`, maxSkokWd < 0.1);
+
+process.exit(ok ? 0 : 1);
