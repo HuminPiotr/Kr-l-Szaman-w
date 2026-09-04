@@ -1,69 +1,61 @@
 /**
- * Znak Striboga - wiatr, podmuch.
+ * Powietrze - Stribog: wiatr, dziad wiatrów.
  *
- * Nasz odpowiednik znaku Aard: otwarta dłoń, palce szeroko rozstawione,
- * jakby gracz łapał wiatr.
+ * Łokcie stykają się przed mostkiem, przedramiona idą pionowo w górę,
+ * dłonie rozchylają się na zewnątrz jak dwie gałęzie z jednego pnia.
+ * Punkt styku: łokieć o łokieć.
  *
- * Celowo KSZTAŁT STATYCZNY, nie ruch. Rozpoznawanie trajektorii (zamach,
- * przeciągnięcie) to osobny mechanizm i osobny kawałek pracy - tutaj chodzi
- * o udowodnienie, że rejestr obsługuje więcej niż jeden znak.
+ * ORTOGONALNY DO OGNIA Z KONSTRUKCJI: piramidka Swaroga to NADGARSTKI
+ * ROZSUNIĘTE przy opuszkach razem, powietrze to ŁOKCIE RAZEM przy
+ * nadgarstkach rozsuniętych. Te same dwie osie w odwrotnych rolach,
+ * więc dwie pieczęcie nie mogą jednocześnie siedzieć wysoko.
  *
- * Kształt jest geometrycznie przeciwny do "miseczki" Swaroga: tam palce
- * zbiegają się do kciuka, tu rozchodzą się maksymalnie. Dzięki temu oba znaki
- * nie zapalają się nawzajem.
+ * ================== POPRAWKA PO POMIARZE ==================
  *
- * Punkty MediaPipe: 0 = nadgarstek, 9 = nasada środkowego palca,
- *                   4/8/12/16/20 = końce kciuka/wskazującego/środkowego/serdecznego/małego
+ * Pierwotny projekt miał trzeci warunek: "nadgarstki dalej od siebie niż
+ * łokcie" (rozchylone dłonie). USUNIĘTY po nagraniu. Zmierzona wartość jest
+ * UJEMNA (-0.43): gracz trzyma nadgarstki BLIŻEJ siebie niż łokcie, czyli
+ * dokładnie odwrotnie, niż zakładał projekt. Wykonanie na żywym ciele to
+ * raczej "dłonie razem przed sobą, łokcie na zewnątrz" niż "gałęzie".
+ *
+ * Zostają dwa warunki i wystarczają: 0.75 wyniku we własnym kroku, ZERO
+ * z 763 klatek tańca nad progiem, maksimum w tańcu 0.12.
  */
+import { NADG_L, NADG_P, LOKIEC_L, LOKIEC_P, BARK_L, BARK_P,
+         widoczne, skalaCiala, rampa } from './postawa.js';
+import { styk, nadBarkami } from './styk.js';
+import { PROGI } from './progi-zmierzone.js';
 
-const KONCE_PALCOW = [4, 8, 12, 16, 20];
-
-// Rozstaw palców (znormalizowany rozmiarem dłoni), przy którym dłoń jest
-// uznana za w pełni rozłożoną. Poniżej wynik spada płynnie do zera -
-// nigdy skokowo, bo częściowy układ ma dawać częściowy efekt.
-const ROZSTAW_PELNY = 1.5;
-const ROZSTAW_MINIMALNY = 0.6;
+const PUNKTY = [BARK_L, BARK_P, NADG_L, NADG_P, LOKIEC_L, LOKIEC_P];
+const P = PROGI.powietrze;
 
 export const stribog = {
     id: 'stribog',
-    nazwa: 'Stribog',
-    wymaga: 'hands',
+    nazwa: 'Stribog (powietrze)',
+    wymaga: 'pose',
 
     score(frame) {
-        const { hands, width, height } = frame;
-        if (hands.length === 0) return 0;
+        const sk = skladnikiZ(frame);
+        if (!sk) return 0;
+        return Math.min(sk.lokcie, sk.wysokosc);
+    },
 
-        // Wystarczy JEDNA rozłożona dłoń. Bierzemy najlepszą z widocznych,
-        // żeby druga dłoń zajęta czym innym nie psuła wyniku.
-        let najlepszy = 0;
-        for (const dlon of hands) {
-            const wynik = oceanDlon(dlon.landmarks, width, height);
-            if (wynik > najlepszy) najlepszy = wynik;
-        }
-        return najlepszy;
+    skladniki(frame) {
+        return skladnikiZ(frame);
     }
 };
 
-function oceanDlon(h, width, height) {
-    // Skala dłoni na ekranie - bez tego gest działałby tylko z jednej odległości
-    const size_dx = (h[0].x - h[9].x) * width;
-    const size_dy = (h[0].y - h[9].y) * height;
-    const handSize = Math.max(10, Math.sqrt(size_dx * size_dx + size_dy * size_dy));
+/** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
+function skladnikiZ(frame) {
+        const wl = frame.pose?.worldLandmarks;
+        if (!widoczne(wl, PUNKTY)) return null;
+        const skala = skalaCiala(wl);
 
-    // Średni rozstaw sąsiednich końców palców. Rozłożona dłoń ma je daleko
-    // od siebie, zaciśnięta albo złożona w miseczkę - blisko.
-    let suma = 0;
-    for (let i = 0; i < KONCE_PALCOW.length - 1; i++) {
-        const a = h[KONCE_PALCOW[i]];
-        const b = h[KONCE_PALCOW[i + 1]];
-        const dx = (a.x - b.x) * width;
-        const dy = (a.y - b.y) * height;
-        suma += Math.sqrt(dx * dx + dy * dy);
-    }
-    const rozstaw = (suma / (KONCE_PALCOW.length - 1)) / handSize;
-
-    // Ciągła rampa zamiast progu - reguła "nic nie mówi źle" obowiązuje
-    // także tutaj: dłoń rozłożona w połowie daje pół wyniku, nie zero.
-    if (rozstaw <= ROZSTAW_MINIMALNY) return 0;
-    return Math.min(1, (rozstaw - ROZSTAW_MINIMALNY) / (ROZSTAW_PELNY - ROZSTAW_MINIMALNY));
+        return {
+            lokcie: styk(wl, LOKIEC_L, LOKIEC_P, skala, P.STYK_PELNY, P.STYK_ZERO),
+            // Najniższy z dwóch nadgarstków decyduje - jedna ręka w górze
+            // to nie jest ta poza.
+            wysokosc: rampa(Math.min(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
+                            P.WYSOKOSC_ZERO, P.WYSOKOSC_PELNY),
+        };
 }
