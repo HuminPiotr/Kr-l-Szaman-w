@@ -60,12 +60,13 @@ import { weles } from '../js/znaki/weles.js';
 import { perun } from '../js/znaki/perun.js';
 import { stribog } from '../js/znaki/stribog.js';
 import { mokosz } from '../js/znaki/mokosz.js';
-import { SkladaniePieczeci } from '../js/pieczecie.js';
+import { SkladaniePieczeci, PROG_POSTAWY, MARGINES_LIDERA } from '../js/pieczecie.js';
 import { KomboSilnik } from '../js/kombosy.js';
 
 const KATALOG = join(dirname(fileURLToPath(import.meta.url)), 'probki');
-const MARGINES_LIDERA = 0.12;   // musi zgadzać się z pieczecie.js
-const PROG_POSTAWY = 0.5;
+// PROG_POSTAWY i MARGINES_LIDERA importowane z js/pieczecie.js (patrz wyżej)
+// - NIE lokalne kopie, żeby nie rozjechały się po cichu przy przyszłej
+// zmianie w prawdziwym silniku składania.
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };

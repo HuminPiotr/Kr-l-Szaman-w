@@ -52,13 +52,17 @@
 // też został wyprowadzony z sygnałów syntetycznych i nadal czeka na
 // potwierdzenie (GEMINI.md §6).
 
-const PROG_POSTAWY = 0.5;   // poniżej - cisza
+// Eksportowane: tools/test-rozdzielnosc.mjs sprawdza rozdzielność pieczęci
+// na nagraniach WZGLĘDEM TYCH SAMYCH liczb, którymi steruje się prawdziwy
+// silnik składania - kopia lokalnym literałem rozjechałaby się po cichu
+// przy każdej przyszłej zmianie tutaj, bez żadnego ostrzeżenia.
+export const PROG_POSTAWY = 0.5;   // poniżej - cisza
 const CZAS_MIN_S = 0.5;     // postawa idealna
 const CZAS_MAX_S = 2.5;     // postawa tuż nad progiem - TO JEST SUFIT
 export const KOSZT_PODSTAWOWY = 0.10;  // ułamek pełnego paska
 
 const CZAS_ZANIKU_S = 1.5;      // ile trwa zejście postępu do zera przy dołku
-const MARGINES_LIDERA = 0.12;   // o ile rywal musi przebić urzędującego
+export const MARGINES_LIDERA = 0.12;   // o ile rywal musi przebić urzędującego
 const CZAS_PRZEJECIA_S = 0.25;  // jak długo musi utrzymać tę przewagę
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
