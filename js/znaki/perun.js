@@ -1,72 +1,128 @@
 /**
- * Pieczęć Peruna - grom.
+ * Błyskawica - Perun: grom, dąb, władca burzy.
  *
- * Jedna ręka wyprostowana nad głowę, druga opuszczona wzdłuż ciała.
- * Szaman ściąga błyskawicę.
+ * IGLICA: obie ręce w górę, ŁOKCIE nad linią barków, opuszki złączone
+ * w piramidkę nad głową.
  *
- * Gest jest zdefiniowany SYMETRYCZNIE. MediaPipe podaje lewo/prawo względem
- * OBRAZU, a płótno ma CSS scaleX(-1) (GEMINI.md:88), więc stronność nie może
- * nieść znaczenia - inaczej gest działałby lustrzanie odwrotnie niż wygląda.
- * Liczymy oba przypisania rąk i bierzemy lepsze.
+ * ================== TRZECIA POZA TEJ PIECZĘCI ==================
+ *
+ * Dwie poprzednie padły na nagraniach z żywego ciała, i obie z tego samego
+ * powodu: opisywały precyzyjny układ kończyn, którego człowiek mający 12 s
+ * na ustawienie się i nie widzący ekranu po prostu nie przyjmuje.
+ *
+ *   1. Zygzak bokiem - z 327 klatek ANI JEDNA nie osiągnęła profilu.
+ *      Kąt w łokciu wyszedł PROSTSZY niż w swobodnym tańcu (137 vs 127 st.),
+ *      więc warunek "zgięte łokcie" działał w drugą stronę. Pieczęć zapalała
+ *      się mocniej w tańcu (0.37) niż we własnej pozie (0.22).
+ *   2. Chwyt za łokieć - dłoń zatrzymała się 1.14 szerokości barków od celu
+ *      (dla porównania pięść na barku osiąga 0.32). Wada była w PROJEKCIE:
+ *      żeby chwycić uniesiony łokieć, druga ręka też musi pójść w górę, więc
+ *      towarzyszący warunek "jedna ręka wysoko, druga nisko" był z tą pozą
+ *      wewnętrznie sprzeczny.
+ *
+ * Nieudana próba 2 okazała się rozstrzygająca, bo pokazała, co ciało robi
+ * NAPRAWDĘ: unosi łokcie NAD linię barków. Mediany wysokości łokci względem
+ * tej linii: błyskawica +0.13, taniec -0.70, ziemia -0.65, powietrze -0.67,
+ * woda -0.72, ogień -0.65. Zapas ponad pół szerokości barków.
+ *
+ * ================== DLACZEGO BEZ STYKU ==================
+ *
+ * Jedyna pieczęć bez punktu dotyku - i jedyna, która go nie potrzebuje.
+ * Cztery pozostałe stoją na styku, bo dotyk jest rzadki i łatwo go zmierzyć,
+ * ale tym, co naprawdę rozdziela, jest OŚ, KTÓREJ NIE UŻYWA NIC INNEGO.
+ * Wysokość łokci jest taką osią. Styk był drogą do niej, nie warunkiem.
+ *
+ * ================== PIRAMIDKA JEST MIĘKKA ==================
+ *
+ * Propozycja właściciela projektu: skoro to iglica, niech gracz złoży opuszki
+ * w namiot nad głową. Przyjęta JAKO KWALIFIKATOR, nie jako warunek konieczny -
+ * przy rękach nad głową MediaPipe widzi obie dłonie tylko w 31% klatek.
+ * Potwierdziło się to eksperymentem, którego nikt nie planował: w nagraniu
+ * kontrolnym jedno z trzech powtórzeń miało ZERO klatek z obiema dłońmi,
+ * a pieczęć i tak wyszła w 100% klatek, bo stoi na łokciach.
+ *
+ * ================== OGIEŃ MUSIAŁ DOSTAĆ WARUNEK WYSOKOŚCI ==================
+ *
+ * Ta piramidka jest DOKŁADNIE tym samym kształtem dłoni co żywioł ognia
+ * (swarogDlon.js). Zmierzone na nagraniu: bez warunku wysokości w ogniu,
+ * ogień zapalał się na 223 z 333 klatek iglicy - gracz robiący błyskawicę
+ * niechcący podpalał ogień. Naprawa siedzi w swarogDlon.js (pasmo wysokości,
+ * zadanie 10), nie tutaj - iglica i tak zawsze poprawnie zgłasza SIEBIE,
+ * niezależnie od tego, co robi ogień.
  */
-import {
-    BARK_L, BARK_P, LOKIEC_L, LOKIEC_P, NADG_L, NADG_P, BIODRO_L, BIODRO_P,
-    widoczne, skalaCiala, rampa, poziom
-} from './postawa.js';
+import { NADG_L, NADG_P, LOKIEC_L, LOKIEC_P, BARK_L, BARK_P,
+         widoczne, skalaCiala, rampa } from './postawa.js';
+import { nadBarkami } from './styk.js';
+import { pelnaDlon } from './dlon.js';
+import { swarogDlon } from './swarogDlon.js';
+import { PROGI } from './progi-zmierzone.js';
 
-const PUNKTY = [BARK_L, BARK_P, LOKIEC_L, LOKIEC_P, NADG_L, NADG_P, BIODRO_L, BIODRO_P];
+const PUNKTY = [BARK_L, BARK_P, NADG_L, NADG_P, LOKIEC_L, LOKIEC_P];
+const P = PROGI.blyskawica;
 
-// ZGADNIĘTE - wymagają potwierdzenia na żywym ciele. Stroić z nakładki
-// debug (klawisz D), która pokazuje wynik każdej postawy. Jednostka:
-// szerokości barków.
-const UNIESIENIE_MIN = 0.2;   // nadgarstek tyle nad linią barków -> zaczyna się liczyć
-const UNIESIENIE_PELNE = 1.2; // ramię wyciągnięte pionowo w górę
-const OPUSZCZENIE_MIN = 0.05; // druga dłoń poniżej linii bioder
-const OPUSZCZENIE_PELNE = 0.5;
-// Prostota ramienia: |bark->nadgarstek| / (|bark->łokieć| + |łokieć->nadgarstek|).
-// 1.0 = idealnie prosta linia, mniej = ramię zgięte.
-const PROSTOTA_MIN = 0.85;
-const PROSTOTA_PELNA = 0.98;
+// Ten sam wzorzec i ta sama wartość co w ziemi i wodzie.
+const WAGA_BEZ_DLONI = 0.7;
 
 export const perun = {
     id: 'perun',
-    nazwa: 'Perun',
+    nazwa: 'Perun (błyskawica)',
     wymaga: 'pose',
 
     score(frame) {
-        const wl = frame.pose?.worldLandmarks;
-        if (!widoczne(wl, PUNKTY)) return 0;
+        const sk = skladnikiZ(frame);
+        if (!sk) return 0;
+        return Math.min(sk.nadgarstki, sk.lokcie, sk.piramidka);
+    },
 
-        const skala = skalaCiala(wl);
-        const yBarkow = poziom(wl, BARK_L, BARK_P);
-        const yBioder = poziom(wl, BIODRO_L, BIODRO_P);
-
-        // Oba przypisania: prawa w górze / lewa w górze.
-        return Math.max(
-            ocen(wl, skala, yBarkow, yBioder, BARK_P, LOKIEC_P, NADG_P, NADG_L),
-            ocen(wl, skala, yBarkow, yBioder, BARK_L, LOKIEC_L, NADG_L, NADG_P)
-        );
+    skladniki(frame) {
+        return skladnikiZ(frame);
     }
 };
 
-function ocen(wl, skala, yBarkow, yBioder, bark, lokiec, nadgGora, nadgDol) {
-    // Oś Y rośnie W DÓŁ, więc "nad barkami" to y MNIEJSZE od linii barków.
-    const uniesienie = rampa((yBarkow - wl[nadgGora].y) / skala,
-                             UNIESIENIE_MIN, UNIESIENIE_PELNE);
-    const opuszczenie = rampa((wl[nadgDol].y - yBioder) / skala,
-                              OPUSZCZENIE_MIN, OPUSZCZENIE_PELNE);
-    const prostota = rampa(prostotaRamienia(wl[bark], wl[lokiec], wl[nadgGora]),
-                           PROSTOTA_MIN, PROSTOTA_PELNA);
+/** Warunki w funkcji modułowej, nie przez `this` - wzorzec mokoszSplot.js:53. */
+function skladnikiZ(frame) {
+    const wl = frame.pose?.worldLandmarks;
+    if (!widoczne(wl, PUNKTY)) return null;
+    const skala = skalaCiala(wl);
 
-    // MINIMUM, nie średnia: wszystkie trzy warunki muszą zachodzić naraz,
-    // inaczej ręce opuszczone punktowałyby na 2/3 tylko dlatego, że ramię
-    // jest proste. Minimum jest nadal CIĄGŁE - reguła nadrzędna spełniona.
-    return Math.min(uniesienie, opuszczenie, prostota);
+    return {
+        // Niższy z dwóch nadgarstków decyduje - jedna ręka w górze to nie iglica.
+        nadgarstki: rampa(Math.min(nadBarkami(wl, NADG_L, skala), nadBarkami(wl, NADG_P, skala)),
+                          P.WYSNADG_ZERO, P.WYSNADG_PELNY),
+        // Warunek nośny. Niższy łokieć decyduje z tego samego powodu.
+        lokcie: rampa(Math.min(nadBarkami(wl, LOKIEC_L, skala), nadBarkami(wl, LOKIEC_P, skala)),
+                      P.WYSLOK_ZERO, P.WYSLOK_PELNY),
+        piramidka: piramidkaNadGlowa(frame)
+    };
 }
 
-function prostotaRamienia(bark, lokiec, nadg) {
-    const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-    const przez = d(bark, lokiec) + d(lokiec, nadg);
-    if (!(przez > 1e-6)) return 0;
-    return d(bark, nadg) / przez;
+/**
+ * Miękki kwalifikator: ten sam namiot z opuszek co w ogniu, oceniony
+ * PRZEZ SAM swarogDlon - żeby istniała jedna definicja piramidki, nie dwie.
+ *
+ * Wywoływana jest funkcja `skladniki`, nie `score`: `score` ognia zawiera
+ * od tego zadania warunek WYSOKOŚCI (pasmo na wysokości klatki), który nad
+ * głową jest z definicji niespełniony. Tutaj interesuje nas wyłącznie kształt
+ * dłoni, bez tego, gdzie się znajduje.
+ *
+ * PODŁOGA, NIE SUFIT (poprawka względem pierwszej wersji brief-u zadania).
+ * Wzór `max(WAGA_BEZ_DLONI * ksztalt, min(WAGA_BEZ_DLONI, ksztalt))` upraszcza
+ * się do `min(ksztalt, WAGA_BEZ_DLONI)` - czyli SUFITU 0.7, nie podłogi: przy
+ * idealnym kształcie dłoni (ksztalt=1) dawał dokładnie 0.7, więc `score()`
+ * (minimum trzech warunków) nigdy nie mógł przekroczyć 0.7, mimo dobrze
+ * ułożonych rąk i łokci. Ten sam wzorzec co `piesci()` w weles.js (podłoga
+ * WAGA_BEZ_DLONI, rosnąca DO 1.0 wraz z jakością kształtu) naprawia to
+ * i pasuje do zdania tuż pod spodem: dłoń widoczna, ale nieułożona, osłabia
+ * pieczęć - nigdy BARDZIEJ, niż zrobiłby to jej brak (czyli wynik nigdy
+ * poniżej podłogi WAGA_BEZ_DLONI, nie: wynik nigdy powyżej sufitu).
+ */
+function piramidkaNadGlowa(frame) {
+    const dlonie = (frame.hands ?? []).filter(d => pelnaDlon(d.landmarks));
+    if (dlonie.length < 2) return WAGA_BEZ_DLONI;
+    const sk = swarogDlon.skladniki(frame);
+    if (!sk) return WAGA_BEZ_DLONI;
+    const ksztalt = Math.min(sk.palce, sk.opuszki, sk.nadgarstki);
+    // Ta sama podłoga co w pozostałych kwalifikatorach: dłoń widoczna, ale
+    // nieułożona, osłabia pieczęć - nigdy bardziej, niż zrobiłby to jej brak.
+    return WAGA_BEZ_DLONI + (1 - WAGA_BEZ_DLONI) * ksztalt;
 }

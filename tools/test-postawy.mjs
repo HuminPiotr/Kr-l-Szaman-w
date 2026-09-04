@@ -21,6 +21,8 @@ import { resetSkali, skalaCiala, aktualizujSkale } from '../js/znaki/postawa.js'
 import { weles } from '../js/znaki/weles.js';
 import { stribog } from '../js/znaki/stribog.js';
 import { mokosz } from '../js/znaki/mokosz.js';
+import { perun } from '../js/znaki/perun.js';
+import { swarogDlon } from '../js/znaki/swarogDlon.js';
 import { kierunekDloni } from '../js/znaki/dlon.js';
 import { PROGI } from '../js/znaki/progi-zmierzone.js';
 
@@ -51,7 +53,13 @@ export function cialo({ nadgL, nadgP, lokL, lokP, vis = 1, obrot = 0 }) {
 }
 
 const rej = new ZnakRegistry();
+// POPRAWKA WZGLĘDEM BRIEFU zadania 10: brief twierdził, że `swarogDlon` jest
+// "już zarejestrowany z Task 7" w TYM pliku - nieprawda, Task 7 zarejestrował
+// go w tools/test-pieczecie-dloni.mjs, tools/test-splot.mjs i
+// tools/test-runy.mjs, nigdy tutaj. Bez tej rejestracji `ig.swarog` niżej
+// byłby `undefined`, nie liczbą.
 rej.zarejestruj(weles); rej.zarejestruj(stribog); rej.zarejestruj(mokosz);
+rej.zarejestruj(perun); rej.zarejestruj(swarogDlon);
 export const ocen = (wl, hands = []) => {
   resetSkali();
   return rej.ocen({ hands, pose: { landmarks: [], worldLandmarks: wl }, width: 1920, height: 1080, dt: 1 / 60, now: 0 });
@@ -984,5 +992,352 @@ for (let i = 0; i <= 60; i++) {
 console.log('  ' + poziomyWd.join('  '));
 // Ten sam ujednolicony próg 0.1 co pętle ciągłości ziemi i powietrza wyżej.
 spr(`największy skok wody = ${maxSkokWd.toFixed(3)} (rampa, nie próg)`, maxSkokWd < 0.1);
+
+// ================== BŁYSKAWICA (Perun) I PASMO WYSOKOŚCI OGNIA ==================
+//
+// Zadanie 10 dotyka DWÓCH plików naraz i celowo: piramidka nad głową w
+// iglicy błyskawicy to TEN SAM kształt dłoni co ogień (swarogDlon.js), więc
+// bez warunku wysokości w ogniu, ogień zapalał się na 223 z 333 klatek
+// iglicy (zmierzone na nagraniu, patrz docstring swarogDlon.js).
+
+/**
+ * Dłoń w piramidce: palce wyprostowane, opuszki zbiegają się w jednym
+ * punkcie (wierzchołek namiotu).
+ *
+ * POPRAWKA WZGLĘDEM BRIEFU (dwie, obie zmierzone node -e - patrz raport
+ * zadania):
+ *
+ *   1. `bok` ROZSUWA nadgarstek i podstawy palców, a wierzchołek namiotu
+ *      zostaje w STAŁYM miejscu, wspólnym dla obu wywołań tej funkcji.
+ *      Wersja z briefu wołała `piramidka()` DWA RAZY bez żadnego przesunięcia
+ *      - obie dłonie lądowały w DOKŁADNIE tych samych współrzędnych, więc
+ *      `odlegloscNadgarstkow()` (swarogDlon.js) wychodziła 0, warunek
+ *      "nadgarstki rozsunięte" wynosił 0, i CAŁA piramidka (Math.min) była 0
+ *      niezależnie od jakości reszty kształtu - dokładnie ten sam błąd, przed
+ *      którym ostrzega ten plik w innym miejscu ("dwie dłonie w jednej klatce
+ *      to fizycznie jedna lewa i jedna prawa, nigdy dwie te same", `piesc()`
+ *      wyżej), tylko tym razem dotyczący POZYCJI, nie etykiety `handedness`.
+ *      Etykieta `handedness` sama w sobie jest tu kosmetyczna - żadna funkcja
+ *      na ścieżce pary (`skladnikiPary` w swarogDlon.js) jej nie czyta.
+ *   2. Pośrednie stawy każdego palca (PIP/DIP) są policzone jako DOKŁADNA
+ *      interpolacja liniowa między podstawą a wierzchołkiem, nie zostawione
+ *      na domyślnym (0.50,0.50) jak w wersji z briefu. Wersja z briefu miała
+ *      tę samą degenerację łańcucha, którą ten plik już dwa razy naprawiał
+ *      (`piesc()` - task 7, `otwartaDlon()` - task 8): środkowy staw
+ *      pokrywał się sam ze sobą (odcinek PIP->DIP długości 0), a wynikowa
+ *      "prostota" (~0.98) była przypadkiem geometrii tej konkretnej pozycji,
+ *      nie gwarancją wzoru - i, co gorsza, zmieniała się nieprzewidywalnie
+ *      wraz z `bok` (przesunięcie podstawy przy nieruchomym wierzchołku
+ *      zmienia całą geometrię palca). Interpolacja liniowa daje idealnie
+ *      prosty łańcuch (`prosto` = 1.000) z DEFINICJI, niezależnie od `bok`.
+ *
+ * ZMIERZONE (node -e, swarogDlon.skladniki na parze `piramidka(-0.10)` /
+ * `piramidka(0.10)`): palce=1.000, opuszki=1.000, nadgarstki=1.000 - pełny
+ * kształt, zapas z obu stron progu (bok=0.06 daje jeszcze tylko 0.31
+ * nadgarstków, bok=0.08 już 0.75 - próg ROZSUNIECIE_PELNE mija się gdzieś
+ * między nimi; bok=0.10 jest bezpiecznie w głębi nasycenia).
+ */
+function piramidka(bok = 0) {
+  const lm = Array.from({ length: 21 }, () => ({ x: 0.50, y: 0.50, z: 0 }));
+  const wierzcholek = { x: 0.50, y: 0.40, z: 0 };          // wspólny wierzchołek namiotu
+  lm[0] = { x: 0.50 + bok, y: 0.70, z: 0 };                // nadgarstek
+  lm[1] = { x: 0.46 + bok, y: 0.65, z: 0 };                // kciuk - poza metryką palceProste
+  lm[4] = { x: 0.50, y: 0.42, z: 0 };                      // opuszek kciuka - liczy się do zbieżności
+
+  const palec = (baza, pip, dip, opuszek, x0, y0) => {
+    const b = { x: x0, y: y0, z: 0 };
+    lm[baza] = b;
+    lm[pip] = { x: b.x + (wierzcholek.x - b.x) / 3, y: b.y + (wierzcholek.y - b.y) / 3, z: 0 };
+    lm[dip] = { x: b.x + (wierzcholek.x - b.x) * 2 / 3, y: b.y + (wierzcholek.y - b.y) * 2 / 3, z: 0 };
+    lm[opuszek] = wierzcholek;
+  };
+  palec(5, 6, 7, 8, 0.47 + bok, 0.58);
+  palec(9, 10, 11, 12, 0.49 + bok, 0.57);
+  palec(13, 14, 15, 16, 0.51 + bok, 0.57);
+  palec(17, 18, 19, 20, 0.53 + bok, 0.58);
+
+  return { handedness: bok <= 0 ? 'Left' : 'Right', landmarks: lm };
+}
+// Para gotowa do przekazania jako `hands` - rozsunięcie 0.10 z dużym zapasem
+// nad progiem (patrz docstring `piramidka` wyżej).
+const PIRAMIDKA_PARA = [piramidka(-0.10), piramidka(0.10)];
+
+console.log('\nBŁYSKAWICA (iglica):');
+// BŁYSKAWICA (iglica): obie ręce w górę, ŁOKCIE nad linią barków.
+// Oś nośna to wysokość łokci - zmierzona mediana +0.13 w tej pozie wobec
+// -0.65..-0.72 we wszystkich pozostałych i -0.70 w tańcu.
+const IGLICA = cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+  lokL:  [-0.34, -0.85], lokP:  [0.34, -0.85]
+});
+
+// POPRAWKA WZGLĘDEM BRIEFU: `ig = ocen(IGLICA)` (bez trzeciego argumentu)
+// domyślnie NIE przekazuje żadnych dłoni (`ocen`'s `hands = []`) - dokładnie
+// TA SAMA klatka co `igBezDloni` niżej, która w briefie jest osobną,
+// zduplikowaną linią. Dwa niezależne defekty złożyły się w jeden:
+// (a) formuła `piramidkaNadGlowa` w briefie była SUFITEM 0.7 (patrz poprawka
+// w perun.js), więc nawet z dłońmi `ig.perun` nie mógł przekroczyć 0.7;
+// (b) bez dłoni piramidka i tak wynosi dokładnie WAGA_BEZ_DLONI=0.7 (early
+// return), więc `ig.perun > 0.7` było MATEMATYCZNIE NIEOSIĄGALNE niezależnie
+// od poprawności implementacji. Naprawiona wersja przekazuje parę piramidek,
+// więc `ig` faktycznie testuje "ręce ułożone W PIRAMIDKĘ", a `igBezDloni`
+// (dalej z pustą listą) testuje coś INNEGO - miękkość kwalifikatora.
+const ig = ocen(IGLICA, PIRAMIDKA_PARA);
+spr(`ręce w górze z łokciami nad barkami i piramidką zapalają błyskawicę (${ig.perun.toFixed(2)})`, ig.perun > 0.7);
+
+// KLUCZOWE ROZRÓŻNIENIE: ręce w górze, ale łokcie NISKO (opuszczone wzdłuż
+// ciała, przedramiona w górę). W tańcu zdarza się nieustannie.
+const lokcieNisko = ocen(cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+  lokL:  [-0.30, -0.40], lokP:  [0.30, -0.40]
+}));
+spr(`ręce w górze z łokciami POD barkami NIE zapalają błyskawicy (${lokcieNisko.perun.toFixed(2)})`,
+    lokcieNisko.perun < 0.3);
+
+// MIN, NIE MAX - jedna ręka w górze to nie iglica (docstring perun.js).
+// Bez tego fixture'a żadna asercja tej sekcji nie odróżnia Math.min od
+// Math.max w `nadgarstki`/`lokcie`: wszystkie pozostałe trzymają obie ręce
+// SYMETRYCZNIE, więc mutacja min<->max przechodziłaby niezauważona
+// (ZMIERZONE node -e - patrz raport zadania, ten sam wzorzec co "jedna ręka
+// w górze" w stribog.js i "MAX niższej ręki" w mokosz.js wyżej w tym pliku).
+const asymNadgarstki = ocen(cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, 0.30],
+  lokL:  [-0.34, -0.85], lokP:  [0.34, -0.85]
+}));
+spr(`jedna ręka w górze, druga w dół NIE zapala błyskawicy - MIN, nie MAX (${asymNadgarstki.perun.toFixed(2)})`,
+    asymNadgarstki.perun < 0.3);
+const asymLokcie = ocen(cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+  lokL:  [-0.34, -0.85], lokP:  [0.34, 0.10]
+}));
+spr(`jeden łokieć nad barkami, drugi nisko NIE zapala błyskawicy - MIN, nie MAX (${asymLokcie.perun.toFixed(2)})`,
+    asymLokcie.perun < 0.3);
+
+spr(`iglica NIE zapala ziemi (${ig.weles.toFixed(2)})`, ig.weles < 0.3);
+spr(`iglica NIE zapala powietrza (${ig.stribog.toFixed(2)})`, ig.stribog < 0.3);
+spr(`iglica NIE zapala wody (${ig.mokosz.toFixed(2)})`, ig.mokosz < 0.3);
+spr(`ziemia NIE zapala błyskawicy (${z.perun.toFixed(2)})`, z.perun < 0.3);
+spr(`powietrze NIE zapala błyskawicy (${pw.perun.toFixed(2)})`, pw.perun < 0.3);
+spr(`woda NIE zapala błyskawicy (${wd.perun.toFixed(2)})`, wd.perun < 0.3);
+
+// Łokieć NISKO PEWNY (visibility poniżej progu, współrzędne skończone) - ten
+// sam wzorzec co w powietrzu i wodzie wyżej. `perun.PUNKTY` obejmuje
+// LOKIEC_L/LOKIEC_P - bez tej asercji mutacja usuwająca łokcie z PUNKTY
+// przechodzi niezauważona (ZMIERZONE: perun=1.00 zamiast 0.00, bo reszta
+// pozy w tym fixture to pełna iglica).
+const perunLokNiewidoczny = ocen((() => {
+  const wl = cialo({
+    nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+    lokL:  [-0.34, -0.85], lokP:  [0.34, -0.85]
+  });
+  wl[13] = { ...wl[13], visibility: 0.1 }; // LOKIEC_L (postawa.js) - poniżej PROG_WIDOCZNOSCI (0.5)
+  return wl;
+})(), PIRAMIDKA_PARA);
+spr(`łokieć niepewny (visibility niska) -> błyskawica = 0, nie śmieć (${perunLokNiewidoczny.perun})`,
+    perunLokNiewidoczny.perun === 0);
+
+console.log('\nLUSTRO (błyskawica):');
+const igL = ocen(odbij(IGLICA), PIRAMIDKA_PARA.map(odbijDlon));
+spr(`odbita iglica = ta sama (${igL.perun.toFixed(2)})`, Math.abs(igL.perun - ig.perun) < 0.02);
+
+// Brak dłoni NIE KARZE - piramidka jest kwalifikatorem miękkim. To nie jest
+// detal: w nagraniu z żywego ciała jedno z trzech powtórzeń miało ZERO klatek
+// z obiema wykrytymi dłońmi, a pieczęć i tak wyszła.
+const igBezDloni = ocen(IGLICA, []);
+spr(`brak dłoni nie zeruje iglicy (${igBezDloni.perun.toFixed(2)})`, igBezDloni.perun > 0.5);
+// Kontrola, że `igBezDloni` faktycznie stoi na PODŁODZE WAGA_BEZ_DLONI (0.7),
+// nie na przypadkowej wartości - inaczej test wyżej niczego by o niej nie
+// dowodził. Zarazem to jest dowód poprawki formuły w perun.js: sufit z
+// briefu i podłoga z poprawki dają w TEJ JEDNEJ klatce identyczną liczbę
+// (obie 0.7) - rozjeżdżają się dopiero przy DOBRYM kształcie dłoni (`ig`
+// wyżej), co jest dokładnie tym, co pierwsza asercja tej sekcji sprawdza.
+spr(`brak dłoni w iglicy = podłoga WAGA_BEZ_DLONI (${igBezDloni.perun.toFixed(3)})`,
+    Math.abs(igBezDloni.perun - 0.7) < 0.01);
+
+console.log('\nLUSTRO W POŁOWIE RAMPY - osobno dla KAŻDEGO z dwóch warunków:');
+// POPRAWKA PONAD BRIEF (wzorzec z zadań 8/9): `IGLICA` ma OBA warunki
+// (nadgarstki, łokcie) NASYCONE - mirror porównywałby 1.00 z 1.00
+// niezależnie od formuły. Błyskawica ma DWA warunki z pozy (nie jeden jak
+// powietrze w warunku STYKU), więc potrzeba DWÓCH fixture'ów, każdy w
+// połowie SWOJEJ rampy, z drugim warunkiem bezpiecznie nasyconym - inaczej
+// minimum() mogłoby zamaskować błąd w tym, który akurat testujemy.
+//
+// Środki ramp (ZMIERZONE node -e, patrz raport zadania):
+//   WYSNADG: (1.098 + -0.227)/2 = 0.4355 -> y nadgarstka = -0.7242
+//   WYSLOK:  (0.533 + -0.438)/2 = 0.0475 -> y łokcia = -0.5690
+// (skala 0.40 m, yBarkow = -0.55, v = (yBarkow - y)/skala).
+const P = PROGI.blyskawica;
+const NADG_MID = (P.WYSNADG_PELNY + P.WYSNADG_ZERO) / 2;
+const LOK_MID = (P.WYSLOK_PELNY + P.WYSLOK_ZERO) / 2;
+const Y_NADG_MID = -0.55 - NADG_MID * 0.40;
+const Y_LOK_MID = -0.55 - LOK_MID * 0.40;
+
+// Fixture 1: NADGARSTKI w połowie rampy, ŁOKCIE nasycone (jak w IGLICA).
+// Piramidka NIE jest przekazywana (hands=[]) CELOWO: podłoga WAGA_BEZ_DLONI
+// (0.7) leży NAD środkiem tej rampy (0.5), więc nie maskuje go w Math.min -
+// dokładnie ten sam zabieg, którym POWIETRZE_POL_RAMPY_STYK/WYSOKOSC (wyżej
+// w tym pliku) unikają przekazywania dłoni.
+const PERUN_NADG_POL_RAMPY = { nadgL: [-0.30, Y_NADG_MID], nadgP: [0.30, Y_NADG_MID],
+                                lokL: [-0.34, -0.85], lokP: [0.34, -0.85] };
+const nadgPolRampy = ocen(cialo(PERUN_NADG_POL_RAMPY));
+spr(`fixture lustra (nadgarstki) faktycznie leży w połowie rampy (${nadgPolRampy.perun.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    nadgPolRampy.perun > 0.4 && nadgPolRampy.perun < 0.6);
+const nadgPolRampyL = ocen(odbij(cialo(PERUN_NADG_POL_RAMPY)));
+spr(`odbita błyskawica (połowa rampy nadgarstków) = ta sama (${nadgPolRampyL.perun.toFixed(2)})`,
+    Math.abs(nadgPolRampyL.perun - nadgPolRampy.perun) < 0.02);
+
+// Fixture 2: ŁOKCIE w połowie rampy, NADGARSTKI nasycone.
+const PERUN_LOK_POL_RAMPY = { nadgL: [-0.30, -1.30], nadgP: [0.30, -1.30],
+                               lokL: [-0.34, Y_LOK_MID], lokP: [0.34, Y_LOK_MID] };
+const lokPolRampy = ocen(cialo(PERUN_LOK_POL_RAMPY));
+spr(`fixture lustra (łokcie) faktycznie leży w połowie rampy (${lokPolRampy.perun.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    lokPolRampy.perun > 0.4 && lokPolRampy.perun < 0.6);
+const lokPolRampyL = ocen(odbij(cialo(PERUN_LOK_POL_RAMPY)));
+spr(`odbita błyskawica (połowa rampy łokci) = ta sama (${lokPolRampyL.perun.toFixed(2)})`,
+    Math.abs(lokPolRampyL.perun - lokPolRampy.perun) < 0.02);
+
+// GRANICA TEGO, CO LUSTRO MOŻE UDOWODNIĆ (ten sam zapis co przy powietrzu
+// i wodzie wyżej w tym pliku). `nadBarkami()` (styk.js) czyta WYŁĄCZNIE
+// współrzędną y - żaden z dwóch warunków błyskawicy nie ma operacji czułej
+// na znak x, więc test lustra dowodzi wyłącznie tego, że żadna z formuł nie
+// czyta surowej współrzędnej x wprost. Wartość obu asercji-precondycji
+// wyżej (fixture faktycznie w połowie rampy) leży w tym, że łapią błąd
+// SKALI czy ZAMIENIONYCH progów, nie w symetrii lustra jako takiej.
+
+console.log('\nGŁĘBIA (oś z) - błyskawica z tułowiem obróconym bokiem:');
+// Ten sam cel co sekcje GŁĘBIA w ziemi/powietrzu/wodzie wyżej: `nadBarkami()`
+// dzieli przez `skalaCiala()`, więc usunięcie dz z tej ostatniej wpływa na
+// KAŻDY warunek błyskawicy przez WSPÓLNY mianownik. Oba warunki są ROSNĄCE
+// (wyżej = więcej), więc błąd (skala zapada się do podłogi 0.12, każda
+// odległość znormalizowana wychodzi kilkukrotnie za duża) wynik ZAWYŻA,
+// nie zaniża - ten sam kierunek co w ziemi/powietrzu, przeciwny niż w wodzie.
+// Fixture'y NIE MOGĄ być nasycone (jak ZIEMIA_BOKIEM) - zawyżenie nie miałoby
+// dokąd urosnąć. Ponownie użyte są fixture'y "połowa rampy" z sekcji LUSTRA
+// wyżej, z dodanym obrotem tułowia. Obracamy WYŁĄCZNIE barki (`cialo({obrot})`
+// robi to automatycznie) - `nadBarkami()` czyta TYLKO y punktu, więc obrót
+// WŁASNEJ pozycji nadgarstka/łokcia nie dodałby żadnej nowej ścieżki (ten
+// sam argument co przy sekcji GŁĘBOKOŚĆ wody wyżej).
+const KAT_PERUN = 75;
+const RAD_PERUN = KAT_PERUN * Math.PI / 180;
+const bzPerun = 0.20 * Math.sin(RAD_PERUN);
+
+const nadgBokiem = ocen(cialo({ ...PERUN_NADG_POL_RAMPY, obrot: KAT_PERUN }));
+spr(`błyskawica (nadgarstki) z realną głębią tułowia zostaje w połowie rampy (${nadgBokiem.perun.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    nadgBokiem.perun > 0.4 && nadgBokiem.perun < 0.6);
+
+const lokBokiem = ocen(cialo({ ...PERUN_LOK_POL_RAMPY, obrot: KAT_PERUN }));
+spr(`błyskawica (łokcie) z realną głębią tułowia zostaje w połowie rampy (${lokBokiem.perun.toFixed(2)}, oczekiwane 0.4-0.6)`,
+    lokBokiem.perun > 0.4 && lokBokiem.perun < 0.6);
+
+resetSkali();
+const skalaProstoPerun = skalaCiala(cialo(PERUN_NADG_POL_RAMPY));
+resetSkali();
+const skalaBokiemPerun = skalaCiala(cialo({ ...PERUN_NADG_POL_RAMPY, obrot: KAT_PERUN }));
+console.log(`  skala prosto=${skalaProstoPerun.toFixed(3)} m   skala bokiem=${skalaBokiemPerun.toFixed(3)} m`);
+spr(`skala barków jest niezmiennikiem obrotu (różnica ${Math.abs(skalaProstoPerun - skalaBokiemPerun).toFixed(3)} m)`,
+    Math.abs(skalaProstoPerun - skalaBokiemPerun) < 0.01);
+spr(`fixture błyskawicy rzeczywiście ma niezerową głębię (bz=${bzPerun.toFixed(3)})`, Math.abs(bzPerun) > 0.05);
+resetSkali();
+
+console.log('\nOGIEŃ - PASMO WYSOKOŚCI:');
+// Piramidka NAD GŁOWĄ to wciąż piramidka dla swarogDlon. Bez pasma ogień
+// zapalał się na 223 z 333 klatek iglicy (zmierzone na nagraniu).
+const piramidkaNadGlowa = ocen(IGLICA, PIRAMIDKA_PARA);
+// Próg ZAOSTRZONY względem briefu (< 0.3 -> === 0): `pasmo()` zwraca
+// DOKŁADNIE 0 poza suficiem GORA_ZERO (rampa() przycina do 0, nie tylko
+// "blisko zera"), a Math.min w swarogDlon.score przepuszcza to zero bez
+// zmian niezależnie od reszty kształtu dłoni. To darmowa siła: zmierzone
+// (node -e) 0.0000 dokładnie, nie tylko "poniżej 0.3".
+spr(`piramidka NAD GŁOWĄ nie zapala ognia (${piramidkaNadGlowa.swarog.toFixed(4)})`,
+    piramidkaNadGlowa.swarog === 0);
+
+// Ta sama piramidka na wysokości klatki - ogień ma się zapalić.
+const NA_KLATCE = cialo({
+  nadgL: [-0.10, -0.35], nadgP: [0.10, -0.35],
+  lokL:  [-0.28, -0.15], lokP:  [0.28, -0.15]
+});
+const piramidkaNaKlatce = ocen(NA_KLATCE, PIRAMIDKA_PARA);
+spr(`piramidka na wysokości klatki zapala ogień (${piramidkaNaKlatce.swarog.toFixed(2)})`,
+    piramidkaNaKlatce.swarog > 0.7);
+
+console.log('\nOGIEŃ - MIN, NIE MAX / BRAK POZY (konsekwencja `wymaga: \'both\'`):');
+// MIN, NIE MAX - jeden nadgarstek na wysokości iglicy, drugi na wysokości
+// klatki. `wysokoscPiramidki` bierze Math.max z dwóch nadBarkami(), czyli
+// WYŻSZY (bliższy iglicy) nadgarstek rządzi - konserwatywnie, tak samo jak
+// perun.js bierze Math.min (niższy = "mniej iglicowy") z tych samych dwóch
+// punktów dla SWOJEGO warunku. Bez tego fixture'a żadna asercja tej sekcji
+// nie odróżnia MIN od MAX: piramidkaNadGlowa/piramidkaNaKlatce trzymają obie
+// ręce symetrycznie (ZMIERZONE node -e - patrz raport zadania).
+const jedenNadgIglica = ocen(cialo({
+  nadgL: [-0.30, -1.30], nadgP: [0.10, -0.35],
+  lokL:  [-0.34, -0.85], lokP:  [0.28, -0.15]
+}), PIRAMIDKA_PARA);
+spr(`jeden nadgarstek na wysokości iglicy NIE zapala ognia - MAX wyższego, nie MIN (${jedenNadgIglica.swarog.toFixed(2)})`,
+    jedenNadgIglica.swarog < 0.3);
+
+// KONSEKWENCJA `wymaga: 'both'` (registry.js, _ocenJeden): klatka z dłońmi,
+// ale bez WYKRYTEJ POZY W OGÓLE (frame.pose === null, nie tylko puste
+// worldLandmarks) - dokładnie sytuacja z main.js:199 (buildFrame), gdy
+// MediaPipe traci sylwetkę, a dłonie zostają widoczne. Przed zadaniem 10
+// (`wymaga: 'hands'`) taka klatka liczyła się WYŁĄCZNIE z kształtu dłoni;
+// od tego zadania rejestr blokuje wywołanie score() w ogóle, WCZEŚNIEJ niż
+// wewnętrzny strażnik `widoczne()` w wysokoscPiramidki() zdążyłby cokolwiek
+// policzyć. Test woła `rej.ocen()` (rejestr), nie lokalny `ocen()` (który
+// zawsze buduje poprawną pozę) - inaczej ta ścieżka zostałaby nieprzetestowana.
+resetSkali();
+const brakPozySwarog = rej.ocen({
+  hands: PIRAMIDKA_PARA, pose: null, width: 1920, height: 1080, dt: 1 / 60, now: 0
+});
+spr(`piramidka BEZ ŻADNEJ pozy (frame.pose === null) nie zapala ognia (${brakPozySwarog.swarog}) - gate rejestru "both"`,
+    brakPozySwarog.swarog === 0);
+// Ten sam scenariusz, ale WOŁANY BEZPOŚREDNIO przez score() (z pominięciem
+// rejestru) - łapie mutację w WEWNĘTRZNYM strażniku `widoczne()` wewnątrz
+// wysokoscPiramidki(), niezależnie od gate'u rejestru. Bez tego strażnika
+// `skalaCiala(undefined)` i `nadBarkami(undefined, ...)` nie wybuchają
+// (mają własne podłogi), ale `wys` wychodzi 0 przez przypadek, co ląduje
+// W ŚRODKU opadającej części pasma (~0.40, nie 0) - ZMIERZONE node -e, ta
+// klasa błędu NIE objawia się jako wyjątek, tylko jako cichy częściowy wynik.
+const brakPozyBezposrednio = swarogDlon.score({
+  hands: PIRAMIDKA_PARA, pose: null, width: 1920, height: 1080, dt: 1 / 60, now: 0
+});
+spr(`...i tak samo przy wywołaniu score() z pominięciem rejestru (${brakPozyBezposrednio}) - strażnik widoczne()`,
+    brakPozyBezposrednio === 0);
+resetSkali();
+
+console.log('\nOGIEŃ - CIĄGŁOŚĆ PASMA (cztery segmenty, dwa przejścia, nie jedna rampa):');
+// Rampa ma dwa krańce (0 i 1) i jedno przejście. PASMO ma CZTERY krańce
+// (DOL_ZERO, DOL_PELNY, GORA_PELNY, GORA_ZERO) i DWA przejścia: wchodzenie
+// od dołu (woda -> ogień) i wychodzenie górą (ogień -> iglica), plus PLATEAU
+// pełnego wyniku pomiędzy nimi. Test niżej przemiata całe pasmo i sprawdza
+// WSZYSTKIE CZTERY odcinki naraz - nie wystarczy sam brak skoków (to samo
+// zaliczyłby test, który nigdy nie opuszcza plateau).
+//
+// Ręce trzymają STAŁY, pełny kształt piramidki (PIRAMIDKA_PARA) przez cały
+// przemiat - jedyną zmienną jest WYSOKOŚĆ nadgarstków pozy. Dzięki temu
+// `swarog` = dokładnie `wysokosc` (pozostałe trzy składniki = 1 przez cały
+// czas) i przemiat mierzy CZYSTO samo pasmo, bez interferencji kształtu dłoni.
+const PO = PROGI.ogien;
+const SKALA_SWEEP = 0.40, Y_BARKOW_SWEEP = -0.55;
+let poprzPasmo = null, maxSkokPasmo = 0;
+let widzianoZeroNisko = false, widzianoPlateau = false, widzianoZeroWysoko = false;
+const poziomyPasmo = [];
+const V0 = -1.05, V1 = 0.35, N_PASMO = 100;
+for (let i = 0; i <= N_PASMO; i++) {
+  const v = V0 + (V1 - V0) * i / N_PASMO;
+  const y = Y_BARKOW_SWEEP - v * SKALA_SWEEP;
+  const wl = cialo({ nadgL: [-0.30, y], nadgP: [0.30, y], lokL: [-0.34, -0.85], lokP: [0.34, -0.85] });
+  const s = ocen(wl, PIRAMIDKA_PARA).swarog;
+  if (poprzPasmo !== null) maxSkokPasmo = Math.max(maxSkokPasmo, Math.abs(s - poprzPasmo));
+  poprzPasmo = s;
+  if (v < PO.WYSOKOSC_DOL_ZERO && s === 0) widzianoZeroNisko = true;
+  if (v > PO.WYSOKOSC_DOL_PELNY && v < PO.WYSOKOSC_GORA_PELNY && s === 1) widzianoPlateau = true;
+  if (v > PO.WYSOKOSC_GORA_ZERO && s === 0) widzianoZeroWysoko = true;
+  if (i % 10 === 0) poziomyPasmo.push(`${v.toFixed(2)}:${s.toFixed(2)}`);
+}
+console.log('  ' + poziomyPasmo.join('  '));
+spr(`największy skok w pasmie = ${maxSkokPasmo.toFixed(3)} (rampa w środku, nie próg)`, maxSkokPasmo < 0.1);
+spr('przemiat faktycznie dotyka MILCZENIA NISKO (segment 1: woda)', widzianoZeroNisko);
+spr('przemiat faktycznie dotyka PLATEAU 1.0 (segment 2-3: ogień)', widzianoPlateau);
+spr('przemiat faktycznie dotyka MILCZENIA WYSOKO (segment 4: iglica)', widzianoZeroWysoko);
 
 process.exit(ok ? 0 : 1);

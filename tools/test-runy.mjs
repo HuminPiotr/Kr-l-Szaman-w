@@ -407,18 +407,42 @@ console.log('TRAFIENIE CZYŚCI ŚLAD (decyzja 9 - jedno przejście, jedna piecz�
 
 console.log('PIRAMIDKA A RUNY - ROZDZIAŁ OBUSTRONNY (żywioł ognia zostaje, decyzja projektu):');
 {
-    // (a) Piramidka trzymana nieruchomo, BEZ pozy - żadna runa się nie zapala,
-    // bo bufor śladu nigdy nie dostaje żadnej pozycji (sufit wieku i tak by to
-    // wygasił, ale tu sprawdzamy najprostszy przypadek: nie ma z czego liczyć).
+    // POPRAWKA (zadanie 10 planu piec-pieczeci-styku, swarogDlon.js). Ta
+    // sekcja dawniej dowodziła "ogień działa BEZ pozy" (`pose: null`,
+    // komentarz przy asercji: "swarogDlon.js nietknięty"). To zdanie samo
+    // siebie obaliło - swarogDlon.js dostał warunek WYSOKOŚCI z pozy
+    // (pasmo na wysokości klatki, patrz jego docstring), bo bez niego ogień
+    // zapalał się na 223 z 333 klatek iglicy błyskawicy. Ta sama zmiana,
+    // która naprawia tamtą kolizję, oznacza że `wysokoscPiramidki()` bez
+    // pozy zwraca 0 (brak danych), a to zero przechodzi przez Math.min
+    // w score() - więc ognia bez pozy już NIE da się zapalić, niezależnie
+    // od kształtu dłoni. Sekcja teraz dowodzi węższej, wciąż prawdziwej
+    // tezy: piramidka na wysokości klatki wciąż dobija do progu, a bez
+    // RUCHU nadgarstków (nawet z pozą obecną) żadna z sześciu run się nie
+    // składa - "ogień" i "runy" to dalej DWIE OSOBNE ścieżki oceny.
     const piramidka = [
         dlon({ ox: 0.42, oy: 0.62, zgiecia: [0, 0, 0, 0, 0], skala: 0.09, obrot: 0.42, wachlarz: 0.15 }),
         dlon({ ox: 0.42, oy: 0.62, zgiecia: [0, 0, 0, 0, 0], skala: 0.09, obrot: 0.42, wachlarz: 0.15, lustro: true })
     ];
+    // Poza na wysokości klatki piersiowej - ta sama konstrukcja co
+    // `NA_KLATCE` w tools/test-postawy.mjs: barki 0.40 m rozstawu,
+    // nadgarstki pozy 0.20 szerokości barków NAD linią barków (v=-0.50,
+    // w głębi plateau PROGI.ogien: -0.542..-0.351). `pose.landmarks`
+    // (2D) zostaje PUSTA CELOWO - `sparujDlonieZNadgarstkami` (definicje.js)
+    // wtedy nie paruje dłoni z nadgarstkiem pozy, więc test (b) niżej i
+    // "brak ruchu -> brak runy" zostają dokładnie tak surowe, jak były.
+    const pozaNaKlatce = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 1 }));
+    pozaNaKlatce[11] = { x: -0.20, y: -0.55, z: 0, visibility: 1 };
+    pozaNaKlatce[12] = { x: 0.20, y: -0.55, z: 0, visibility: 1 };
+    pozaNaKlatce[15] = { x: -0.10, y: -0.35, z: 0, visibility: 1 };
+    pozaNaKlatce[16] = { x: 0.10, y: -0.35, z: 0, visibility: 1 };
     const frameSwaroga = { hands: piramidka.map(lm => ({ landmarks: lm, worldLandmarks: null, handedness: null })),
-                            pose: null, width: 1920, height: 1080, dt: 1 / 60, now: 0 };
+                            pose: { landmarks: [], worldLandmarks: pozaNaKlatce },
+                            width: 1920, height: 1080, dt: 1 / 60, now: 0 };
 
     const wSwarog = swarogDlon.score(frameSwaroga);
-    spr(`piramidka nadal dobija do progu (${wSwarog.toFixed(2)}) - swarogDlon.js nietknięty`, wSwarog > 0.6);
+    spr(`piramidka na wysokości klatki nadal dobija do progu (${wSwarog.toFixed(2)}) - kształt dłoni nietknięty, doszła poza`,
+        wSwarog > 0.6);
 
     const slady = stworzSlady();
     const znaki = stworzZnakiRun(slady);

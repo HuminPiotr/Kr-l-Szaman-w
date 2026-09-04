@@ -24,6 +24,36 @@ const klatka = (...rece) => ({
     hands: rece.map(lm => ({ landmarks: lm, worldLandmarks: null, handedness: null })),
     pose: null, width: W, height: H, dt: 1 / 60, now: 0
 });
+
+// POPRAWKA WZGLĘDEM STANU SPRZED ZADANIA 10. `swarogDlon.js` dostał warunek
+// WYSOKOŚCI z pozy (pasmo na wysokości klatki - patrz jego docstring), więc
+// `wymaga` zmieniło się z 'hands' na 'both'. Ten plik jest testem CZYSTO
+// DŁONIOWYM (`pose: null` w każdej klatce) dla CZTERECH starych pieczęci
+// "Naruto" - żadna z pozostałych trzech (weles/perun/szczur) nie czyta
+// `frame.pose`, więc dla nich `pose: null` zostaje bez zmian. Swaróg jest
+// teraz WYJĄTKIEM: bez pozy `wysokoscPiramidki()` (swarogDlon.js) zwraca 0
+// (brak danych), i to zero przechodzi przez Math.min w score() niezależnie
+// od tego, jak dobry jest kształt dłoni - więc fixture 'Swaróg (Koń)'
+// potrzebuje WŁASNEJ klatki z realną pozą na wysokości klatki piersiowej,
+// żeby nadal móc zapalić Swaroga. Reszta układów (gdzie Swaróg ma być NISKI
+// albo zerowy) zostaje przy `pose: null` bez zmian - z pustej/złej dłoni
+// i tak wychodzi 0 niezależnie od wysokości, więc brak pozy tam nic nie maskuje.
+//
+// Poza dobrana identycznie jak `NA_KLATCE` w tools/test-postawy.mjs: barki
+// 0.40 m rozstawu, nadgarstki pozy 0.20 szerokości barków NAD linią barków
+// (v = -0.50, głęboko w plateau PROGI.ogien: -0.542..-0.351).
+function pozaNaKlatce() {
+    const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 1 }));
+    wl[11] = { x: -0.20, y: -0.55, z: 0, visibility: 1 };
+    wl[12] = { x: 0.20, y: -0.55, z: 0, visibility: 1 };
+    wl[15] = { x: -0.10, y: -0.35, z: 0, visibility: 1 };
+    wl[16] = { x: 0.10, y: -0.35, z: 0, visibility: 1 };
+    return wl;
+}
+const klatkaZPozaNaKlatce = (...rece) => ({
+    ...klatka(...rece),
+    pose: { landmarks: [], worldLandmarks: pozaNaKlatce() }
+});
 const oceny = (f) => Object.fromEntries(
     Object.entries(PIECZECIE).map(([k, p]) => [k, p.score(f)]));
 
@@ -55,7 +85,11 @@ const UKLADY = {
     // Namiot: dłoń przechylona ku środkowi plus jej ODBICIE LUSTRZANE.
     // wachlarz ~0, bo w namiocie dłonie widać niemal z profilu - palce
     // zachodzą na siebie, a ich rozłożenie schodzi w głębię obrazu.
-    'Swaróg (Koń)': klatka(
+    // POPRAWKA (zadanie 10): `klatkaZPozaNaKlatce`, nie `klatka` - Swaróg
+    // potrzebuje teraz pozy na wysokości klatki, żeby warunek WYSOKOŚCI
+    // nie wyzerował go mimo poprawnego kształtu dłoni. Patrz komentarz przy
+    // definicji `klatkaZPozaNaKlatce` wyżej.
+    'Swaróg (Koń)': klatkaZPozaNaKlatce(
         dlon({ ox: 0.42, oy: 0.62, zgiecia: PROSTE, skala: S, obrot: 0.42, wachlarz: 0.15 }),
         dlon({ ox: 0.42, oy: 0.62, zgiecia: PROSTE, skala: S, obrot: 0.42, wachlarz: 0.15, lustro: true })),
 
