@@ -1,0 +1,139 @@
+# Okadzenie — technika dymu (Swaróg → Stribog → Swaróg)
+
+## Kontekst
+
+Gracz-szaman po złożeniu combo i przyłożeniu dłoni do ust „wydmuchuje" kłęby dymu, które
+unoszą się po ekranie przez ~2 min. Potencjał trwa 4 min od combo; dłoń przy ustach włącza
+strumień, opuszczenie go wstrzymuje. Dym podpalony przez dowolną technikę ognia (dziś:
+Płonący Palec) wybucha frontem ognia kłąb po kłębie i znika.
+
+Decyzje z burzy mózgów (2026-09-11):
+- Sekwencja **swaróg → stribog → swaróg**, id `dym`, nazwa **„Okadzenie"**.
+- Zapłon od **każdej techniki ognia teraz i w przyszłości** — pull-based lista `zarzewia`.
+- Detonacja: **front kłąb po kłębie**, kula ognia + wstrząs.
+- Gest: **sama dłoń przy ustach** (bez wykrywania zgięcia palca), duża tolerancja.
+- Fizyka: unoszenie + turbulencja + rozrost, **dłonie rozgarniają dym**; kłąb ma być na
+  ekranie na tyle długo, żeby gracz zdążył złożyć Grom w Ogniu, potem wylatuje górą.
+- **Jeden zegar 4 min od combo** (bez osobnego okna aktywacji — spójne z Płonącym Palcem,
+  „licznik to presja").
+- Tekstury ognia/eksplozji: **pobrać z kenney.nl** (Particle Pack, CC0).
+
+Rozstrzygnięcia niewypowiedziane wprost przez użytkownika, przyjęte w projekcie:
+- **Inne combo gasi tylko PRODUKCJĘ; wydmuchane kłęby żyją dalej.** Bez tego nie ma drogi do
+  nagrody: podpalenie wymaga Gromu w Ogniu, czyli „innego combo".
+- Opuszczenie dłoni **wstrzymuje** technikę (celowa różnica wobec Płonącego Palca, gdzie
+  schowanie palca KOŃCZY) — zapisać w komentarzu nagłówkowym, żeby nikt tego „nie poprawił".
+- Grubość strumienia skaluje się z `moc`, ale pobór ≈ 0 i wyczerpanie mocy NIGDY nie kończy
+  potencjału (gracz potrzebuje mocy na Grom w Ogniu; głodzenie 4-minutowego zegara to stan
+  porażki).
+- Łańcuch **swaróg→stribog→swaróg→perun** daje Okadzenie, a zaraz Grom w Ogniu (bufor kombosów
+  nie jest czyszczony) — to cecha, objęta testem.
+
+## Architektura (wzorzec Płonący Palec / Ogień)
+
+```
+pieczęć → KomboSilnik → main.js: uzbraja 'dym' → dmuchanie.uzbrój(now)
+pose (usta 9/10, nadgarstki 15/16) → dmuchanie.update(frame, moc, dt) → { zaczep(px), sila }
+                                                                      ↓
+zarzewia (px) ← plonacyPalec.zaczep + ogien.czastki      dym.emituj(zaczep, kierunek, sila, dt)
+                          ↓                                dym.rozgarnij(nadgarstkiPx)
+                     dym.podpal(zarzewia) → front → eksplozje → ekran.uderz, playWybuchSFX
+                                             dym.updateAndDraw(ctx, dt)   (source-over, po aurze)
+```
+
+### `js/dmuchanie.js` (nowy) — technika, nie rysuje
+- Stany: `BEZCZYNNY → GOTOWY (uzbrój) → DMUCHA ⇄ GOTOWY` (dłoń przy ustach / opuszczona);
+  `wygas()` po 4 min od uzbrojenia (`CZAS_POTENCJALU_MS = 240000`) albo `anuluj()` przy innym
+  combo. Wystawia: `stan`, `zaczep` (usta, znormalizowane 0..1 jak `plonacyPalec.zaczep`),
+  `kierunek` (od dłoni, jednostkowy), `sila` 0..1, `pozostalo` (s, do HUD).
+- Gest: `styk(wl, NADG, USTA, skala, pelny, zero)` — ale usta to średnia 9/10, więc
+  potrzebna wersja przyjmująca punkt, nie indeks: dodać do `js/znaki/styk.js` małą
+  `stykPunktow(a, b, skala, pelny, zero)` reużywaną przez `styk()`. Odległość w METRACH
+  (worldLandmarks są metryczne, więc niezależne od gracza): pełny ≤ 0,10 m, zero ≥ 0,28 m —
+  ZGADNIĘTE, oznaczone w komentarzu, do strojenia z nakładki (klawisz D).
+- Lepsza z dwóch rąk; bramka `visibility` jak `PROG_WIDOCZNOSCI_BARKU` w `plonacyPalec.js`.
+  Kotwica ust trzyma ostatnią widoczną pozycję gdy dłoń ją zasłania; fallback nos (0).
+- Histereza/attack-release na `sila`, żeby dłoń na granicy progu nie „jąkała" strumienia.
+- Nie zna tekstur ani `ctx`.
+
+### `js/dym.js` (nowy) — kłęby, rysowanie, zapłon
+- Kłąb: `{x, y, vx, vy, r, obrot, wobrot, wiek, zycie, faza, stan: 'DYM'|'ZAPLON'|'WYBUCH', tZaplonu, sprite}`.
+  Jeden teksturowany quad na kłąb (nie sub-emiter). Sprite z `MANIFEST.mgla`
+  (`smoke_01/05/08/10`) przez `losowyWariant` + `wypalTintowany` (jasna szarość).
+- `emituj(zaczepPx, kierunek, sila, dt)` — emisja ciągła z ułamkowym przeniesieniem jak
+  `ogien.js::_nadwyzka`; impuls od ust w kierunku od dłoni, hamowanie.
+- `_ruszaj(dt)` (czysta, testowalna, dt przycięte do 0.05): unoszenie tak, żeby kłąb
+  opuścił górę ekranu w ~50–70 s (`vy` w ułamkach H/s, nie px), turbulencja z sumy sinusów
+  (faza per kłąb), rozrost `r`, zanik alfy; `zycie = 120 s` jako sufit; usuwa NaN.
+- `rozgarnij([{x, y, vx, vy}])` — nadgarstki w px z prędkością pchają kłęby w promieniu
+  (skala = szerokość barków px, jak `kregSylwetki()` w `kolowrot.js`).
+- `podpal(zarzewia)` — kłąb `DYM` w zasięgu `{x,y,r}` → `ZAPLON`; front: kłąb `ZAPLON`
+  po `OPOZNIENIE_FRONTU_MS ≈ 80` zapala sąsiadów `DYM` w promieniu `k·r`; po `CZAS_ZAPLONU`
+  → `WYBUCH` (kula ognia, ~0.4 s) → usunięty. Zwraca liczbę kłębów, które w tej klatce
+  weszły w `WYBUCH` (main.js skaluje `ekran.uderz` i dźwięk).
+- Sufit `MAX_KLEBOW ≈ 150`, najstarsze wypadają.
+- Rysowanie: kłęby `DYM` w **`source-over`** (addytywne `lighter` zjada szary dym —
+  pułapka udokumentowana w `efekty.js:206-216` i nagłówku `ogien.js`); `ZAPLON` przełącza na
+  `lighter` z **4–5 wstępnie wypalonymi stopniami** ciepłego tintu (snap do najbliższego —
+  cache `wypalTintowany` jest nieograniczonym Map, tint co klatkę by go rozsadził);
+  `WYBUCH` = rdzeń `fire_*`/`flame_*` + błysk `scorch_*` z `MANIFEST`.
+- Zegar liczy się przed strażnikiem `!ctx` (konwencja `kolowrot.js:354`, `ekran.js:136`).
+
+### `js/assety.js`
+- Rozszerzyć `MANIFEST` o `plomien: [flame_01..06]`, `ogienRdzen: [fire_01, fire_02]`,
+  `rozblyskUderzenia: [scorch_01..03]`. Pliki dograć do `assets/czastki/` z
+  https://kenney.nl/assets/particle-pack (CC0; `LICENSE.txt` już leży w katalogu).
+
+### `js/kombosy.js`
+- Wiersz `{ id: 'dym', nazwa: 'Okadzenie', sekwencja: ['swarog','stribog','swarog'], uzbraja: 'dym' }`
+  z komentarzem o łańcuchu z Gromem w Ogniu.
+
+### `js/efekty.js`
+- Wiersz `TABELA.dym` (krótki błysk uzbrojenia w szarości/bieli, kształt `mglaIMrok` lub
+  `pierscien`). `efekty.js` NIE rośnie o logikę dymu (spec Płonącego Palca).
+
+### `js/main.js`
+- `BARWA_ZAPLONU.dym` (szarobiały); gałąź `uzbraja === 'dym'` → `dmuchanie.uzbrój(now)`;
+  każde inne combo → `dmuchanie.anuluj()`.
+- Po `aura.updateAndDraw`, przed `efekty.updateAndDraw`: `dym.updateAndDraw(ctx, dt)`.
+- Po `plonacyPalec.update`: `dmuchanie.update(frame, moc, dt)`; gdy `DMUCHA` →
+  `dym.emituj(zaczepPx, kierunek, sila, dt)` (konwersja jak `main.js:556-558`).
+- `zarzewia`: czubek palca (`plonacyPalec.zaczep`→px, `r` z `sila`) + próbka `ogien.czastki`
+  (co n-ta, są już w px). `const wybuchy = dym.podpal(zarzewia)`; `if (wybuchy)`
+  `ekran.uderz(min(1, 0.3 + 0.1·wybuchy))`, `audioEngine.playWybuchSFX(...)`.
+- `dym.rozgarnij(nadgarstki px z pose.landmarks 15/16 + prędkość z poprzedniej klatki)`.
+- Panel debug (`main.js:~647`): `dym: { stan, sila, pozostalo, klebow, plonacych }`.
+
+### `js/audioEngine.js`
+- `playWybuchSFX(sila)` — jeden strzał (szum + niski sinus z opadającą obwiednią), wzorzec
+  `playGromSFX`. Opcjonalnie cichy szum „wydechu" sterowany z `dmuchanie.sila`.
+
+### `GEMINI.md`
+- Tabela plików: `dmuchanie.js`, `dym.js`; diagram bez zmian poza dopiskiem o `zarzewia`.
+
+## Kolejność wdrożenia
+
+0. Zapisać ten projekt jako `docs/superpowers/specs/2026-09-11-okadzenie-dym-design.md`
+   (plan mode nie pozwolił tego zrobić w burzy mózgów), commit.
+1. Assety: pobrać paczkę, skopiować `flame_01-06`, `fire_01-02`, `scorch_01-03`, rozszerzyć
+   `MANIFEST`; `tools/test-assety.mjs` sprawdza obecność.
+2. `kombosy.js` + `tools/test-kombosy.mjs`: sam dym; dym→perun daje Grom w Ogniu; dym nie
+   trafia w Tęczę/Aard po drodze.
+3. `znaki/styk.js::stykPunktow` + `dmuchanie.js` + `tools/test-dmuchanie.mjs` (fixtury klatek
+   jak `test-plonacy-palec.mjs:24-58` z punktami ust/nadgarstka).
+4. `dym.js` fizyka + `tools/test-dym.mjs` (bez canvasu, `_ruszaj`/`podpal` czysto).
+5. `dym.js` rysowanie, `main.js` spięcie, `efekty`, `BARWA_ZAPLONU`, audio, HUD, GEMINI.md.
+6. Test na kamerze → strojenie progu ust, prędkości unoszenia, tempa frontu (użytkownik
+   zgłasza poprawki krótko, oczekuje chirurgicznych edycji — patrz pamięć o iteracji VFX).
+
+## Weryfikacja
+
+- `tools/test-wszystko.sh` zielony (nowe `test-dmuchanie.mjs`, `test-dym.mjs` wchodzą przez glob).
+- Testy do nazwania: wygaśnięcie po 240 s; dłoń opuszczona wstrzymuje, nie kończy; `anuluj()`
+  zatrzymuje produkcję, kłęby zostają; front dochodzi do połączonego łańcucha i omija oderwane
+  skupisko; sufit wypycha najstarsze; NaN w klatce nie zatruwa kłębów; kłąb opuszcza ekran
+  w oknie 50–70 s; brak boolean w miejscu wyniku gestu.
+- Na żywo (`run`/kamera): Swaróg→Stribog→Swaróg, dłoń do ust → dym z ust w stronę od dłoni;
+  opuść dłoń → strumień gaśnie, podnieś → wraca; Perun → Grom w Ogniu, palec w górę, dotknij
+  kłębu → front biegnie, kule ognia, wstrząs; po wybuchu dym znika; nic nie migocze na granicy
+  progu; FPS przy 150 kłębach nie spada poniżej 30.
