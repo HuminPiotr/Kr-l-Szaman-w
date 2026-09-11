@@ -9,7 +9,7 @@
  * moc NIGDY nie kończy potencjału; i że jeden zegar 4-minutowy jest
  * jedynym samoistnym sposobem wygaśnięcia.
  */
-import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI } from '../js/dmuchanie.js';
+import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, SKOS_W_GORE } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -24,7 +24,8 @@ const DT = 1 / 60;
  * skali ciała, nie w surowych współrzędnych).
  */
 function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
-                  usta = [0, -0.78, 0.05], ustaWidoczne = true, brakPozy = false } = {}) {
+                  usta = [0, -0.78, 0.05], ustaWidoczne = true, brakPozy = false,
+                  skretGlowy = 0, uszyWidoczne = true } = {}) {
     if (brakPozy) return null;
     const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
     wl[11] = { x: -0.15, y: -0.55, z: 0, visibility: 0.9 };   // BARK_L
@@ -33,7 +34,13 @@ function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
     wl[16] = { x: nadgP[0], y: nadgP[1], z: nadgP[2], visibility: 0.9 };
     wl[9] = { x: usta[0] - 0.02, y: usta[1], z: usta[2], visibility: ustaWidoczne ? 0.9 : 0.1 };
     wl[10] = { x: usta[0] + 0.02, y: usta[1], z: usta[2], visibility: ustaWidoczne ? 0.9 : 0.1 };
-    wl[0] = { x: usta[0], y: usta[1] - 0.05, z: usta[2], visibility: 0.9 };   // nos, nad ustami
+    // Głowa: uszy 7/8 w rozstawie 0.16 m nad ustami, nos 0 - 0.55 rozstawu
+    // poniżej linii uszu (twarz na wprost) i przesunięty o `skretGlowy`
+    // (ułamek rozstawu; dodatni = ku uchu P).
+    const rozstaw = 0.16, uszyY = usta[1] - 0.12;
+    wl[7] = { x: usta[0] - rozstaw / 2, y: uszyY, z: usta[2], visibility: uszyWidoczne ? 0.9 : 0.1 };
+    wl[8] = { x: usta[0] + rozstaw / 2, y: uszyY, z: usta[2], visibility: uszyWidoczne ? 0.9 : 0.1 };
+    wl[0] = { x: usta[0] + skretGlowy * rozstaw, y: uszyY + 0.55 * rozstaw, z: usta[2], visibility: 0.9 };
     return wl;
 }
 
@@ -181,6 +188,55 @@ console.log('\nKOTWICA UST PRZEŻYWA ZASŁONIĘCIE:');
     });
     spr(`usta zasłonięte przez dłoń - DMUCHA trwa dalej (${d.stan})`, d.stan === 'DMUCHA');
 }
+
+console.log('\nKIERUNEK WYDECHU (v2: głowa + dłoń, EMA):');
+{
+    // Głowa na wprost, dłoń P przy ustach z prawej strony -> kłąb leci w lewo
+    // (od dłoni) i w górę (SKOS_W_GORE).
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    spr('wynik jest jednostkowy', Math.abs(Math.hypot(d.kierunek.x, d.kierunek.y) - 1) < 1e-6);
+    spr(`składowa Y ujemna - w górę ekranu (${d.kierunek.y.toFixed(2)})`, d.kierunek.y < 0);
+    spr(`dłoń z prawej -> składowa X w lewo, OD dłoni (${d.kierunek.x.toFixed(2)})`, d.kierunek.x < 0);
+}
+{
+    // Skręt głowy w stronę ucha P przeważa nad dłonią z tej samej strony.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 0.4, now: 0 });
+    spr(`nos ku uchu P -> kierunek.x > 0 mimo dłoni z prawej (${d.kierunek.x.toFixed(2)})`, d.kierunek.x > 0);
+    const e = new Dmuchanie();
+    resetSkali();
+    e.uzbrój(0);
+    dmuchajNKlatek(e, 40, { nadgL: [-0.10, -0.78, 0.05], skretGlowy: -0.4, now: 0 });
+    spr(`nos ku uchu L -> kierunek.x < 0 (${e.kierunek.x.toFixed(2)})`, e.kierunek.x < 0);
+}
+{
+    // Bez uszu (niepewne) - fallback na samą dłoń, nadal jednostkowy, w górę.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], uszyWidoczne: false, now: 0 });
+    spr('bez uszu: fallback na dłoń - X od dłoni', d.kierunek.x < 0);
+    spr('bez uszu: nadal jednostkowy', Math.abs(Math.hypot(d.kierunek.x, d.kierunek.y) - 1) < 1e-6);
+}
+{
+    // EMA: nagły skręt głowy nie przerzuca kierunku w jednej klatce.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], skretGlowy: -0.4, now: 0 });
+    const przed = { ...d.kierunek };
+    dmuchajNKlatek(d, 1, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 0.4, now: 0 });
+    const skok = Math.hypot(d.kierunek.x - przed.x, d.kierunek.y - przed.y);
+    spr(`EMA: skok kierunku w jednej klatce mały (${skok.toFixed(3)} < 0.2)`, skok < 0.2);
+    dmuchajNKlatek(d, 60, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 0.4, now: 0 });
+    spr('...ale po sekundzie kierunek dochodzi do nowego skrętu', d.kierunek.x > 0);
+}
+spr('SKOS_W_GORE ujemny (w górę ekranu)', SKOS_W_GORE < 0);
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');
 spr('PELNY_SKALI < ZERO_SKALI (rampa ma sens)', PELNY_SKALI < ZERO_SKALI);

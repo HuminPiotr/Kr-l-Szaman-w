@@ -488,8 +488,8 @@ export class DebugHud {
                        ` (wejście 0.55 / wyjście 0.35)   siła ${this._num(stats.dmuchanie.sila)}` +
                        `   pozostało ${stats.dmuchanie.pozostaloS.toFixed(0)} s`);
         }
-        if (stats.dym && (stats.dym.kleby > 0 || stats.dym.plonacych > 0)) {
-            lines.push(`dym: kłębów ${stats.dym.kleby}  płonących ${stats.dym.plonacych}`);
+        if (stats.dym && (stats.dym.kleby > 0 || stats.dym.strumien > 0 || stats.dym.plonacych > 0)) {
+            lines.push(`dym: kłębów ${stats.dym.kleby}  strumień ${stats.dym.strumien}  płonących ${stats.dym.plonacych}`);
         }
 
         if (stats.maska) lines.push(`maska ${stats.maska}`);

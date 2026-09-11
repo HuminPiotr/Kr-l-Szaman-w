@@ -146,3 +146,36 @@ zarzewia (px) ← plonacyPalec.zaczep + ogien.czastki      dym.emituj(zaczep, ki
   opuść dłoń → strumień gaśnie, podnieś → wraca; Perun → Grom w Ogniu, palec w górę, dotknij
   kłębu → front biegnie, kule ognia, wstrząs; po wybuchu dym znika; nic nie migocze na granicy
   progu; FPS przy 150 kłębach nie spada poniżej 30.
+
+---
+
+## v2 (2026-09-11) — diagnoza po teście na kamerze i przebudowa dymu
+
+**Zgłoszenie:** „dym to nieżywe tekstury, zdecydowanie za mało, gracz ma w 4 min spokojnie
+okadzić cały ekran — wystrzeliwać kłęby z ust strumieniem w kierunku zależnym od pozycji
+(głowa/ręka/palce), które potem zaczynają się kłębić; jak przy vapowaniu".
+
+**Diagnoza v1 (nazwane przyczyny):**
+1. jeden sprite na kłąb, obrót ±0,075 rad/s (niewidoczny), turbulencja ~19 px/s² — bilbord
+   sunący w górę; żywy dym to ruch WEWNĘTRZNY;
+2. emisja to kapanie 6/s z prędkością 40–80 px/s — nie było WYDECHU, tylko balon
+   nadmuchiwany w miejscu;
+3. rozrost sprzężony z ~4-minutowym życiem (pełny rozmiar po 2 minutach) — przez pierwszą
+   minutę każdy kłąb to plamka, stąd „za mało";
+4. kierunek z zaszumionego wektora nadgarstek→usta;
+5. sufit 180 i za mała alfa łączna.
+
+**Przebudowa (`js/dym.js`, `js/dmuchanie.js`):**
+- Dwie populacje: `strumien` (wystrzał 550–900 px/s w stożku ±14°, opór 2,6/s → zatrzymuje
+  się po ~210–350 px, żyje 1,6–2,6 s, alfa 0,65) i `klab` (rodzi się razem z wydechem, z
+  ujemnym wiekiem 0,6–1,2 s, tam gdzie strumień zwalnia; życie 200–260 s; rozrost
+  1−exp(−t/9 s), 90% po ~21 s; alfa 0,32).
+- Wydech pulsowany: okres 1,35 s, faza aktywna 0,5 s (sin²), ~90 sprite'ów/s strumienia
+  w szczycie + 4 kłęby na wydech. Przerwa w dmuchaniu zeruje fazę.
+- Ruch wewnętrzny kłębów: pole przepływu zależne od pozycji i czasu (spójne wiry, dryf
+  ~20 px/s), obrót 0,15–0,35 rad/s (sąsiedzi przeciwbieżnie), oddech skali ±5%, migotanie
+  alfy ±8%.
+- Kierunek wydechu: 60% głowa (skręt nosa względem środka uszu 7/8, ×2,5; skos w górę −0,3
+  + pochylenie), 40% dłoń (usta − nadgarstek), EMA τ=0,25 s. Palce celowo nie (kamera gubi je
+  przy twarzy).
+- Sufity 450 kłębów + 300 strumienia (osobne FIFO). Budżet fill-rate do sprawdzenia na HUD.

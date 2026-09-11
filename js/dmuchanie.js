@@ -98,6 +98,13 @@ const SILA_PODLOGA = 0.35;
 
 const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
+// --- Kierunek wydechu (v2) - ZGADNIĘTE, do strojenia na kamerze ---
+export const WAGA_GLOWY = 0.6;          // reszta to dłoń (usta - nadgarstek)
+const WZMOCNIENIE_SKRETU = 2.5;         // (nos - środek uszu)/rozstaw uszu x to -> [-1,1]
+export const SKOS_W_GORE = -0.3;        // stała składowa Y (ujemna = w górę ekranu)
+const WAGA_POCHYLENIA = 0.5;            // ile uniesienie głowy dokłada do składowej Y
+const TAU_KIERUNKU_S = 0.25;            // EMA - plume nie drga klatka po klatce
+
 export class Dmuchanie {
     constructor() {
         this.stan = 'BEZCZYNNY';
@@ -109,6 +116,7 @@ export class Dmuchanie {
         this._gest = 0;            // wygładzony wynik gestu, do histerezy
         this._ustaSwiat = null;    // ostatnia PEWNA pozycja ust w metrach (worldLandmarks)
         this._ustaEkran = null;    // ostatnia PEWNA pozycja ust znormalizowana (do rysowania)
+        this._kierunekEma = null;  // wygładzony kierunek wydechu (patrz _kierunek)
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności GOTOWY. */
@@ -167,7 +175,7 @@ export class Dmuchanie {
         this.sila = Math.max(SILA_PODLOGA, Math.min(1, this._gest)) * mocCzynnik;
 
         this.zaczep = this._ustaEkran;
-        this.kierunek = this._kierunek(wl, lm);
+        this.kierunek = this._kierunek(wl, lm, krok);
 
         // Pobór jest bliski zeru i NIGDY nie warunkuje kontynuacji (frame nie
         // sprawdza moc > 0, w przeciwieństwie do plonacyPalec.js) - jeśli moc
@@ -185,6 +193,7 @@ export class Dmuchanie {
         this._gest = 0;
         this._ustaSwiat = null;
         this._ustaEkran = null;
+        this._kierunekEma = null;
     }
 
     /**
@@ -227,23 +236,76 @@ export class Dmuchanie {
     }
 
     /**
-     * Jednostkowy kierunek OD dłoni w stronę ust i dalej - "dym wylatuje
-     * z ust w stronę od dłoni" (życzenie właściciela gry). Licznik z
-     * landmarks 2D (rysowanie, nie pomiar - GEMINI.md:49): wybieramy
-     * nadgarstek BLIŻSZY ustom w świecie (ta sama ręka, którą oceniał
-     * _ocenGest), a wektor liczymy w przestrzeni ekranu, bo tam ma służyć.
+     * Jednostkowy kierunek WYDECHU - "gracz dmucha w stronę zależną od
+     * ustawienia głowy i ręki" (v2, po teście na kamerze; v1 brała sam wektor
+     * nadgarstek->usta, który przy dłoni PRZY ustach jest krótki i zaszumiony,
+     * więc kłęby rozpryskiwały się losowo).
+     *
+     * Blend dwóch sygnałów, wszystko z landmarks 2D (to kierunek na ekranie,
+     * nie pomiar - GEMINI.md:49):
+     *   GŁOWA (WAGA_GLOWY): skręt = (nos - środek uszu) / rozstaw uszu -> X;
+     *          Y = stały skos w górę + pochylenie głowy (nos względem uszu).
+     *   DŁOŃ  (1 - WAGA_GLOWY): usta - nadgarstek (kłąb leci OD dłoni), nadgarstek
+     *          bliższy ustom w świecie (ta sama ręka, którą oceniał _ocenGest).
+     * Palce CELOWO nie: kamera z jednego oka gubi je przy twarzy (GEMINI.md §4).
+     * Wynik wygładzony EMA (TAU_KIERUNKU_S), żeby plume nie drgał klatka po
+     * klatce. Fallbacki: bez uszu - sama dłoń; bez niczego - {0,-1}.
      */
-    _kierunek(wl, lm) {
-        if (!lm || !lm[15] || !lm[16] || !this._ustaEkran) return { x: 0, y: -1 };
-        let reka = lm[15];
+    _kierunek(wl, lm, krok = 0) {
+        let cel = null;
+        const glowa = this._kierunekGlowy(lm);
+        const dlon = this._kierunekDloni(wl, lm);
+        if (glowa && dlon) {
+            cel = { x: glowa.x * WAGA_GLOWY + dlon.x * (1 - WAGA_GLOWY),
+                    y: glowa.y * WAGA_GLOWY + dlon.y * (1 - WAGA_GLOWY) };
+        } else {
+            cel = glowa ?? dlon ?? { x: 0, y: -1 };
+        }
+        const dl = Math.hypot(cel.x, cel.y);
+        cel = dl > 1e-6 ? { x: cel.x / dl, y: cel.y / dl } : { x: 0, y: -1 };
+
+        if (!this._kierunekEma) {
+            this._kierunekEma = cel;
+        } else {
+            const a = Math.min(1, (Number.isFinite(krok) ? krok : 0) / TAU_KIERUNKU_S);
+            const ex = this._kierunekEma.x + a * (cel.x - this._kierunekEma.x);
+            const ey = this._kierunekEma.y + a * (cel.y - this._kierunekEma.y);
+            const el = Math.hypot(ex, ey);
+            this._kierunekEma = el > 1e-6 ? { x: ex / el, y: ey / el } : cel;
+        }
+        return { x: this._kierunekEma.x, y: this._kierunekEma.y };
+    }
+
+    /** Skręt i pochylenie głowy z nosa (0) i uszu (7/8), 2D. null bez pewnych uszu. */
+    _kierunekGlowy(lm) {
+        const nos = lm?.[0], uL = lm?.[7], uP = lm?.[8];
+        const ok = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y)
+            && (p.visibility === undefined || p.visibility >= PROG_WIDOCZNOSCI_TWARZY);
+        if (!ok(nos) || !ok(uL) || !ok(uP)) return null;
+        const rozstaw = Math.hypot(uL.x - uP.x, uL.y - uP.y);
+        if (rozstaw < 1e-4) return null;
+        const sx = (uL.x + uP.x) / 2, sy = (uL.y + uP.y) / 2;
+        const skret = Math.max(-1, Math.min(1, (nos.x - sx) / rozstaw * WZMOCNIENIE_SKRETU));
+        // Nos w twarzy na wprost leży ~0.55 rozstawu uszu PONIŻEJ ich linii;
+        // uniesienie głowy podnosi go względem uszu -> dodatnie pochylenie.
+        const pochylenie = Math.max(-1, Math.min(1, (sy + 0.55 * rozstaw - nos.y) / rozstaw));
+        return { x: skret, y: SKOS_W_GORE - pochylenie * WAGA_POCHYLENIA };
+    }
+
+    /** usta - nadgarstek bliższy ustom, 2D. null bez danych. */
+    _kierunekDloni(wl, lm) {
+        if (!lm || !this._ustaEkran) return null;
+        let reka = null;
         if (wl && wl[15] && wl[16] && this._ustaSwiat) {
             const dL = Math.hypot(wl[15].x - this._ustaSwiat.x, wl[15].y - this._ustaSwiat.y, (wl[15].z ?? 0) - this._ustaSwiat.z);
             const dP = Math.hypot(wl[16].x - this._ustaSwiat.x, wl[16].y - this._ustaSwiat.y, (wl[16].z ?? 0) - this._ustaSwiat.z);
             reka = dP < dL ? lm[16] : lm[15];
+        } else {
+            reka = lm[15] ?? lm[16];
         }
-        if (!Number.isFinite(reka.x) || !Number.isFinite(reka.y)) return { x: 0, y: -1 };
+        if (!reka || !Number.isFinite(reka.x) || !Number.isFinite(reka.y)) return null;
         const dx = this._ustaEkran.x - reka.x, dy = this._ustaEkran.y - reka.y;
         const dl = Math.hypot(dx, dy);
-        return dl > 1e-6 ? { x: dx / dl, y: dy / dl } : { x: 0, y: -1 };
+        return dl > 1e-6 ? { x: dx / dl, y: dy / dl } : null;
     }
 }
