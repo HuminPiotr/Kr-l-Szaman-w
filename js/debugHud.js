@@ -457,6 +457,41 @@ export class DebugHud {
                        `${t.aktywna ? `  siła śladu ${this._num(t.silaSladu)}` : ''}`);
         }
 
+        // Iskry Gromu w Ziemię - tylko licznik, żeby widać było, że wystrzał
+        // faktycznie coś emituje i dogasa w rozsądnym czasie.
+        if (stats.iskry && stats.iskry.czastki > 0) {
+            lines.push(`iskry Gromu w Ziemię: cząstek ${stats.iskry.czastki}`);
+        }
+
+        // Zapłon sylwetki i wstrząs ekranu - tylko gdy aktywne, żeby nie
+        // zaśmiecać panelu przez 99% czasu gry, w którym obie warstwy śpią.
+        if (stats.zaplon && stats.zaplon.aktywny) {
+            lines.push(`zapłon sylwetki: aktywny`);
+        }
+        if (stats.ekran && stats.ekran.sila > 0.01) {
+            lines.push(`wstrząs ekranu: siła ${this._num(stats.ekran.sila)}`);
+        }
+        if (stats.piorun && stats.piorun.aktywny) {
+            lines.push(`piorun: aktywny`);
+        }
+        if (stats.kolowrot && stats.kolowrot.aktywny) {
+            lines.push(`kołowrót: mgła ${stats.kolowrot.mgla}  drobiny ${stats.kolowrot.drobiny}`);
+        }
+
+        // Okadzenie - `gest` to NAJLEPSZY kandydat do strojenia progu
+        // dłoń-usta (PELNY_SKALI/ZERO_SKALI/PROG_WEJSCIA/PROG_WYJSCIA w
+        // js/dmuchanie.js są ZGADNIĘTE, tak jak progi pięciu pieczęci) -
+        // bez tej liczby nie da się odróżnić "gest za daleko" od "gest
+        // prawie trafiony". Ten sam wzorzec co ogień (zapłon/utrzym.).
+        if (stats.dmuchanie && stats.dmuchanie.stan !== 'BEZCZYNNY') {
+            lines.push(`okadzenie ${stats.dmuchanie.stan}  gest ${this._num(stats.dmuchanie.gest)}` +
+                       ` (wejście 0.55 / wyjście 0.35)   siła ${this._num(stats.dmuchanie.sila)}` +
+                       `   pozostało ${stats.dmuchanie.pozostaloS.toFixed(0)} s`);
+        }
+        if (stats.dym && (stats.dym.kleby > 0 || stats.dym.plonacych > 0)) {
+            lines.push(`dym: kłębów ${stats.dym.kleby}  płonących ${stats.dym.plonacych}`);
+        }
+
         if (stats.maska) lines.push(`maska ${stats.maska}`);
         if (stats.stan) lines.push(`stan  ${stats.stan}`);
 

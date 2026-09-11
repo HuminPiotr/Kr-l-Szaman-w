@@ -37,7 +37,11 @@
 import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 
 // --- Emisja i sufit bezpieczeństwa ---
-export const NA_SEKUNDE = 1.3;         // kłębów/s przy pełnej sile - kłęby żyją długo, nie trzeba ich dużo
+// PODNIESIONE z 1.3 (przegląd po pierwszej wersji): przy 1.3/s sufit
+// (wtedy 180) wypełniał się dopiero po ~170 s dmuchania - "kłębi się po
+// całym ekranie" (życzenie właściciela gry) miałoby wyglądać rzadko przez
+// pierwszą minutę. Przy 6/s sufit wypełnia się w ~30 s.
+export const NA_SEKUNDE = 6;           // kłębów/s przy pełnej sile
 export const MAX_KLEBOW = 180;         // "sufit wypycha najstarsze" - patrz _dodaj()
 
 // --- Życie kłębu: rząd wielkości zegara potencjału (~4 min), NIE 50-70 s ---
@@ -45,6 +49,11 @@ export const ZYCIE_MIN_S = 200, ZYCIE_MAX_S = 260;
 // Zanik alfy zaczyna się dopiero w OSTATNIEJ ĆWIARTCE życia - kłąb ma trwać
 // pełną jasnością prawie do końca, nie dogasać od razu.
 export const ZANIK_OD = 0.75;
+// Narost NA STARCIE jest ABSOLUTNY (sekundy), NIE ułamek życia - błąd
+// znaleziony w przeglądzie: `sin(min(1, p*8)*...)` z p=wiek/zycie i
+// zycie≈230s dawało pełną jasność dopiero po ~29 s. Kłąb ma się pojawić
+// widocznie w ułamku sekundy, jak każda inna cząstka w tej grze.
+export const NAROST_S = 1.2;
 
 // --- Wznoszenie, słabnące blisko sufitu (patrz nagłówek "ZMIANA FIZYKI") ---
 // Wyrażone jako UŁAMEK WYSOKOŚCI EKRANU na sekundę, nie px - ten sam powód
@@ -68,8 +77,13 @@ const ROZGARNIJ_SILA = 0.55;         // ile prędkości dłoni przejmuje kłąb 
 
 // --- Zapłon i front ognia ---
 const ZAPLON_KONTAKT_MNOZNIK = 1.5;  // promień kontaktu z zarzewiem = kłąb.r * to + zarzewie.r - hojny, nie pikselowy
-const FRONT_PROMIEN_MNOZNIK = 1.5;   // promień zarażania sąsiadów = (r1+r2) * to
-export const OPOZNIENIE_FRONTU_S = 0.09;    // ile czeka podpalony kłąb, zanim zarazi sąsiadów
+// STROJONE (przegląd): przy dojrzałym kłębie (r≈0.075*W) i pierwotnym 1.5
+// promień zarażania sąsiadów wychodził ~430 px, a opóźnienie 0.09 s dawało
+// falę biegnącą przez CAŁY ekran w mniej niż sekundę - bliżej "cały dym
+// naraz" niż wybranej opcji "front kłąb po kłębie". Ciaśniejszy mnożnik +
+// dłuższe opóźnienie na skok rozciągają widoczny czas przejścia frontu.
+const FRONT_PROMIEN_MNOZNIK = 1.2;   // promień zarażania sąsiadów = (r1+r2) * to
+export const OPOZNIENIE_FRONTU_S = 0.15;    // ile czeka podpalony kłąb, zanim zarazi sąsiadów
 export const CZAS_DO_WYBUCHU_S = 0.35;      // ile płonie (ZAPLON), zanim przejdzie w WYBUCH
 export const CZAS_WYBUCHU_S = 0.4;          // jak długo trwa sama kula ognia (WYBUCH), potem kłąb znika
 
@@ -301,7 +315,7 @@ export class Dym {
             if (c.stan !== 'DYM') continue;
             const img = obraz(MANIFEST.mgla[c.wariantMgla]);
             if (!img) continue;
-            const alfa = obwiedniaAlfy(c.wiek / c.zycie) * 0.5;
+            const alfa = obwiedniaAlfy(c.wiek, c.zycie) * 0.5;
             if (alfa <= 0.01) continue;
             const sprite = wypalTintowany(img, BARWA_DYMU, 220);
             ctx.globalAlpha = alfa;
@@ -379,13 +393,22 @@ export function wznoszenieCzynnik(y, H) {
 }
 
 /**
- * Obwiednia alfy: narost na starcie (jak wszędzie w grze - unika skokowego
- * pojawienia się), pełna jasność aż do ZANIK_OD, potem opada do zera na
- * końcu życia. Zanik BLISKO KOŃCA, nie od połowy - patrz nagłówek pliku.
+ * Obwiednia alfy: narost na starcie, pełna jasność aż do ZANIK_OD, potem
+ * opada do zera na końcu życia. Zanik BLISKO KOŃCA, nie od połowy (patrz
+ * nagłówek pliku) - stąd DWA ARGUMENTY, nie jeden ułamek: narost musi być
+ * ABSOLUTNY (sekundy, NAROST_S), bo przy życiu rzędu 200-260 s ułamek życia
+ * dawałby atak liczony w dziesiątkach sekund - dokładnie odwrotność tego,
+ * jak narost działa wszędzie indziej w grze (ogien.js/kolowrot.js: ułamek
+ * SEKUNDY, bo tamte żyją sekundy, nie minuty).
+ *
+ * @param {number} wiek   wiek kłębu w sekundach
+ * @param {number} zycie  całkowite życie kłębu w sekundach
  */
-export function obwiedniaAlfy(p) {
-    const t = Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 1;
-    const narost = Math.sin(Math.min(1, t * 8) * Math.PI * 0.5);
+export function obwiedniaAlfy(wiek, zycie) {
+    const z = Number.isFinite(zycie) && zycie > 0 ? zycie : 1;
+    const w = Number.isFinite(wiek) ? Math.max(0, wiek) : 0;
+    const t = Math.min(1, w / z);
+    const narost = Math.sin(Math.min(1, w / NAROST_S) * Math.PI * 0.5);
     const zanik = t > ZANIK_OD ? Math.max(0, 1 - (t - ZANIK_OD) / (1 - ZANIK_OD)) : 1;
     return narost * zanik;
 }

@@ -9,7 +9,7 @@
  * moc NIGDY nie kończy potencjału; i że jeden zegar 4-minutowy jest
  * jedynym samoistnym sposobem wygaśnięcia.
  */
-import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_M, ZERO_M } from '../js/dmuchanie.js';
+import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -85,8 +85,11 @@ console.log('\nGEST - DŁOŃ PRZY USTACH:');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    // Nadgarstek P tuż przy ustach (odległość << PELNY_M x skala).
-    dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], now: 0 });
+    // Nadgarstek P realistycznie blisko ust (~10 cm - dłoń przy twarzy,
+    // NIE dotyka dosłownie zero cm, bo palce/dłoń są MIĘDZY nadgarstkiem
+    // a wargami). Skala ciała w cialo() to 0.30 m, więc 0.10 m = 0.33
+    // szerokości barków - poniżej PELNY_SKALI=0.45, czyli pełny wynik.
+    dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr(`dłoń przy ustach - stan przechodzi w DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
     spr(`sila > 0 (${d.sila.toFixed(2)})`, d.sila > 0);
     spr('zaczep jest ustawiony', d.zaczep && Number.isFinite(d.zaczep.x) && Number.isFinite(d.zaczep.y));
@@ -99,12 +102,12 @@ console.log('\nPAUZA, NIE KONIEC (odsunięcie dłoni):');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], now: 0 });
+    dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr('faza 1: DMUCHA', d.stan === 'DMUCHA');
     dmuchajNKlatek(d, 20, { nadgP: [0.25, 0.05, 0], now: 0 });
     spr(`odsunięcie dłoni wraca do GOTOWY, NIE BEZCZYNNY (${d.stan})`, d.stan === 'GOTOWY');
     // I gracz może wrócić dłonią - technika nie jest skończona.
-    dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], now: 0 });
+    dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr(`powrót dłoni wznawia DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
 }
 
@@ -113,7 +116,7 @@ console.log('\nINNE COMBO ANULUJE POTENCJAŁ:');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], now: 0 });
+    dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr('przed anulowaniem: DMUCHA', d.stan === 'DMUCHA');
     d.anuluj();
     spr('anuluj() wraca do BEZCZYNNY', d.stan === 'BEZCZYNNY');
@@ -125,9 +128,9 @@ console.log('\nJEDEN ZEGAR - WYGAŚNIĘCIE PO 4 MIN:');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    dmuchajNKlatek(d, 5, { nadgP: [0.01, -0.78, 0.05], now: 1000 });
+    dmuchajNKlatek(d, 5, { nadgP: [0.10, -0.78, 0.05], now: 1000 });
     spr('tuż po uzbrojeniu: nie BEZCZYNNY', d.stan !== 'BEZCZYNNY');
-    d.update(klatka({ nadgP: [0.01, -0.78, 0.05], now: CZAS_POTENCJALU_MS + 1 }), 1, DT, CZAS_POTENCJALU_MS + 1);
+    d.update(klatka({ nadgP: [0.10, -0.78, 0.05], now: CZAS_POTENCJALU_MS + 1 }), 1, DT, CZAS_POTENCJALU_MS + 1);
     spr('po 4 minutach - BEZCZYNNY, nawet w trakcie DMUCHA', d.stan === 'BEZCZYNNY');
 }
 {
@@ -144,7 +147,7 @@ console.log('\nWYCZERPANA MOC NIGDY NIE KOŃCZY POTENCJAŁU:');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    const pobor = dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], now: 0 }, () => 0);
+    const pobor = dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 }, () => 0);
     spr(`moc=0 przez cały czas - stan nadal DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
     spr(`moc=0 - sila ma podłogę, nie jest zerem (${d.sila.toFixed(2)})`, d.sila > 0);
     spr('moc=0 - pobór wynosi 0 (nic nie ma do pobrania)', pobor === 0);
@@ -169,18 +172,18 @@ console.log('\nKOTWICA UST PRZEŻYWA ZASŁONIĘCIE:');
     resetSkali();
     d.uzbrój(0);
     // Usta widoczne i dłoń blisko - łapiemy kotwicę i wchodzimy w DMUCHA.
-    dmuchajNKlatek(d, 20, { nadgP: [0.01, -0.78, 0.05], usta: [0, -0.78, 0.05], now: 0 });
+    dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], usta: [0, -0.78, 0.05], now: 0 });
     spr('kotwica złapana, DMUCHA', d.stan === 'DMUCHA');
     // Teraz usta "zasłonięte" (niska widoczność) - ale dłoń tam gdzie była
     // kotwica: gest MUSI nadal działać na starej, pewnej pozycji.
     dmuchajNKlatek(d, 20, {
-        nadgP: [0.01, -0.78, 0.05], usta: [0, -0.78, 0.05], ustaWidoczne: false, now: 0
+        nadgP: [0.10, -0.78, 0.05], usta: [0, -0.78, 0.05], ustaWidoczne: false, now: 0
     });
     spr(`usta zasłonięte przez dłoń - DMUCHA trwa dalej (${d.stan})`, d.stan === 'DMUCHA');
 }
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');
-spr('PELNY_M < ZERO_M (rampa ma sens)', PELNY_M < ZERO_M);
-spr('ZERO_M daje spory zapas tolerancji (>= 0.25 m)', ZERO_M >= 0.25);
+spr('PELNY_SKALI < ZERO_SKALI (rampa ma sens)', PELNY_SKALI < ZERO_SKALI);
+spr('ZERO_SKALI daje spory zapas tolerancji (>= 1.0 szerokości barków)', ZERO_SKALI >= 1.0);
 
 process.exit(ok ? 0 : 1);

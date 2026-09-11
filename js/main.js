@@ -749,7 +749,10 @@ function klatka(now) {
         zaplon: { aktywny: zaplon.aktywny },
         piorun: { aktywny: piorun.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
-        dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS },
+        // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
+        // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
+        // strojenia progu na żywo, patrz debugHud.js.
+        dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest },
         dym: { kleby: dym.liczba, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,

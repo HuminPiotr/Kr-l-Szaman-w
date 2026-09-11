@@ -45,13 +45,24 @@ spr('powyżej sufitu (poza ekranem) - dalej nie spada poniżej minimum',
 const posrodku = wznoszenieCzynnik(H * (SUFIT_Y_H + SPADEK_OD_Y_H) / 2, H);
 spr(`w połowie pasma - między minimum a pełnią (${posrodku.toFixed(2)})`, posrodku > 0.2 && posrodku < 0.9);
 
-// --- 2. obwiedniaAlfy(): czysta funkcja - zanik dopiero BLISKO KOŃCA życia ---
-console.log('\nOBWIEDNIA ALFY (zanik blisko końca, NIE od połowy):');
-spr('na starcie (p=0) alfa niska (narost)', obwiedniaAlfy(0) < 0.1);
-spr('w połowie życia (p=0.5) alfa pełna', obwiedniaAlfy(0.5) > 0.95);
-spr('przy 0.9 (blisko ZANIK_OD=0.75) alfa już opada', obwiedniaAlfy(0.9) < obwiedniaAlfy(0.5));
-spr('na końcu (p=1) alfa = 0', obwiedniaAlfy(1) === 0);
-spr('poza zakresem (p>1) nie ujemna, nie NaN', Number.isFinite(obwiedniaAlfy(1.5)) && obwiedniaAlfy(1.5) >= 0);
+// --- 2. obwiedniaAlfy(wiek, zycie): czysta funkcja ---
+// DWA argumenty (wiek w sekundach, zycie w sekundach), NIE jeden ułamek -
+// błąd znaleziony w przeglądzie: narost liczony z UŁAMKA życia dawał ~29 s
+// ataku przy zyciu rzędu 230 s (kłąb byłby niewidoczny przez pierwsze pół
+// minuty). Testy niżej sprawdzają WPROST, że narost jest ABSOLUTNY.
+console.log('\nOBWIEDNIA ALFY (narost absolutny w sekundach, zanik dopiero blisko końca):');
+const ZYCIE_TESTOWE = ZYCIE_MIN_S;   // 200 s - reprezentatywne życie kłębu
+spr('na starcie (wiek=0) alfa niska (narost)', obwiedniaAlfy(0, ZYCIE_TESTOWE) < 0.1);
+spr('REGRESJA: po 2 s (ułamek życia ~1%) alfa JUŻ prawie pełna - narost liczy się w SEKUNDACH, nie w ułamku ~230 s życia',
+    obwiedniaAlfy(2, ZYCIE_TESTOWE) > 0.9);
+spr('w połowie życia alfa pełna', obwiedniaAlfy(ZYCIE_TESTOWE * 0.5, ZYCIE_TESTOWE) > 0.95);
+spr('blisko ZANIK_OD (0.9 życia) alfa już opada',
+    obwiedniaAlfy(ZYCIE_TESTOWE * 0.9, ZYCIE_TESTOWE) < obwiedniaAlfy(ZYCIE_TESTOWE * 0.5, ZYCIE_TESTOWE));
+spr('na końcu życia alfa = 0', obwiedniaAlfy(ZYCIE_TESTOWE, ZYCIE_TESTOWE) === 0);
+spr('poza zakresem (wiek > zycie) nie ujemna, nie NaN',
+    Number.isFinite(obwiedniaAlfy(ZYCIE_TESTOWE * 1.5, ZYCIE_TESTOWE)) && obwiedniaAlfy(ZYCIE_TESTOWE * 1.5, ZYCIE_TESTOWE) >= 0);
+spr('brak zycie (undefined) nie wywala wyjątku, nie NaN',
+    Number.isFinite(obwiedniaAlfy(1, undefined)));
 
 // --- 3. Emisja ---
 console.log('\nEMISJA:');

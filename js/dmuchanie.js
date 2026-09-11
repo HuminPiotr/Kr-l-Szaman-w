@@ -37,10 +37,16 @@
  *
  * GEST: "sama dłoń przy ustach" (decyzja właściciela gry - żadnego
  * rozpoznawania zgięcia palca, kamera z jednego oka słabo widzi palce
- * zasłonięte dłonią/twarzą). Odległość NADGARSTEK-USTA w metrach
- * (worldLandmarks pozy, niezmiennik odległości od kamery), z DUŻĄ
- * tolerancją - usta leżą inaczej u każdego gracza, więc precyzja tu byłaby
- * egzaminem, nie pomiarem. Lepsza z dwóch rąk.
+ * zasłonięte dłonią/twarzą). Odległość NADGARSTEK-USTA w SZEROKOŚCIACH
+ * BARKÓW (stykPunktow dzieli przez skalaCiala(wl), TEN SAM niezmiennik
+ * odległości od kamery co pięć pieczęci styku - PELNY_SKALI/ZERO_SKALI są
+ * WIELOKROTNOŚCIAMI skali ciała, NIE metrami, mimo że pierwsza wersja tego
+ * pliku była tak nazwana i wartościowana - naprawione po przeglądzie: stara
+ * "PELNY_M = 0.14" czytana jako 0.14 szerokości barków (~4 cm) była
+ * NIEOSIĄGALNA dla nadgarstka - dłoń przy ustach trzyma nadgarstek
+ * 10-20 cm od warg, nie kilka centymetrów), z DUŻĄ tolerancją - usta leżą
+ * inaczej u każdego gracza, więc precyzja tu byłaby egzaminem, nie
+ * pomiarem. Lepsza z dwóch rąk.
  *
  * KOTWICA UST PRZEŻYWA ZASŁONIĘCIE. Dłoń przy ustach z konieczności
  * zasłania punkty 9/10 (kąciki ust) - MediaPipe wtedy albo obniża
@@ -60,8 +66,13 @@ export const CZAS_POTENCJALU_MS = 240_000;
 // tak jak progi pięciu pieczęci (docs/superpowers/specs/2026-09-02-piec-
 // -pieczeci-styku-design.md). Duża tolerancja NA ŻYCZENIE: usta leżą
 // inaczej u każdego gracza, więc próg ma wybaczać, nie egzaminować.
-export const PELNY_M = 0.14;   // odległość (m), przy której gest = 1 (pełny kontakt)
-export const ZERO_M = 0.34;    // odległość (m), przy której gest = 0
+//
+// JEDNOSTKA: SZEROKOŚCI BARKÓW, nie metry - patrz nagłówek pliku. Przy
+// typowej skali ~0.30 m: PELNY_SKALI=0.45 to ~13,5 cm (nadgarstek naprawdę
+// przy twarzy, z zapasem na to, że dłoń zasłania usta i wciska się między
+// nimi a nadgarstkiem), ZERO_SKALI=1.2 to ~36 cm (ręka wyraźnie opuszczona).
+export const PELNY_SKALI = 0.45;   // odległość (szer. barków), przy której gest = 1
+export const ZERO_SKALI = 1.2;     // odległość (szer. barków), przy której gest = 0
 
 // Histereza wejścia/wyjścia w stan DMUCHA - "nic nie migocze na granicy"
 // (GEMINI.md §2). Pasmo WEJŚCIE > WYJŚCIE: dłoń musi podejść wyraźnie
@@ -210,8 +221,8 @@ export class Dmuchanie {
     _ocenGest(wl) {
         if (!wl || !this._ustaSwiat) return 0;
         const skala = skalaCiala(wl);
-        const lewa = stykPunktow(wl[15], this._ustaSwiat, skala, PELNY_M, ZERO_M);
-        const prawa = stykPunktow(wl[16], this._ustaSwiat, skala, PELNY_M, ZERO_M);
+        const lewa = stykPunktow(wl[15], this._ustaSwiat, skala, PELNY_SKALI, ZERO_SKALI);
+        const prawa = stykPunktow(wl[16], this._ustaSwiat, skala, PELNY_SKALI, ZERO_SKALI);
         return Math.max(lewa, prawa);
     }
 
