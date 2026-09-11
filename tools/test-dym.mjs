@@ -13,7 +13,8 @@
  * być stała, a kółka mają powstawać z zataczania okręgów; dym w cztery strony
  * świata, mocno w boki i w dół; siła z ustawienia gracza").
  */
-import { Dym, wznoszenieCzynnik, obwiedniaAlfy, alfaOdSzerokosci,
+import { Dym, wznoszenieCzynnik, obwiedniaAlfy, alfaOdSzerokosci, spojnosc,
+         KOLUMNA_S, TAU_ROZPADU_S,
          MAX_WEZLOW, MAX_WEZLOW_WSTEGI, ZYCIE_MIN_S, ZYCIE_MAX_S,
          WEZLY_NA_S, ODDECH_AMPLITUDA, R_START_W, ROZROST_TAU_S,
          WYRAZISTOSC_PODLOGA, TAU_WYPORU_S, PRZERZEDZ_PO_S,
@@ -45,10 +46,11 @@ function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1, wyrazistosc = 1, us
 const wszystkie = (d) => [...d.wezly()];
 /** Gotowy węzeł do wstawienia wprost do wstęgi (testy fizyki/ognia). */
 const wezel = (over = {}) => ({
-    x: 900, y: 600, vx: 0, vy: 0, wiek: 30, zycie: 120, faza: 0,
+    x: 900, y: 600, vx: 0, vy: 0, wiek: 30, zycie: 120, faza: 0, fazaWlasna: 0,
+    rozbieznoscX: 0, rozbieznoscY: 0, szum: 1,
     r: 60, rStart: 8, rCel: 80, przerwa: false,
     stan: 'DYM', tZaplonu: 0, tWybuch: 0, rozprzestrzenil: false,
-    wariantPlomien: 0, wariantOgien: 0, wariantRozblysk: 0, ...over
+    wariantMgla: 0, wariantPlomien: 0, wariantOgien: 0, wariantRozblysk: 0, ...over
 });
 /** Wstawia gotowe węzły jako jedną wstęgę (z pominięciem emisji). */
 function wstaw(d, wezly) {
@@ -136,24 +138,61 @@ console.log('\nMALOWANIE (okrąg zatoczony ustami):');
     spr(`ślad ust to okrąg (odchylenie ${(odchyl / R * 100).toFixed(1)}% < 5%)`, odchyl < 0.05 * R);
     spr(`...o zadanym promieniu (${sredni.toFixed(0)} px ≈ ${R})`, Math.abs(sredni - R) < 0.1 * R);
 
-    // Z fizyką: kształt ma PRZETRWAĆ - po 8 s okrąg jest wciąż okręgiem
-    // o podobnym promieniu (dryf w górę jest dozwolony, rozpad kształtu nie).
-    const d = new Dym();
-    dmuchaj(d, 1.5, { wyrazistosc: 0, kierunek: { x: 0, y: -1 }, usta: naOkregu });
-    // Promień liczony względem BIEŻĄCEGO środka: dryf całości w górę jest
-    // dozwolony (dym się unosi), rozpad KSZTAŁTU nie.
+    // v5: kształt ma być czytelny TYLKO tak długo, jak trwa kolumna - potem
+    // celowo rozpada się w chmurę (życzenie: "naturalny dym ważniejszy").
     const wzglednySrodka = (d) => {
         const c0 = srodek(d);
         return wszystkie(d).map(c => Math.hypot(c.x - c0.x, c.y - c0.y));
     };
     const sredniaZ = (t) => t.reduce((a, b) => a + b, 0) / t.length;
-    const przedSrodek = srodek(d), przedR = sredniaZ(wzglednySrodka(d));
+    const d = new Dym();
+    dmuchaj(d, 1.5, { wyrazistosc: 0, kierunek: { x: 0, y: -1 }, usta: naOkregu });
+    const wKolumnie = sredniaZ(wzglednySrodka(d));
+    przepusc(d, 12);
+    const wChmurze = sredniaZ(wzglednySrodka(d));
+    spr(`kształt rozlewa się po rozpadzie (${wKolumnie.toFixed(0)} -> ${wChmurze.toFixed(0)} px)`,
+        wChmurze > 1.2 * wKolumnie);
+}
+
+// --- 4b. Rozpad kolumny w chmurę (v5) ---
+console.log('\nROZPAD KOLUMNY W CHMURĘ:');
+spr('świeży węzeł w pełni spójny', spojnosc(0) === 1);
+spr(`spójność trzyma przez KOLUMNA_S (${KOLUMNA_S} s)`, spojnosc(KOLUMNA_S) === 1);
+spr('po jednym tau spójność wyraźnie spada', spojnosc(KOLUMNA_S + TAU_ROZPADU_S) < 0.4);
+spr('po trzech tau kreski praktycznie nie ma', spojnosc(KOLUMNA_S + 3 * TAU_ROZPADU_S) < 0.06);
+spr('spójność maleje monotonicznie', (() => {
+    let poprz = 2;
+    for (let t = 0; t < 20; t += 0.1) { const v = spojnosc(t); if (v > poprz + 1e-9) return false; poprz = v; }
+    return true;
+})());
+spr('spójność odporna na NaN', spojnosc(NaN) === 1);
+{
+    // Kolumna: przez pierwsze sekundy sąsiedzi lecą RÓWNOLEGLE (kreska jest kreską).
+    const d = new Dym();
+    dmuchaj(d, 0.5, { kierunek: W_PRAWO });
+    const kat = (c) => Math.atan2(c.vy, c.vx);
+    const w = () => d._wstegi[0].wezly;
+    const rozrzut = () => {
+        const katy = w().map(kat);
+        return Math.max(...katy) - Math.min(...katy);
+    };
+    const odstep = () => {
+        const l = w();
+        let suma = 0;
+        for (let i = 1; i < l.length; i++) suma += Math.hypot(l[i].x - l[i - 1].x, l[i].y - l[i - 1].y);
+        return suma / (l.length - 1);
+    };
+    const rozrzutKolumny = rozrzut(), odstepKolumny = odstep();
+    spr(`w kolumnie kierunki sąsiadów prawie równoległe (${(rozrzutKolumny * 180 / Math.PI).toFixed(1)}° < 10°)`,
+        rozrzutKolumny < 10 * Math.PI / 180);
+
+    // Rozpad: po kilku sekundach sąsiedzi rozchodzą się i wstęga pęka.
     przepusc(d, 8);
-    const poR = sredniaZ(wzglednySrodka(d));
-    const dryf = Math.hypot(srodek(d).x - przedSrodek.x, srodek(d).y - przedSrodek.y);
-    spr(`po 8 s kształt trzyma rozmiar (${przedR.toFixed(0)} -> ${poR.toFixed(0)} px, < 30%)`,
-        Math.abs(poR - przedR) < 0.3 * przedR);
-    spr(`po 8 s dryf środka mały (${(dryf / W * 100).toFixed(1)}% W < 10%)`, dryf < 0.10 * W);
+    const rozrzutChmury = rozrzut(), odstepChmury = odstep();
+    spr(`w chmurze kierunki się rozjeżdżają (${(rozrzutChmury * 180 / Math.PI).toFixed(0)}° > 40°)`,
+        rozrzutChmury > 40 * Math.PI / 180);
+    spr(`...a odstęp sąsiadów rośnie (${odstepKolumny.toFixed(0)} -> ${odstepChmury.toFixed(0)} px)`,
+        odstepChmury > 1.5 * odstepKolumny);
 }
 
 // --- 5. Cztery strony świata ---
@@ -209,8 +248,10 @@ console.log('\nSZEROKOŚĆ KRESKI:');
     spr(`przy ustach r = ${c.r.toFixed(0)} px (${R_START_W} W)`, Math.abs(c.r - W * R_START_W) < 1);
     przepusc(d, ROZROST_TAU_S);
     spr('po jednej stałej czasowej kreska wyraźnie szersza', c.r > 3 * W * R_START_W);
-    przepusc(d, 30);
-    spr(`po 30 s >= 90% docelowej szerokości (${(c.r / c.rCel * 100).toFixed(0)}%)`, c.r >= 0.9 * c.rCel);
+    przepusc(d, 10);
+    spr(`po ~10 s >= 90% docelowej szerokości - kłąb ma być GRUBY (${(c.r / c.rCel * 100).toFixed(0)}%)`,
+        c.r >= 0.9 * c.rCel);
+    spr(`docelowa szerokość kłębu duża (${(c.rCel / W).toFixed(3)} W >= 0.05)`, c.rCel / W >= 0.05);
     spr('szerokość nigdy nie przekracza celu', c.r <= c.rCel + 1e-6);
 }
 
@@ -301,8 +342,9 @@ console.log('\nPODPALENIE I FRONT OGNIA:');
 {
     const d = new Dym();
     // Dwie RÓWNOLEGŁE kreski blisko siebie - front przeskakuje przez siatkę.
+    // Odstęp 80 px < (60+60)*0.8 = 96 px promienia zarażania (FRONT_PROMIEN_MNOZNIK).
     const a = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 600, r: 60, rStart: 60, rCel: 60 }));
-    const b = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 700, r: 60, rStart: 60, rCel: 60 }));
+    const b = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 680, r: 60, rStart: 60, rCel: 60 }));
     wstaw(d, a); wstaw(d, b);
     a[0].stan = 'ZAPLON';
     przepusc(d, OPOZNIENIE_FRONTU_S + 0.03);

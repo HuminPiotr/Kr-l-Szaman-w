@@ -42,6 +42,28 @@
  * Sprite'y Kenney zostają WYŁĄCZNIE przy zapłonie i wybuchu - to jest ta
  * część, którą właściciel gry lubi ("podoba mi się wybuch").
  *
+ * ================== V5 (2026-09-11, czwarty test) ==================
+ * Zgłoszenie: "kolumny utrzymują się za długo, to nie wygląda naturalnie.
+ * Najpierw powinna być kolumna z mocą wydychania, ale potem powinno
+ * przypominać bardziej chmurę, tak jak w poprzedniej wersji z teksturami".
+ * Diagnoza: wszystko, co v4 dodało dla CIĄGŁOŚCI kreski, trzymało ją spójną
+ * NA ZAWSZE - wspólna prędkość i faza całej wstęgi (celowo, bo per-węzeł
+ * losowanie dawało zygzak), pole przepływu przesuwające sąsiadów tak samo,
+ * odcinek rysowany niezależnie od wieku i rozrost rozciągnięty na 35 s.
+ * Brakowało FAZY ROZPADU: kolumna i chmura to nie dwa dymy, tylko dwa etapy
+ * życia tego samego węzła.
+ *
+ * Odpowiedź - jedna liczba `spojnosc(wiek)`: 1 przez KOLUMNA_S, potem opada
+ * wykładniczo (TAU_ROZPADU_S). Steruje NARAZ rysowaniem i fizyką:
+ *   rysowanie - odcinek kreski z alfą x spojnosc, tekstura kłębu z alfą
+ *               x (1 - spojnosc); crossfade, więc kolumna PRZECHODZI w chmurę;
+ *   fizyka    - własny wektor rozbieżności węzła i pole przepływu wchodzą
+ *               z wagą (1 - spojnosc): w kolumnie nic nie psuje kreski,
+ *               w rozpadzie sąsiedzi idą w różne strony i wąż pęka na kłęby.
+ * Tekstury MANIFEST.mgla wracają - ale WYŁĄCZNIE w fazie chmury. To była dobra
+ * tekstura w złej roli: jako CAŁA technika dawała "kółka", jako rozpad
+ * kolumny daje kłębienie.
+ *
  * ================== KIERUNEK: CZTERY STRONY ŚWIATA ==================
  * Wyporność wchodzi z wagą 1-exp(-wiek/TAU_WYPORU_S), TAU = 6 s (v3: 0.8 s) -
  * namalowany kształt trzyma pozycję ~8 s, a dym wypuszczony w dół NAPRAWDĘ
@@ -115,8 +137,21 @@ export const R_START_W = 0.008;          // ~15 px przy ustach na 1920 (kreska m
 // była szersza niż długa i czytała się jako placek. Rozrost jest powolny -
 // przez pierwsze sekundy kształt jest czytelny, mgła robi się z niego dopiero
 // po ~minucie.
-const R_KONIEC_MIN_W = 0.030, R_KONIEC_MAX_W = 0.042;
-export const ROZROST_TAU_S = 15;         // 90% szerokości po ~35 s
+// v5: kłąb ma być GRUBY (jak w v2/v3, gdzie to czytało się jak dym) i dorastać
+// SZYBKO - cienka jest tylko kolumna, przez pierwsze sekundy.
+const R_KONIEC_MIN_W = 0.055, R_KONIEC_MAX_W = 0.075;
+export const ROZROST_TAU_S = 4;          // 90% szerokości po ~9 s
+
+// --- Rozpad kolumny w chmurę (v5) ---
+// ZGADNIĘTE - do strojenia na kamerze. KOLUMNA_S to "ile trwa wydech, który
+// widać jako kolumnę"; po nim spójność opada i węzeł staje się kłębem.
+export const KOLUMNA_S = 1.5;
+export const TAU_ROZPADU_S = 1.2;        // po ~3 tau (4.5 s) kreski praktycznie nie ma
+// Własny wektor każdego węzła, wchodzi dopiero z (1 - spojnosc) - to jest to,
+// czego v4 brakowało, żeby wstęga PĘKŁA zamiast płynąć jak sztywny wąż.
+const ROZBIEZNOSC_W_S = 0.035;           // ułamek W/s
+export const KLAB_CO_ILE = 2;            // co ile-ty węzeł dostaje teksturę kłębu
+const KLAB_SKALA = 2.2;                  // tekstura jest szersza niż kreska - kłęby mają NACHODZIĆ
 
 // --- Życie węzła ---
 export const ZYCIE_MIN_S = 100, ZYCIE_MAX_S = 140;
@@ -160,11 +195,19 @@ const ROZGARNIJ_SILA = 0.55;
 // Kreska jest CIENKA u wylotu, więc kontakt musi być hojniejszy niż przy
 // kłębach v3 (tam 1.5) - inaczej płonący palec mijałby świeżą linię.
 const ZAPLON_KONTAKT_MNOZNIK = 2.5;
-const FRONT_PROMIEN_MNOZNIK = 2.0;       // zarażanie SĄSIEDNICH WSTĘG (wzdłuż własnej front idzie zawsze)
-export const OPOZNIENIE_FRONTU_S = 0.15;
+// STROJONE (v5): przy kłębach 0.07 W mnożnik 2.0 i opóźnienie 0.15 s dawały
+// skok ~540 px co 0.15 s, czyli CAŁY ekran w jedną trzecią sekundy - zamiast
+// frontu było jednoczesne zapalenie wszystkiego.
+const FRONT_PROMIEN_MNOZNIK = 0.8;       // zarażanie SĄSIEDNICH WSTĘG (wzdłuż własnej front idzie zawsze)
+export const OPOZNIENIE_FRONTU_S = 0.25;
 export const CZAS_DO_WYBUCHU_S = 0.35;
 export const CZAS_WYBUCHU_S = 0.4;
-export const SPRITE_CO_ILE = 6;          // co ile-ty wybuchający węzeł dostaje sprite
+export const SPRITE_CO_ILE = 6;          // co ile-ty wybuchający węzeł dostaje sprite...
+// ...ale przy detonacji zasnutego ekranu płonie NARAZ kilkaset węzłów - wtedy
+// krok rośnie tak, żeby kul ognia było co najwyżej tyle. Bez tego addytywne
+// sprite'y wybielają CAŁY ekran na pół sekundy (zmierzone: 2444 wybuchy).
+export const MAX_SPRITE_WYBUCHU = 110;
+const R_WYBUCHU_MAX_W = 0.06;            // sufit promienia kuli ognia (kłąb bywa 0.075 W)
 
 // --- Rysowanie ---
 // Miękkość bez tekstury: TRZY przebiegi tej samej kreski - szeroka, ledwie
@@ -180,27 +223,34 @@ const PRZEBIEGI = [
     { szerokosc: 1.5, alfa: 0.45 },
     { szerokosc: 1.0, alfa: 1.00 }
 ];
+// Płonąca kreska: szerokie przebiegi 'source-over' (nie sumują się w biel),
+// dopiero wąski rdzeń addytywnie - daje poświatę bez wybielania ekranu.
+// Zmierzone: przy 1800 płonących węzłach same addytywne przebiegi dawały
+// średnią jasność klatki 255/255, czyli biały ekran.
 const PRZEBIEGI_OGNIA = [
-    { szerokosc: 3.0, alfa: 0.10 },
-    { szerokosc: 1.8, alfa: 0.22 },
-    { szerokosc: 1.0, alfa: 0.55 }
+    { szerokosc: 3.0, alfa: 0.16, addytywny: false },
+    { szerokosc: 1.8, alfa: 0.34, addytywny: false },
+    { szerokosc: 1.0, alfa: 0.60, addytywny: false },
+    { szerokosc: 0.5, alfa: 0.45, addytywny: true }
 ];
-const ROZMYCIE_PX = 4;                   // jeden blur na klatkę przy kompozycji (nie na sprite)
+const ROZMYCIE_PX = 6;                   // jeden blur na klatkę przy kompozycji (nie na sprite)
 const SZUM_SZEROKOSCI = 0.25;            // per-węzeł, TYLKO szerokość - kreska nie ma być rurką
 const KWANT_SZEROKOSCI_PX = 3;           // kubełki szerokości na płótnie pomocniczym
 const KWANT_ALFY = 0.05;
 
 // --- Barwy ---
 const BARWA_DYMU = '215, 215, 222';      // jasna, chłodna szarość - source-over
+const BARWA_DYMU_RGB = [215, 215, 222];  // ta sama barwa dla wypalTintowany (tekstury kłębów)
+const KLAB_SPRITE_PX = 128;              // rozmiar wypalonego sprite'a (rysowany na płótnie 1/3)
 // Pierwszy stopień jest CIEMNY i ciepły, nie biały: te kreski idą w trybie
 // 'lighter', więc jasna szarość dodana do rozświetlonego dymu robiła białe
 // rury zamiast pełznącego ognia.
 const BARWA_ZAPLONU_STOPNIE = [
-    [90, 70, 55],
-    [200, 140, 70],
+    [130, 100, 75],
+    [225, 155, 75],
     [255, 150, 50],
     [255, 95, 25],
-    [215, 40, 10]
+    [205, 35, 10]
 ];
 const BARWA_RDZENIA = [255, 238, 200];
 const BARWA_ROZBLYSKU = [255, 225, 170];
@@ -217,6 +267,7 @@ export class Dym {
         this._tEmisji = 0;           // zegar oddechu (płynie tylko podczas dmuchania)
         this._emitowal = false;      // czy emituj() zawołano w tej klatce
         this._poprzZaczep = null;    // usta z poprzedniej klatki emisji - interpolacja (malowanie)
+        this._wybuchajacych = 0;     // liczba węzłów w stanie WYBUCH (krok sprite'ów)
         this._plotnoPom = null;
         this._ctxPom = null;
     }
@@ -309,6 +360,11 @@ export class Dym {
                 wiek: 0,
                 zycie: ZYCIE_MIN_S + Math.random() * (ZYCIE_MAX_S - ZYCIE_MIN_S),
                 faza: wstega.faza,
+                // Faza WŁASNA i wektor rozbieżności działają dopiero w fazie
+                // rozpadu (waga 1 - spojnosc), więc nie psują kreski kolumny.
+                fazaWlasna: Math.random() * Math.PI * 2,
+                rozbieznoscX: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
+                rozbieznoscY: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
                 szum: 1 + (Math.random() - 0.5) * 2 * SZUM_SZEROKOSCI,
                 r: wRef * R_START_W,
                 rStart: wRef * R_START_W,
@@ -415,6 +471,7 @@ export class Dym {
         const k = 2 * Math.PI / (wRef * POLE_DLUGOSC_FALI_W);
         const A = POLE_AMPLITUDA_W_S2 * wRef;
         let nowychWybuchow = 0;
+        let wybuchajacych = 0;   // ile węzłów JEST w stanie WYBUCH (krok sprite'ów w _rysuj)
         let doFrontu = null;   // węzły, które W TEJ KLATCE zarażają sąsiednie wstęgi
 
         for (const w of this._wstegi) {
@@ -427,6 +484,7 @@ export class Dym {
                     c.tWybuch += krok;
                     if (c.tWybuch >= CZAS_WYBUCHU_S) { this._usun(w, idx); continue; }
                     zywe.push(c);
+                    wybuchajacych++;
                     continue;
                 }
                 if (c.wiek >= c.zycie) { this._usun(w, idx); continue; }
@@ -458,14 +516,21 @@ export class Dym {
                 // wchodzą DOPIERO z wagą wyporu, żeby dało się malować w dół.
                 const wylot = Math.exp(-c.wiek / TAU_WYLOTU_S);
                 const wypor = 1 - Math.exp(-c.wiek / TAU_WYPORU_S);
+                const rozpad = 1 - spojnosc(c.wiek);
                 const wznoszenie = wznoszenieCzynnik(c.y, hRef);
                 const celVy = -WZNOSZENIE_H_S * hRef * wznoszenie;
                 c.vy += (celVy - c.vy) * Math.min(1, krok * 2) * wypor;
 
-                const ax = A * Math.sin(c.y * k + this._t * POLE_OMEGA_1 + c.faza * 0.3);
-                const ay = A * Math.cos(c.x * k * 0.8 + this._t * POLE_OMEGA_2);
-                c.vx += ax * krok * wypor;
-                c.vy += ay * krok * wypor;
+                // Pole przepływu z fazą WŁASNĄ węzła i rozbieżność - oba tylko
+                // w fazie rozpadu, dlatego kolumna zostaje kolumną, a potem
+                // sąsiedzi rozchodzą się i wstęga pęka na kłęby.
+                const fw = Number.isFinite(c.fazaWlasna) ? c.fazaWlasna : 0;
+                const ax = A * Math.sin(c.y * k + this._t * POLE_OMEGA_1 + fw);
+                const ay = A * Math.cos(c.x * k * 0.8 + this._t * POLE_OMEGA_2 + fw * 0.5);
+                c.vx += ax * krok * rozpad;
+                c.vy += ay * krok * rozpad;
+                c.vx += (c.rozbieznoscX ?? 0) * krok * rozpad;
+                c.vy += (c.rozbieznoscY ?? 0) * krok * rozpad;
                 c.vx += Math.sign(Math.sin(c.faza)) * ROZLEW_BOK_H_S * hRef * (1 - wznoszenie) * wypor * krok;
 
                 // Opór zmieszany wagą wylotu - JEDEN wektor prędkości, więc
@@ -492,6 +557,7 @@ export class Dym {
             return false;
         });
 
+        this._wybuchajacych = wybuchajacych;
         if (doFrontu) this._front(doFrontu);
         this._przerzedz();
         return nowychWybuchow;
@@ -614,14 +680,42 @@ export class Dym {
         // Odcinki zbierane w kubełkach (szerokość x alfa): jeden stroke() na
         // kubełek zamiast jednego na odcinek - przy 2000 odcinków to różnica
         // rzędu wielkości w liczbie wywołań rysujących.
+        // --- Faza CHMURY: tekstury kłębów pod spodem (crossfade z kreską) ---
+        // Sprite'y wracają z v2/v3, ale tylko dla rozpadu - patrz nagłówek V5.
+        // Rysowane na płótnie 1/3 i przez wspólne rozmycie, więc nie czytają
+        // się jako ostre krążki.
+        let licznikKlebow = 0;
+        for (const w of this._wstegi) {
+            for (const c of w.wezly) {
+                if (c.stan !== 'DYM') continue;
+                if ((licznikKlebow++ % KLAB_CO_ILE) !== 0) continue;
+                const rozpad = 1 - spojnosc(c.wiek);
+                if (rozpad <= 0.01) continue;
+                const img = obraz(MANIFEST.mgla[c.wariantMgla ?? 0]);
+                if (!img) continue;
+                const alfa = obwiedniaAlfy(c.wiek, c.zycie) * alfaOdSzerokosci(c.r, c.rStart, c.rCel)
+                           * rozpad * (1 + MIGOTANIE_ALFY * Math.sin(this._t * MIGOTANIE_OMEGA + c.fazaWlasna));
+                if (alfa <= 0.01) continue;
+                const oddech = 1 + ODDECH_SZEROKOSCI * Math.sin(this._t * ODDECH_OMEGA + c.fazaWlasna);
+                const r = c.r * KLAB_SKALA * (c.szum ?? 1) * oddech * skala;
+                pc.globalAlpha = Math.min(1, alfa);
+                const sprite = wypalTintowany(img, BARWA_DYMU_RGB, KLAB_SPRITE_PX);
+                pc.drawImage(sprite, c.x * skala - r, c.y * skala - r, r * 2, r * 2);
+            }
+        }
+        pc.globalAlpha = 1;
+
+        // --- Faza KOLUMNY: kreska na wierzchu, gaśnie z rozpadem spójności ---
         const kubelki = new Map();
         for (const w of this._wstegi) {
             for (let i = 1; i < w.wezly.length; i++) {
                 const a = w.wezly[i - 1], b = w.wezly[i];
                 if (b.przerwa || a.stan !== 'DYM' || b.stan !== 'DYM') continue;
+                if (!polaczone(a, b)) continue;
                 const oddech = 1 + ODDECH_SZEROKOSCI * Math.sin(this._t * ODDECH_OMEGA + a.faza);
                 const szer = (a.r + b.r) * skala * oddech * (a.szum ?? 1);
                 const alfa = obwiedniaAlfy(a.wiek, a.zycie) * alfaOdSzerokosci(a.r, a.rStart, a.rCel)
+                           * spojnosc(a.wiek)
                            * (1 + MIGOTANIE_ALFY * Math.sin(this._t * MIGOTANIE_OMEGA + a.faza * 2));
                 if (alfa <= 0.01 || szer <= 0.2) continue;
                 const kszer = Math.max(KWANT_SZEROKOSCI_PX,
@@ -662,6 +756,10 @@ export class Dym {
         // Płonąca kreska: te same wielokrotne przebiegi co dym (szeroka poświata
         // -> wąski rdzeń), inaczej ogień czyta się jak pomarańczowe rury.
         // Kubełki po STOPNIU barwy i szerokości - stroke'ów są dziesiątki, nie tysiące.
+        // Płonący węzeł czyta tę samą oś czasu co dym: w fazie KOLUMNY jest
+        // odcinkiem kreski, w fazie CHMURY - płonącym kłębem (tekstura mgły
+        // w ciepłym tincie). Bez tego ogień łączył odcinkami węzły oddalone
+        // o setki pikseli i rysował przez ekran wielkie żółte belki.
         const ogien = new Map();
         for (const w of this._wstegi) {
             for (let i = 0; i < w.wezly.length; i++) {
@@ -670,33 +768,49 @@ export class Dym {
                 const p = Math.max(0, Math.min(1, c.tZaplonu / CZAS_DO_WYBUCHU_S));
                 const stopien = Math.min(BARWA_ZAPLONU_STOPNIE.length - 1,
                                           Math.floor(p * BARWA_ZAPLONU_STOPNIE.length));
-                const szer = Math.max(KWANT_SZEROKOSCI_PX,
-                                       Math.round(c.r * (1 + p * 0.4) / KWANT_SZEROKOSCI_PX) * KWANT_SZEROKOSCI_PX);
-                const klucz = stopien * 10000 + szer;
-                let wpis = ogien.get(klucz);
-                if (!wpis) ogien.set(klucz, wpis = { stopien, szer, p: new Path2D() });
+                const sp = spojnosc(c.wiek);
                 const poprz = w.wezly[i - 1];
-                if (poprz && !c.przerwa) wpis.p.moveTo(poprz.x, poprz.y);
-                else wpis.p.moveTo(c.x - 0.01, c.y);
-                wpis.p.lineTo(c.x, c.y);
+                if (sp > 0.05 && poprz && !c.przerwa && polaczone(poprz, c)) {
+                    const szer = Math.max(KWANT_SZEROKOSCI_PX,
+                                           Math.round(c.r * (1 + p * 0.4) / KWANT_SZEROKOSCI_PX) * KWANT_SZEROKOSCI_PX);
+                    const kalfa = Math.max(KWANT_ALFY, Math.round(sp / KWANT_ALFY) * KWANT_ALFY);
+                    const klucz = (stopien * 10000 + szer) * 100 + Math.round(kalfa * 100);
+                    let wpis = ogien.get(klucz);
+                    if (!wpis) ogien.set(klucz, wpis = { stopien, szer, alfa: kalfa, p: new Path2D() });
+                    wpis.p.moveTo(poprz.x, poprz.y);
+                    wpis.p.lineTo(c.x, c.y);
+                }
+                if (sp < 0.95) {
+                    const img = obraz(MANIFEST.mgla[c.wariantMgla ?? 0]);
+                    if (!img) continue;
+                    const r = c.r * KLAB_SKALA * 0.8;
+                    ctx.globalAlpha = Math.min(1, (1 - sp) * (0.35 + 0.45 * p));
+                    ctx.drawImage(wypalTintowany(img, BARWA_ZAPLONU_STOPNIE[stopien], KLAB_SPRITE_PX),
+                                   c.x - r, c.y - r, r * 2, r * 2);
+                }
             }
         }
+        ctx.globalAlpha = 1;
         for (const przebieg of PRZEBIEGI_OGNIA) {
-            for (const { stopien, szer, p } of ogien.values()) {
+            ctx.globalCompositeOperation = przebieg.addytywny ? 'lighter' : 'source-over';
+            for (const { stopien, szer, alfa, p } of ogien.values()) {
                 const [cr, cg, cb] = BARWA_ZAPLONU_STOPNIE[stopien];
-                ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${przebieg.alfa})`;
+                ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${(przebieg.alfa * alfa).toFixed(3)})`;
                 ctx.lineWidth = szer * przebieg.szerokosc;
                 ctx.stroke(p);
             }
         }
+        ctx.globalCompositeOperation = 'lighter';
 
         let licznikSprite = 0;
+        const krokSprite = Math.max(SPRITE_CO_ILE,
+                                     Math.ceil(this._wybuchajacych / MAX_SPRITE_WYBUCHU));
         for (const w of this._wstegi) {
             for (const c of w.wezly) {
                 if (c.stan === 'WYBUCH') {
-                    // Sprite co SPRITE_CO_ILE-ty wybuchający węzeł - detonacja ma
-                    // wyglądać jak dotąd, a nie jak tysiąc nakładek na kresce.
-                    if ((licznikSprite++ % SPRITE_CO_ILE) !== 0) continue;
+                    // Sprite co krokSprite-ty wybuchający węzeł - detonacja ma
+                    // wyglądać jak dotąd, a nie wybielić ekranu.
+                    if ((licznikSprite++ % krokSprite) !== 0) continue;
                     const p = Math.max(0, Math.min(1, c.tWybuch / CZAS_WYBUCHU_S));
                     const zanik = 1 - p;
                     const rdzen = obraz(MANIFEST.ogienRdzen[c.wariantOgien]);
@@ -705,7 +819,8 @@ export class Dym {
                     const skalaOgnia = 0.6 + 0.8 * Math.min(1, p * 4);
                     // Kreska jest cieńsza niż kłąb v3 - podłoga promienia, żeby
                     // kula ognia została kulą ognia, a nie iskierką.
-                    const r = Math.max(c.r * 2, wRef * 0.035) * (0.7 + 0.3 * skalaOgnia);
+                    const r = Math.min(wRef * R_WYBUCHU_MAX_W, Math.max(c.r * 2, wRef * 0.035))
+                            * (0.7 + 0.3 * skalaOgnia);
 
                     if (rozblysk && p < 0.35) {
                         const sprite = wypalTintowany(rozblysk, BARWA_ROZBLYSKU, 320);
@@ -765,6 +880,28 @@ export function obwiedniaAlfy(wiek, zycie) {
 }
 
 /**
+ * Czy dwa sąsiednie węzły wolno połączyć odcinkiem. W fazie chmury sąsiedzi
+ * rozchodzą się na setki pikseli - kreska między nimi byłaby belką przez pół
+ * ekranu, nie dymem.
+ */
+function polaczone(a, b) {
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    return d <= (a.r + b.r) * 1.5;
+}
+
+/**
+ * Spójność węzła 1..0: przez KOLUMNA_S kreska trzyma się kupy (widać kolumnę
+ * wydechu), potem opada wykładniczo i węzeł staje się kłębem chmury. Jedna
+ * liczba steruje NARAZ rysowaniem (crossfade kreska/tekstura) i fizyką
+ * (rozbieżność, pole przepływu) - patrz nagłówek V5.
+ */
+export function spojnosc(wiek) {
+    const w = Number.isFinite(wiek) ? wiek : 0;
+    if (w <= KOLUMNA_S) return 1;
+    return Math.exp(-(w - KOLUMNA_S) / TAU_ROZPADU_S);
+}
+
+/**
  * Alfa cienieje z szerokością kreski (zachowanie "masy"): świeża, wąska
  * kreska jest gęsta, rozdęta w mgłę - rzadka. NIGDY poniżej ALFA_KONIEC;
  * zanik końcowy to osobno obwiedniaAlfy.
@@ -778,6 +915,7 @@ export function alfaOdSzerokosci(r, rStart, rCel) {
 
 function warianty() {
     return {
+        wariantMgla: losowyIndeks(MANIFEST.mgla),
         wariantPlomien: losowyIndeks(MANIFEST.plomien),
         wariantOgien: losowyIndeks(MANIFEST.ogienRdzen),
         wariantRozblysk: losowyIndeks(MANIFEST.rozblyskUderzenia)

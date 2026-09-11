@@ -274,3 +274,44 @@ z **wyrazistości ustawienia**, kształt trzyma pozycję **~8 s**.
 
 **Zmierzone w przeglądarce** (1920×1080): 100 s ciągłego dmuchania → 2748 węzłów, rysowanie
 3,2 ms/klatkę, fizyka 0,3 ms; detonacja całej chmury: najgorsza klatka 14,7 ms.
+
+## v5 (2026-09-11) — kolumna, która rozpada się w chmurę
+
+**Zgłoszenie po czwartym teście:** „kolumny utrzymują się za długo, to nie wygląda naturalnie.
+Najpierw powinna być kolumna z mocą wydychania, ale potem powinno przypominać bardziej chmurę,
+tak jak w poprzedniej wersji z teksturami." Decyzje z pytań: kolumna trzyma **~1,5 s**,
+malowanie kształtów **odpada** (naturalny dym ważniejszy).
+
+**Diagnoza:** wszystko, co v4 dodało dla *ciągłości* kreski, trzymało ją spójną **na zawsze** —
+wspólna prędkość i faza całej wstęgi (celowo, bo losowanie per węzeł dawało zygzak), pole
+przepływu przesuwające sąsiadów tak samo, odcinek rysowany niezależnie od wieku, rozrost
+rozciągnięty na 35 s. Brakowało **fazy rozpadu**: kolumna i chmura to nie dwa dymy, tylko dwa
+etapy życia tego samego węzła.
+
+**Przebudowa — jedna liczba `spojnosc(wiek)`** (1 przez `KOLUMNA_S = 1,5 s`, potem
+`exp(−t/1,2 s)`) steruje naraz:
+- **rysowaniem** — odcinek kreski z alfą `× spojnosc`, tekstura kłębu (`MANIFEST.mgla`,
+  ciepło/chłodno tintowana przez `wypalTintowany`) z alfą `× (1 − spojnosc)`. Tekstury **wracają**,
+  ale wyłącznie w fazie chmury: to była dobra tekstura w złej roli — jako *cała* technika dawała
+  „kółka", jako *rozpad kolumny* daje kłębienie. Wszystko na płótnie 1/3 z jednym `blur(6px)`.
+- **fizyką** — własny wektor rozbieżności węzła (±0,035 W/s) i pole przepływu z *własną* fazą
+  wchodzą z wagą `(1 − spojnosc)`: w kolumnie nic nie psuje kreski, w rozpadzie sąsiedzi
+  rozchodzą się i wstęga pęka na kłęby (zmierzone: rozrzut kierunków 0,1° → 175°, odstęp
+  sąsiadów 14 → 302 px).
+- Kłąb dorasta **szybko i grubo**: `rCel` 0,055–0,075 W, `ROZROST_TAU_S` 15 s → 4 s.
+
+**Poprawki znalezione dopiero na renderach (nie w testach):**
+- Odcinek rysowany tylko gdy sąsiedzi są bliżej niż `(r1 + r2) × 1,5` (`polaczone()`) — w fazie
+  chmury kreska łączyła punkty oddalone o setki pikseli.
+- Płonący węzeł czyta tę samą oś czasu: w kolumnie jest odcinkiem, w chmurze płonącym kłębem.
+  Bez tego detonacja rysowała przez ekran wielkie żółte belki.
+- Szerokie przebiegi ognia idą `source-over`, tylko wąski rdzeń addytywnie; przy 1800 płonących
+  węzłach same addytywne dawały **średnią jasność klatki 255/255** (biały ekran).
+- Sufit kul ognia (`MAX_SPRITE_WYBUCHU = 110`, krok liczony z liczby wybuchających) i sufit ich
+  promienia (0,06 W).
+- Front zwolniony: `FRONT_PROMIEN_MNOZNIK` 2,0 → 0,8, `OPOZNIENIE_FRONTU_S` 0,15 → 0,25 s —
+  przy kłębach 0,07 W poprzednie wartości zapalały cały ekran w ⅓ sekundy.
+
+**Zmierzone w przeglądarce** (1920×1080): 2 min ciągłego dmuchania → rysowanie 2,4 ms/klatkę,
+fizyka 0,24 ms; detonacja całego zasnutego ekranu: najgorsza klatka 12,9 ms, szczyt jasności
+196/255 zamiast 255.
