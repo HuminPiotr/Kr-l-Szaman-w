@@ -17,9 +17,17 @@ import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
 import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
+import { Dmuchanie } from './dmuchanie.js';
+import { Dym } from './dym.js';
 import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA } from './podmuch.js';
 import { Fala } from './fala.js';
 import { Tecza } from './tecza.js';
+import { Iskry, pekniecieZiemi } from './iskry.js';
+import { Zaplon } from './zaplon.js';
+import { Ekran } from './ekran.js';
+import { Piorun } from './piorun.js';
+import { Kolowrot, BARWA_MGLA as BARWA_KOLOWROTU, kregSylwetki } from './kolowrot.js';
+import { zaladuj as zaladujAssety } from './assety.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
          skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
@@ -43,6 +51,35 @@ import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
 // Dłonie są WPIĘTE - piramidka Swaroga ich potrzebuje. Zmierzone na żywym
 // tańcu: ~60 FPS z ciałem i maską, więc 8 ms na dłonie mieści się z ogromnym
 // zapasem.
+
+// Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
+// PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
+// fala.js rysuje przez 'lighter': muszony fiolet, który dobrze czyta się
+// jako pieczęć, gaśnie do bladego różu pod addytywnym blendowaniem, jeśli
+// nie jest wystarczająco nasycony na starcie.
+const BARWA_GROMU = [190, 100, 255];
+
+// Barwy zapłonu sylwetki (js/zaplon.js) per TECHNIKA (pole `uzbraja`
+// z js/kombosy.js) - jeden wpis na każdą z czterech technik, nie na
+// pojedynczą pieczęć: zapłon jest nagrodą za COMBO, tak samo jak
+// fala/iskry przy Gromie w Ziemię. Barwy dobrane z tego samego rejestru
+// co efekty.js TABELA (przybliżone RGB odpowiedniej barwy HSL, podbite do
+// pełnego nasycenia z tego samego powodu co BARWA_GROMU wyżej).
+const BARWA_ZAPLONU = {
+    ogien: [255, 140, 40],        // pomarańcz Swaroga (efekty.js swarog: 25°)
+    aard: [140, 235, 195],        // mięta Striboga (efekty.js stribog: 160°)
+    // Tęcza nie ma JEDNEJ barwy z definicji - biel czyta się jako "cała
+    // paleta naraz", zamiast fałszywie wybierać jeden odcień z siedmiu.
+    tecza: [255, 255, 255],
+    gromWZiemie: BARWA_GROMU,
+    // Turkus mgły Kołowrotu (js/kolowrot.js) - JEDNO ŹRÓDŁO PRAWDY (import,
+    // nie powielona wartość), żeby zapłon sylwetki i sam efekt zawsze grały
+    // tą samą barwą.
+    kolowrot: BARWA_KOLOWROTU,
+    // Jasna, chłodna szarość - dym jeszcze nie płonie w chwili uzbrojenia
+    // combo (patrz efekty.js TABELA.dym - ten sam powód, ta sama barwa).
+    dym: [210, 210, 220]
+};
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -82,9 +119,16 @@ let kombosy = new KomboSilnik();
 let efekty = new Efekty();
 let ogien = new Ogien();
 let plonacyPalec = new PlonacyPalec();
+let dmuchanie = new Dmuchanie();
+let dym = new Dym();
 let podmuch = new Podmuch();
 let fala = new Fala();
 let tecza = new Tecza();
+let iskry = new Iskry();
+let zaplon = new Zaplon();
+let ekran = new Ekran();
+let piorun = new Piorun();
+let kolowrot = new Kolowrot();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -95,6 +139,10 @@ let isRunning = false;
 let lastPoseResults = null;   // wynik PoseLandmarker z ostatniej klatki wideo
 let lastHandResults = null;   // wynik HandLandmarker z ostatniej klatki wideo
 let lastFrameTime = 0;
+
+// Poprzednie pozycje nadgarstków (px) - do prędkości dłoni przy rozgarnianiu
+// dymu (js/dym.js:rozgarnij()). { 15: {x,y}|undefined, 16: {x,y}|undefined }.
+let poprzNadgarstkiPx = null;
 
 // Maska sylwetki, przepisana na CPU. Trzymamy poza wynikiem detekcji, bo
 // obiekt maski trzeba zwolnić od razu po odczycie (patrz pobierzMaske).
@@ -135,6 +183,14 @@ startBtn.addEventListener('click', async () => {
             poseTracker.initialize(),
             handTracker.initialize()
         ]);
+
+        // 3a. Assety Kołowrotu (js/assety.js) - CELOWO NIE await. Pobieranie
+        // 10 obrazków nie ma blokować startu gry - to jest cały sens
+        // asynchronicznego ładowania (patrz nagłówek assety.js). Kołowrót
+        // po prostu nie narysuje którejś warstwy przez pierwsze kilka
+        // sekund gry, jeśli gracz złoży combo zanim pobieranie się skończy -
+        // GEMINI.md §2, brak assetu nigdy nie jest błędem.
+        zaladujAssety().catch(() => {});   // per-obraz błędy już łapie assety.js; catch tu to tylko siatka bezpieczeństwa
 
         // 4. Aura tancerza
         aura = new Aura(canvas, ctx);
@@ -323,6 +379,17 @@ function klatka(now) {
     // --- 1. Podgląd z kamery ---
     const fit = computeCoverFit(video, canvas);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Wstrząs ekranu (js/ekran.js) opakowuje CAŁĄ resztę rysowania tej
+    // klatki - translate/scale WEWNĄTRZ ctx, NIGDY jako CSS na elemencie
+    // <canvas> (ten ma już scaleX(-1) na lustro - patrz style.css - drugi
+    // transform by się z nim pobił, patrz nagłówek ekran.js). Sparowany
+    // ctx.restore() jest niżej, tuż przed iskry.updateAndDraw() kończącym
+    // rysowanie sceny; ekran.dokoncz() (winieta/bloom) idzie PO restore,
+    // w układzie nieprzesuniętym - ma być stabilną ramką, nie drgać.
+    ctx.save();
+    ekran.przesun(ctx, canvas.width, canvas.height);
+
     // Płótno jest odwrócone przez CSS (scaleX(-1)), więc wideo działa jak lustro
     drawVideoCover(ctx, video, fit);
 
@@ -403,6 +470,14 @@ function klatka(now) {
         if (technika) {
             efekty.odpal(technika.id);
             aura.rozblysk(1);
+            // Zapłon sylwetki (js/zaplon.js) i wstrząs ekranu (js/ekran.js) -
+            // WARSTWA WSPÓLNA dla WSZYSTKICH czterech technik, nie tylko
+            // Gromu w Ziemię (ten dostaje DODATKOWO falę+iskry+grzmot
+            // w gałęzi niżej). Siła stała (1.0) z tego samego powodu co
+            // przy Gromie w Ziemię - technika jest gratis, efekt nie może
+            // być karą za niski pasek mocy.
+            zaplon.zapal(BARWA_ZAPLONU[technika.uzbraja] ?? [255, 255, 255], 1.0);
+            ekran.uderz(1.0);
             // Kombos uzbraja technikę WSKAZANĄ POLEM `uzbraja` - dopóki
             // technika była jedna, bezwarunkowe uzbrajanie ognia było
             // w porządku; przy dwóch trzeba routować.
@@ -418,7 +493,49 @@ function klatka(now) {
                 // czekającą na osobny gest gracza. aktywuj() (re)startuje
                 // licznik do pełnych 30 s bezwarunkowo.
                 tecza.aktywuj();
+            } else if (technika.uzbraja === 'gromWZiemie') {
+                // Aktywacja NATYCHMIASTOWA jak Tęcza. Siła STAŁA (1.0), NIE
+                // pochodna motionMeter.moc - combo jest gratis, efekt nie
+                // może być karą za niski pasek mocy. Bez motionMeter.zuzyj()
+                // z tego samego powodu - w przeciwieństwie do gałęzi
+                // podmuchu niżej, tu nic nie jest "kupowane" z paska mocy.
+                const zaczepPx = pekniecieZiemi(frame, canvas.width, canvas.height);
+                // Piorun UDERZA PIERWSZY (js/piorun.js) - dopiero w niego
+                // pęka ziemia i tryskają iskry. To jedyny efekt w grze
+                // z prawdziwą, twardą krawędzią zamiast kolejnej miękkiej
+                // plamy - patrz nagłówek piorun.js. Ta sama barwa co fala,
+                // żeby cała sekwencja czytała się jako JEDNO zdarzenie.
+                piorun.uderz(zaczepPx, BARWA_GROMU, 1.0);
+                // Kierunek {0,-1,0} daje w fala.js pierścień w płaszczyźnie
+                // POZIOMEJ (prostopadłej do "w górę") - "pęknięcie ziemi,
+                // energia wybucha na boki i w głąb", nie fontanna.
+                //
+                // BARWA_GROMU: fiolet Welesa, jasny wariant jego pieczęci
+                // (efekty.js weles: 280°) - fala.js domyślnie jest blada
+                // niebieska (barwa Aarda), a ta sama fala niosła oba combosy
+                // nie do odróżnienia dopóki wystrzel() nie przyjął barwy.
+                fala.wystrzel(zaczepPx, { x: 0, y: -1, z: 0 }, 1.0, BARWA_GROMU);
+                iskry.wystrzel(zaczepPx, 1.0);
+                audioEngine.playGromSFX();
+            } else if (technika.uzbraja === 'kolowrot') {
+                // Aktywacja NATYCHMIASTOWA jak Tęcza i Grom w Ziemię. Siła
+                // STAŁA (1.0) z tego samego powodu - combo jest gratis.
+                // Zaczep na TUŁOWIU (kregSylwetki, nie pekniecieZiemi) -
+                // krąg rośnie WOKÓŁ tancerza (pas -> nad głowę), nie leży
+                // na niewidocznej podłodze. Patrz nagłówek kolowrot.js.
+                const kolko = kregSylwetki(frame, canvas.width, canvas.height);
+                kolowrot.zapal(kolko, kolko.skala, canvas.height, 1.0);
+                audioEngine.playKolowrotSFX();
+            } else if (technika.uzbraja === 'dym') {
+                // Trzecia technika KANAŁOWANA (jak 'ogien'/'aard') - uzbraja,
+                // nie odpala natychmiast. Gest aktywacji: js/dmuchanie.js.
+                dmuchanie.uzbrój(now);
             }
+            // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
+            // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,
+            // NIE KONIEC". Bez tego nie byłoby drogi do podpalenia dymu:
+            // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
+            if (technika.uzbraja !== 'dym') dmuchanie.anuluj();
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
         } else {
@@ -435,6 +552,12 @@ function klatka(now) {
     tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
                        moc, plynnosc, fit, dt, tecza);
+
+    // --- 7a0. Zapłon sylwetki (Kierunek A) ---
+    // TA SAMA maska co aura, zero kosztu dodatkowego liczenia - patrz
+    // nagłówek zaplon.js. Rysowany PO aurze: sylwetka jest tłem dla
+    // cząstek techniki, nie odwrotnie.
+    zaplon.updateAndDraw(ctx, frame.pose ? maskaDane : null, maskaSzer, maskaWys, fit, dt);
 
     // --- 7a. Efekty pieczęci i technik ---
     efekty.updateAndDraw(ctx, frame, dt);
@@ -457,6 +580,77 @@ function klatka(now) {
         dt
     );
 
+    // --- 7b2. Okadzenie (dmuchanie + dym) ---
+    // Druga technika kanałowana. Pobór idzie przez motionMeter.zuzyj() jak
+    // Płonący Palec, ale jest prawie zerowy i NIGDY nie warunkuje
+    // kontynuacji (js/dmuchanie.js nagłówek) - stąd brak strażnika
+    // "if (pobor2 > 0)" na coś więcej niż samo pobranie.
+    const pobor2 = dmuchanie.update(frame, motionMeter.moc, dt, now);
+    if (pobor2 > 0) motionMeter.zuzyj(pobor2);
+
+    if (dmuchanie.stan === 'DMUCHA' && dmuchanie.zaczep) {
+        dym.emituj(
+            { x: dmuchanie.zaczep.x * canvas.width, y: dmuchanie.zaczep.y * canvas.height },
+            dmuchanie.kierunek,
+            dmuchanie.sila,
+            dt
+        );
+    }
+
+    // Dłonie rozgarniają dym - nadgarstki POZY (bardziej stabilne niż
+    // landmarki dłoni przy geście przy ustach), w PIKSELACH, z prędkością
+    // liczoną z różnicy względem poprzedniej klatki (ten sam wzorzec co
+    // ogien.js: prędkość źródła, nie tylko pozycja).
+    if (frame.pose?.landmarks) {
+        const lm = frame.pose.landmarks;
+        const nadgarstkiPx = [];
+        const nowePoprzNadgarstki = {};
+        for (const i of [15, 16]) {
+            const p = lm[i];
+            if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+            const x = p.x * canvas.width, y = p.y * canvas.height;
+            const poprz = poprzNadgarstkiPx?.[i];
+            // Brak poprzedniej pozycji (dłoń dopiero się pojawiła) -> vx/vy=0,
+            // NIGDY zgadywany skok - ten sam ostrożny domysł co wszędzie
+            // indziej w grze (GEMINI.md §2, brak danych ≠ fałszywy sygnał).
+            nadgarstkiPx.push({
+                x, y,
+                vx: poprz && dt > 0 ? (x - poprz.x) / dt : 0,
+                vy: poprz && dt > 0 ? (y - poprz.y) / dt : 0
+            });
+            nowePoprzNadgarstki[i] = { x, y };
+        }
+        poprzNadgarstkiPx = nowePoprzNadgarstki;
+        dym.rozgarnij(nadgarstkiPx, canvas.width);
+    }
+
+    // Zarzewia: punkty ognia dowolnej techniki ognia w tej klatce - DZIŚ
+    // Płonący Palec (czubek + próbka jego cząstek, już w px). PULL-BASED,
+    // nie subskrypcje: repo nie ma systemu zdarzeń nigdzie indziej (kombosy
+    // to zwykłe wartości zwrotne), więc kolejna technika ognia w przyszłości
+    // dokłada tu swoje punkty tą samą metodą, zero nowej architektury.
+    const zarzewia = [];
+    if (plonacyPalec.zaczep) {
+        zarzewia.push({
+            x: plonacyPalec.zaczep.x * canvas.width,
+            y: plonacyPalec.zaczep.y * canvas.height,
+            r: 14 * plonacyPalec.sila
+        });
+        // Co ósma cząstka ognia - kontakt ma być HOJNY (patrz dym.js
+        // ZAPLON_KONTAKT_MNOZNIK), nie każda z do 900 cząstek osobno.
+        for (let i = 0; i < ogien.czastki.length; i += 8) {
+            const c = ogien.czastki[i];
+            zarzewia.push({ x: c.x, y: c.y, r: 6 });
+        }
+    }
+    if (zarzewia.length) dym.podpal(zarzewia);
+
+    const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
+    if (wybuchyDymu > 0) {
+        ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
+        audioEngine.playWybuchSFX(wybuchyDymu);
+    }
+
     // --- 7c. Podmuch (Aard) ---
     // Jednorazowe zdarzenie: update() zwraca coś TYLKO w klatce wystrzału.
     // W przeciwieństwie do płonącego palca, podmuch nie pobiera mocy przez
@@ -470,7 +664,18 @@ function klatka(now) {
             wystrzal.sila
         );
     }
+    // Piorun PRZED falą/iskrami - uderza z góry, dopiero potem pęka ziemia.
+    piorun.updateAndDraw(ctx, dt);
     fala.updateAndDraw(ctx, dt);
+    iskry.updateAndDraw(ctx, dt);
+    kolowrot.updateAndDraw(ctx, dt);
+
+    // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
+    // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
+    // układzie NIEPRZESUNIĘTYM (stabilna ramka wokół drgającego wnętrza)
+    // i przesuwa zegar obwiedni uderzenia - MUSI być wołane co klatkę.
+    ctx.restore();
+    ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
 
     // --- 7. HUD i audio ---
     const mocPct = Math.round(moc * 100);
@@ -540,6 +745,13 @@ function klatka(now) {
                    progPredkosci: PROG_PREDKOSCI, progOtwarcia: PROG_OTWARCIA },
         tecza: { aktywna: tecza.aktywna, pozostaloS: tecza.pozostaloS,
                  barwaHue: tecza.barwaHue, silaSladu: tecza.silaSladu },
+        iskry: { czastki: iskry.liczba },
+        zaplon: { aktywny: zaplon.aktywny },
+        piorun: { aktywny: piorun.aktywny },
+        kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
+        dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS },
+        dym: { kleby: dym.liczba, plonacych: dym.plonacych },
+        ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,

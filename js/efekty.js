@@ -70,7 +70,39 @@ export const TABELA = {
     // Błysk AKTYWACJI nagrody - jednorazowy, jedna barwa (TABELA nie umie
     // prawdziwej tęczy). Sama tęczowa wstęga żyje w aura.js/tecza.js i
     // trwa 30 s niezależnie od tego krótkiego błysku.
-    tecza:        { barwa: '0, 0%, 100%',   ksztalt: 'blyskIFala', czas: 1.2 }
+    tecza:        { barwa: '0, 0%, 100%',   ksztalt: 'blyskIFala', czas: 1.2 },
+    // Błysk AKTYWACJI Gromu w Ziemię. Fiolet Welesa (280°), ŚWIADOMIE nie
+    // pomarańcz/czerwień jak gromWOgniu (35, 100%, 92%): oba combosy
+    // zawierają Swaroga, więc barwa aktywacji musi być rozróżnialna od
+    // pierwszego uderzenia. Jasność 65%, NIE 92% - przy 92% fiolet jest
+    // praktycznie nierozróżnialny od bieli (zmierzone na żywej kamerze:
+    // gracz zgłosił "biały błysk", nie fioletowy) - 65% to dalej jasny,
+    // "elektryczny" fiolet, ale koloru już nie gubi. Czas 1.6 s - dłuższy
+    // niż gromWOgniu (1.4) i błysk Tęczy (1.2): to combo ma być największą
+    // nagrodą wizualną w grze, więc dostaje najdłuższy błysk w tabeli.
+    // Trwała treść (fala uderzeniowa + tęczowe iskry) żyje w fala.js/
+    // iskry.js, nie tutaj - ten wiersz to tylko jednorazowy błysk.
+    gromWZiemie:  { barwa: '285, 100%, 65%', ksztalt: 'blyskIFala', czas: 1.6 },
+    // Błysk AKTYWACJI Kołowrotu - domknięcia mitu Gromu w Ziemię (Mokosz
+    // zamyka krąg, który Perun i Weles otworzyli). Bursztynowe złoto,
+    // ŚWIADOMIE ciemniejsze (L 55%, nie 92% jak inne błyski) niż
+    // gromWOgniu (35, 100%, 92%) - ten sam odcień przy pełnej jasności
+    // zlewałby się z pierwszym uderzeniem w oko na ułamek sekundy błysku,
+    // gdzie odróżnialność liczy się najbardziej. Trwała treść (dwa
+    // przeciwbieżne pierścienie run + mgła + spiralne iskry) żyje
+    // w js/kolowrot.js, nie tutaj - ten wiersz to tylko jednorazowy błysk.
+    kolowrot:     { barwa: '42, 85%, 55%',  ksztalt: 'blyskIFala', czas: 1.5 },
+    // Błysk AKTYWACJI Okadzenia - technika KANAŁOWANA jak Płonący Palec/Aard
+    // (uzbraja, nie odpala natychmiast), więc dostaje ten sam skromny
+    // wzorzec co ich błyski uzbrojenia (TABELA.aard), nie pełny blyskIFala
+    // zarezerwowany dla technik NATYCHMIASTOWYCH (tecza/gromWZiemie/
+    // kolowrot). Kształt 'mglaIMrok' - PIERWSZY realny konsument tego
+    // wiersza (dotąd tylko zdefiniowany w rysuj(), bez żadnego wywołującego)
+    // - pasuje tematycznie: mgła wznosząca się od dołu kadru, zapowiedź
+    // dymu, który zaraz zacznie unosić się naprawdę (js/dym.js). Chłodna,
+    // jasna szarość - ŚWIADOMIE nie pomarańcz/fiolet/bursztyn jak inne
+    // błyski technik: dym jeszcze nie płonie.
+    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 }
 };
 
 export class Efekty {
@@ -133,25 +165,40 @@ function rysuj(ctx, def, p, alfa, lm, W, H, zaczep) {
             break;
         }
         case 'pierscien': {
-            // Pierścień rozchodzący się od dłoni.
+            // Pierścień rozchodzący się od dłoni - MIĘKKI: rozmycie ROŚNIE
+            // wraz z rozszerzaniem (rozpraszająca się energia naturalnie
+            // rozmywa się bardziej im dalej ucieka), alfa obniżona o połowę
+            // względem pierwszej wersji - zgłoszenie: twardy okrąg wyglądał
+            // tandetnie. Wzorzec blur+reset jak aura.js/zaplon.js; reset
+            // KONIECZNY - Efekty.updateAndDraw() robi jedno save()/restore()
+            // wokół CAŁEJ pętli aktywnych efektów, więc bez `filter='none'`
+            // rozmycie przeciekłoby do KOLEJNEGO efektu w tej samej klatce.
             const s = zaczep;
             const r = W * (0.05 + 0.20 * p);
-            ctx.strokeStyle = kolor(alfa * 0.7);
+            ctx.filter = `blur(${(H * 0.004 * (0.3 + p * 1.7)).toFixed(1)}px)`;
+            ctx.strokeStyle = kolor(alfa * 0.35);
             ctx.lineWidth = Math.max(1, H * 0.008 * (1 - p * 0.6));
             ctx.beginPath();
             ctx.ellipse(s.x, s.y, r, r * 0.30, 0, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.filter = 'none';
             break;
         }
         case 'sciagniecie': {
             // Pierścień ZBIEGAJĄCY się do dłoni - odwrotność Swaroga.
+            // MIĘKKI: rozmycie MALEJE wraz ze zbieganiem (skupiająca się
+            // energia naturalnie ostrzy się w punkcie) - odwrotność
+            // 'pierscien' wyżej, bo geometria jest odwrotna (promień MALEJE,
+            // nie rośnie). Alfa obniżona - to samo zgłoszenie co wyżej.
             const s = zaczep;
             const r = W * (0.28 * (1 - p) + 0.02);
-            ctx.strokeStyle = kolor(alfa * 0.8);
+            ctx.filter = `blur(${(H * 0.004 * (2.0 - p * 1.7)).toFixed(1)}px)`;
+            ctx.strokeStyle = kolor(alfa * 0.45);
             ctx.lineWidth = Math.max(1, H * 0.012 * p);
             ctx.beginPath();
             ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.filter = 'none';
             break;
         }
         case 'blyskIFala': {

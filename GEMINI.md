@@ -73,6 +73,14 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/pieczecie.js` | postawa/runa ciągła → zdarzenie: pierścień, zanik, lepki argmax |
 | `js/kombosy.js` | bufor sekwencji pieczęci → technika, okno czasowe |
 | `js/efekty.js` | tabela efektów wizualnych pieczęci i technik |
+| `js/iskry.js` | tęczowe iskry Gromu w Ziemię (cząstki + pomocnik zaczepu "pęknięcia ziemi") |
+| `js/zaplon.js` | zapłon sylwetki z maski segmentacji przy odpaleniu KAŻDEJ techniki - reużywa maskę, której aura.js już nie liczy dwa razy |
+| `js/ekran.js` | odpowiedź ekranu przy odpaleniu KAŻDEJ techniki: wstrząs (translate/scale wewnątrz ctx), winieta, bramkowany bloom |
+| `js/piorun.js` | prawdziwy kanciasty piorun (rekurencyjne przesunięcie punktu środkowego) przy Gromie w Ziemię - jedyna twarda krawędź w całej grze |
+| `js/assety.js` | asynchroniczna ładowarka gotowych tekstur (Kenney Particle Pack, CC0, `assets/czastki/`) - jedyne miejsce w grze dotykające `new Image()` |
+| `js/kolowrot.js` | Kołowrót (perun→weles→mokosz) - pierwsza technika na gotowych teksturach: dwa przeciwbieżne pierścienie run, kolumna teksturowanej mgły, spiralne iskry |
+| `js/dmuchanie.js` | Okadzenie (swaróg→stribog→swaróg) - gest "dłoń przy ustach"; DRUGA technika kanałowana, celowo INNA niż Płonący Palec (odsunięcie dłoni WSTRZYMUJE, nie kończy; wyczerpana moc nigdy nie kończy potencjału; jeden zegar 4 min od combo) |
+| `js/dym.js` | Kłęby dymu Okadzenia - fizyka (unoszenie słabnące blisko sufitu, turbulencja, rozrost), rozgarnianie dłońmi, front ognia po kontakcie z DOWOLNĄ techniką ognia (pull-based `zarzewia`), detonacja na teksturach Kenney |
 
 **Odpięte, nie usunięte** (wracają, gdyby kamera zewnętrzna albo lepszy tracker to uzasadniły): `powerBall.js`, `wiatr.js`, `znaki/perun.js`, `znaki/mokosz.js`, `znaki/weles.js`, `znaki/postawa.js` (postawy CAŁEGO CIAŁA - wymagają kadru z barkami i biodrami), `znaki/welesDlon.js`, `znaki/perunDlon.js`, `znaki/szczurDlon.js`, `znaki/mokoszSplot.js` (pieczęcie/znaki PALCOWE lub z pozy zastąpione runami 2026-09-01 - patrz §4).
 

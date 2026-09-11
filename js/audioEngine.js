@@ -134,4 +134,140 @@ export class AudioEngine {
         fireOsc.start();
         fireOsc.stop(now + 0.65);
     }
+
+    /**
+     * Warstwa DODATKOWA do playFireSFX, wyłącznie dla Gromu w Ziemię -
+     * main.js woła obie metody naraz przy aktywacji. Dziś pojedyncza pieczęć
+     * i najtrudniejszy combo w grze brzmią identycznie (ten sam playFireSFX
+     * o innej wysokości) - to warstwuje głęboki, długi grzmot NA WIERZCHU
+     * istniejącego dźwięku, zamiast go zastępować, żeby rodzina brzmieniowa
+     * została spójna, a ten combo dostał coś więcej.
+     *
+     * Niższa częstotliwość startowa i wolniejszy spadek niż playFireSFX
+     * (300-700→40 Hz w 0.6 s) - ma brzmieć jak uderzenie pioruna w ziemię,
+     * nie kolejny "whoosh" o innej wysokości.
+     */
+    playGromSFX() {
+        if (!this.initialized || !this.audioCtx) return;
+        const now = this.audioCtx.currentTime;
+
+        const gromOsc = this.audioCtx.createOscillator();
+        const gromGain = this.audioCtx.createGain();
+
+        gromOsc.type = 'square';
+        gromOsc.frequency.setValueAtTime(90, now);
+        gromOsc.frequency.exponentialRampToValueAtTime(28, now + 1.1);
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(220, now);
+        // Filtr otwiera się w pierwszej chwili (moment uderzenia), potem
+        // przymyka - rumble po grzmocie, nie ostry trzask przez cały czas.
+        filter.frequency.linearRampToValueAtTime(700, now + 0.05);
+        filter.frequency.exponentialRampToValueAtTime(80, now + 1.1);
+
+        gromGain.gain.setValueAtTime(0.001, now);
+        gromGain.gain.exponentialRampToValueAtTime(0.3, now + 0.03);
+        gromGain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+
+        gromOsc.connect(filter);
+        filter.connect(gromGain);
+        gromGain.connect(this.audioCtx.destination);
+
+        gromOsc.start();
+        gromOsc.stop(now + 1.15);
+    }
+
+    /**
+     * Kołowrót - domknięcie mitu Gromu w Ziemię. Świadomie NIE trzask
+     * (playGromSFX) ani whoosh (playFireSFX): dwa lekko ROZSTROJONE
+     * oscylatory sinusoidalne dają DUDNIENIE ("beating") jak prawdziwy
+     * gong, ton WZNOSI SIĘ w czasie (odwrotność playGromSFX, który OPADA -
+     * tam grzmot bije w dół, tu koło "nabiera obrotów"), a obwiednia trwa
+     * ~2.6 s, dopasowana do CZAS_TRWANIA_PIERSCIEN w js/kolowrot.js.
+     */
+    playKolowrotSFX() {
+        if (!this.initialized || !this.audioCtx) return;
+        const now = this.audioCtx.currentTime;
+        const czasTrwania = 2.6;
+
+        const osc1 = this.audioCtx.createOscillator();
+        const osc2 = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(70, now);
+        osc1.frequency.linearRampToValueAtTime(130, now + czasTrwania);
+        // Rozstrojony o kilka Hz względem osc1 - RÓŻNICA częstotliwości
+        // słyszalna jest jako powolne dudnienie, nie jako dwa czyste tony.
+        osc2.frequency.setValueAtTime(74, now);
+        osc2.frequency.linearRampToValueAtTime(136, now + czasTrwania);
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(200, now);
+        filter.frequency.linearRampToValueAtTime(900, now + czasTrwania * 0.6);
+        filter.frequency.exponentialRampToValueAtTime(150, now + czasTrwania);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + 0.4);
+        gain.gain.setValueAtTime(0.22, now + czasTrwania * 0.6);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + czasTrwania);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        osc1.start(); osc2.start();
+        osc1.stop(now + czasTrwania + 0.05);
+        osc2.stop(now + czasTrwania + 0.05);
+    }
+
+    /**
+     * Wybuch podpalonego dymu (Okadzenie, js/dym.js) - KRÓTKI trzask, w
+     * przeciwieństwie do długiego grzmotu playGromSFX (1.1 s) i dudnienia
+     * playKolowrotSFX (2.6 s). Front ognia może zapalić kilka kłębów w jednej
+     * klatce (main.js sumuje `wybuchy` z Dym.updateAndDraw), więc `sila`
+     * (zwykle liczba świeżych wybuchów, nie tylko 0..1) skaluje GŁOŚNOŚĆ
+     * i odrobinę wysokość - kilka kłębów naraz ma brzmieć grubiej, nie tylko
+     * głośniej, inaczej seria eksplozji zlewa się w nieodróżnialny szum.
+     *
+     * Szum biały (nie oscylator) + szybko zamykający się filtr - trzask, nie
+     * ton. To jedyny dźwięk w grze budowany z szumu, nie z oscylatora,
+     * celowo: eksplozja ma brzmieć chropowato, reszta gry (whoosh/grzmot/
+     * gong) jest tonalna.
+     */
+    playWybuchSFX(sila = 1) {
+        if (!this.initialized || !this.audioCtx) return;
+        const now = this.audioCtx.currentTime;
+        const s = Number.isFinite(sila) ? Math.max(0.3, Math.min(3, sila)) : 1;
+
+        const dlugoscBufora = Math.floor(this.audioCtx.sampleRate * 0.35);
+        const buforSzumu = this.audioCtx.createBuffer(1, dlugoscBufora, this.audioCtx.sampleRate);
+        const dane = buforSzumu.getChannelData(0);
+        for (let i = 0; i < dlugoscBufora; i++) dane[i] = Math.random() * 2 - 1;
+
+        const zrodlo = this.audioCtx.createBufferSource();
+        zrodlo.buffer = buforSzumu;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400 + s * 200, now);
+        filter.frequency.exponentialRampToValueAtTime(180, now + 0.3);
+        filter.Q.value = 0.7;
+
+        const gain = this.audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(Math.min(0.4, 0.16 * s), now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+
+        zrodlo.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        zrodlo.start();
+        zrodlo.stop(now + 0.35);
+    }
 }
