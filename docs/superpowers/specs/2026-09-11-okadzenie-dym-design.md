@@ -13,7 +13,13 @@ Decyzje z burzy mózgów (2026-09-11):
 - Detonacja: **front kłąb po kłębie**, kula ognia + wstrząs.
 - Gest: **sama dłoń przy ustach** (bez wykrywania zgięcia palca), duża tolerancja.
 - Fizyka: unoszenie + turbulencja + rozrost, **dłonie rozgarniają dym**; kłąb ma być na
-  ekranie na tyle długo, żeby gracz zdążył złożyć Grom w Ogniu, potem wylatuje górą.
+  ekranie na tyle długo, żeby gracz zdążył złożyć Grom w Ogniu.
+- **ZMIANA (2026-09-11, w trakcie implementacji):** dym NIE wylatuje górą po 50–70 s.
+  Zamiast tego kłęby gromadzą się na całym ekranie, głównie **pod sufitem** (unoszenie
+  słabnie, gdy kłąb zbliża się do góry ekranu, więc zamiast uciekać - rozlewa się na
+  boki, jak dym uderzający o sufit). Życie pojedynczego kłębu ~200–260 s (docelowo ~4 min,
+  ten sam rząd wielkości co zegar potencjału), zanik alfy dopiero w ostatniej ćwiartce
+  życia - kłąb blednie i znika BLISKO końca swojego żywota, nie wcześniej.
 - **Jeden zegar 4 min od combo** (bez osobnego okna aktywacji — spójne z Płonącym Palcem,
   „licznik to presja").
 - Tekstury ognia/eksplozji: **pobrać z kenney.nl** (Particle Pack, CC0).
@@ -62,9 +68,11 @@ zarzewia (px) ← plonacyPalec.zaczep + ogien.czastki      dym.emituj(zaczep, ki
   (`smoke_01/05/08/10`) przez `losowyWariant` + `wypalTintowany` (jasna szarość).
 - `emituj(zaczepPx, kierunek, sila, dt)` — emisja ciągła z ułamkowym przeniesieniem jak
   `ogien.js::_nadwyzka`; impuls od ust w kierunku od dłoni, hamowanie.
-- `_ruszaj(dt)` (czysta, testowalna, dt przycięte do 0.05): unoszenie tak, żeby kłąb
-  opuścił górę ekranu w ~50–70 s (`vy` w ułamkach H/s, nie px), turbulencja z sumy sinusów
-  (faza per kłąb), rozrost `r`, zanik alfy; `zycie = 120 s` jako sufit; usuwa NaN.
+- `_ruszaj(dt)` (czysta, testowalna, dt przycięte do 0.05): unoszenie SŁABNĄCE z wysokością
+  (kłąb zwalnia, zbliżając się do sufitu ekranu, i rozlewa się na boki zamiast uciekać poza
+  kadr), turbulencja z sumy sinusów (faza per kłąb), rozrost `r`, zanik alfy dopiero
+  w OSTATNIEJ ĆWIARTCE życia; `zycie ≈ 200–260 s` (ok. 4 min, ZMIANA 2026-09-11 - patrz
+  Kontekst); usuwa NaN.
 - `rozgarnij([{x, y, vx, vy}])` — nadgarstki w px z prędkością pchają kłęby w promieniu
   (skala = szerokość barków px, jak `kregSylwetki()` w `kolowrot.js`).
 - `podpal(zarzewia)` — kłąb `DYM` w zasięgu `{x,y,r}` → `ZAPLON`; front: kłąb `ZAPLON`
@@ -131,8 +139,9 @@ zarzewia (px) ← plonacyPalec.zaczep + ogien.czastki      dym.emituj(zaczep, ki
 - `tools/test-wszystko.sh` zielony (nowe `test-dmuchanie.mjs`, `test-dym.mjs` wchodzą przez glob).
 - Testy do nazwania: wygaśnięcie po 240 s; dłoń opuszczona wstrzymuje, nie kończy; `anuluj()`
   zatrzymuje produkcję, kłęby zostają; front dochodzi do połączonego łańcucha i omija oderwane
-  skupisko; sufit wypycha najstarsze; NaN w klatce nie zatruwa kłębów; kłąb opuszcza ekran
-  w oknie 50–70 s; brak boolean w miejscu wyniku gestu.
+  skupisko; sufit wypycha najstarsze; NaN w klatce nie zatruwa kłębów; kłąb zwalnia unoszenie
+  blisko góry ekranu zamiast go opuszczać; zanik alfy zaczyna się dopiero w ostatniej
+  ćwiartce życia (blisko 4 min), nie wcześniej; brak boolean w miejscu wyniku gestu.
 - Na żywo (`run`/kamera): Swaróg→Stribog→Swaróg, dłoń do ust → dym z ust w stronę od dłoni;
   opuść dłoń → strumień gaśnie, podnieś → wraca; Perun → Grom w Ogniu, palec w górę, dotknij
   kłębu → front biegnie, kule ognia, wstrząs; po wybuchu dym znika; nic nie migocze na granicy

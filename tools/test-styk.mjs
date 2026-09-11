@@ -85,7 +85,7 @@ spr('resetSkali czyści EMA - nowe ciało (0.20 m) liczy się od zera, nie ciąg
 console.log('\nPRYMITYWY STYKU:');
 // Bez katWLokciu: patrz nagłówek js/znaki/styk.js - poza błyskawicy straciła
 // jedynego konsumenta tej funkcji po dwóch iteracjach na żywym ciele.
-const { odleglosc, styk, nadBarkami } = await import('../js/znaki/styk.js');
+const { odleglosc, styk, stykPunktow, nadBarkami } = await import('../js/znaki/styk.js');
 
 function cialo(punkty) {
   const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 1 }));
@@ -145,5 +145,20 @@ console.log('  odporność na skalę niedodatnią/nieskończoną (brak jednostki
 spr('skala ujemna daje 0, nie fałszywy pełny dotyk', styk(c, 15, 11, -0.40, 0.15, 0.60) === 0);
 spr('skala zerowa daje 0', styk(c, 15, 11, 0, 0.15, 0.60) === 0);
 spr('skala nieskończona daje 0', styk(c, 15, 11, Infinity, 0.15, 0.60) === 0);
+
+// --- stykPunktow: ten sam pomiar, ale między dwoma PUNKTAMI, nie indeksami
+// landmarków - potrzebny dla js/dmuchanie.js ("usta" to środek 9/10, nie
+// jeden landmark). Testuje wyłącznie WŁASNE strażniki funkcji - reguły
+// wspólne z styk() (ciągłość, brak danych = 0) są już pokryte wyżej.
+console.log('\nSTYK PUNKTÓW (dwa punkty zamiast indeksów landmarków):');
+spr('dotyk daje pełny wynik', stykPunktow({ x: 0, y: 0 }, { x: 0.05, y: 0 }, 0.40, 0.15, 0.60) > 0.99);
+spr('daleko daje zero', stykPunktow({ x: 0, y: 0 }, { x: 1.0, y: 0 }, 0.40, 0.15, 0.60) === 0);
+spr('brak punktu A to 0, nie wyjątek', stykPunktow(null, { x: 0, y: 0 }, 0.40, 0.15, 0.60) === 0);
+spr('brak punktu B to 0, nie wyjątek', stykPunktow({ x: 0, y: 0 }, null, 0.40, 0.15, 0.60) === 0);
+spr('skala niedodatnia daje 0, nie fałszywy pełny dotyk',
+    stykPunktow({ x: 0, y: 0 }, { x: 0.05, y: 0 }, 0, 0.15, 0.60) === 0);
+spr('liczy się w 3D (z brany pod uwagę)',
+    Math.abs(stykPunktow({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0.5 }, 0.40, 0.15, 0.60) -
+             stykPunktow({ x: 0, y: 0 }, { x: 0, y: 0.5 }, 0.40, 0.15, 0.60)) < 1e-9);
 
 process.exit(ok ? 0 : 1);

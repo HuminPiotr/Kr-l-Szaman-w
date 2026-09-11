@@ -57,6 +57,25 @@ export function styk(wl, i, j, skala, pelny, zero) {
 }
 
 /**
+ * Ten sam pomiar co styk(), ale między dwoma PUNKTAMI zamiast indeksami
+ * landmarków - potrzebny, gdy jeden z punktów nie jest pojedynczym
+ * landmarkiem (np. "usta" = środek landmarków 9/10, patrz js/dmuchanie.js).
+ *
+ * @param {{x,y,z?}|null} a
+ * @param {{x,y,z?}|null} b
+ * @param {number} skala  jednostka odniesienia (metry), np. skalaCiala(wl)
+ * @param {number} pelny  odległość (w jednostkach skali), przy której wynik = 1
+ * @param {number} zero   odległość, przy której wynik = 0
+ */
+export function stykPunktow(a, b, skala, pelny, zero) {
+    if (!Number.isFinite(skala) || skala <= 0) return 0;
+    if (!a || !b) return 0;
+    const d = Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)) / skala;
+    if (!Number.isFinite(d)) return 0;
+    return 1 - rampa(d, pelny, zero);
+}
+
+/**
  * Wysokość punktu NAD linią barków, w szerokościach barków.
  * Dodatnia w górę, mimo że oś Y worldLandmarks rośnie w dół - znak jest
  * odwrócony tutaj, raz, żeby cztery znaki nie musiały o tym pamiętać.
