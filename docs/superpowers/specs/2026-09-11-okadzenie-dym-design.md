@@ -393,3 +393,36 @@ machnięcie wywiewało **cały obłok poza ekran** — dziś 0,15/0,22, dym się
 
 **Zmierzone w przeglądarce** (1920×1080): 25 s ciągłego dmuchania → sufit 700 cząstek, pełna
 klatka (fizyka + rysowanie + kompozycja) **0,7 ms**; detonacja: najgorsza klatka 18,8 ms.
+
+## v7.1 (2026-09-11) — kolumna przy ustach, kłębienie i rozejście po ekranie
+
+**Zgłoszenie:** dym ma się wydobywać **z początku bardziej kolumnowo, jak mocno wydychany**,
+a potem **kłębić na boki i naturalnie rozszerzać praktycznie na cały ekran**. Z pytania: kolumna
+wąska przez **~1 s**, długa na **~1/4 ekranu**.
+
+**Diagnoza — trzy rzeczy działały przeciwko temu:**
+1. **Rozmiar był sprzężony z alfą.** `wiekBiblioteki()` (poprawka z v7) skacze do połowy
+   `lifetime` w 0,8 s, a smoke.js liczy z tego samego `age` NIE TYLKO alfę, ale i skalę — sprite
+   miał ~0,7 rozmiaru docelowego już przy ustach. Alfa musi dochodzić do szczytu szybko, więc
+   rozmiar trzeba było odsprzęgnąć: `c.scale` nadpisujemy w callbacku (biblioteka rysuje PO nim).
+2. **Nic nie rozpychało dymu na boki** — po zgaśnięciu wylotu zostawała tylko wyporność, więc dym
+   płynął pod sufit wąskim pasmem.
+3. **Sufit cząstek wycinał NAJSTARSZE**, czyli największe i najbardziej rozeszłe — kasował
+   dokładnie to, co miało zasnuć ekran.
+
+**Zmiany:**
+- `skalaCzastki(wiekGry, finalScale)` — płaska, wąska kolumna (`SKALA_KOLUMNY = 3`, ~60 px
+  promienia) przez `KOLUMNA_S = 1 s`, potem rozrost do docelowej ze stałą `TAU_ROZROSTU_S = 5 s`.
+- Kolumna ciaśniej i krócej: stożek ±3°, `WYLOT_W_S = 0,6` przy `OPOR = 2,0/s` → zasięg
+  ≈ 0,30 W, czyli widoczna struga na ~1/4 ekranu.
+- **Rozrzut prędkości wzdłuż kierunku** (0,55–1,35×): bez niego wszystkie cząstki hamowały w tym
+  samym miejscu i na końcu strugi robiła się **zbita kulka** (widoczne na renderze) — teraz
+  struga przechodzi w wydłużoną, kłębiącą się chmurę.
+- Kłębienie i rozejście z wagą `1 − exp(−(wiek − KOLUMNA_S)/4 s)`, więc w kolumnie nie działa
+  nic z tego: rozpychanie **w poprzek** kierunku wylotu (znak stały per cząstka), mocniejsze pole
+  przepływu (0,004 → 0,012) i rozlew pod sufitem (im wyżej, tym więcej dryfu w bok).
+- Gęstsza emisja (45 → 70 cząstek/s) i sufit 700 → **1100**, a `_pilnujSufitu()` wyrzuca teraz
+  cząstki **najbliższe końca życia**, nie najstarsze żyjące.
+
+**Zmierzone w przeglądarce** (1920×1080): 40 s ciągłego dmuchania → sufit 1100 cząstek, pełna
+klatka **1,89 ms**; detonacja całej chmury: najgorsza klatka 19,2 ms.

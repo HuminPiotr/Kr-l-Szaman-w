@@ -30,7 +30,8 @@ globalThis.document = {
     }
 };
 
-const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, NAROST_S, ZANIK_S,
+const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki,
+        NAROST_S, ZANIK_S, KOLUMNA_S, SKALA_KOLUMNY, TAU_ROZROSTU_S,
         CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK,
         WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
         OPOZNIENIE_FRONTU_S, CZAS_WYBUCHU_S,
@@ -120,12 +121,17 @@ console.log('\nPOCZĄTKOWA SIŁA KIERUNKU:');
     spr(`cząstki lecą w stożku ±10° wokół kierunku (max ${(Math.max(...katy) * 180 / Math.PI).toFixed(1)}°)`,
         Math.max(...katy) < 10 * Math.PI / 180);
 
+    // Porównujemy ŚREDNIE z wielu cząstek: prędkość ma rozrzut 0.55-1.35x
+    // (ROZRZUT_PREDKOSCI), więc pojedyncza para potrafi się minąć.
     const mocno = new Dym(), slabo = new Dym();
-    const cM = pierwszaCzastka(mocno), cS = pierwszaCzastka(slabo, { wyrazistosc: 0 });
-    const v = (c) => Math.hypot(c.vxGry, c.vyGry);
-    spr(`wyrazista poza wypycha mocniej (${v(cM).toFixed(3)} vs ${v(cS).toFixed(3)} px/ms)`,
-        v(cM) > 2 * v(cS));
-    spr(`...a nijaka i tak wypycha (podłoga ${WYRAZISTOSC_PODLOGA})`, v(cS) > 0);
+    for (let i = 0; i < 20; i++) {
+        mocno.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+        slabo.emituj(USTA, W_PRAWO, 1, 0, DT, W, H);
+    }
+    const srednieV = (d) => wszystkie(d).reduce((a, c) => a + Math.hypot(c.vxGry, c.vyGry), 0) / d.liczba;
+    const vM = srednieV(mocno), vS = srednieV(slabo);
+    spr(`wyrazista poza wypycha mocniej (${vM.toFixed(3)} vs ${vS.toFixed(3)} px/ms)`, vM > 2 * vS);
+    spr(`...a nijaka i tak wypycha (podłoga ${WYRAZISTOSC_PODLOGA})`, vS > 0);
 
     przepusc(mocno, 2);
     const s = srodek(wszystkie(mocno));
@@ -174,6 +180,45 @@ console.log('\nOBWIEDNIA (sterowanie czasem biblioteki):');
     spr('na końcu życia age dobija do lifetime (biblioteka usuwa cząstkę)',
         wiekBiblioteki(Z, Z, L) === L);
     spr('obwiednia odporna na NaN', Number.isFinite(wiekBiblioteki(NaN, NaN, NaN)));
+}
+
+// --- 5c. Kolumna -> kłębienie (v7.1) ---
+console.log('\nKOLUMNA -> KŁĘBIENIE:');
+spr(`świeża cząstka jest WĄSKA (${SKALA_KOLUMNY} skali)`, skalaCzastki(0, 15) === SKALA_KOLUMNY);
+spr('...i taka zostaje przez całą fazę kolumny', skalaCzastki(KOLUMNA_S, 15) === SKALA_KOLUMNY);
+spr('po kolumnie rośnie monotonicznie', (() => {
+    let poprz = -1;
+    for (let t = KOLUMNA_S; t < 30; t += 0.2) { const v = skalaCzastki(t, 15); if (v < poprz - 1e-9) return false; poprz = v; }
+    return true;
+})());
+spr(`po ~11 s >= 90% docelowej (${skalaCzastki(KOLUMNA_S + 11, 15).toFixed(1)}/15)`,
+    skalaCzastki(KOLUMNA_S + 11, 15) >= 0.9 * 15);
+spr('nigdy nie przekracza docelowej', skalaCzastki(120, 15) <= 15);
+spr('odporna na NaN', Number.isFinite(skalaCzastki(NaN, NaN)));
+{
+    // Struga: 1 s dmuchania w bok - wąski pas, małe cząstki.
+    const d = new Dym();
+    dmuchaj(d, 1, { kierunek: W_PRAWO });
+    const cz = wszystkie(d);
+    const wPoprzek = Math.max(...cz.map(c => Math.abs(c.y / POL - USTA.y)));
+    spr(`kolumna jest WĄSKA (rozrzut w poprzek ${(wPoprzek / W).toFixed(3)} W < 0.03)`, wPoprzek < 0.03 * W);
+    const maxR = Math.max(...cz.map(c => promienCzastki(c) / POL));
+    spr(`...i zbudowana z małych kłębów (max promień ${(maxR / W).toFixed(3)} W < 0.05)`, maxR < 0.05 * W);
+
+    przepusc(d, 0.5);
+    const czolo = Math.max(...wszystkie(d).map(c => c.x / POL)) - USTA.x;
+    // Górna granica z zapasem na ROZRZUT_PREDKOSCI_MAX: najszybsza cząstka
+    // zajeżdża 1.35x dalej niż nominalne WYLOT_W_S / OPOR = 0.30 W.
+    spr(`zasięg kolumny ${(czolo / W).toFixed(2)} W (0.15-0.50 - "na 1/4 ekranu")`,
+        czolo / W > 0.15 && czolo / W < 0.50);
+
+    // Rozejście: po kilkunastu sekundach dym jest DUŻO szerszy niż struga.
+    przepusc(d, 14);
+    const poRozejsciu = Math.max(...wszystkie(d).map(c => Math.abs(c.y / POL - USTA.y)));
+    spr(`po 15 s dym rozchodzi się na boki (${(wPoprzek).toFixed(0)} -> ${poRozejsciu.toFixed(0)} px)`,
+        poRozejsciu > 4 * wPoprzek);
+    const maxR2 = Math.max(...wszystkie(d).map(c => promienCzastki(c) / POL));
+    spr(`...i kłęby urosły (${(maxR / W).toFixed(3)} -> ${(maxR2 / W).toFixed(3)} W)`, maxR2 > 2 * maxR);
 }
 
 // --- 6. Reakcja na ręce i taniec ---
@@ -262,6 +307,25 @@ console.log('\nSUFIT CZĄSTEK:');
     dmuchaj(d, MAX_CZASTEK / CZASTEK_NA_S + 10);
     spr(`nie przekracza ${MAX_CZASTEK} (${d.liczba})`, d.liczba <= MAX_CZASTEK);
     spr('...i nadal coś jest (sufit nie kasuje wszystkiego)', d.liczba > MAX_CZASTEK / 2);
+}
+{
+    // Sufit wyrzuca cząstkę NAJBLIŻSZĄ KOŃCA ŻYCIA, nie po prostu najstarszą:
+    // stare, rozeszłe kłęby są tym, co ma zasnuć ekran.
+    const d = new Dym();
+    dmuchaj(d, 2);
+    const cz = wszystkie(d);
+    const skazana = cz[Math.floor(cz.length / 2)];
+    skazana.wiekGry = skazana.zycieGry * 0.99;          // tuż przed końcem
+    const swiezaStara = cz[0];
+    swiezaStara.wiekGry = 1; swiezaStara.zycieGry = 200; // najstarsza, ale daleko jej do końca
+    // Dosypujemy, aż sufit zacznie ciąć (sama emisja, bez fizyki - inaczej
+    // pętla byłaby nieskończona: po przycięciu długość zawsze == MAX_CZASTEK).
+    for (let i = 0; i < MAX_CZASTEK * 3 && wszystkie(d).length < MAX_CZASTEK; i++) {
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+    }
+    d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+    spr('sufit wyrzucił cząstkę najbliższą końca życia', !wszystkie(d).includes(skazana));
+    spr('...a nie tę najstarszą, której daleko do końca', wszystkie(d).includes(swiezaStara));
 }
 
 // --- 9. Odporność ---

@@ -52,13 +52,16 @@ import smokemachine from './vendor/smoke.js';
 // --- Emisja (jednostki biblioteki: px na MILISEKUNDĘ) ---
 // ZGADNIĘTE - do strojenia na kamerze. Tempo jest duże, bo alfa cząstki to
 // 0.125: gęstość dymu robi LICZBA nakładających się kłębów, nie krycie.
-export const CZASTEK_NA_S = 45;
+export const CZASTEK_NA_S = 70;
 // Początkowa siła kierunku: ułamek szerokości płótna na sekundę. Stożek jest
 // wąski - to ma być wydech w konkretną stronę, nie wachlarz.
-export const WYLOT_W_S = 0.55;
+export const WYLOT_W_S = 0.6;
 export const WYRAZISTOSC_PODLOGA = 0.35;   // poza nijaka nadal coś wypuszcza
-const STOZEK_RAD = 0.14;                   // ±8°
-const ROZRZUT_UST_W = 0.008;
+const STOZEK_RAD = 0.05;                   // ±3° - wylot ma być STRUGĄ, nie wachlarzem
+// Rozrzut prędkości WZDŁUŻ kierunku: bez niego wszystkie cząstki hamują w tym
+// samym miejscu i na końcu strugi robi się zbita kulka (widziane na renderze).
+const ROZRZUT_PREDKOSCI_MIN = 0.55, ROZRZUT_PREDKOSCI_MAX = 1.35;
+const ROZRZUT_UST_W = 0.004;
 
 // --- Życie i rozmiar ---
 // 20-40 s: kompromis (życzenie) między naturalnym rozwiewaniem smoke.js (2-8 s)
@@ -69,6 +72,20 @@ export const ZYCIE_MIN_S = 20, ZYCIE_MAX_S = 40;
 // dym; kilka wielkich - jak mleko.
 const SKALA_MIN = 9, SKALA_MAX = 15;
 const SKALA_STARTOWA = 0.5;
+
+// --- KOLUMNA -> KŁĘBIENIE (v7.1) ---
+// Życzenie: "żeby dym wydobywał się z początku bardziej kolumnowo, jak mocno
+// wydychany dym, a potem kłębił się na boki i naturalnie rozszerzał praktycznie
+// na cały ekran". Rozmiar MUSI być odsprzęgnięty od alfy: smoke.js liczy jedno
+// i drugie z age/lifetime, a alfa ma dochodzić do szczytu szybko (v7), więc
+// sprite był wielki już przy ustach. `scale` nadpisujemy w callbacku -
+// biblioteka rysuje PO nim, więc nasza wartość wygrywa.
+export const KOLUMNA_S = 1.0;            // tyle cząstka trzyma się wąskiej kolumny
+export const SKALA_KOLUMNY = 3;          // ~60 px promienia na płótnie gry
+export const TAU_ROZROSTU_S = 5;         // 90% docelowego rozmiaru po ~11 s
+const TAU_ROZEJSCIA_S = 4;               // z tą stałą narasta rozpychanie na boki
+const ROZPYCHANIE_W_S2 = 0.09;           // ułamek W/s² w poprzek kierunku wylotu
+const ROZLEW_POD_SUFITEM_W_S = 0.035;    // dryf w bok rosnący blisko górnej krawędzi
 
 // --- Obwiednia: STEROWANIE CZASEM BIBLIOTEKI ---
 // smoke.js liczy i alfę, i skalę z `age/lifetime`: alfa to trójkąt ze szczytem
@@ -84,16 +101,17 @@ export const NAROST_S = 0.8;
 export const ZANIK_S = 3;
 
 // --- Sufit cząstek (biblioteka nie ogranicza niczego) ---
-export const MAX_CZASTEK = 700;
+export const MAX_CZASTEK = 1100;
 
 // --- Fizyka dokładana w setPreDrawCallback ---
-const OPOR = 0.9;                        // 1/s - smoke.js hamuje tylko vy, i to nie do końca
+const OPOR = 2.0;                        // 1/s - z WYLOT_W_S daje kolumnę długą na ~1/4 ekranu
+                                         // (zasięg ≈ WYLOT_W_S / OPOR = 0.30 W)
 const WZNOSZENIE_W_S = 0.022;             // ułamek SZEROKOŚCI płótna na sekundę
 export const SUFIT_Y_H = 0.12;           // górna granica - tu wznoszenie prawie zanika
 export const SPADEK_OD_Y_H = 0.55;       // poniżej tego Y (w dół ekranu) pełne wznoszenie
 const SUFIT_MIN_CZYNNIK = 0.12;          // NIGDY do zera - lekkie mrowienie zostaje
 const TAU_WYPORU_S = 2.5;                // wyporność wchodzi z opóźnieniem: da się dmuchnąć W DÓŁ
-const POLE_AMPLITUDA_W_S2 = 0.004;       // pole przepływu - spójne wiry, nie per-cząstka szum
+const POLE_AMPLITUDA_W_S2 = 0.012;       // pole przepływu - spójne wiry, nie per-cząstka szum
 const POLE_DLUGOSC_FALI_W = 0.35;
 const POLE_OMEGA_1 = 0.35, POLE_OMEGA_2 = 0.27;
 
@@ -187,7 +205,17 @@ export class Dym {
         // biblioteki (połowa rozdzielczości), stąd `skala`.
         const v = wRef * WYLOT_W_S * skala / 1000
                 * (WYRAZISTOSC_PODLOGA + (1 - WYRAZISTOSC_PODLOGA) * wyr);
-        const bokX = -ky * Math.tan(STOZEK_RAD) * v, bokY = kx * Math.tan(STOZEK_RAD) * v;
+        // Zakresy prędkości: rozrzut WZDŁUŻ kierunku (ROZRZUT_PREDKOSCI) plus
+        // wąski stożek w poprzek. Rozrzut wzdłuż jest kluczowy - przy jednej
+        // prędkości wszystkie cząstki hamują w TYM SAMYM miejscu i zamiast
+        // kłębiącej się chmury robi się kulka na końcu strugi.
+        const bokX = Math.abs(ky * Math.tan(STOZEK_RAD) * v);
+        const bokY = Math.abs(kx * Math.tan(STOZEK_RAD) * v);
+        const zakres = (skladowa) => {
+            const a = skladowa * v * ROZRZUT_PREDKOSCI_MIN, b = skladowa * v * ROZRZUT_PREDKOSCI_MAX;
+            return { min: Math.min(a, b), max: Math.max(a, b) };
+        };
+        const zX = zakres(kx), zY = zakres(ky);
         const rozrzut = wRef * ROZRZUT_UST_W * skala;
 
         // UWAGA: minScale/maxScale przekazane do biblioteki ustawiają NARAZ
@@ -195,13 +223,15 @@ export class Dym {
         // czyli kłąb rodziłby się od razu wielki. Docelową skalę ustawiamy
         // więc sami, po dodaniu - wtedy zostaje wzrost sqrt(wiek/życie).
         maszyna.addsmoke(zaczepPx.x * skala, zaczepPx.y * skala, n, {
-            minVx: kx * v - Math.abs(bokX) - 1e-6, maxVx: kx * v + Math.abs(bokX) + 1e-6,
-            minVy: ky * v - Math.abs(bokY) - 1e-6, maxVy: ky * v + Math.abs(bokY) + 1e-6,
+            minVx: zX.min - bokX - 1e-6, maxVx: zX.max + bokX + 1e-6,
+            minVy: zY.min - bokY - 1e-6, maxVy: zY.max + bokY + 1e-6,
             minLifetime: ZYCIE_BIBLIOTEKI_MS, maxLifetime: ZYCIE_BIBLIOTEKI_MS
         });
 
         for (let i = Math.max(0, this._czastki.length - n); i < this._czastki.length; i++) {
-            this._przygotuj(this._czastki[i], rozrzut);
+            const c = this._czastki[i];
+            this._przygotuj(c, rozrzut);
+            if (c) { c.kierunekX = kx; c.kierunekY = ky; }
         }
         this._pilnujSufitu();
     }
@@ -224,6 +254,9 @@ export class Dym {
         c.wiekGry = 0;
         c.zycieGry = ZYCIE_MIN_S + Math.random() * (ZYCIE_MAX_S - ZYCIE_MIN_S);
         c.age = 0;
+        // Znak rozpychania na boki (stały per cząstka): sąsiadki rozchodzą się
+        // w przeciwne strony, więc kolumna ROZKŁĘBIA SIĘ, zamiast płynąć pasmem.
+        c.rozpychanie = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.8);
         c.stan = 'DYM';
         c.tZaplonu = 0;
         c.tWybuch = 0;
@@ -381,6 +414,10 @@ export class Dym {
             c.wiekGry = (c.wiekGry ?? 0) + dt;
             c.age = wiekBiblioteki(c.wiekGry, c.zycieGry ?? ZYCIE_MIN_S, c.lifetime);
 
+            // Rozmiar z WŁASNEJ obwiedni (patrz KOLUMNA_S) - nadpisuje to, co
+            // biblioteka policzyła z age/lifetime.
+            c.scale = skalaCzastki(c.wiekGry, c.finalScale);
+
             // smoke.js hamuje TYLKO vy i tylko przez obwiednię wieku - kierunkowy
             // wydech bez oporu na vx leciałby przez ekran bez końca.
             c.vxGry *= opor;
@@ -393,9 +430,25 @@ export class Dym {
             const wznoszenie = wznoszenieCzynnik(c.y, hRef);
             c.vyGry -= WZNOSZENIE_W_S * wRef / 1000 * wznoszenie * wypor * dt;
 
+            // --- Kłębienie i rozejście po ekranie (v7.1) ---
+            // Wszystko poniżej wchodzi z wagą `rozejscie`, więc W KOLUMNIE nie
+            // działa nic z tego - struga zostaje strugą.
+            const rozejscie = c.wiekGry <= KOLUMNA_S
+                ? 0
+                : 1 - Math.exp(-(c.wiekGry - KOLUMNA_S) / TAU_ROZEJSCIA_S);
             const faza = Number.isFinite(c.faza) ? c.faza : 0;
-            c.vxGry += A * Math.sin(c.y * k + this._t * POLE_OMEGA_1 + faza) * dt * 1000 * wypor;
-            c.vyGry += A * Math.cos(c.x * k * 0.8 + this._t * POLE_OMEGA_2 + faza * 0.5) * dt * 1000 * wypor;
+            c.vxGry += A * Math.sin(c.y * k + this._t * POLE_OMEGA_1 + faza) * dt * 1000 * rozejscie;
+            c.vyGry += A * Math.cos(c.x * k * 0.8 + this._t * POLE_OMEGA_2 + faza * 0.5) * dt * 1000 * rozejscie;
+
+            // Rozpychanie W POPRZEK kierunku wylotu - to jest "kłębi się na boki".
+            const rozp = (c.rozpychanie ?? 0) * ROZPYCHANIE_W_S2 * wRef / 1e6 * dt * 1000 * rozejscie;
+            c.vxGry += -(c.kierunekY ?? 0) * rozp;
+            c.vyGry += (c.kierunekX ?? 0) * rozp;
+
+            // Rozlew pod sufitem: im wyżej, tym więcej dryfu w bok - dym uderza
+            // o górną krawędź i rozchodzi się na całą szerokość ekranu.
+            c.vxGry += Math.sign(c.rozpychanie ?? 1) * ROZLEW_POD_SUFITEM_W_S * wRef / 1000
+                     * (1 - wznoszenie) * rozejscie * dt;
 
             // --- Reakcja na ręce i taniec ---
             for (const d of this._dlonie) {
@@ -469,10 +522,23 @@ export class Dym {
         }
     }
 
-    /** Sufit: biblioteka nie ogranicza niczego, a 500-pikselowe kłęby kosztują. */
+    /**
+     * Sufit: biblioteka nie ogranicza niczego, a wielkie kłęby kosztują.
+     * Wyrzucamy cząstki NAJBLIŻSZE KOŃCA ŻYCIA, nie najstarsze żyjące - te
+     * drugie są największe i najbardziej rozeszłe, czyli dokładnie te, które
+     * mają zasnuć ekran (v7 kasował właśnie je i chmura nigdy nie rosła).
+     */
     _pilnujSufitu() {
         const nadmiar = this._czastki.length - MAX_CZASTEK;
-        if (nadmiar > 0) this._czastki.splice(0, nadmiar);   // najstarsze są na początku
+        if (nadmiar <= 0) return;
+        const postep = (c) => (c.wiekGry ?? 0) / (c.zycieGry || ZYCIE_MIN_S);
+        const doWyrzucenia = [...this._czastki]
+            .sort((a, b) => postep(b) - postep(a))
+            .slice(0, nadmiar);
+        for (const c of doWyrzucenia) {
+            const i = this._czastki.indexOf(c);
+            if (i >= 0) this._czastki.splice(i, 1);
+        }
     }
 
     /**
@@ -556,6 +622,19 @@ export function wiekBiblioteki(wiekGry, zycieGry, lifetime) {
     const doKonca = zycie - w;
     if (doKonca <= ZANIK_S) return L * (1 - 0.5 * doKonca / ZANIK_S);
     return L * 0.5;
+}
+
+/**
+ * Rozmiar cząstki: przez KOLUMNA_S płaska, wąska kolumna (SKALA_KOLUMNY),
+ * potem rozrost do `finalScale` ze stałą TAU_ROZROSTU_S. Czysta funkcja -
+ * testowalna bez cząstek, jak wiekBiblioteki().
+ */
+export function skalaCzastki(wiekGry, finalScale) {
+    const cel = Number.isFinite(finalScale) ? finalScale : SKALA_MIN;
+    const w = Number.isFinite(wiekGry) ? Math.max(0, wiekGry) : 0;
+    if (w <= KOLUMNA_S) return Math.min(SKALA_KOLUMNY, cel);
+    const p = 1 - Math.exp(-(w - KOLUMNA_S) / TAU_ROZROSTU_S);
+    return Math.min(cel, SKALA_KOLUMNY + (cel - SKALA_KOLUMNY) * p);
 }
 
 /** Promień cząstki biblioteki (jej `scale` jest w jednostkach sprite'a 20 px). */
