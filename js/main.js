@@ -143,6 +143,9 @@ let lastFrameTime = 0;
 // Poprzednie pozycje nadgarstków (px) - do prędkości dłoni przy rozgarnianiu
 // dymu (js/dym.js:rozgarnij()). { 15: {x,y}|undefined, 16: {x,y}|undefined }.
 let poprzNadgarstkiPx = null;
+let ostatniWybuchSFX = -Infinity;   // performance.now() ostatniego dźwięku detonacji dymu
+let wybuchyDoDzwieku = 0;           // wybuchy zebrane od ostatniego dźwięku
+const ODSTEP_WYBUCH_SFX_MS = 120;
 
 // Maska sylwetki, przepisana na CPU. Trzymamy poza wynikiem detekcji, bo
 // obiekt maski trzeba zwolnić od razu po odczycie (patrz pobierzMaske).
@@ -635,7 +638,15 @@ function klatka(now) {
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
-        audioEngine.playWybuchSFX(wybuchyDymu);
+        // Dźwięk NIE co klatkę: przy zapłonie świeżej kolumny (v3: setki
+        // cząstek wstęgi) front detonuje przez kilkanaście klatek z rzędu -
+        // szum 0.35 s nakładany 60x/s to ściana hałasu, nie seria wybuchów.
+        wybuchyDoDzwieku += wybuchyDymu;
+        if (now - ostatniWybuchSFX >= ODSTEP_WYBUCH_SFX_MS) {
+            audioEngine.playWybuchSFX(wybuchyDoDzwieku);
+            wybuchyDoDzwieku = 0;
+            ostatniWybuchSFX = now;
+        }
     }
 
     // --- 7a. Efekty pieczęci i technik ---

@@ -495,7 +495,7 @@ export class DebugHud {
                        `   głowa ${g ? `skręt ${this._num(g.skret)} pochyl ${this._num(g.pochylenie)}` : 'brak oczu'}`);
         }
         if (stats.dym && (stats.dym.kleby > 0 || stats.dym.strumien > 0 || stats.dym.plonacych > 0)) {
-            lines.push(`dym: kłębów ${stats.dym.kleby}  strumień ${stats.dym.strumien}  płonących ${stats.dym.plonacych}`);
+            lines.push(`dym: kłębów ${stats.dym.kleby}  wstęga ${stats.dym.strumien}  płonących ${stats.dym.plonacych}`);
         }
 
         if (stats.maska) lines.push(`maska ${stats.maska}`);

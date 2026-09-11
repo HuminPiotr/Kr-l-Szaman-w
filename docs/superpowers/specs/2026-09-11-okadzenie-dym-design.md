@@ -184,3 +184,44 @@ okadzić cały ekran — wystrzeliwać kłęby z ust strumieniem w kierunku zale
   dymem; gracz widzi płonący palec, którym celuje). Zarzewia są przez to z poprzedniej
   klatki - niezauważalne.
 - Sufity 450 kłębów + 300 strumienia (osobne FIFO). Budżet fill-rate do sprawdzenia na HUD.
+
+## v3 (2026-09-11) — ciągły strumień z płuc i malowanie dymem
+
+**Zgłoszenie po drugim teście:** wybuch i ogólny wygląd OK, ale okadzanie „to kółka
+wypuszczane". Ma być **jednolity, CIĄGŁY strumień wypychany z płuc** — dopóki dłoń jest przy
+ustach albo nie minie 4 min; wystrzeliwany już z ust, a po ~1/4 ekranu siła wypchnięcia
+„rozpuszcza się" i dym zaczyna się kłębić i lecieć w górę. Gracz ma móc **malować wzory linią
+dymu**; wzór ulotny — rozpływa się w chmurę po ~10 s.
+
+**Diagnoza „kółek" (v2):**
+1. emisja pulsowana (sin² 0,5 s co 1,35 s) — kolejne wystrzały to z definicji osobne obłoczki;
+2. dwie populacje rodziły się w **różnych miejscach** (strumień przy ustach, kłąb 0,11–0,18 W
+   dalej, z ujemnym wiekiem) — kłąb „pojawiał się" jako osobne koło, nie wyrastał ze strumienia;
+3. za rzadko i za szeroko: 90/s tylko w szczycie obwiedni (średnio ~17/s) w stożku ±14°;
+4. brak interpolacji między klatkami — wszystkie sprite'y klatki w jednym punkcie, więc ruch
+   głowy zostawiał przerwy.
+
+**Przebudowa (`js/dym.js`):**
+- **Jedna fizyka, dwa czasy życia.** Każda cząstka rodzi się w ustach, z tą samą prędkością
+  wylotu (0,60–0,80 W/s × (0,7 + 0,3·siła) × oddech) i tą samą fizyką. `typ` decyduje tylko o
+  życiu, promieniu docelowym i alfie: `strumien` (wstęga, życie 6–12 s, r → 0,035–0,045 W,
+  alfa 0,55), `klab` (co `KLAB_CO = 32`-ta cząstka, życie 200–260 s, r → 0,075–0,10 W).
+- **Opór mieszany wagą wylotu** `exp(−wiek/0,8 s)`: `4,0/s` dla świeżej cząstki → `0,6/s` dla
+  starej. Jeden wektor prędkości, więc `rozgarnij()` i pole przepływu **zawsze** mają opór
+  (machnięcie dłonią nie wstrzykuje prędkości, która nigdy nie gaśnie). Zasięg wylotu 0,15–0,26 W
+  po 3 s (stałe dobrane numerycznie, test pilnuje przedziału).
+- **Emisja ciągła**: 90 sprite'ów/s × (0,7 + 0,3·siła) × oddech (1 ± 0,15 przy 0,3 Hz, nigdy do
+  zera), stożek ±5°. Usunięte: `Dym.wydech`, okres/faza wydechu, opóźniony start kłębu.
+- **Malowanie**: cząstki klatki rodzą się rozłożone wzdłuż odcinka usta(poprzednia klatka) →
+  usta(teraz). Dym **nie dziedziczy** prędkości ust — zostaje tam, gdzie wydmuchany, więc ruch
+  głowy rysuje linię. Przerwa w dmuchaniu urywa odcinek.
+- **Alfa kłębu cienieje z rozrostem** (0,55 → 0,30 po postępie `r`) — gęsty w kolumnie, rzadki
+  jako chmura; zachowanie „masy".
+- Sufity: 900 wstęgi + 600 kłębów (liczniki trzymane przyrostowo, bez skanu tablicy przy
+  ~1,5 dodania na klatkę). Wstęga wybucha bez sprite'a rozbłysku (setki cząstek naraz).
+- `js/main.js`: dźwięk detonacji **dławiony** do 1 na 120 ms z sumowaniem — front biegnący przez
+  świeżą kolumnę detonuje kilkanaście klatek z rzędu.
+
+**Kompromis do świadomej decyzji:** linia trzyma ~10 s (życzenie „szybko w chmurę"), po czym
+zostaje po niej **rzadki ślad kłębów (~2,8/s), nie kształt**. Jeśli wzór ma zostać czytelny
+dłużej — `KLAB_CO` w dół (32 → 8) i `MAX_STRUMIENIA` w dół (budżet fill-rate).

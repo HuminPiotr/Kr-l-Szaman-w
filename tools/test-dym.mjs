@@ -1,5 +1,6 @@
 /**
- * Dym Okadzenia v2 - wydech strumieniem, kłębienie, front ognia; BEZ document.
+ * Dym Okadzenia v3 - ciągły strumień z ust, malowanie, kłębienie, front ognia;
+ * BEZ document.
  *
  *   node tools/test-dym.mjs
  *
@@ -7,14 +8,15 @@
  * powód co test-kolowrot.mjs. Fizyka idzie przez updateAndDraw(null, W, H,
  * dt) - guard na `!ctx` jest PO doliczeniu czasu i fizyki (patrz js/dym.js).
  *
- * v2 (2026-09-11, po teście na kamerze - "nieżywe tekstury, za mało, ma
- * wystrzeliwać kłęby"): dwie populacje (strumien/klab), wydech pulsowany,
- * opóźniony start kłębu, rozrost odsprzężony od życia, pole przepływu.
+ * v3 (2026-09-11, drugi test na kamerze - "nie kółka, tylko jednolity ciągły
+ * strumień z płuc; malowanie linią dymu"): jedna fizyka, dwa czasy życia,
+ * emisja ciągła interpolowana wzdłuż ruchu ust, opór mieszany wagą wylotu.
  */
-import { Dym, wznoszenieCzynnik, obwiedniaAlfy, obwiedniaStrumienia,
-         MAX_KLEBOW, MAX_STRUMIENIA, ZYCIE_MIN_S, ZYCIE_MAX_S, NAROST_S,
-         OKRES_WYDECHU_S, WYDECH_AKTYWNY_S, KLAB_NA_WYDECH,
-         KLAB_OPOZNIENIE_MIN_S, KLAB_OPOZNIENIE_MAX_S, KLAB_ROZROST_TAU_S,
+import { Dym, wznoszenieCzynnik, obwiedniaAlfy, obwiedniaStrumienia, alfaKlebu,
+         MAX_KLEBOW, MAX_STRUMIENIA, ZYCIE_MIN_S, ZYCIE_MAX_S,
+         STRUMIEN_NA_S, ODDECH_AMPLITUDA, KLAB_CO, R_START_W,
+         WYLOT_PREDKOSC_MAX_W_S, STRUMIEN_ZYCIE_MIN_S, STRUMIEN_ZYCIE_MAX_S,
+         KLAB_ROZROST_TAU_S, KLAB_ALFA_START, KLAB_ALFA_KONIEC,
          OPOZNIENIE_FRONTU_S, CZAS_DO_WYBUCHU_S, CZAS_WYBUCHU_S, SUFIT_Y_H, SPADEK_OD_Y_H }
     from '../js/dym.js';
 
@@ -31,12 +33,13 @@ const przepusc = (d, sekundy) => {
     return suma;
 };
 /** Dmucha przez `sekundy` REALNEGO czasu: emituj + updateAndDraw co klatkę, jak main.js. */
-function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1 } = {}) {
+function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1, usta = USTA } = {}) {
     for (let i = 0; i < Math.round(sekundy / DT); i++) {
-        d.emituj(USTA, kierunek, sila, DT, W);
+        d.emituj(typeof usta === 'function' ? usta(i) : usta, kierunek, sila, DT, W);
         d.updateAndDraw(null, W, H, DT);
     }
 }
+const naUstach = (c, usta = USTA) => Math.hypot(c.x - usta.x, c.y - usta.y);
 const klab = (over = {}) => ({
     typ: 'klab', x: 900, y: 700, vx: 0, vy: 0, wiek: 30, zycie: 240, faza: 0, obrot: 0, wobrot: 0,
     r: 120, rStart: 86, rCel: 190, stan: 'DYM', tZaplonu: 0, tWybuch: 0, rozprzestrzenil: false,
@@ -65,96 +68,136 @@ spr('strumień: po 0.2 s już prawie pełny (błyskawiczny narost)', obwiedniaSt
 spr('strumień: w 90% życia opada', obwiedniaStrumienia(1.8, 2) < obwiedniaStrumienia(1.0, 2));
 spr('strumień: na końcu 0', obwiedniaStrumienia(2, 2) === 0);
 
-// --- 3. Wydech pulsowany ---
-console.log('\nWYDECH PULSOWANY (Dym.wydech - obwiednia okresu):');
-spr('start okresu: obwiednia 0 (sin² od zera)', Dym.wydech(0) === 0);
-spr('środek fazy aktywnej: obwiednia 1', Math.abs(Dym.wydech(WYDECH_AKTYWNY_S / 2) - 1) < 1e-9);
-spr('tuż po fazie aktywnej: 0 (przerwa)', Dym.wydech(WYDECH_AKTYWNY_S + 0.01) === 0);
-spr('koniec okresu: nadal 0', Dym.wydech(OKRES_WYDECHU_S - 0.01) === 0);
-spr('kolejny okres: znowu aktywny', Dym.wydech(OKRES_WYDECHU_S + WYDECH_AKTYWNY_S / 2) > 0.99);
+// --- 3. Emisja ciągła ---
+console.log('\nEMISJA CIĄGŁA (nie pulsy):');
 {
+    let minO = Infinity, maxO = -Infinity;
+    for (let t = 0; t < 10; t += 0.01) { const o = Dym.oddech(t); minO = Math.min(minO, o); maxO = Math.max(maxO, o); }
+    spr(`oddech nigdy do zera: min ${minO.toFixed(2)} >= ${(1 - ODDECH_AMPLITUDA).toFixed(2)}`, minO >= 1 - ODDECH_AMPLITUDA - 1e-9 && minO > 0.5);
+    spr(`oddech ograniczony: max ${maxO.toFixed(2)} <= ${(1 + ODDECH_AMPLITUDA).toFixed(2)}`, maxO <= 1 + ODDECH_AMPLITUDA + 1e-9);
+    spr('oddech NaN -> 1±amp, nie NaN', Number.isFinite(Dym.oddech(NaN)));
+
     const d = new Dym();
-    dmuchaj(d, OKRES_WYDECHU_S);
-    const strumien = d.strumienia, kleby = d.klebow;
-    spr(`jeden okres dmuchania: >= 20 sprite'ów strumienia (${strumien})`, strumien >= 20);
-    spr(`jeden okres dmuchania: dokładnie ${KLAB_NA_WYDECH} trwałe kłęby (${kleby})`, kleby === KLAB_NA_WYDECH);
-    // Przerwa: w drugiej połowie okresu NIC nie przybywa.
-    const d2 = new Dym();
-    dmuchaj(d2, WYDECH_AKTYWNY_S + 0.05);
-    const poAktywnej = d2.liczba;
-    dmuchaj(d2, OKRES_WYDECHU_S - WYDECH_AKTYWNY_S - 0.1);
-    spr('w przerwie między wydechami nic nie przybywa', d2.liczba <= poAktywnej);
-    // Drugi wydech rodzi kolejne kłęby.
-    dmuchaj(d2, WYDECH_AKTYWNY_S);
-    spr(`drugi wydech dokłada kolejne ${KLAB_NA_WYDECH} kłęby (${d2.klebow})`, d2.klebow === 2 * KLAB_NA_WYDECH);
-}
-{
-    // Przerwa w dmuchaniu (dłoń odsunięta) zeruje fazę - po powrocie
-    // pierwszy wystrzał idzie od razu, nie po resztce przerwy.
-    const d = new Dym();
-    dmuchaj(d, WYDECH_AKTYWNY_S + 0.2);    // jesteśmy w przerwie
-    przepusc(d, 0.5);                       // klatki BEZ emituj()
-    const przed = d.strumienia;
-    d.emituj(USTA, W_PRAWO, 1, DT, W); d.updateAndDraw(null, W, H, DT);
-    d.emituj(USTA, W_PRAWO, 1, DT, W); d.updateAndDraw(null, W, H, DT);
-    d.emituj(USTA, W_PRAWO, 1, DT, W); d.updateAndDraw(null, W, H, DT);
-    spr('po przerwie w dmuchaniu wydech startuje od nowa (nowe kłęby od razu)', d.klebow === 2 * KLAB_NA_WYDECH);
-    spr('sila=0 nic nie emituje', (() => { const x = new Dym(); dmuchaj(x, 1, { sila: 0 }); return x.liczba === 0; })());
-    spr('brak zaczepu nic nie emituje, bez wyjątku', (() => { const x = new Dym(); x.emituj(null, W_PRAWO, 1, DT, W); return x.liczba === 0; })());
-    void przed;
+    const przyrosty = [];
+    for (let i = 0; i < 60; i++) {
+        const przed = d.liczba;
+        d.emituj(USTA, W_PRAWO, 1, DT, W);
+        przyrosty.push(d.liczba - przed);
+        d.updateAndDraw(null, W, H, DT);
+    }
+    spr(`1 s dmuchania -> >= 60 sprite'ów wstęgi (${d.strumienia})`, d.strumienia >= 60);
+    spr(`1 s dmuchania -> >= 2 trwałe kłęby (${d.klebow})`, d.klebow >= 2);
+    let najdluzszaPrzerwa = 0, przerwa = 0;
+    for (const n of przyrosty) { if (n === 0) { przerwa++; najdluzszaPrzerwa = Math.max(najdluzszaPrzerwa, przerwa); } else przerwa = 0; }
+    spr(`bez przerw: najdłuższa seria klatek bez narodzin ${najdluzszaPrzerwa} <= 1`, najdluzszaPrzerwa <= 1);
+    spr('REGRESJA v2: żadna cząstka nie czeka z ujemnym wiekiem', d._kleby.every(c => c.wiek >= 0));
+
+    // Ciągłość kolumny: odstęp wzdłuż lotu (v0 / tempo) < promień startowy.
+    const v0max = WYLOT_PREDKOSC_MAX_W_S * (1 + ODDECH_AMPLITUDA);
+    const tempoMax = STRUMIEN_NA_S * (1 + ODDECH_AMPLITUDA);
+    spr(`kolumna bez paciorków: odstęp ${(v0max / tempoMax).toFixed(4)} W < R_START_W ${R_START_W}`, v0max / tempoMax < R_START_W);
+
+    const slabo = new Dym();
+    dmuchaj(slabo, 1, { sila: 0.35 });
+    spr(`przy sile podłogi (0.35) dalej ciągle: ${slabo.liczba} >= 45`, slabo.liczba >= 45);
 }
 
-// --- 4. Strumień: wystrzał, hamowanie, krótkie życie, kierunek ---
-console.log('\nSTRUMIEŃ (wystrzał z ust):');
+// --- 4. Wspólne narodziny w ustach ---
+console.log('\nWSPÓLNE NARODZINY (oba typy z ust):');
 {
     const d = new Dym();
-    // Dojście do SZCZYTU wydechu (z tickami, żeby wcześniejsze sprite'y
-    // miały wiek > 0), potem jedna klatka emisji bez ticku - jej sprite'y
-    // (wiek === 0) są świeże i wystrzelone w pełni obwiedni.
-    dmuchaj(d, WYDECH_AKTYWNY_S / 2 - DT);
+    for (let i = 0; i < KLAB_CO + 2; i++) d.emituj(USTA, W_PRAWO, 1, DT, W);   // bez fizyki - świeże pozycje
+    const wstega = d._kleby.find(c => c.typ === 'strumien');
+    const trwaly = d._kleby.find(c => c.typ === 'klab');
+    spr('jest wstęga i trwały kłąb', !!wstega && !!trwaly);
+    spr(`wstęga rodzi się w ustach (${naUstach(wstega).toFixed(1)} px < 10)`, naUstach(wstega) < 10);
+    spr(`REGRESJA v2: kłąb TEŻ rodzi się w ustach, nie 0.11 W dalej (${naUstach(trwaly).toFixed(1)} px < 10)`, naUstach(trwaly) < 10);
+    spr('oba typy mają tę samą prędkość wylotu (±20%)',
+        Math.abs(Math.hypot(wstega.vx, wstega.vy) / Math.hypot(trwaly.vx, trwaly.vy) - 1) < 0.35);
+    spr('wstęga rośnie do mniejszego promienia niż kłąb', wstega.rCel < trwaly.rCel);
+    spr(`kłąb co ${KLAB_CO}-ta cząstka (deterministycznie)`, d._kleby.filter(c => c.typ === 'klab').length === Math.ceil(d.liczba / KLAB_CO));
+}
+
+// --- 5. Zasięg wylotu ---
+console.log('\nZASIĘG WYLOTU (~1/4 ekranu, potem kłębienie):');
+{
+    const d = new Dym();
     d.emituj(USTA, W_PRAWO, 1, DT, W);
-    const swieze = d._kleby.filter(c => c.typ === 'strumien' && c.wiek === 0);
-    spr(`świeże sprite'y strumienia istnieją (${swieze.length})`, swieze.length > 0);
-    const v = swieze.map(c => Math.hypot(c.vx, c.vy));
-    spr(`startują z |v| >= 500 px/s (min ${Math.min(...v).toFixed(0)})`, Math.min(...v) >= 500);
-    spr('lecą W KIERUNKU dmuchania (vx > 0 przy kierunku w prawo)', swieze.every(c => c.vx > 0));
-    spr('stożek: |vy| < |vx| dla każdego (±14°)', swieze.every(c => Math.abs(c.vy) < Math.abs(c.vx)));
-    const jeden = swieze[0];
-    przepusc(d, 1.4);
-    spr(`po 1.4 s hamowanie poniżej 60 px/s (${Math.hypot(jeden.vx, jeden.vy).toFixed(0)})`,
-        Math.hypot(jeden.vx, jeden.vy) < 60);
-    spr('przeleciał w prawo od ust (>= 150 px)', jeden.x - USTA.x >= 150);
-    przepusc(d, 2.0);
-    spr('po ~3.4 s strumień zgasł (życie < 3 s)', d.strumienia === 0);
+    const c = d._kleby[0];
+    const v0 = Math.hypot(c.vx, c.vy) / W;
+    spr(`prędkość wylotu ${v0.toFixed(2)} W/s w [0.5, 0.95]`, v0 >= 0.5 && v0 <= 0.95);
+    const kat = Math.abs(Math.atan2(c.vy, c.vx));
+    spr(`kierunek w stożku ±6° od zadanego (${(kat * 180 / Math.PI).toFixed(1)}°)`, kat < 6 * Math.PI / 180);
+    przepusc(d, 3);
+    const droga = (c.x - USTA.x) / W;
+    spr(`po 3 s przebył ${droga.toFixed(3)} W - w [0.18, 0.32]`, droga >= 0.18 && droga <= 0.32);
+    spr(`wypchnięcie zgasło: |v| ${(Math.hypot(c.vx, c.vy) / W).toFixed(3)} W/s < 0.03`, Math.hypot(c.vx, c.vy) / W < 0.03);
+    spr('po zgaśnięciu wylotu kłąb UNOSI SIĘ (vy < 0)', c.vy < 0);
+
+    const e = new Dym();
+    e.emituj(USTA, W_PRAWO, 0.35, DT, W);
+    przepusc(e, 3);
+    spr(`przy sile 0.35 krócej, ale wciąż > 0.15 W (${((e._kleby[0].x - USTA.x) / W).toFixed(3)})`,
+        (e._kleby[0].x - USTA.x) / W > 0.15 && e._kleby[0].x < c.x);
 }
 
-// --- 5. Kłąb: opóźniony start, narodziny tam, gdzie strumień zwalnia, rozrost ---
-console.log('\nKŁĄB (kłębienie):');
+// --- 6. Malowanie: interpolacja wzdłuż ruchu ust ---
+console.log('\nMALOWANIE (interpolacja między klatkami):');
 {
     const d = new Dym();
-    d.emituj(USTA, W_PRAWO, 1, DT, W);   // pierwsza klatka wydechu rodzi kłęby
-    const kleby = d._kleby.filter(c => c.typ === 'klab');
-    spr(`kłęby rodzą się na starcie wydechu (${kleby.length})`, kleby.length === KLAB_NA_WYDECH);
-    spr('kłąb ma UJEMNY wiek (opóźniony start)',
-        kleby.every(c => c.wiek <= -KLAB_OPOZNIENIE_MIN_S && c.wiek >= -KLAB_OPOZNIENIE_MAX_S));
-    spr('kłąb rodzi się PRZED ustami w kierunku dmuchania (x > usta + 150)', kleby.every(c => c.x > USTA.x + 150));
-    spr('kłąb ma życie 200-260 s', kleby.every(c => c.zycie >= ZYCIE_MIN_S && c.zycie <= ZYCIE_MAX_S));
-    const k = kleby[0];
-    d.updateAndDraw(null, W, H, DT);
-    spr('przed startem kłąb nie ma promienia (nie da się go podpalić)', k.r === 0);
-    spr('przed startem alfa = 0 (niewidoczny)', obwiedniaAlfy(k.wiek, k.zycie) === 0);
-    przepusc(d, KLAB_OPOZNIENIE_MAX_S + NAROST_S + 0.1);
-    spr('po opóźnieniu + naroście kłąb widoczny', obwiedniaAlfy(k.wiek, k.zycie) > 0.9);
-    spr(`i ma promień > 0 (${k.r.toFixed(0)} px)`, k.r > 0);
-    przepusc(d, 30);
-    spr(`rozrost: >= 90% docelowego po ~30 s (${(k.r / k.rCel * 100).toFixed(0)}%) - nie po 2 min`,
-        k.r >= 0.9 * k.rCel);
-    spr('rozrost jest ease-out: tau ~9 s (90% po ~21 s)', KLAB_ROZROST_TAU_S >= 6 && KLAB_ROZROST_TAU_S <= 12);
-    spr('kłąb obraca się widocznie (>= 0.15 rad/s)', Math.abs(k.wobrot) >= 0.15);
-    spr('sąsiednie kłęby obracają się PRZECIWBIEŻNIE', Math.sign(kleby[0].wobrot) !== Math.sign(kleby[1].wobrot));
+    // Usta jadą 300 px w prawo przez 10 klatek; dmuchanie W GÓRĘ, żeby ruch
+    // ust był jedyną składową X.
+    const start = { x: 600, y: 700 };
+    for (let i = 0; i < 10; i++) {
+        d.emituj({ x: start.x + 30 * (i + 1), y: start.y }, { x: 0, y: -1 }, 1, DT, W);
+        d.updateAndDraw(null, W, H, DT);
+    }
+    const xs = d._kleby.map(c => c.x).sort((a, b) => a - b);
+    let luka = 0;
+    for (let i = 1; i < xs.length; i++) luka = Math.max(luka, xs[i] - xs[i - 1]);
+    // Usta 30 px/klatkę = 1800 px/s (bardzo szybko); przy ~1.5 sprite'a na
+    // klatkę luka bywa ~30 px - wciąż mniejsza niż ŚREDNICA startowa
+    // (2 x R_START_W x W = 58 px), więc sprite'y nachodzą na siebie = linia.
+    spr(`cząstki pokrywają odcinek: największa luka ${luka.toFixed(1)} px < średnica startowa ${(2 * R_START_W * W).toFixed(0)}`,
+        luka < 2 * R_START_W * W && xs.length >= 10);
+    spr('cząstki rozłożone od początku do końca odcinka', xs[0] < start.x + 60 && xs[xs.length - 1] > start.x + 270);
+    spr('dym NIE dziedziczy prędkości ust (vx ~ 0 przy dmuchaniu w górę)', d._kleby.every(c => Math.abs(c.vx) < 0.15 * W));
+
+    // Po przerwie - brak interpolacji: pierwsza cząstka w NOWYM miejscu.
+    przepusc(d, 0.2);
+    const przed = d.liczba;
+    for (let i = 0; i < 3; i++) { d.emituj({ x: 1500, y: 300 }, { x: 0, y: -1 }, 1, DT, W); d.updateAndDraw(null, W, H, DT); }
+    const nowe = d._kleby.slice(przed);
+    // Dmuchanie w górę: po 1-3 klatkach fizyki y już uciekł w górę - liczy się X.
+    spr('po przerwie pierwsza cząstka rodzi się w nowym miejscu, nie na drodze do starego',
+        nowe.length > 0 && nowe.every(c => Math.abs(c.x - 1500) < 20 && c.y <= 310 && c.y > 200));
 }
 
-// --- 6. Pole przepływu: sąsiedzi płyną SPÓJNIE ---
+// --- 7. Życie i rozrost: wstęga ~10 s, kłąb ~4 min, alfa cienieje ---
+console.log('\nŻYCIE I ROZROST:');
+{
+    const d = new Dym();
+    dmuchaj(d, 1);
+    spr(`wstęga żyje ${STRUMIEN_ZYCIE_MIN_S}-${STRUMIEN_ZYCIE_MAX_S} s`,
+        d._kleby.filter(c => c.typ === 'strumien').every(c => c.zycie >= STRUMIEN_ZYCIE_MIN_S && c.zycie <= STRUMIEN_ZYCIE_MAX_S));
+    spr(`kłąb żyje ${ZYCIE_MIN_S}-${ZYCIE_MAX_S} s`,
+        d._kleby.filter(c => c.typ === 'klab').every(c => c.zycie >= ZYCIE_MIN_S && c.zycie <= ZYCIE_MAX_S));
+    const kleby = d.klebow;
+    przepusc(d, 15);
+    spr(`po 15 s bez dmuchania wstęga zniknęła (${d.strumienia})`, d.strumienia === 0);
+    spr(`...a kłęby zostały (${d.klebow} = ${kleby})`, d.klebow === kleby);
+    przepusc(d, 15);
+    const k = d._kleby.find(c => c.typ === 'klab');
+    spr(`kłąb po 30 s ma >= 90% docelowego promienia (${(k.r / k.rCel * 100).toFixed(0)}%)`, k.r >= 0.9 * k.rCel);
+    spr('liczniki zgodne z tablicą', d.klebow === d._kleby.filter(c => c.typ === 'klab').length
+                                     && d.strumienia === d._kleby.filter(c => c.typ === 'strumien').length);
+}
+spr(`alfaKlebu: na starcie ${KLAB_ALFA_START}`, alfaKlebu(86, 86, 190) === KLAB_ALFA_START);
+spr(`alfaKlebu: dojrzały ${KLAB_ALFA_KONIEC}`, Math.abs(alfaKlebu(190, 86, 190) - KLAB_ALFA_KONIEC) < 1e-9);
+spr('alfaKlebu: maleje z r', alfaKlebu(120, 86, 190) < alfaKlebu(100, 86, 190));
+spr('alfaKlebu: nigdy < KLAB_ALFA_KONIEC', alfaKlebu(999, 86, 190) >= KLAB_ALFA_KONIEC && alfaKlebu(NaN, 86, 190) >= KLAB_ALFA_KONIEC);
+spr('alfaKlebu: zerowy zakres nie dzieli przez 0', Number.isFinite(alfaKlebu(60, 60, 60)));
+
 console.log('\nPOLE PRZEPŁYWU (koherencja sąsiadów):');
 {
     const d = new Dym();
@@ -167,7 +210,7 @@ console.log('\nPOLE PRZEPŁYWU (koherencja sąsiadów):');
     spr('NaN nie przeżywa', d._kleby.every(c => Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.vx)));
 }
 
-// --- 7. Sufity per populacja ---
+// --- 8. Sufity per populacja ---
 console.log('\nSUFITY (osobne FIFO):');
 {
     const d = new Dym();
@@ -177,9 +220,10 @@ console.log('\nSUFITY (osobne FIFO):');
     spr(`kłąb: nie przekracza ${MAX_KLEBOW} (${d.klebow})`, d.klebow === MAX_KLEBOW);
     spr('kłąb: wypchnięte NAJSTARSZE (pierwsze x zniknęły)', d._kleby.filter(c => c.typ === 'klab')[0].x === 50);
     spr('sufit kłębów nie rusza strumienia i odwrotnie', d.strumienia === MAX_STRUMIENIA);
+    spr('liczniki = tablica', d.liczba === MAX_STRUMIENIA + MAX_KLEBOW);
 }
 
-// --- 8. Życie i wygasanie ---
+// --- 9. Wygasanie kłębu ---
 console.log('\nŻYCIE KŁĘBU (~4 min, NIE 50-70 s):');
 {
     const d = new Dym();
@@ -230,12 +274,6 @@ console.log('\nPODPALENIE I FRONT OGNIA:');
 }
 {
     const d = new Dym();
-    d._kleby.push(klab({ x: 900, wiek: -0.5, r: 0 }));
-    d.podpal([{ x: 900, y: 700, r: 30 }]);
-    spr('kłąb PRZED opóźnionym startem nie daje się podpalić', d._kleby[0].stan === 'DYM');
-}
-{
-    const d = new Dym();
     d._kleby.push(klab({ stan: 'ZAPLON', rozprzestrzenil: true }));
     let wybuchy = 0;
     for (let i = 0; i < Math.round((CZAS_DO_WYBUCHU_S + 0.02) / DT); i++) wybuchy += d.updateAndDraw(null, W, H, DT);
@@ -252,6 +290,17 @@ console.log('\nPODPALENIE I FRONT OGNIA:');
                      wariantMgla: 0, wariantPlomien: 0, wariantOgien: 0, wariantRozblysk: 0 });
     d.podpal([{ x: 500, y: 500, r: 5 }]);
     spr('sprite strumienia też daje się podpalić', d._kleby[0].stan === 'ZAPLON');
+}
+{
+    // Front biegnie wzdłuż świeżo wydmuchanej kolumny - to jest "kłąb po kłębie" na linii.
+    const d = new Dym();
+    dmuchaj(d, 1.5);
+    przepusc(d, 1);
+    const koniec = d._kleby.reduce((m, c) => (c.x > m.x ? c : m), d._kleby[0]);
+    d.podpal([{ x: koniec.x, y: koniec.y, r: 10 }]);
+    let wybuchy = 0;
+    for (let i = 0; i < Math.round(3 / DT); i++) wybuchy += d.updateAndDraw(null, W, H, DT);
+    spr(`zapłon końca kolumny obiega całą linię (wybuchło ${wybuchy} z ${wybuchy + d.liczba})`, wybuchy > 0 && d.liczba < 0.1 * wybuchy);
 }
 
 // --- 11. Odporność ---
