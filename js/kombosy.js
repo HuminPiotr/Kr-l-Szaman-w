@@ -55,13 +55,49 @@ export const KOMBOSY = [
 
     // Powietrze x2 -> Aard. Wiatr złożony dwa razy pod rząd.
     { id: 'aard', nazwa: 'Podmuch Striboga',
-      sekwencja: ['stribog', 'stribog'], uzbraja: 'aard' }
-];
+      sekwencja: ['stribog', 'stribog'], uzbraja: 'aard' },
 
-// ZIEMIA nie wchodzi na razie w żaden kombos - zostaje pieczęcią
-// samodzielną, dającą swój błysk. Kombos bez techniki, którą miałby
-// uzbrajać, byłby wymyślaniem na zapas; ziemia wejdzie, gdy powstanie
-// technika ziemi.
+    // GROM W ZIEMIĘ (2026-09-08): pierwsza technika ziemi. Kuźnia (Swaróg)
+    // rozgrzewa skorupę, piorun (Perun) bije w rozgrzaną ziemię (Weles) -
+    // mit Peruna kontra Welesa, centralny konflikt słowiańskiej mitologii.
+    // Trzy pieczęcie, aktywacja NATYCHMIASTOWA jak Tęcza - `uzbraja`
+    // wskazuje na WŁASNE id (nie na osobną technikę czekającą na gest),
+    // main.js routuje tę gałąź osobno, tak samo jak dla 'tecza'.
+    { id: 'gromWZiemie', nazwa: 'Grom w Ziemię',
+      sekwencja: ['swarog', 'weles', 'perun'], uzbraja: 'gromWZiemie' },
+
+    // KOŁOWRÓT (2026-09-09): domknięcie mitu Gromu w Ziemię. Piorun (Perun)
+    // uderzył w ziemię (Weles) - centralny konflikt słowiańskiej mitologii -
+    // a Mokosz, prządka losu, zamyka krąg wodą i koło toczy się dalej.
+    // Sekwencja CELOWO omija ognia i powietrze - z tools/test-rozdzielnosc.mjs
+    // na prawdziwych nagraniach: woda 0.97-1.00, ziemia 0.95-1.00, błyskawica
+    // 0.70-1.00, a ogień 0.21-0.59 i powietrze 0.40-0.93. Każde wcześniejsze
+    // combo poza Aardem zaczynało się od ognia, czyli od najsłabiej
+    // rozpoznawanej pieczęci - to combo ma być pierwszym, które da się
+    // odpalić powtarzalnie. `weles` nadal NIGDY nie rozpoczyna żadnej
+    // sekwencji (zaczyna się od peruna) - ten sam inwariant, na którym
+    // opiera się komentarz przy teście k2 niżej w tools/test-kombosy.mjs.
+    // Pierwsza technika w grze zbudowana na gotowych teksturach (Kenney
+    // Particle Pack, CC0) - patrz js/kolowrot.js.
+    { id: 'kolowrot', nazwa: 'Kołowrót',
+      sekwencja: ['perun', 'weles', 'mokosz'], uzbraja: 'kolowrot' },
+
+    // OKADZENIE (2026-09-11, spec docs/superpowers/specs/2026-09-11-okadzenie
+    // -dym-design.md): pierwsza technika KANAŁOWANA uzbrajana kombosem
+    // trójelementowym. Ogień -> wiatr -> ogień - dym to żar niesiony
+    // wiatrem, powtórzony dwa razy dla wagi tego combo (życzenie właściciela
+    // gry). Jak Płonący Palec, `uzbraja` wskazuje na osobną technikę
+    // czekającą na GEST (dłoń przy ustach), nie odpala się natychmiastowo -
+    // main.js routuje tę gałąź razem z 'ogien'/'aard'.
+    //
+    // CELOWA KOLIZJA OGONA z Gromem w Ogniu: swarog->stribog->swarog->perun
+    // dopasowuje NAJPIERW Okadzenie (ogon długości 3 w chwili trzeciej
+    // pieczęci), a zaraz potem, bez czyszczenia bufora, Grom w Ogniu (ogon
+    // [swarog, perun] w chwili czwartej pieczęci) - dokładnie łańcuch "dym,
+    // potem zapałka", jakiego wymaga podpalenie dymu. Patrz test-kombosy.mjs.
+    { id: 'dym', nazwa: 'Okadzenie',
+      sekwencja: ['swarog', 'stribog', 'swarog'], uzbraja: 'dym' }
+];
 
 export class KomboSilnik {
     constructor({ okno = OKNO_MS, kombosy = KOMBOSY } = {}) {
