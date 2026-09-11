@@ -25,7 +25,7 @@ const DT = 1 / 60;
  */
 function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
                   usta = [0, -0.78, 0.05], ustaWidoczne = true, brakPozy = false,
-                  skretGlowy = 0, uszyWidoczne = true } = {}) {
+                  skretGlowy = 0, oczyWidoczne = true } = {}) {
     if (brakPozy) return null;
     const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
     wl[11] = { x: -0.15, y: -0.55, z: 0, visibility: 0.9 };   // BARK_L
@@ -34,13 +34,13 @@ function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
     wl[16] = { x: nadgP[0], y: nadgP[1], z: nadgP[2], visibility: 0.9 };
     wl[9] = { x: usta[0] - 0.02, y: usta[1], z: usta[2], visibility: ustaWidoczne ? 0.9 : 0.1 };
     wl[10] = { x: usta[0] + 0.02, y: usta[1], z: usta[2], visibility: ustaWidoczne ? 0.9 : 0.1 };
-    // Głowa: uszy 7/8 w rozstawie 0.16 m nad ustami, nos 0 - 0.55 rozstawu
-    // poniżej linii uszu (twarz na wprost) i przesunięty o `skretGlowy`
-    // (ułamek rozstawu; dodatni = ku uchu P).
-    const rozstaw = 0.16, uszyY = usta[1] - 0.12;
-    wl[7] = { x: usta[0] - rozstaw / 2, y: uszyY, z: usta[2], visibility: uszyWidoczne ? 0.9 : 0.1 };
-    wl[8] = { x: usta[0] + rozstaw / 2, y: uszyY, z: usta[2], visibility: uszyWidoczne ? 0.9 : 0.1 };
-    wl[0] = { x: usta[0] + skretGlowy * rozstaw, y: uszyY + 0.55 * rozstaw, z: usta[2], visibility: 0.9 };
+    // Głowa: oczy 2/5 w rozstawie 0.063 m nad ustami, nos 0 - 0.7 rozstawu
+    // poniżej linii oczu (twarz na wprost, NOS_POD_OCZAMI) i przesunięty
+    // o `skretGlowy` (ułamek rozstawu; dodatni = ku oku P).
+    const rozstaw = 0.063, oczyY = usta[1] - 0.08;
+    wl[2] = { x: usta[0] - rozstaw / 2, y: oczyY, z: usta[2], visibility: oczyWidoczne ? 0.9 : 0.1 };
+    wl[5] = { x: usta[0] + rozstaw / 2, y: oczyY, z: usta[2], visibility: oczyWidoczne ? 0.9 : 0.1 };
+    wl[0] = { x: usta[0] + skretGlowy * rozstaw, y: oczyY + 0.7 * rozstaw, z: usta[2], visibility: 0.9 };
     return wl;
 }
 
@@ -207,21 +207,23 @@ console.log('\nKIERUNEK WYDECHU (v2: głowa + dłoń, EMA):');
     resetSkali();
     d.uzbrój(0);
     dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 0.4, now: 0 });
-    spr(`nos ku uchu P -> kierunek.x > 0 mimo dłoni z prawej (${d.kierunek.x.toFixed(2)})`, d.kierunek.x > 0);
+    spr(`nos ku oku P -> kierunek.x > 0 mimo dłoni z prawej (${d.kierunek.x.toFixed(2)})`, d.kierunek.x > 0);
+    spr('głowa na wprost w pionie -> surowe pochylenie ~0', d.glowa && Math.abs(d.glowa.pochylenie) < 1e-6);
     const e = new Dmuchanie();
     resetSkali();
     e.uzbrój(0);
     dmuchajNKlatek(e, 40, { nadgL: [-0.10, -0.78, 0.05], skretGlowy: -0.4, now: 0 });
-    spr(`nos ku uchu L -> kierunek.x < 0 (${e.kierunek.x.toFixed(2)})`, e.kierunek.x < 0);
+    spr(`nos ku oku L -> kierunek.x < 0 (${e.kierunek.x.toFixed(2)})`, e.kierunek.x < 0);
 }
 {
-    // Bez uszu (niepewne) - fallback na samą dłoń, nadal jednostkowy, w górę.
+    // Bez oczu (niepewne) - fallback na samą dłoń, nadal jednostkowy, w górę.
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], uszyWidoczne: false, now: 0 });
-    spr('bez uszu: fallback na dłoń - X od dłoni', d.kierunek.x < 0);
-    spr('bez uszu: nadal jednostkowy', Math.abs(Math.hypot(d.kierunek.x, d.kierunek.y) - 1) < 1e-6);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], oczyWidoczne: false, now: 0 });
+    spr('bez oczu: fallback na dłoń - X od dłoni', d.kierunek.x < 0);
+    spr('bez oczu: nadal jednostkowy', Math.abs(Math.hypot(d.kierunek.x, d.kierunek.y) - 1) < 1e-6);
+    spr('bez oczu: glowa === null (HUD wie, że sygnału nie ma)', d.glowa === null);
 }
 {
     // EMA: nagły skręt głowy nie przerzuca kierunku w jednej klatce.

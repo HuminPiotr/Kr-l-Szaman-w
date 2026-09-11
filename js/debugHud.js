@@ -487,6 +487,12 @@ export class DebugHud {
             lines.push(`okadzenie ${stats.dmuchanie.stan}  gest ${this._num(stats.dmuchanie.gest)}` +
                        ` (wejście 0.55 / wyjście 0.35)   siła ${this._num(stats.dmuchanie.sila)}` +
                        `   pozostało ${stats.dmuchanie.pozostaloS.toFixed(0)} s`);
+            // Kierunek wydechu to sedno v2 - bez odczytu strojenie WZMOCNIENIE_SKRETU /
+            // NOS_POD_OCZAMI byłoby zgadywaniem. Głowa surowa: skręt ma sięgać ±1 przy
+            // wyraźnym obrocie, pochylenie ~0 przy głowie na wprost.
+            const k = stats.dmuchanie.kierunek, g = stats.dmuchanie.glowa;
+            lines.push(`  kierunek ${k ? `${this._num(k.x)} ${this._num(k.y)}` : '-'}` +
+                       `   głowa ${g ? `skręt ${this._num(g.skret)} pochyl ${this._num(g.pochylenie)}` : 'brak oczu'}`);
         }
         if (stats.dym && (stats.dym.kleby > 0 || stats.dym.strumien > 0 || stats.dym.plonacych > 0)) {
             lines.push(`dym: kłębów ${stats.dym.kleby}  strumień ${stats.dym.strumien}  płonących ${stats.dym.plonacych}`);

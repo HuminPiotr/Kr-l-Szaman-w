@@ -175,7 +175,12 @@ okadzić cały ekran — wystrzeliwać kłęby z ust strumieniem w kierunku zale
 - Ruch wewnętrzny kłębów: pole przepływu zależne od pozycji i czasu (spójne wiry, dryf
   ~20 px/s), obrót 0,15–0,35 rad/s (sąsiedzi przeciwbieżnie), oddech skali ±5%, migotanie
   alfy ±8%.
-- Kierunek wydechu: 60% głowa (skręt nosa względem środka uszu 7/8, ×2,5; skos w górę −0,3
-  + pochylenie), 40% dłoń (usta − nadgarstek), EMA τ=0,25 s. Palce celowo nie (kamera gubi je
-  przy twarzy).
+- Kierunek wydechu: 60% głowa (skręt nosa względem środka OCZU 2/5, ×2,5; skos w górę −0,3
+  + pochylenie z baseline „nos 0,7 rozstawu oczu pod ich linią"), 40% dłoń (usta − nadgarstek),
+  EMA τ=0,25 s. Oczy, nie uszy: przy skręcie głowy dalsze ucho znika i traci visibility, więc
+  sygnał gasłby dokładnie wtedy, gdy gracz celuje. Palce celowo nie (kamera gubi je przy
+  twarzy). HUD pokazuje surowy skręt/pochylenie do strojenia.
+- Warstwa: dym rysowany PO zapłonie sylwetki, PRZED efektami i ogniem (ogień bloomuje nad
+  dymem; gracz widzi płonący palec, którym celuje). Zarzewia są przez to z poprzedniej
+  klatki - niezauważalne.
 - Sufity 450 kłębów + 300 strumienia (osobne FIFO). Budżet fill-rate do sprawdzenia na HUD.

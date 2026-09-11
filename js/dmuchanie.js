@@ -100,9 +100,14 @@ const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
 // --- Kierunek wydechu (v2) - ZGADNIĘTE, do strojenia na kamerze ---
 export const WAGA_GLOWY = 0.6;          // reszta to dłoń (usta - nadgarstek)
-const WZMOCNIENIE_SKRETU = 2.5;         // (nos - środek uszu)/rozstaw uszu x to -> [-1,1]
+const WZMOCNIENIE_SKRETU = 2.5;         // (nos - środek oczu)/rozstaw oczu x to -> [-1,1]
 export const SKOS_W_GORE = -0.3;        // stała składowa Y (ujemna = w górę ekranu)
 const WAGA_POCHYLENIA = 0.5;            // ile uniesienie głowy dokłada do składowej Y
+// Nos w twarzy na wprost leży ~0.7 rozstawu oczu PONIŻEJ ich linii (rozstaw
+// źrenic ~63 mm, czubek nosa ~45 mm pod linią oczu). ZGADNIĘTE z anatomii,
+// nie zmierzone - HUD (klawisz D) pokazuje surowe pochylenie, żeby to
+// sprawdzić: przy głowie na wprost ma czytać ~0.
+const NOS_POD_OCZAMI = 0.7;
 const TAU_KIERUNKU_S = 0.25;            // EMA - plume nie drga klatka po klatce
 
 export class Dmuchanie {
@@ -117,6 +122,7 @@ export class Dmuchanie {
         this._ustaSwiat = null;    // ostatnia PEWNA pozycja ust w metrach (worldLandmarks)
         this._ustaEkran = null;    // ostatnia PEWNA pozycja ust znormalizowana (do rysowania)
         this._kierunekEma = null;  // wygładzony kierunek wydechu (patrz _kierunek)
+        this.glowa = null;         // surowy {skret, pochylenie} z ostatniej klatki (HUD)
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności GOTOWY. */
@@ -243,13 +249,18 @@ export class Dmuchanie {
      *
      * Blend dwóch sygnałów, wszystko z landmarks 2D (to kierunek na ekranie,
      * nie pomiar - GEMINI.md:49):
-     *   GŁOWA (WAGA_GLOWY): skręt = (nos - środek uszu) / rozstaw uszu -> X;
-     *          Y = stały skos w górę + pochylenie głowy (nos względem uszu).
+     *   GŁOWA (WAGA_GLOWY): skręt = (nos - środek oczu) / rozstaw oczu -> X;
+     *          Y = stały skos w górę + pochylenie głowy (nos względem oczu).
+     *          OCZY (2/5), nie uszy (7/8): przy skręcie głowy dalsze ucho
+     *          znika za twarzą i jego visibility spada - sygnał gasłby
+     *          dokładnie wtedy, gdy gracz celuje. Oczy przy umiarkowanym
+     *          skręcie zostają oba widoczne, a nos (wystaje) przesuwa się
+     *          względem ich środka - to jest skręt.
      *   DŁOŃ  (1 - WAGA_GLOWY): usta - nadgarstek (kłąb leci OD dłoni), nadgarstek
      *          bliższy ustom w świecie (ta sama ręka, którą oceniał _ocenGest).
      * Palce CELOWO nie: kamera z jednego oka gubi je przy twarzy (GEMINI.md §4).
      * Wynik wygładzony EMA (TAU_KIERUNKU_S), żeby plume nie drgał klatka po
-     * klatce. Fallbacki: bez uszu - sama dłoń; bez niczego - {0,-1}.
+     * klatce. Fallbacki: bez oczu - sama dłoń; bez niczego - {0,-1}.
      */
     _kierunek(wl, lm, krok = 0) {
         let cel = null;
@@ -276,19 +287,19 @@ export class Dmuchanie {
         return { x: this._kierunekEma.x, y: this._kierunekEma.y };
     }
 
-    /** Skręt i pochylenie głowy z nosa (0) i uszu (7/8), 2D. null bez pewnych uszu. */
+    /** Skręt i pochylenie głowy z nosa (0) i oczu (2/5), 2D. null bez pewnych oczu. */
     _kierunekGlowy(lm) {
-        const nos = lm?.[0], uL = lm?.[7], uP = lm?.[8];
+        const nos = lm?.[0], oL = lm?.[2], oP = lm?.[5];
         const ok = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y)
             && (p.visibility === undefined || p.visibility >= PROG_WIDOCZNOSCI_TWARZY);
-        if (!ok(nos) || !ok(uL) || !ok(uP)) return null;
-        const rozstaw = Math.hypot(uL.x - uP.x, uL.y - uP.y);
-        if (rozstaw < 1e-4) return null;
-        const sx = (uL.x + uP.x) / 2, sy = (uL.y + uP.y) / 2;
+        if (!ok(nos) || !ok(oL) || !ok(oP)) { this.glowa = null; return null; }
+        const rozstaw = Math.hypot(oL.x - oP.x, oL.y - oP.y);
+        if (rozstaw < 1e-4) { this.glowa = null; return null; }
+        const sx = (oL.x + oP.x) / 2, sy = (oL.y + oP.y) / 2;
         const skret = Math.max(-1, Math.min(1, (nos.x - sx) / rozstaw * WZMOCNIENIE_SKRETU));
-        // Nos w twarzy na wprost leży ~0.55 rozstawu uszu PONIŻEJ ich linii;
-        // uniesienie głowy podnosi go względem uszu -> dodatnie pochylenie.
-        const pochylenie = Math.max(-1, Math.min(1, (sy + 0.55 * rozstaw - nos.y) / rozstaw));
+        // Uniesienie głowy podnosi nos względem oczu -> dodatnie pochylenie.
+        const pochylenie = Math.max(-1, Math.min(1, (sy + NOS_POD_OCZAMI * rozstaw - nos.y) / rozstaw));
+        this.glowa = { skret, pochylenie };
         return { x: skret, y: SKOS_W_GORE - pochylenie * WAGA_POCHYLENIA };
     }
 

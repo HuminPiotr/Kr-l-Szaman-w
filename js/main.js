@@ -559,32 +559,18 @@ function klatka(now) {
     // cząstek techniki, nie odwrotnie.
     zaplon.updateAndDraw(ctx, frame.pose ? maskaDane : null, maskaSzer, maskaWys, fit, dt);
 
-    // --- 7a. Efekty pieczęci i technik ---
-    efekty.updateAndDraw(ctx, frame, dt);
-
-    // --- 7b. Płonący palec ---
-    // Technika kanałowana: zjada moc tak długo, jak gracz ją prowadzi.
-    // Pobranie idzie przez motionMeter.zuzyj(), żeby moc miała JEDNEGO
-    // właściciela. zuzyj() przyjmuje koszt częściowy, więc nie trzeba tu
-    // osobnej metody - technika zwraca, ile chce pobrać, i nie sięga do
-    // this.moc sama.
-    const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
-    if (pobor > 0) motionMeter.zuzyj(pobor);
-
-    ogien.updateAndDraw(
-        ctx,
-        plonacyPalec.zaczep
-            ? { x: plonacyPalec.zaczep.x * canvas.width, y: plonacyPalec.zaczep.y * canvas.height }
-            : null,
-        plonacyPalec.sila,
-        dt
-    );
-
-    // --- 7b2. Okadzenie (dmuchanie + dym) ---
+    // --- 7a1. Okadzenie (dmuchanie + dym) ---
     // Druga technika kanałowana. Pobór idzie przez motionMeter.zuzyj() jak
     // Płonący Palec, ale jest prawie zerowy i NIGDY nie warunkuje
     // kontynuacji (js/dmuchanie.js nagłówek) - stąd brak strażnika
     // "if (pobor2 > 0)" na coś więcej niż samo pobranie.
+    //
+    // Rysowany PRZED efektami i ogniem (spec: dym w warstwie source-over,
+    // ogień/piorun bloomują NAD nim) - przy 450 kłębach gracz musi widzieć
+    // swój płonący palec, żeby go w dym wcelować. Konsekwencja: zarzewia
+    // (plonacyPalec.zaczep, ogien.czastki) są z POPRZEDNIEJ klatki - jedna
+    // klatka spóźnienia zapłonu jest niezauważalna, rozdzielanie
+    // updateAndDraw na tick i rysowanie nie jest tego warte.
     const pobor2 = dmuchanie.update(frame, motionMeter.moc, dt, now);
     if (pobor2 > 0) motionMeter.zuzyj(pobor2);
 
@@ -625,7 +611,7 @@ function klatka(now) {
         dym.rozgarnij(nadgarstkiPx, canvas.width);
     }
 
-    // Zarzewia: punkty ognia dowolnej techniki ognia w tej klatce - DZIŚ
+    // Zarzewia: punkty ognia dowolnej techniki ognia z poprzedniej klatki (patrz wyżej) - DZIŚ
     // Płonący Palec (czubek + próbka jego cząstek, już w px). PULL-BASED,
     // nie subskrypcje: repo nie ma systemu zdarzeń nigdzie indziej (kombosy
     // to zwykłe wartości zwrotne), więc kolejna technika ognia w przyszłości
@@ -651,6 +637,27 @@ function klatka(now) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
         audioEngine.playWybuchSFX(wybuchyDymu);
     }
+
+    // --- 7a. Efekty pieczęci i technik ---
+    efekty.updateAndDraw(ctx, frame, dt);
+
+    // --- 7b. Płonący palec ---
+    // Technika kanałowana: zjada moc tak długo, jak gracz ją prowadzi.
+    // Pobranie idzie przez motionMeter.zuzyj(), żeby moc miała JEDNEGO
+    // właściciela. zuzyj() przyjmuje koszt częściowy, więc nie trzeba tu
+    // osobnej metody - technika zwraca, ile chce pobrać, i nie sięga do
+    // this.moc sama.
+    const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
+    if (pobor > 0) motionMeter.zuzyj(pobor);
+
+    ogien.updateAndDraw(
+        ctx,
+        plonacyPalec.zaczep
+            ? { x: plonacyPalec.zaczep.x * canvas.width, y: plonacyPalec.zaczep.y * canvas.height }
+            : null,
+        plonacyPalec.sila,
+        dt
+    );
 
     // --- 7c. Podmuch (Aard) ---
     // Jednorazowe zdarzenie: update() zwraca coś TYLKO w klatce wystrzału.
@@ -753,7 +760,8 @@ function klatka(now) {
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
         // strojenia progu na żywo, patrz debugHud.js.
-        dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest },
+        dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest,
+                     kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa },
         dym: { kleby: dym.klebow, strumien: dym.strumienia, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
