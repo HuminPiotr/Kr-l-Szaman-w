@@ -9,8 +9,7 @@
  * moc NIGDY nie kończy potencjału; i że jeden zegar 4-minutowy jest
  * jedynym samoistnym sposobem wygaśnięcia.
  */
-import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY,
-         CZAS_PELNEGO_LADUNKU_S, LADUNEK_MIN } from '../js/dmuchanie.js';
+import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -61,23 +60,11 @@ function dmuchajNKlatek(d, n, opts, mocFn = () => 1) {
     }
     return out;
 }
-/** Trzyma dłoń przy ustach `sekundy`, potem ją cofa - zwraca zdarzenie wypuszczenia. */
-function naladujIPusc(d, sekundy, opts = {}) {
-    dmuchajNKlatek(d, Math.round(sekundy / DT), { nadgP: [0.10, -0.78, 0.05], now: 0, ...opts });
-    // Kilka klatek z dłonią daleko - histereza gestu (PROG_WYJSCIA) potrzebuje
-    // paru klatek wygładzenia, zanim uzna, że dłoń faktycznie odeszła.
-    for (let i = 0; i < 40; i++) {
-        const out = d.update(klatka({ nadgP: [0.25, 0.05, 0], now: 0, ...opts }), 1, DT, 0);
-        if (out.wypuszczenie) return out.wypuszczenie;
-    }
-    return null;
-}
-
 console.log('BEZ COMBO:');
 {
     const d = new Dmuchanie();
     resetSkali();
-    const { pobor } = d.update(klatka({ nadgL: [0, -0.78, 0] }), 1, DT, 0);
+    const pobor = d.update(klatka({ nadgL: [0, -0.78, 0] }), 1, DT, 0);
     spr('bez uzbrojenia stan zostaje BEZCZYNNY', d.stan === 'BEZCZYNNY');
     spr('bez uzbrojenia sila = 0', d.sila === 0);
     spr('bez uzbrojenia pobór = 0', pobor === 0);
@@ -168,7 +155,7 @@ console.log('\nWYCZERPANA MOC NIGDY NIE KOŃCZY POTENCJAŁU:');
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    const { pobor } = dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 }, () => 0);
+    const pobor = dmuchajNKlatek(d, 20, { nadgP: [0.10, -0.78, 0.05], now: 0 }, () => 0);
     spr(`moc=0 przez cały czas - stan nadal DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
     spr(`moc=0 - sila ma podłogę, nie jest zerem (${d.sila.toFixed(2)})`, d.sila > 0);
     spr('moc=0 - pobór wynosi 0 (nic nie ma do pobrania)', pobor === 0);
@@ -179,12 +166,12 @@ console.log('\nODPORNOŚĆ:');
     const d = new Dmuchanie();
     resetSkali();
     spr('update() bez uzbrojenia i bez pozy nie wywala wyjątku',
-        d.update(klatka({ brakPozy: true }), 1, DT, 0).pobor === 0);
+        d.update(klatka({ brakPozy: true }), 1, DT, 0) === 0);
     d.uzbrój(0);
     spr('update() z brakiem pozy po uzbrojeniu nie wywala wyjątku i zostaje w GOTOWY',
-        d.update(klatka({ brakPozy: true }), 1, DT, 0).pobor === 0 && d.stan === 'GOTOWY');
-    spr('NaN jako dt nie wywala wyjątku', Number.isFinite(d.update(klatka({ now: 0 }), 1, NaN, 0).pobor));
-    spr('NaN jako moc nie wywala wyjątku', Number.isFinite(d.update(klatka({ now: 0 }), NaN, DT, 0).pobor));
+        d.update(klatka({ brakPozy: true }), 1, DT, 0) === 0 && d.stan === 'GOTOWY');
+    spr('NaN jako dt nie wywala wyjątku', Number.isFinite(d.update(klatka({ now: 0 }), 1, NaN, 0)));
+    spr('NaN jako moc nie wywala wyjątku', Number.isFinite(d.update(klatka({ now: 0 }), NaN, DT, 0)));
 }
 
 console.log('\nKOTWICA UST PRZEŻYWA ZASŁONIĘCIE:');
@@ -322,69 +309,6 @@ console.log('\nWYRAZISTOŚĆ USTAWIENIA (siła wypchnięcia):');
     zgaszony.anuluj();
     zgaszony.update(klatka({ now: 0 }), 1, DT, 0);
     spr('po wygaszeniu wyrazistość zeruje się', zgaszony.wyrazistosc === 0);
-}
-
-console.log('\nŁADOWANIE I WYPUSZCZANIE KÓŁKA (v6):');
-{
-    const d = new Dmuchanie();
-    resetSkali();
-    d.uzbrój(0);
-    dmuchajNKlatek(d, Math.round(1 / DT), { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    spr(`1 s trzymania -> ładunek ~1/3 (${d.ladunek.toFixed(2)})`, Math.abs(d.ladunek - 1 / CZAS_PELNEGO_LADUNKU_S) < 0.06);
-    dmuchajNKlatek(d, Math.round(2.5 / CZAS_PELNEGO_LADUNKU_S / DT * CZAS_PELNEGO_LADUNKU_S), { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    spr(`po 3 s ładunek pełny (${d.ladunek.toFixed(2)})`, d.ladunek === 1);
-    dmuchajNKlatek(d, Math.round(3 / DT), { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    spr('dalsze trzymanie nie przepełnia ładunku', d.ladunek === 1);
-}
-{
-    const d = new Dmuchanie();
-    resetSkali();
-    d.uzbrój(0);
-    const w = naladujIPusc(d, 1.0);
-    spr('cofnięcie dłoni wypuszcza kółko', !!w);
-    spr(`...z ładunkiem z czasu trzymania (${w.ladunek.toFixed(2)})`, Math.abs(w.ladunek - 1 / CZAS_PELNEGO_LADUNKU_S) < 0.08);
-    spr('...z pozycją ust i jednostkowym kierunkiem',
-        !!w.zaczep && Math.abs(Math.hypot(w.kierunek.x, w.kierunek.y) - 1) < 1e-6);
-    spr('po wypuszczeniu stan wraca do GOTOWY', d.stan === 'GOTOWY');
-    spr('ładunek wyzerowany po wypuszczeniu', d.ladunek === 0 && d.trzymanieS === 0);
-    const kolejne = d.update(klatka({ nadgP: [0.25, 0.05, 0], now: 0 }), 1, DT, 0);
-    spr('zdarzenie leci TYLKO raz', kolejne.wypuszczenie === null);
-}
-{
-    // Szybkie przyłożenie i cofnięcie - "normalne" kółko, nigdy zero.
-    const d = new Dmuchanie();
-    resetSkali();
-    d.uzbrój(0);
-    const w = naladujIPusc(d, 0.2);
-    spr(`błyskawiczne przyłożenie też wypuszcza (ładunek ${w.ladunek.toFixed(2)} >= ${LADUNEK_MIN})`,
-        !!w && w.ladunek >= LADUNEK_MIN);
-    const duze = new Dmuchanie();
-    resetSkali();
-    duze.uzbrój(0);
-    const w2 = naladujIPusc(duze, 3.2);
-    spr(`długie trzymanie -> pełny ładunek (${w2.ladunek.toFixed(2)})`, w2.ladunek === 1);
-}
-{
-    // Naładowane kółko NIE PRZEPADA: anulowanie potencjału je wypuszcza.
-    const d = new Dmuchanie();
-    resetSkali();
-    d.uzbrój(0);
-    dmuchajNKlatek(d, Math.round(1.5 / DT), { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    const w = d.anuluj();
-    spr('anuluj() z naładowanym kółkiem wypuszcza je', !!w && w.ladunek > 0.3);
-    spr('...i gasi technikę', d.stan === 'BEZCZYNNY');
-    spr('anuluj() bez ładowania nic nie wypuszcza', new Dmuchanie().anuluj() === null);
-}
-{
-    // Wygaśnięcie zegara 4 min w trakcie trzymania też wypuszcza.
-    const d = new Dmuchanie();
-    resetSkali();
-    d.uzbrój(0);
-    dmuchajNKlatek(d, Math.round(1.5 / DT), { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    const out = d.update(klatka({ nadgP: [0.10, -0.78, 0.05], now: CZAS_POTENCJALU_MS + 1 }),
-                          1, DT, CZAS_POTENCJALU_MS + 1);
-    spr('wygaśnięcie zegara wypuszcza naładowane kółko', !!out.wypuszczenie);
-    spr('...i gasi technikę', d.stan === 'BEZCZYNNY');
 }
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');

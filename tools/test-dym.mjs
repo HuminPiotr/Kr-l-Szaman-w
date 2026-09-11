@@ -1,27 +1,40 @@
 /**
- * Dym Okadzenia v6 - KÓŁKA wypuszczane po naładowaniu, rozkłębiające się
- * w chmurę; front ognia wokół obwodu. BEZ document.
+ * Dym Okadzenia v7 - cząstki na silniku smoke.js: emisja kierunkowa, opór
+ * i wyporność, reakcja na ręce (taniec), front ognia i detonacja.
  *
  *   node tools/test-dym.mjs
  *
- * Rysowanie (stroke, Path2D, tekstury, płótno pomocnicze) NIE JEST tu
- * testowane - ten sam powód co test-kolowrot.mjs. Fizyka idzie przez
- * updateAndDraw(null, W, H, dt) - guard na `!ctx` jest PO doliczeniu czasu
- * i fizyki (patrz js/dym.js), więc test nigdy nie dotyka document.
- *
- * v6 (2026-09-11): "chcę, żeby wypuszczane były kółka i w zależności jak długo
- * przytrzyma się rękę przy ustach, tym większe kółko wychodzi (max 3 s = 1/3
- * ekranu); kółka i tak dalej kłębią się po wypuszczeniu".
+ * Rysowanie NIE JEST tu testowane (ten sam powód co test-kolowrot.mjs), ale
+ * biblioteka POTRZEBUJE `document` już przy tworzeniu maszyny (buduje sprite
+ * dymu na płótnie). Podstawiamy więc ATRAPĘ płótna - dzięki temu fizyka dalej
+ * jest testowana bez przeglądarki, a `updateAndDraw(null, ...)` nie rysuje nic
+ * na płótnie gry.
  */
-import { Dym, wznoszenieCzynnik, obwiedniaAlfy, alfaOdSzerokosci, spojnosc,
-         KOLUMNA_S, TAU_ROZPADU_S, MAX_WEZLOW, MAX_WEZLOW_WSTEGI,
-         ZYCIE_MIN_S, ZYCIE_MAX_S, ZYCIE_SMUGI_S, WEZLY_SMUGI_NA_S,
-         KOLKO_R_MIN_W, KOLKO_R_MAX_W, KOLKO_WEZLY_MIN, KOLKO_WEZLY_MAX,
-         ODDECH_AMPLITUDA, R_START_W, ROZROST_TAU_S, WYRAZISTOSC_PODLOGA,
-         TAU_WYPORU_S, PRZERZEDZ_PO_S, ALFA_START, ALFA_KONIEC,
-         OPOZNIENIE_FRONTU_S, CZAS_DO_WYBUCHU_S, CZAS_WYBUCHU_S,
-         SUFIT_Y_H, SPADEK_OD_Y_H }
-    from '../js/dym.js';
+
+// --- Atrapa DOM: musi stać PRZED importem js/dym.js, stąd dynamiczny import ---
+function atrapaCtx() {
+    return {
+        canvas: { width: 960, height: 540 },
+        globalAlpha: 1,
+        clearRect() {}, drawImage() {}, save() {}, restore() {},
+        createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+        putImageData() {}, fillRect() {}, stroke() {}, beginPath() {},
+        moveTo() {}, lineTo() {}, translate() {}, rotate() {}
+    };
+}
+globalThis.document = {
+    createElement() {
+        const plotno = { width: 1, height: 1, _ctx: null };
+        plotno.getContext = () => (plotno._ctx ??= atrapaCtx());
+        return plotno;
+    }
+};
+
+const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, NAROST_S, ZANIK_S,
+        CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK,
+        WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
+        OPOZNIENIE_FRONTU_S, CZAS_WYBUCHU_S,
+        SUFIT_Y_H, SPADEK_OD_Y_H } = await import('../js/dym.js');
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
@@ -31,46 +44,38 @@ const W = 1920, H = 1080;
 const USTA = { x: 960, y: 600 };
 const W_PRAWO = { x: 1, y: 0 };
 const W_DOL = { x: 0, y: 1 };
+/** Cząstki biblioteki żyją w PÓŁ rozdzielczości - tu przeliczamy z płótna gry. */
+const POL = 0.5;
 
 const przepusc = (d, sekundy) => {
     let suma = 0;
     for (let i = 0; i < Math.round(sekundy / DT); i++) suma += d.updateAndDraw(null, W, H, DT);
     return suma;
 };
-/** Ładuje smużką przez `sekundy` i wypuszcza kółko - dokładnie jak main.js. */
-function kolko(d, { kierunek = W_PRAWO, ladunek = 0.5, wyrazistosc = 1, usta = USTA, smuga = 0 } = {}) {
-    for (let i = 0; i < Math.round(smuga / DT); i++) {
-        d.smuz(usta, kierunek, ladunek, DT, W);
+/** Dmucha przez `sekundy`: emituj + updateAndDraw co klatkę, dokładnie jak main.js. */
+function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1, wyrazistosc = 1, usta = USTA } = {}) {
+    for (let i = 0; i < Math.round(sekundy / DT); i++) {
+        d.emituj(usta, kierunek, sila, wyrazistosc, DT, W, H);
         d.updateAndDraw(null, W, H, DT);
     }
-    const R = d.wypusc(usta, kierunek, ladunek, wyrazistosc, W);
-    return { R, wstega: d._wstegi[d._wstegi.length - 1] };
 }
-/** Środek i średni promień zbioru węzłów - do oceny kształtu kółka. */
-function ksztalt(wezly) {
-    const n = wezly.length;
-    const sx = wezly.reduce((a, c) => a + c.x, 0) / n;
-    const sy = wezly.reduce((a, c) => a + c.y, 0) / n;
-    const promienie = wezly.map(c => Math.hypot(c.x - sx, c.y - sy));
-    return { sx, sy, r: promienie.reduce((a, b) => a + b, 0) / n,
-             min: Math.min(...promienie), max: Math.max(...promienie) };
+const wszystkie = (d) => d._czastki;
+/**
+ * Dmucha tyle klatek, ile trzeba, żeby powstała pierwsza cząstka, i ją zwraca.
+ * Przy 26 cząstkach/s jedna klatka (1/60 s) to 0.43 cząstki - pojedyncze
+ * emituj() często nie tworzy jeszcze nic (nadwyżka przechodzi dalej).
+ */
+function pierwszaCzastka(d, opts = {}) {
+    for (let i = 0; i < 30 && d.liczba === 0; i++) {
+        d.emituj(opts.usta ?? USTA, opts.kierunek ?? W_PRAWO,
+                  opts.sila ?? 1, opts.wyrazistosc ?? 1, DT, W, H);
+    }
+    return wszystkie(d)[wszystkie(d).length - 1];
 }
-const wszystkie = (d) => [...d.wezly()];
-/** Gotowy węzeł do wstawienia wprost do wstęgi (testy fizyki/ognia). */
-const wezel = (over = {}) => ({
-    x: 900, y: 600, vx: 0, vy: 0, wiek: 30, zycie: 120, faza: 0, fazaWlasna: 0,
-    rozbieznoscX: 0, rozbieznoscY: 0, szum: 1,
-    r: 60, rStart: 8, rCel: 80, przerwa: false,
-    stan: 'DYM', tZaplonu: 0, tWybuch: 0, rozprzestrzenil: false,
-    wariantMgla: 0, wariantPlomien: 0, wariantOgien: 0, wariantRozblysk: 0, ...over
+const srodek = (cz) => ({
+    x: cz.reduce((a, c) => a + c.x, 0) / cz.length,
+    y: cz.reduce((a, c) => a + c.y, 0) / cz.length
 });
-/** Wstawia gotowe węzły jako jedną wstęgę (z pominięciem emisji). */
-function wstaw(d, wezly, zamknieta = false) {
-    wezly[0].przerwa = !zamknieta;
-    d._wstegi.push({ id: -d._wstegi.length - 1, wezly, przerzedzen: 0, zamknieta });
-    d._ile += wezly.length;
-    return d._wstegi[d._wstegi.length - 1];
-}
 
 // --- 1. wznoszenieCzynnik(): czysta funkcja ---
 console.log('WZNOSZENIE CZYNNIK (funkcja czysta):');
@@ -81,311 +86,199 @@ spr('przy samym suficie - czynnik minimalny, ale NIE zero',
 spr('powyżej sufitu - nie spada poniżej minimum',
     wznoszenieCzynnik(H * 0.01, H) === wznoszenieCzynnik(H * SUFIT_Y_H, H));
 
-// --- 2. obwiednie alfy ---
-console.log('\nOBWIEDNIE ALFY:');
-spr('wiek=0 -> alfa niska', obwiedniaAlfy(0, ZYCIE_MIN_S) < 0.1);
-spr('po 1 s (ułamek życia ~1%) już pełna - narost w SEKUNDACH', obwiedniaAlfy(1, ZYCIE_MIN_S) > 0.9);
-spr('w połowie życia pełna', obwiedniaAlfy(ZYCIE_MIN_S * 0.5, ZYCIE_MIN_S) > 0.95);
-spr('przy 0.9 życia opada', obwiedniaAlfy(ZYCIE_MIN_S * 0.9, ZYCIE_MIN_S) < 0.6);
-spr('na końcu życia 0', obwiedniaAlfy(ZYCIE_MIN_S, ZYCIE_MIN_S) === 0);
-spr('brak zycie nie wywala', Number.isFinite(obwiedniaAlfy(1, undefined)));
-spr(`alfaOdSzerokosci: świeża kreska gęsta (${ALFA_START})`, alfaOdSzerokosci(8, 8, 80) === ALFA_START);
-spr(`alfaOdSzerokosci: rozdęta rzadka (${ALFA_KONIEC})`, Math.abs(alfaOdSzerokosci(80, 8, 80) - ALFA_KONIEC) < 1e-9);
-spr('alfaOdSzerokosci: maleje z r', alfaOdSzerokosci(40, 8, 80) < alfaOdSzerokosci(20, 8, 80));
-spr('alfaOdSzerokosci: zerowy zakres nie dzieli przez 0', Number.isFinite(alfaOdSzerokosci(8, 8, 8)));
-
-// --- 3. Kółko: kształt, rozmiar z ładunku ---
-console.log('\nKÓŁKO (kształt i rozmiar z ładunku):');
-{
-    let minO = Infinity, maxO = -Infinity;
-    for (let t = 0; t < 10; t += 0.01) { const o = Dym.oddech(t); minO = Math.min(minO, o); maxO = Math.max(maxO, o); }
-    spr(`oddech nigdy do zera (min ${minO.toFixed(2)})`, minO >= 1 - ODDECH_AMPLITUDA - 1e-9 && minO > 0.5);
-    spr('oddech NaN -> liczba', Number.isFinite(Dym.oddech(NaN)));
-
-    const d = new Dym();
-    const { R, wstega } = kolko(d, { ladunek: 0.5 });
-    spr(`wypusc() tworzy JEDNĄ zamkniętą wstęgę (${d.wsteg})`, d.wsteg === 1 && wstega.zamknieta === true);
-    const k = ksztalt(wstega.wezly);
-    spr(`węzły leżą na okręgu (${k.min.toFixed(0)}-${k.max.toFixed(0)} px wobec R=${R.toFixed(0)})`,
-        k.max - k.min < 0.08 * R && Math.abs(k.r - R) < 0.05 * R);
-    spr(`środek kółka LEŻY PRZED USTAMI o R (${(k.sx - USTA.x).toFixed(0)} px)`,
-        Math.abs((k.sx - USTA.x) - R) < 0.1 * R && Math.abs(k.sy - USTA.y) < 0.1 * R);
-    spr(`liczba węzłów w granicach ${KOLKO_WEZLY_MIN}-${KOLKO_WEZLY_MAX} (${d.liczba})`,
-        d.liczba >= KOLKO_WEZLY_MIN && d.liczba <= KOLKO_WEZLY_MAX);
-    spr('żaden węzeł nie czeka (brak ujemnego wieku)', wszystkie(d).every(c => c.wiek === 0));
-}
-{
-    const male = new Dym(), duze = new Dym();
-    const rm = kolko(male, { ladunek: 0 }).R;
-    const rd = kolko(duze, { ladunek: 1 }).R;
-    spr(`ładunek 0 -> małe kółko (${(rm / W).toFixed(3)} W ≈ ${KOLKO_R_MIN_W})`, Math.abs(rm / W - KOLKO_R_MIN_W) < 1e-6);
-    spr(`ładunek 1 -> średnica ~1/3 ekranu (${(2 * rd / W).toFixed(2)} W)`,
-        Math.abs(rd / W - KOLKO_R_MAX_W) < 1e-6 && Math.abs(2 * rd / W - 0.33) < 0.02);
-    spr('większe kółko ma więcej węzłów', duze.liczba > male.liczba);
-    const srednie = new Dym();
-    const rs = kolko(srednie, { ladunek: 0.5 }).R;
-    spr('promień rośnie liniowo z ładunkiem', rs > rm && rs < rd);
-    spr('brak ładunku (undefined) nie wywala', (() => {
-        const x = new Dym();
-        return x.wypusc(USTA, W_PRAWO, undefined, 1, W) > 0;
-    })());
-}
-
-// --- 4. Lot kółka: pół ekranu, większe wolniej ---
-console.log('\nLOT KÓŁKA:');
-{
-    const male = new Dym(), duze = new Dym();
-    const rm = kolko(male, { ladunek: 0 }).R;
-    const rd = kolko(duze, { ladunek: 1 }).R;
-    const sxM0 = ksztalt(wszystkie(male)).sx, sxD0 = ksztalt(wszystkie(duze)).sx;
-    przepusc(male, 3); przepusc(duze, 3);
-    const drogaM = (ksztalt(wszystkie(male)).sx - sxM0) / W;
-    const drogaD = (ksztalt(wszystkie(duze)).sx - sxD0) / W;
-    spr(`małe kółko leci ~pół ekranu (${drogaM.toFixed(2)} W w 0.25-0.7)`, drogaM > 0.25 && drogaM < 0.7);
-    spr(`duże leci WOLNIEJ (${drogaD.toFixed(2)} W < ${drogaM.toFixed(2)} W)`, drogaD < drogaM * 0.8);
-    spr(`kółko puchnie w locie, ale nie rozdyma się (${(ksztalt(wszystkie(male)).r / rm).toFixed(2)}x)`,
-        ksztalt(wszystkie(male)).r > rm && ksztalt(wszystkie(male)).r < 1.8 * rm);
-}
-
-// --- 5. Rozkłębienie kółka (spójność z v5) ---
-console.log('\nROZKŁĘBIENIE KÓŁKA:');
-spr('świeży węzeł w pełni spójny', spojnosc(0) === 1);
-spr(`spójność trzyma przez KOLUMNA_S (${KOLUMNA_S} s)`, spojnosc(KOLUMNA_S) === 1);
-spr('po trzech tau kółka praktycznie nie ma', spojnosc(KOLUMNA_S + 3 * TAU_ROZPADU_S) < 0.06);
-spr('spójność maleje monotonicznie', (() => {
-    let poprz = 2;
-    for (let t = 0; t < 20; t += 0.1) { const v = spojnosc(t); if (v > poprz + 1e-9) return false; poprz = v; }
-    return true;
-})());
-spr('spójność odporna na NaN', spojnosc(NaN) === 1);
+// --- 2. Emisja ciągła ---
+console.log('\nEMISJA CIĄGŁA:');
 {
     const d = new Dym();
-    kolko(d, { ladunek: 0.6 });
-    const kat = (c) => Math.atan2(c.vy, c.vx);
-    const rozrzut = () => {
-        const katy = wszystkie(d).map(kat);
-        return Math.max(...katy) - Math.min(...katy);
-    };
-    przepusc(d, 0.5);
-    const wKolku = rozrzut();
-    spr(`świeże kółko leci SPÓJNIE (rozrzut ${(wKolku * 180 / Math.PI).toFixed(0)}° < 45°)`,
-        wKolku < 45 * Math.PI / 180);
-    przepusc(d, KOLUMNA_S + 3 * TAU_ROZPADU_S);
-    const wChmurze = rozrzut();
-    spr(`po rozpadzie kierunki się rozjeżdżają (${(wChmurze * 180 / Math.PI).toFixed(0)}° > 90°)`,
-        wChmurze > 90 * Math.PI / 180);
-    const k = ksztalt(wszystkie(d));
-    spr(`...a obwód przestaje być okręgiem (${k.min.toFixed(0)}-${k.max.toFixed(0)} px)`,
-        k.max - k.min > 0.3 * k.r);
+    const przyrosty = [];
+    for (let i = 0; i < 60; i++) {
+        const przed = d.liczba;
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+        przyrosty.push(d.liczba - przed);
+        d.updateAndDraw(null, W, H, DT);
+    }
+    spr(`1 s dmuchania -> >= 12 cząstek (${d.liczba})`, d.liczba >= 12 && d.liczba <= CZASTEK_NA_S * 1.5);
+    let przerwa = 0, najdluzsza = 0;
+    for (const n of przyrosty) { if (n === 0) najdluzsza = Math.max(najdluzsza, ++przerwa); else przerwa = 0; }
+    spr(`emisja bez dziur (najdłuższa przerwa ${najdluzsza} klatek <= 4)`, najdluzsza <= 4);
+    spr('każda cząstka ma pola gry (stan, prędkość gry)',
+        wszystkie(d).every(c => c.stan === 'DYM' && Number.isFinite(c.vxGry) && Number.isFinite(c.vyGry)));
+    spr('cząstki rosną od małej skali (nie rodzą się wielkie)',
+        wszystkie(d).some(c => promienCzastki(c) < 40));
+
+    const cisza = new Dym();
+    dmuchaj(cisza, 0.5, { sila: 0 });
+    spr('siła 0 -> brak emisji', cisza.liczba === 0);
 }
 
-// --- 6. Cztery strony świata ---
+// --- 3. Początkowa siła kierunku ---
+console.log('\nPOCZĄTKOWA SIŁA KIERUNKU:');
+{
+    const d = new Dym();
+    pierwszaCzastka(d);
+    const katy = wszystkie(d).map(c => Math.abs(Math.atan2(c.vyGry, c.vxGry)));
+    spr(`cząstki lecą w stożku ±10° wokół kierunku (max ${(Math.max(...katy) * 180 / Math.PI).toFixed(1)}°)`,
+        Math.max(...katy) < 10 * Math.PI / 180);
+
+    const mocno = new Dym(), slabo = new Dym();
+    const cM = pierwszaCzastka(mocno), cS = pierwszaCzastka(slabo, { wyrazistosc: 0 });
+    const v = (c) => Math.hypot(c.vxGry, c.vyGry);
+    spr(`wyrazista poza wypycha mocniej (${v(cM).toFixed(3)} vs ${v(cS).toFixed(3)} px/ms)`,
+        v(cM) > 2 * v(cS));
+    spr(`...a nijaka i tak wypycha (podłoga ${WYRAZISTOSC_PODLOGA})`, v(cS) > 0);
+
+    przepusc(mocno, 2);
+    const s = srodek(wszystkie(mocno));
+    spr(`po 2 s obłok przesunął się w PRAWO (${((s.x / POL - USTA.x) / W).toFixed(2)} W)`,
+        s.x / POL - USTA.x > 0.05 * W);
+}
+
+// --- 4. Cztery strony świata i wyporność ---
 console.log('\nCZTERY STRONY ŚWIATA:');
 {
     const d = new Dym();
-    kolko(d, { kierunek: W_DOL, ladunek: 0.3 });
-    przepusc(d, 2.5);
-    const k = ksztalt(wszystkie(d));
-    spr(`REGRESJA v3 (SKOS_W_GORE): kółko w DÓŁ jest NIŻEJ ust (${(k.sy - USTA.y).toFixed(0)} px)`, k.sy > USTA.y);
-    spr(`...i sięga w dół ${((k.sy - USTA.y) / W).toFixed(2)} W`, (k.sy - USTA.y) / W > 0.15);
+    dmuchaj(d, 0.4, { kierunek: W_DOL });
+    przepusc(d, 1.6);
+    const s = srodek(wszystkie(d));
+    spr(`REGRESJA: dmuchanie w DÓŁ - obłok NIŻEJ ust (${(s.y / POL - USTA.y).toFixed(0)} px)`,
+        s.y / POL > USTA.y);
+    przepusc(d, 12);
+    spr('...ale po kilkunastu sekundach dym się unosi', wszystkie(d).every(c => c.vyGry < 0));
+}
 
+// --- 5. Życie: naturalne rozwiewanie ---
+console.log('\nŻYCIE CZĄSTKI:');
+{
+    const d = new Dym();
+    dmuchaj(d, 0.5);
+    spr(`życie ${ZYCIE_MIN_S}-${ZYCIE_MAX_S} s (pole gry, nie lifetime biblioteki)`,
+        wszystkie(d).every(c => c.zycieGry >= ZYCIE_MIN_S && c.zycieGry <= ZYCIE_MAX_S));
+    przepusc(d, ZYCIE_MIN_S - 2);
+    spr(`po ${ZYCIE_MIN_S - 2} s dym WCIĄŻ JEST (zdążysz złożyć combo ognia)`, d.liczba > 0);
+    przepusc(d, ZYCIE_MAX_S + 2);
+    spr('po upływie życia rozwiewa się do zera', d.liczba === 0);
+}
+
+// --- 5b. Obwiednia: sterowanie czasem biblioteki ---
+console.log('\nOBWIEDNIA (sterowanie czasem biblioteki):');
+{
+    const L = 6000, Z = 30;
+    const alfa = (w) => (1 - Math.abs(1 - 2 * wiekBiblioteki(w, Z, L) / L)) / 8;
+    spr('świeża cząstka prawie przezroczysta', alfa(0) < 0.01);
+    spr(`po NAROST_S (${NAROST_S} s) alfa na SZCZYCIE (${alfa(NAROST_S).toFixed(3)})`,
+        Math.abs(alfa(NAROST_S) - 0.125) < 1e-6);
+    spr('REGRESJA: po 1 s dym jest już widoczny (bez sterowania czasem byłoby 0.008)',
+        alfa(1) > 0.1);
+    spr('plateau trzyma się przez większość życia', Math.abs(alfa(Z / 2) - 0.125) < 1e-6);
+    spr(`w ostatnich ${ZANIK_S} s zanika`, alfa(Z - 0.1) < 0.02);
+    spr('na końcu życia age dobija do lifetime (biblioteka usuwa cząstkę)',
+        wiekBiblioteki(Z, Z, L) === L);
+    spr('obwiednia odporna na NaN', Number.isFinite(wiekBiblioteki(NaN, NaN, NaN)));
+}
+
+// --- 6. Reakcja na ręce i taniec ---
+console.log('\nREAKCJA NA RĘCE (taniec):');
+{
+    const d = new Dym();
+    dmuchaj(d, 0.5, { kierunek: { x: 0, y: -1 } });
+    przepusc(d, 0.5);
+    const przed = srodek(wszystkie(d));
+    for (let i = 0; i < 10; i++) {
+        d.rozgarnij([{ x: przed.x / POL, y: przed.y / POL, vx: 1500, vy: 0 }]);
+        d.updateAndDraw(null, W, H, DT);
+    }
+    const po = srodek(wszystkie(d));
+    spr(`dłoń przelatująca przez dym pcha go w swoją stronę (${((po.x - przed.x) / POL).toFixed(0)} px)`,
+        po.x > przed.x + 2);
+
+    // Wir: cząstki po przeciwnych stronach toru dostają PRZECIWNE pchnięcia
+    // w pionie (dłoń leci poziomo, więc znak bierze się ze strony toru).
     const e = new Dym();
-    kolko(e, { kierunek: W_PRAWO, ladunek: 0.3 });
-    przepusc(e, 2.5);
-    const ke = ksztalt(wszystkie(e));
-    spr(`kółko w BOK sięga ${((ke.sx - USTA.x) / W).toFixed(2)} W`, (ke.sx - USTA.x) / W > 0.15);
-    spr('w bok trzyma poziom (|dy| < 0.08 W)', Math.abs(ke.sy - USTA.y) < 0.08 * W);
-
-    przepusc(d, TAU_WYPORU_S * 3);
-    spr('po trzech stałych czasowych wyporu dym płynie W GÓRĘ', wszystkie(d).every(c => c.vy < 0));
-}
-
-// --- 7. Wyrazistość, szerokość kreski, smużka ---
-console.log('\nWYRAZISTOŚĆ, SZEROKOŚĆ, SMUŻKA:');
-{
-    const mocno = new Dym(), slabo = new Dym();
-    kolko(mocno, { wyrazistosc: 1, ladunek: 0.2 });
-    kolko(slabo, { wyrazistosc: 0, ladunek: 0.2 });
-    const s0 = ksztalt(wszystkie(mocno)).sx, w0 = ksztalt(wszystkie(slabo)).sx;
-    przepusc(mocno, 2.5); przepusc(slabo, 2.5);
-    const dm = ksztalt(wszystkie(mocno)).sx - s0, ds = ksztalt(wszystkie(slabo)).sx - w0;
-    spr(`wyrazista poza posyła kółko dalej (${(dm / W).toFixed(2)} W vs ${(ds / W).toFixed(2)} W)`, dm > 2 * ds);
-    spr(`...a nijaka i tak coś posyła (podłoga ${WYRAZISTOSC_PODLOGA})`, ds > 0.05 * W);
-}
-{
-    const d = new Dym();
-    kolko(d, { ladunek: 0.4 });
-    const c = wszystkie(d)[0];
-    spr(`kreska startuje cienka (${c.r.toFixed(0)} px = ${R_START_W} W)`, Math.abs(c.r - W * R_START_W) < 1);
-    przepusc(d, 10);
-    spr(`po ~10 s >= 90% docelowej szerokości (${(c.r / c.rCel * 100).toFixed(0)}%)`, c.r >= 0.9 * c.rCel);
-    spr(`docelowa szerokość kłębu duża (${(c.rCel / W).toFixed(3)} W >= 0.05)`, c.rCel / W >= 0.05);
-}
-{
-    // Smużka ładowania: kilka węzłów na sekundę, KRÓTKIE życie, cieńsza kreska.
-    const d = new Dym();
-    for (let i = 0; i < 60; i++) { d.smuz(USTA, W_PRAWO, 0.5, DT, W); d.updateAndDraw(null, W, H, DT); }
-    spr(`1 s ładowania -> kilka węzłów smużki (${d.liczba})`, d.liczba >= 3 && d.liczba <= WEZLY_SMUGI_NA_S * 1.5);
-    spr(`smużka żyje krótko (${ZYCIE_SMUGI_S} s)`, wszystkie(d).every(c => c.zycie === ZYCIE_SMUGI_S));
-    spr('smużka jest cieńsza niż kółko', wszystkie(d).every(c => c.rStart < W * R_START_W));
-    przepusc(d, ZYCIE_SMUGI_S + 0.5);
-    spr('...i znika sama', d.liczba === 0);
-    spr('smuz() bez W/dt nie wywala', (() => { d.smuz(USTA, W_PRAWO, 1, 0, undefined); return true; })());
-}
-
-// --- 8. Budżet: sufity, przerzedzanie ---
-console.log('\nBUDŻET (sufity, przerzedzanie):');
-{
-    const d = new Dym();
-    for (let i = 0; i < 12; i++) kolko(d, { ladunek: 1, usta: { x: 200 + i * 120, y: 600 } });
-    const przed = d.liczba;
-    spr(`12 dużych kółek -> ${przed} węzłów, wstęg ${d.wsteg}`, przed > 400 && przed <= MAX_WEZLOW);
-    spr(`wstęga nie rośnie w nieskończoność (max ${MAX_WEZLOW_WSTEGI})`,
-        d._wstegi.every(w => w.wezly.length <= MAX_WEZLOW_WSTEGI));
-
-    // Przerzedzanie dopiero po PRZERZEDZ_PO_S i tylko dla NIEAKTYWNEJ wstęgi.
-    przepusc(d, 0.1);
-    const w = d._wstegi[0];
-    const pierwszy = w.wezly[0], ostatni = w.wezly[w.wezly.length - 1];
-    const ile = w.wezly.length;
-    przepusc(d, PRZERZEDZ_PO_S[0] + 1);
-    spr(`dojrzała wstęga przerzedzona (${ile} -> ${w.wezly.length})`, w.wezly.length < ile * 0.75);
-    spr('przerzedzanie zachowuje pierwszy i ostatni węzeł (kształt bez zmian)',
-        w.wezly[0] === pierwszy && w.wezly[w.wezly.length - 1] === ostatni);
-    spr('licznik węzłów zgodny z tablicami', d.liczba === wszystkie(d).length);
-    przepusc(d, PRZERZEDZ_PO_S[1] + 1);
-    spr(`przerzedzanie ma limit (${w.przerzedzen} <= ${PRZERZEDZ_PO_S.length})`, w.przerzedzen <= PRZERZEDZ_PO_S.length);
-}
-{
-    // Sufit FIFO wypycha NAJSTARSZE.
-    const d = new Dym();
-    for (let i = 0; i < 60; i++) kolko(d, { ladunek: 1, usta: { x: 100 + (i % 500), y: 600 } });
-    spr(`sufit ${MAX_WEZLOW} nie jest przekroczony (${d.liczba})`, d.liczba === MAX_WEZLOW);
-    spr('licznik = rzeczywista liczba węzłów', d.liczba === wszystkie(d).length);
-}
-
-// --- 9. Życie ---
-console.log('\nŻYCIE WĘZŁA:');
-{
-    const d = new Dym();
-    kolko(d, { ladunek: 0.3 });
-    spr(`życie ${ZYCIE_MIN_S}-${ZYCIE_MAX_S} s`,
-        wszystkie(d).every(c => c.zycie >= ZYCIE_MIN_S && c.zycie <= ZYCIE_MAX_S));
-    przepusc(d, 70);
-    spr('po 70 s dym WCIĄŻ JEST (zegar potencjału to 4 min)', d.liczba > 0);
-    przepusc(d, ZYCIE_MAX_S);
-    spr('po upływie życia znika, wstęgi też', d.liczba === 0 && d.wsteg === 0);
-}
-
-// --- 10. Rozgarnianie dłońmi ---
-console.log('\nROZGARNIANIE DŁOŃMI:');
-{
-    const d = new Dym();
-    wstaw(d, [wezel({ x: 900, y: 600 })]);
-    const przed = wszystkie(d)[0].x;
-    d.rozgarnij([{ x: 900, y: 600, vx: 500, vy: 0 }], W);
-    d.updateAndDraw(null, W, H, DT);
-    spr('dłoń BLISKO kreski popycha ją', wszystkie(d)[0].x > przed + 2);
-    const e = new Dym();
-    wstaw(e, [wezel({ x: 100, y: 600 })]);
-    e.rozgarnij([{ x: 1800, y: 600, vx: 500, vy: 0 }], W);
+    dmuchaj(e, 0.5, { kierunek: { x: 0, y: -1 }, wyrazistosc: 0 });
+    const cz = wszystkie(e);
+    const nad = cz[0], pod = cz[cz.length - 1];
+    spr('...(test wiru ma dwie różne cząstki)', nad !== pod);
+    nad.x = USTA.x * POL; nad.y = (USTA.y - 60) * POL;
+    pod.x = USTA.x * POL; pod.y = (USTA.y + 60) * POL;
+    nad.vxGry = nad.vyGry = pod.vxGry = pod.vyGry = 0;
+    e.rozgarnij([{ x: USTA.x, y: USTA.y, vx: 1500, vy: 0 }]);
     e.updateAndDraw(null, W, H, DT);
-    spr('dłoń DALEKO prawie nie rusza', Math.abs(wszystkie(e)[0].x - 100) < 5);
-    spr('rozgarnij() bez dłoni nie wywala', (() => { e.rozgarnij([], W); e.rozgarnij(null, W); return true; })());
+    spr(`za ręką zostaje WIR - przeciwne strony dostają przeciwny obrót (${nad.vyGry.toFixed(2)} / ${pod.vyGry.toFixed(2)})`,
+        Math.sign(nad.vyGry) !== Math.sign(pod.vyGry) && nad.vyGry !== 0);
+
+    // Dłoń daleko: porównujemy PRZYROST prędkości, nie pozycję - cząstki i tak
+    // lecą własnym pędem, więc sama pozycja niczego by nie dowodziła.
+    const f = new Dym();
+    dmuchaj(f, 0.3, { wyrazistosc: 0 });
+    const przedV = wszystkie(f).map(c => c.vxGry);
+    f.rozgarnij([{ x: USTA.x + ROZGARNIJ_PROMIEN_W * W * 4, y: USTA.y, vx: 1500, vy: 0 }]);
+    f.updateAndDraw(null, W, H, DT);
+    const dalekoMax = Math.max(...wszystkie(f).map((c, i) => Math.abs(c.vxGry - przedV[i])));
+    const g = new Dym();
+    dmuchaj(g, 0.3, { wyrazistosc: 0 });
+    const przedG = wszystkie(g).map(c => c.vxGry);
+    g.rozgarnij([{ x: USTA.x, y: USTA.y, vx: 1500, vy: 0 }]);
+    g.updateAndDraw(null, W, H, DT);
+    const bliskoMax = Math.max(...wszystkie(g).map((c, i) => Math.abs(c.vxGry - przedG[i])));
+    spr(`dłoń DALEKO rusza dym ${(dalekoMax / (bliskoMax || 1) * 100).toFixed(0)}x słabiej niż BLISKO`,
+        dalekoMax < 0.1 * bliskoMax);
+    spr('rozgarnij() bez dłoni / z NaN nie wywala',
+        (() => { f.rozgarnij([]); f.rozgarnij(null); f.rozgarnij([{ x: NaN, y: NaN, vx: NaN, vy: NaN }]);
+                  f.updateAndDraw(null, W, H, DT);
+                  return wszystkie(f).every(c => Number.isFinite(c.x) && Number.isFinite(c.y)); })());
 }
 
-// --- 11. Ogień: zapłon, front wzdłuż kreski, detonacja ---
+// --- 7. Ogień: zapłon, front, detonacja ---
 console.log('\nPODPALENIE I FRONT OGNIA:');
 {
     const d = new Dym();
-    // Kreska: 5 węzłów co 100 px. r=60 -> kontakt = 60*2.5 = 150 px.
-    const kreska = [0, 1, 2, 3, 4].map(i => wezel({ x: 500 + i * 100, y: 600, r: 60, rStart: 60, rCel: 60 }));
-    wstaw(d, kreska);
-    const oderwana = wezel({ x: 1800, y: 200, r: 60, rStart: 60, rCel: 60 });
-    wstaw(d, [oderwana]);
+    dmuchaj(d, 1);
+    przepusc(d, 1);
+    const cz = wszystkie(d);
+    const ile = cz.length;
+    d.podpal([{ x: 1e6, y: 1e6, r: 5 }]);
+    spr('zarzewie daleko nie zapala', cz.every(c => c.stan === 'DYM'));
 
-    d.podpal([{ x: 5000, y: 600, r: 5 }]);
-    spr('zarzewie daleko nie zapala', wszystkie(d).every(c => c.stan === 'DYM'));
-    d.podpal([{ x: kreska[0].x, y: kreska[0].y, r: 5 }]);
-    spr('kontakt z zarzewiem zapala koniec kreski', kreska[0].stan === 'ZAPLON');
-    spr('dalsze węzły jeszcze NIE płoną', kreska[4].stan === 'DYM');
-    przepusc(d, OPOZNIENIE_FRONTU_S + 0.03);
-    spr('front ruszył WZDŁUŻ kreski (sąsiad płonie)', kreska[1].stan !== 'DYM');
-    przepusc(d, OPOZNIENIE_FRONTU_S * 4);
-    spr('front dobiegł do końca kreski', kreska[4].stan !== 'DYM');
-    spr('oderwana wstęga NIE zapłonęła', oderwana.stan === 'DYM');
-    spr('podpal() z pustą listą nie wywala', (() => { d.podpal([]); d.podpal(null); return true; })());
-}
-{
-    // KÓŁKO: front musi obiec CAŁY obwód, także przez domknięcie pętli
-    // (sąsiadem zerowego węzła jest ostatni).
-    const d = new Dym();
-    kolko(d, { ladunek: 0.2 });
-    const obwod = wszystkie(d);
-    obwod[0].stan = 'ZAPLON';
-    przepusc(d, OPOZNIENIE_FRONTU_S * obwod.length);
-    spr(`front obiegł cały obwód kółka (${obwod.filter(c => c.stan !== 'DYM').length}/${obwod.length})`,
-        obwod.every(c => c.stan !== 'DYM'));
-}
-{
-    const d = new Dym();
-    // Dwie RÓWNOLEGŁE kreski blisko siebie - front przeskakuje przez siatkę.
-    // Odstęp 80 px < (60+60)*0.8 = 96 px promienia zarażania (FRONT_PROMIEN_MNOZNIK).
-    const a = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 600, r: 60, rStart: 60, rCel: 60 }));
-    const b = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 680, r: 60, rStart: 60, rCel: 60 }));
-    wstaw(d, a); wstaw(d, b);
-    a[0].stan = 'ZAPLON';
-    przepusc(d, OPOZNIENIE_FRONTU_S + 0.03);
-    spr('front przeskakuje na sąsiednią wstęgę w zasięgu', b.some(c => c.stan !== 'DYM'));
-}
-{
-    const d = new Dym();
-    const kreska = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 600, stan: 'ZAPLON', rozprzestrzenil: true }));
-    wstaw(d, kreska);
+    const cel = cz[Math.floor(cz.length / 2)];
+    d.podpal([{ x: cel.x / POL, y: cel.y / POL, r: 10 }]);
+    spr('kontakt z zarzewiem zapala dym', d.plonacych > 0);
+    const pierwsze = d.plonacych;
+    przepusc(d, OPOZNIENIE_FRONTU_S + 0.05);
+    spr(`front zaraża sąsiadki (${pierwsze} -> ${d.plonacych})`, d.plonacych > pierwsze);
+
     let wybuchy = 0;
-    for (let i = 0; i < Math.round((CZAS_DO_WYBUCHU_S + 0.02) / DT); i++) wybuchy += d.updateAndDraw(null, W, H, DT);
-    spr(`updateAndDraw zwrócił liczbę nowych wybuchów (${wybuchy})`, wybuchy === 3);
-    spr('węzły w stanie WYBUCH', wszystkie(d).every(c => c.stan === 'WYBUCH'));
-    przepusc(d, CZAS_WYBUCHU_S + 0.05);
-    spr('po wybuchu węzły znikają NA ZAWSZE', d.liczba === 0);
-}
-{
-    // Ogień PRZEPALA kreskę: po wybuchu środkowego węzła następny ma przerwę.
-    const d = new Dym();
-    const kreska = [0, 1, 2].map(i => wezel({ x: 500 + i * 100, y: 600 }));
-    wstaw(d, kreska);
-    kreska[1].stan = 'WYBUCH';
-    kreska[1].tWybuch = CZAS_WYBUCHU_S;
-    przepusc(d, DT * 2);
-    spr('węzeł za przepalonym ma przerwę (kreska urwana)', kreska[2].przerwa === true);
-    spr('licznik po przepaleniu zgodny', d.liczba === wszystkie(d).length);
+    for (let i = 0; i < Math.round(3 / DT); i++) wybuchy += d.updateAndDraw(null, W, H, DT);
+    spr(`updateAndDraw zwraca liczbę nowych wybuchów (${wybuchy})`, wybuchy > 0);
+    przepusc(d, CZAS_WYBUCHU_S + 0.2);
+    spr(`po wybuchu cząstki znikają (${ile} -> ${d.liczba})`, d.liczba < ile);
+    spr('podpal() z pustą listą / NaN nie wywala',
+        (() => { d.podpal([]); d.podpal(null); d.podpal([{ x: NaN, y: NaN, r: 5 }]); return true; })());
 }
 
-// --- 12. Odporność ---
+// --- 8. Sufit cząstek ---
+console.log('\nSUFIT CZĄSTEK:');
+{
+    const d = new Dym();
+    dmuchaj(d, MAX_CZASTEK / CZASTEK_NA_S + 10);
+    spr(`nie przekracza ${MAX_CZASTEK} (${d.liczba})`, d.liczba <= MAX_CZASTEK);
+    spr('...i nadal coś jest (sufit nie kasuje wszystkiego)', d.liczba > MAX_CZASTEK / 2);
+}
+
+// --- 9. Odporność ---
 console.log('\nODPORNOŚĆ:');
 {
     const d = new Dym();
     spr('updateAndDraw na pusto = 0', d.updateAndDraw(null, W, H, DT) === 0);
     spr('NaN dt nie wywala', d.updateAndDraw(null, W, H, NaN) === 0);
-    kolko(d, { ladunek: 0.3 });
-    spr('updateAndDraw bez W/H używa domyślnej skali', Number.isFinite(d.updateAndDraw(null, undefined, undefined, DT)));
-    spr('wypusc bez W nie wywala', (() => { d.wypusc(USTA, W_PRAWO, 0.5, 1, undefined); return true; })());
+    spr('emituj z NaN w zaczepie nie tworzy cząstek',
+        (() => { d.emituj({ x: NaN, y: 1 }, W_PRAWO, 1, 1, DT, W, H); return d.liczba === 0; })());
     spr('kierunek zerowy -> fallback w górę, bez NaN', (() => {
         const x = new Dym();
-        x.wypusc(USTA, { x: 0, y: 0 }, 0.5, 1, W);
-        przepusc(x, 0.5);
-        return wszystkie(x).every(c => Number.isFinite(c.vx) && Number.isFinite(c.vy));
+        dmuchaj(x, 0.3, { kierunek: { x: 0, y: 0 } });
+        return wszystkie(x).length > 0
+            && wszystkie(x).every(c => Number.isFinite(c.vxGry) && Number.isFinite(c.vyGry) && c.vyGry <= 0);
     })());
-    d.podpal([{ x: NaN, y: NaN, r: 5 }]);
-    d.rozgarnij([{ x: NaN, y: NaN, vx: NaN, vy: NaN }], W);
-    d.updateAndDraw(null, W, H, DT);
-    spr('NaN w zarzewiu/dłoni nie zatruwa pozycji', wszystkie(d).every(c => Number.isFinite(c.x) && Number.isFinite(c.y)));
-    spr('zaczep NaN nie tworzy węzłów', (() => {
-        const x = new Dym();
-        x.wypusc({ x: NaN, y: 1 }, W_PRAWO, 0.5, 1, W);
-        x.smuz({ x: NaN, y: 1 }, W_PRAWO, 0.5, DT, W);
-        return x.liczba === 0;
-    })());
+    spr('brak W/H używa domyślnej skali', Number.isFinite(d.updateAndDraw(null, undefined, undefined, DT)));
 }
 
 process.exit(ok ? 0 : 1);

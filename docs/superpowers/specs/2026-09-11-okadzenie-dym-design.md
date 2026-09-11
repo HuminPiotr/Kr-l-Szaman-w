@@ -353,3 +353,43 @@ przy pełnym); liczba węzłów ze stałego odstępu na obwodzie (24–160); śr
 
 **Zmierzone w przeglądarce** (1920×1080): 60 kółek co 2 s (2 min gry) → 1133 węzły, rysowanie
 0,84 ms/klatkę, fizyka 0,1 ms; detonacja: najgorsza klatka 4,8 ms.
+
+## v7 (2026-09-11) — silnik smoke.js, ciągły wydech, dym reagujący na taniec
+
+**Zgłoszenie:** po sześciu podejściach „efekt wciąż mnie nie zachwyca". Dym ma być **wypuszczany
+ciągiem, naturalny, z początkową siłą kierunku**, a właściciel gry wskazał gotową bibliotekę:
+[smoke.js](https://github.com/bijection/smoke.js) (MIT, 5,5 KB, bez zależności). Z pytań: życie
+dymu **20–40 s**, dodatkowo **dym reaguje na ręce i taniec**.
+
+**Czego uczy biblioteka (przeczytany kod, nie opis):** cały jej urok siedzi w liczbach, których
+w v2–v6 ani razu nie wypróbowałem — alfa cząstki **max 0,125** (u mnie 0,30–0,55), sprite 20 px
+skalowany **×25–30** = 500–600 px (u mnie 70–290), wzrost `sqrt(age/lifetime)`, życie 2–8 s,
+i jeden ręcznie zrobiony, **szumiący** sprite. Czyli: ogromne, ledwo widoczne kłęby, których dużo
+się nakłada. Moje wersje były za małe, za gęste i za długowieczne — stąd „plastikowość".
+
+**Podział pracy:** `js/vendor/smoke.js` (kopia 1:1, cztery ponumerowane zmiany: root UMD
+`this`→`globalThis`, `export default`, `window` z fallbackiem, usunięty `console.log` ze `step()`)
+daje sprite, cykl życia cząstki i rysowanie. `js/dym.js` daje wszystko, co jest **grą**: kierunek
+i początkową siłę wydechu (`addsmoke` przyjmuje `min/maxVx`, `min/maxVy` per wywołanie), opór,
+wyporność opóźnioną (dym w dół leci w dół), pole przepływu, reakcję na ręce, stany ognia, front
+i detonację. Wpięcie przez `setPreDrawCallback(dt, cząstki)` — tablica cząstek co klatkę.
+
+**Trzy rzeczy, których nie dało się przewidzieć bez czytania kodu biblioteki:**
+1. `updateParticle` **nadpisuje `vy`** co klatkę z `startvy` — nasza wyporność i rozgarnianie
+   znikałyby w tej samej klatce. Stąd własne pola `vxGry/vyGry` (źródło prawdy) przepisywane do
+   `vx/vy` na końcu callbacku, i `startvy = 0`.
+2. `minScale/maxScale` przekazane do `addsmoke` ustawiają **naraz** skalę startową i docelową —
+   kłąb rodziłby się od razu wielki. Docelową skalę ustawiamy sami, po dodaniu.
+3. Alfa i skala liczą się z `age/lifetime`, więc życie 20–40 s dawało dym **niewidzialny**
+   (alfa 0,008 po sekundzie — zmierzone). Zamiast przerabiać bibliotekę **sterujemy jej czasem**:
+   `lifetime` zostaje krótki i stały (6 s), a `age` wyliczamy z prawdziwego wieku
+   (`wiekBiblioteki`) tak, żeby dojść do szczytu w 0,8 s, trzymać plateau przez większość życia
+   i zejść w ostatnich 3 s. Biblioteka usuwa cząstkę dokładnie wtedy, gdy kończy się nasze życie.
+
+**Reakcja na taniec:** `rozgarnij()` dostaje z main.js nadgarstki **i łokcie** (13/14/15/16)
+z prędkościami; każda cząstka w promieniu dostaje pchnięcie wzdłuż ruchu **plus składową
+styczną** (wir za ręką). Strojone na renderach: przy pierwszych wartościach (0,65/0,55)
+machnięcie wywiewało **cały obłok poza ekran** — dziś 0,15/0,22, dym się rozstępuje i wiruje.
+
+**Zmierzone w przeglądarce** (1920×1080): 25 s ciągłego dmuchania → sufit 700 cząstek, pełna
+klatka (fizyka + rysowanie + kompozycja) **0,7 ms**; detonacja: najgorsza klatka 18,8 ms.
