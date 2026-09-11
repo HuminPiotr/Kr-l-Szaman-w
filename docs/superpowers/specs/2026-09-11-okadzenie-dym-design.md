@@ -315,3 +315,41 @@ etapy życia tego samego węzła.
 **Zmierzone w przeglądarce** (1920×1080): 2 min ciągłego dmuchania → rysowanie 2,4 ms/klatkę,
 fizyka 0,24 ms; detonacja całego zasnutego ekranu: najgorsza klatka 12,9 ms, szczyt jasności
 196/255 zamiast 255.
+
+## v6 (2026-09-11) — kółka dymu ładowane trzymaniem dłoni
+
+**Nowy pomysł właściciela gry:** „chcę, żeby wypuszczane były kółka i w zależności jak długo
+przytrzyma się rękę przy ustach, tym większe kółko wychodzi. Maksymalnie trzymanie 3 s daje
+bardzo duże kółko, powiedzmy na 1/3 ekranu. Szybkie przykładanie i od razu odsuwanie palców daje
+normalne kółka. Kółka i tak dalej kłębią się po wypuszczeniu." Z pytań: podczas ładowania
+**cienka smużka + licznik na HUD**; kółko leci **~pół ekranu, większe wolniej**; ciągły strumień
+**znika**.
+
+**Kluczowa obserwacja:** kółko to **wstęga zamknięta w okrąg**, więc cała maszyneria v4/v5
+zostaje bez zmian — odcinki rysują obwód, `spojnosc()` rozkłębia kółko w chmurę, front ognia
+biegnie dookoła obwodu. Nowe jest tylko: układ węzłów na okręgu, ekspansja w locie i to, że
+większe kółko leci wolniej.
+
+**Mechanika (`js/dmuchanie.js`):** stan `DMUCHA` znaczy teraz ŁADOWANIE. `update()` zwraca
+`{ pobor, wypuszczenie }`; `wypuszczenie` niepuste **tylko w klatce cofnięcia dłoni** (wzorzec
+`js/podmuch.js`). `ladunek = min(1, trzymanieS / 3 s)`, z podłogą `LADUNEK_MIN = 0,12` — reguła
+„nic nigdy nie mówi źle": nawet błyskawiczne przyłożenie coś wypuszcza. Naładowane kółko nie
+przepada: wypuszcza je też `anuluj()` (inne combo) i wygaśnięcie zegara 4 min.
+
+**Kółko (`js/dym.js::wypusc`):** promień `0,035 W … 0,165 W` z ładunku (średnica ≈ 1/3 ekranu
+przy pełnym); liczba węzłów ze stałego odstępu na obwodzie (24–160); środek **przed ustami o R**,
+żeby kółko wyleciało z ust, a nie otoczyło głowy; prędkość `KOLKO_V_W_S × wyrazistość ×
+(1 − 0,55·ładunek)` — **większe leci wolniej**; ekspansja jako **ułamek promienia** na sekundę
+(stała w px rozdymała małe kółka dwukrotnie, a dużych nie ruszała).
+
+**Smużka ładowania (`smuz`)** — kilka węzłów/s przy ustach, życie 2,5 s, cieńsza kreska.
+
+**Poprawki znalezione na renderach:**
+- Płonący węzeł rysowany **teksturą w ciepłym tincie**, nie odcinkiem: w fazie chmury sąsiedzi są
+  daleko, a kreska szeroka, więc `stroke` czytał się jak grube brązowe kiełbasy przez ekran.
+  Przy okazji najgorsza klatka detonacji spadła z 20,6 ms do 4,8 ms.
+- Front musi obiegać **domknięcie pętli** (sąsiadem zerowego węzła jest ostatni), inaczej ogień
+  zatrzymywał się na szwie kółka.
+
+**Zmierzone w przeglądarce** (1920×1080): 60 kółek co 2 s (2 min gry) → 1133 węzły, rysowanie
+0,84 ms/klatkę, fizyka 0,1 ms; detonacja: najgorsza klatka 4,8 ms.

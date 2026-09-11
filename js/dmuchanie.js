@@ -96,6 +96,13 @@ const KOSZT_NA_SEKUNDE = 1 / 900;
 // uzbrojona gratis nie może stanąć w miejscu z powodu pustego paska.
 const SILA_PODLOGA = 0.35;
 
+// --- Ładowanie kółka (v6) ---
+// Trzymanie dłoni przy ustach ŁADUJE kółko: 3 s = maksimum (kółko na ~1/3
+// ekranu w js/dym.js). Krótkie przyłożenie i cofnięcie też coś wypuszcza -
+// reguła "nic nigdy nie mówi źle": nie ma stanu "za krótko".
+export const CZAS_PELNEGO_LADUNKU_S = 3;
+export const LADUNEK_MIN = 0.12;
+
 const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
 // --- Kierunek wydechu (v4) - ZGADNIĘTE, do strojenia na kamerze ---
@@ -125,6 +132,8 @@ export class Dmuchanie {
         this.kierunek = { x: 0, y: -1 };   // jednostkowy, OD dłoni w stronę ust i dalej
         this.sila = 0;             // 0..1 - tempo i szerokość kreski dla dym.emituj
         this.wyrazistosc = 0;      // 0..1 - jak zdecydowanie gracz celuje (prędkość wylotu)
+        this.trzymanieS = 0;       // ile sekund dłoń jest przy ustach (ładowanie kółka)
+        this.ladunek = 0;          // 0..1 - trzymanieS / CZAS_PELNEGO_LADUNKU_S
         this.pozostaloS = 0;       // diagnostyka: ile jeszcze żyje potencjał
         this._wygasaO = 0;         // performance.now() + CZAS_POTENCJALU_MS
         this._gest = 0;            // wygładzony wynik gestu, do histerezy
@@ -140,17 +149,27 @@ export class Dmuchanie {
         this._wygasaO = (Number.isFinite(now) ? now : 0) + CZAS_POTENCJALU_MS;
     }
 
-    /** Inne combo złożone - potencjał gaśnie. PRODUKCJA się kończy, kłęby już wydmuchane NIE. */
+    /**
+     * Inne combo złożone - potencjał gaśnie. Naładowane kółko NIE PRZEPADA:
+     * wychodzi w tej samej klatce (jak przy wygaśnięciu zegara). Kółka już
+     * wypuszczone żyją dalej - anulowanie kończy tylko produkcję.
+     * @returns {object|null} zdarzenie wypuszczenia albo null
+     */
     anuluj() {
+        const wypuszczenie = this._wypuszczenie();
         this._zgas();
+        return wypuszczenie;
     }
 
     /**
      * @param {object} frame
-     * @param {number} moc  0..1 - TYLKO skaluje grubość strumienia, nigdy nie kończy techniki
+     * @param {number} moc  0..1 - TYLKO skaluje siłę wydechu, nigdy nie kończy techniki
      * @param {number} dt
      * @param {number} now  performance.now(), do zegara 4 min
-     * @returns {number} ile mocy pobrać w tej klatce (0, jeśli nic)
+     * @returns {{pobor: number, wypuszczenie: object|null}}
+     *   `pobor` - ile mocy pobrać w tej klatce; `wypuszczenie` niepuste TYLKO
+     *   w klatce cofnięcia dłoni (wzorzec js/podmuch.js: zdarzenie zwracane
+     *   wyłącznie w klatce odpalenia).
      */
     update(frame, moc, dt, now) {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
@@ -158,13 +177,15 @@ export class Dmuchanie {
         if (this.stan === 'BEZCZYNNY') {
             this.sila = 0;
             this.wyrazistosc = 0;
-            return 0;
+            return { pobor: 0, wypuszczenie: null };
         }
 
         // Zegar 4 min - JEDYNY sposób, w jaki potencjał wygasa sam z siebie.
+        // Naładowane kółko NIE PRZEPADA: wygaśnięcie je wypuszcza.
         if (Number.isFinite(now) && now >= this._wygasaO) {
+            const ostatnie = this._wypuszczenie();
             this._zgas();
-            return 0;
+            return { pobor: 0, wypuszczenie: ostatnie };
         }
         this.pozostaloS = Number.isFinite(now) ? Math.max(0, (this._wygasaO - now) / 1000) : 0;
 
@@ -177,18 +198,34 @@ export class Dmuchanie {
         const alfa = Math.min(1, krok / 0.05) * ALFA_GESTU;
         this._gest += alfa * (g - this._gest);
 
-        if (this.stan === 'GOTOWY' && this._gest >= PROG_WEJSCIA) this.stan = 'DMUCHA';
-        else if (this.stan === 'DMUCHA' && this._gest < PROG_WYJSCIA) this.stan = 'GOTOWY';
+        let wypuszczenie = null;
+        if (this.stan === 'GOTOWY' && this._gest >= PROG_WEJSCIA) {
+            this.stan = 'DMUCHA';
+            this.trzymanieS = 0;
+            this.ladunek = 0;
+        } else if (this.stan === 'DMUCHA' && this._gest < PROG_WYJSCIA) {
+            // Dłoń cofnięta - KÓŁKO LECI. Kierunek i usta są jeszcze z tej
+            // klatki, więc kółko wychodzi stamtąd, gdzie gracz je ładował.
+            this.zaczep = this._ustaEkran;
+            this.kierunek = this._kierunek(wl, lm, krok);
+            wypuszczenie = this._wypuszczenie();
+            this.stan = 'GOTOWY';
+        }
 
         if (this.stan !== 'DMUCHA') {
             this.sila = 0;
-            return 0;
+            this.trzymanieS = 0;
+            this.ladunek = 0;
+            return { pobor: 0, wypuszczenie };
         }
 
-        // Grubość strumienia: gest x moc, obie z podłogą, żeby technika
-        // gratis nigdy nie stanęła w miejscu - patrz nagłówek SILA_PODLOGA.
+        // Siła wydechu: gest x moc, obie z podłogą, żeby technika gratis nigdy
+        // nie stanęła w miejscu - patrz nagłówek SILA_PODLOGA.
         const mocCzynnik = SILA_PODLOGA + (1 - SILA_PODLOGA) * (Number.isFinite(moc) ? Math.max(0, Math.min(1, moc)) : 0);
         this.sila = Math.max(SILA_PODLOGA, Math.min(1, this._gest)) * mocCzynnik;
+
+        this.trzymanieS += krok;
+        this.ladunek = Math.min(1, this.trzymanieS / CZAS_PELNEGO_LADUNKU_S);
 
         this.zaczep = this._ustaEkran;
         this.kierunek = this._kierunek(wl, lm, krok);
@@ -196,9 +233,22 @@ export class Dmuchanie {
         // Pobór jest bliski zeru i NIGDY nie warunkuje kontynuacji (frame nie
         // sprawdza moc > 0, w przeciwieństwie do plonacyPalec.js) - jeśli moc
         // jest już wyczerpana, po prostu nie pobieramy nic więcej.
-        return Number.isFinite(moc) && moc > 0
+        const pobor = Number.isFinite(moc) && moc > 0
             ? Math.min(moc, KOSZT_NA_SEKUNDE * krok)
             : 0;
+        return { pobor, wypuszczenie: null };
+    }
+
+    /** Zdarzenie wypuszczenia kółka albo null, gdy nie ma czego wypuszczać. */
+    _wypuszczenie() {
+        if (this.stan !== 'DMUCHA' || !this.zaczep) return null;
+        return {
+            zaczep: { x: this.zaczep.x, y: this.zaczep.y },
+            kierunek: { x: this.kierunek.x, y: this.kierunek.y },
+            ladunek: Math.max(LADUNEK_MIN, this.ladunek),
+            wyrazistosc: this.wyrazistosc,
+            sila: this.sila
+        };
     }
 
     _zgas() {
@@ -206,6 +256,8 @@ export class Dmuchanie {
         this.zaczep = null;
         this.sila = 0;
         this.wyrazistosc = 0;
+        this.trzymanieS = 0;
+        this.ladunek = 0;
         this.pozostaloS = 0;
         this._gest = 0;
         this._ustaSwiat = null;

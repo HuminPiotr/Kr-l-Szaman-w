@@ -369,6 +369,21 @@ function renderLoop(now) {
     }
 }
 
+/**
+ * Wypuszczenie kółka dymu - jedno miejsce, bo woła je i klatka (cofnięcie
+ * dłoni), i gałąź combo (anulowanie potencjału z naładowanym kółkiem).
+ */
+function wypuscKolko(w) {
+    const promien = dym.wypusc(
+        { x: w.zaczep.x * canvas.width, y: w.zaczep.y * canvas.height },
+        w.kierunek,
+        w.ladunek,
+        w.wyrazistosc,
+        canvas.width
+    );
+    if (promien > 0) audioEngine.playFireSFX(0.25 + 0.45 * w.ladunek);
+}
+
 function klatka(now) {
 
     // Bez wymiarów wideo computeCoverFit dzieli przez zero, ratio robi się
@@ -538,7 +553,10 @@ function klatka(now) {
             // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,
             // NIE KONIEC". Bez tego nie byłoby drogi do podpalenia dymu:
             // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
-            if (technika.uzbraja !== 'dym') dmuchanie.anuluj();
+            if (technika.uzbraja !== 'dym') {
+                const ostatnieKolko = dmuchanie.anuluj();
+                if (ostatnieKolko) wypuscKolko(ostatnieKolko);
+            }
             audioEngine.playFireSFX(1.0);
             ostatniKomunikat = `${technika.nazwa} ✨`;
         } else {
@@ -574,19 +592,21 @@ function klatka(now) {
     // (plonacyPalec.zaczep, ogien.czastki) są z POPRZEDNIEJ klatki - jedna
     // klatka spóźnienia zapłonu jest niezauważalna, rozdzielanie
     // updateAndDraw na tick i rysowanie nie jest tego warte.
-    const pobor2 = dmuchanie.update(frame, motionMeter.moc, dt, now);
+    const { pobor: pobor2, wypuszczenie } = dmuchanie.update(frame, motionMeter.moc, dt, now);
     if (pobor2 > 0) motionMeter.zuzyj(pobor2);
 
+    // Trzymanie dłoni przy ustach tylko ŁADUJE (smużka + licznik na HUD);
+    // kółko wychodzi dopiero w klatce cofnięcia dłoni - patrz js/dym.js "V6".
     if (dmuchanie.stan === 'DMUCHA' && dmuchanie.zaczep) {
-        dym.emituj(
+        dym.smuz(
             { x: dmuchanie.zaczep.x * canvas.width, y: dmuchanie.zaczep.y * canvas.height },
             dmuchanie.kierunek,
-            dmuchanie.sila,
-            dmuchanie.wyrazistosc,
+            dmuchanie.ladunek,
             dt,
             canvas.width
         );
     }
+    if (wypuszczenie) wypuscKolko(wypuszczenie);
 
     // Dłonie rozgarniają dym - nadgarstki POZY (bardziej stabilne niż
     // landmarki dłoni przy geście przy ustach), w PIKSELACH, z prędkością
@@ -774,7 +794,8 @@ function klatka(now) {
         // strojenia progu na żywo, patrz debugHud.js.
         dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest,
                      kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa,
-                     wyrazistosc: dmuchanie.wyrazistosc },
+                     wyrazistosc: dmuchanie.wyrazistosc,
+                     ladunek: dmuchanie.ladunek, trzymanieS: dmuchanie.trzymanieS },
         dym: { wezlow: dym.liczba, wsteg: dym.wsteg, odcinkow: dym.odcinkow, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,

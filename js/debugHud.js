@@ -491,6 +491,9 @@ export class DebugHud {
             // NOS_POD_OCZAMI byłoby zgadywaniem. Głowa surowa: skręt ma sięgać ±1 przy
             // wyraźnym obrocie, pochylenie ~0 przy głowie na wprost.
             const k = stats.dmuchanie.kierunek, g = stats.dmuchanie.glowa;
+            lines.push(`  ładunek ${this._num(stats.dmuchanie.ladunek)}` +
+                       `  (trzymanie ${(stats.dmuchanie.trzymanieS ?? 0).toFixed(1)} s / 3 s` +
+                       ` - puść dłoń, żeby wypuścić kółko)`);
             lines.push(`  kierunek ${k ? `${this._num(k.x)} ${this._num(k.y)}` : '-'}` +
                        `   wyrazistość ${this._num(stats.dmuchanie.wyrazistosc)}` +
                        `   głowa ${g ? `skręt ${this._num(g.skret)} pochyl ${this._num(g.pochylenie)}` : 'brak oczu'}`);

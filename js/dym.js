@@ -64,6 +64,23 @@
  * tekstura w złej roli: jako CAŁA technika dawała "kółka", jako rozpad
  * kolumny daje kłębienie.
  *
+ * ================== V6 (2026-09-11, nowy pomysł: KÓŁKA) ==================
+ * "Chcę, żeby wypuszczane były kółka i w zależności jak długo przytrzyma się
+ * rękę przy ustach, tym większe kółko wychodzi. Maksymalnie trzymanie 3 s daje
+ * bardzo duże kółko, powiedzmy na 1/3 ekranu. Szybkie przykładanie i od razu
+ * odsuwanie palców daje normalne kółka. Kółka i tak dalej kłębią się po
+ * wypuszczeniu."
+ *
+ * Ciągły strumień znika; zostaje JEDNA mechanika: przyłożenie dłoni ładuje,
+ * cofnięcie wypuszcza kółko. I okazuje się, że kółko to po prostu WSTĘGA
+ * ZAMKNIĘTA W OKRĄG - cała maszyneria z v4/v5 zostaje bez zmian:
+ *   - odcinki między węzłami rysują obwód kółka (zamiast kolumny),
+ *   - spojnosc(wiek) sprawia, że kółko po kilku sekundach ROZKŁĘBIA SIĘ
+ *     w chmurę (życzenie "kółka i tak dalej kłębią się") - zero nowej fizyki,
+ *   - front ognia biegnie wzdłuż wstęgi, czyli DOOKOŁA obwodu kółka.
+ * Nowe jest tylko: układ węzłów na okręgu, lekka ekspansja w locie i to, że
+ * większe kółko leci wolniej (KOLKO_V_W_S x (1 - ...ladunek)).
+ *
  * ================== KIERUNEK: CZTERY STRONY ŚWIATA ==================
  * Wyporność wchodzi z wagą 1-exp(-wiek/TAU_WYPORU_S), TAU = 6 s (v3: 0.8 s) -
  * namalowany kształt trzyma pozycję ~8 s, a dym wypuszczony w dół NAPRAWDĘ
@@ -99,12 +116,28 @@
  */
 import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 
-// --- Emisja ---
-// ZGADNIĘTE - do strojenia na kamerze. Tempo jest NIŻSZE niż w v3 (90/s), bo
-// ciągłość daje KRESKA, nie gęstość sprite'ów; wystarczy tyle, żeby odstęp
-// węzłów wzdłuż lotu nie ścinał zakrętów. Oddech to powolna modulacja ±15%,
-// nigdy do zera.
-export const WEZLY_NA_S = 60;
+// --- Kółko (v6) ---
+// ZGADNIĘTE - do strojenia na kamerze. Promień z ładunku: 3 s trzymania ma dać
+// kółko o średnicy ~1/3 szerokości ekranu (2 x 0.165 W), szybkie przyłożenie -
+// "normalne" kółko (2 x 0.035 W).
+export const KOLKO_R_MIN_W = 0.035, KOLKO_R_MAX_W = 0.165;
+const ODSTEP_WEZLA_W = 0.012;            // stały odstęp na obwodzie: małe kółko tanie, duże gładkie
+export const KOLKO_WEZLY_MIN = 24, KOLKO_WEZLY_MAX = 160;
+// Prędkość wylotu kółka; DUŻE LECI WOLNIEJ (życzenie "im większe tym wolniej").
+export const KOLKO_V_W_S = 1.2;
+export const KOLKO_SPOWOLNIENIE = 0.55;  // ile ładunek odbiera prędkości
+// Ekspansja jest UŁAMKIEM PROMIENIA na sekundę, nie stałą w px: inaczej małe
+// kółko puchło dwukrotnie, a duże prawie wcale.
+const EKSPANSJA_R_NA_S = 0.6;
+const TAU_EKSPANSJI_S = 1.5;
+
+// --- Smużka podczas ładowania ---
+// Jedyna pozostałość po emisji ciągłej: kilka węzłów na sekundę tuż przy
+// ustach, żeby gracz widział, że technika ładuje (reszta informacji na HUD).
+export const WEZLY_SMUGI_NA_S = 8;
+export const ZYCIE_SMUGI_S = 2.5;
+const R_SMUGI_MNOZNIK = 0.6;
+
 export const ODDECH_AMPLITUDA = 0.15;
 export const ODDECH_HZ = 0.3;
 
@@ -145,8 +178,8 @@ export const ROZROST_TAU_S = 4;          // 90% szerokości po ~9 s
 // --- Rozpad kolumny w chmurę (v5) ---
 // ZGADNIĘTE - do strojenia na kamerze. KOLUMNA_S to "ile trwa wydech, który
 // widać jako kolumnę"; po nim spójność opada i węzeł staje się kłębem.
-export const KOLUMNA_S = 1.5;
-export const TAU_ROZPADU_S = 1.2;        // po ~3 tau (4.5 s) kreski praktycznie nie ma
+export const KOLUMNA_S = 2.5;            // v6: tyle kółko trzyma kształt, zanim zacznie się rozkłębiać
+export const TAU_ROZPADU_S = 1.5;        // po ~3 tau kółka praktycznie nie ma - zostaje chmura
 // Własny wektor każdego węzła, wchodzi dopiero z (1 - spojnosc) - to jest to,
 // czego v4 brakowało, żeby wstęga PĘKŁA zamiast płynąć jak sztywny wąż.
 const ROZBIEZNOSC_W_S = 0.035;           // ułamek W/s
@@ -223,16 +256,6 @@ const PRZEBIEGI = [
     { szerokosc: 1.5, alfa: 0.45 },
     { szerokosc: 1.0, alfa: 1.00 }
 ];
-// Płonąca kreska: szerokie przebiegi 'source-over' (nie sumują się w biel),
-// dopiero wąski rdzeń addytywnie - daje poświatę bez wybielania ekranu.
-// Zmierzone: przy 1800 płonących węzłach same addytywne przebiegi dawały
-// średnią jasność klatki 255/255, czyli biały ekran.
-const PRZEBIEGI_OGNIA = [
-    { szerokosc: 3.0, alfa: 0.16, addytywny: false },
-    { szerokosc: 1.8, alfa: 0.34, addytywny: false },
-    { szerokosc: 1.0, alfa: 0.60, addytywny: false },
-    { szerokosc: 0.5, alfa: 0.45, addytywny: true }
-];
 const ROZMYCIE_PX = 6;                   // jeden blur na klatkę przy kompozycji (nie na sprite)
 const SZUM_SZEROKOSCI = 0.25;            // per-węzeł, TYLKO szerokość - kreska nie ma być rurką
 const KWANT_SZEROKOSCI_PX = 3;           // kubełki szerokości na płótnie pomocniczym
@@ -258,15 +281,14 @@ const BARWA_ROZBLYSKU = [255, 225, 170];
 export class Dym {
     constructor() {
         this._wstegi = [];           // [{ id, wezly: [], przerzedzen }] - kolejność = kolejność powstania
-        this._aktywna = null;        // wstęga, do której dopisuje emituj()
+        this._aktywna = null;        // wstęga smużki, do której dopisuje smuz()
         this._nastepneId = 1;
         this._ile = 0;               // liczba węzłów - licznik przyrostowy, bez skanu
         this._odcinkow = 0;          // odcinki narysowane w ostatniej klatce (HUD/budżet)
         this._nadwyzka = 0;          // ułamki węzłów przeniesione na następną klatkę
         this._t = 0;                 // zegar pola przepływu
-        this._tEmisji = 0;           // zegar oddechu (płynie tylko podczas dmuchania)
-        this._emitowal = false;      // czy emituj() zawołano w tej klatce
-        this._poprzZaczep = null;    // usta z poprzedniej klatki emisji - interpolacja (malowanie)
+        this._tEmisji = 0;           // zegar oddechu (płynie tylko podczas ładowania)
+        this._emitowal = false;      // czy smuz() zawołano w tej klatce
         this._wybuchajacych = 0;     // liczba węzłów w stanie WYBUCH (krok sprite'ów)
         this._plotnoPom = null;
         this._ctxPom = null;
@@ -295,103 +317,147 @@ export class Dym {
     }
 
     /**
-     * Wydech z ust - wywoływać co klatkę, TYLKO gdy dmuchanie.stan === 'DMUCHA'.
-     * Węzły tej klatki rodzą się rozłożone wzdłuż odcinka usta(poprzednia
-     * klatka) -> usta(teraz), więc ruch głowy ciągnie kreskę (malowanie).
-     * Po przerwie zaczyna się NOWA wstęga - kreska nie przeskakuje przez pół
-     * ekranu. Prędkość ust NIE jest dziedziczona: dym zostaje tam, gdzie
-     * wydmuchany, i dlatego zataczanie okręgów rysuje okrąg.
+     * WYPUŚĆ KÓŁKO - wołane RAZ, w klatce cofnięcia dłoni od ust
+     * (js/dmuchanie.js zwraca wtedy zdarzenie wypuszczenia).
+     *
+     * Kółko to wstęga ZAMKNIĘTA W OKRĄG: węzły na okręgu o promieniu z
+     * ładunku, wszystkie z tą samą prędkością wzdłuż `kierunek` plus mała,
+     * gasnąca składowa promieniowa (kółko puchnie w locie). Dalej zajmuje się
+     * nim ta sama fizyka co wstęgą - i ta sama spojnosc(), która po kilku
+     * sekundach rozkłębia kółko w chmurę.
      *
      * @param {{x,y}} zaczepPx     usta, w PIKSELACH płótna
-     * @param {{x,y}} kierunek     jednostkowy - w którą stronę gracz dmucha (dmuchanie.js)
-     * @param {number} sila        0..1 - tempo i szerokość kreski
-     * @param {number} wyrazistosc 0..1 - jak zdecydowanie gracz celuje; skaluje PRĘDKOŚĆ wylotu
-     * @param {number} dt
-     * @param {number} W           szerokość płótna (px) - rozmiary i prędkości są jej ułamkami
+     * @param {{x,y}} kierunek     jednostkowy - w którą stronę leci kółko
+     * @param {number} ladunek     0..1 - z czasu trzymania dłoni (rozmiar kółka)
+     * @param {number} wyrazistosc 0..1 - pewność ustawienia gracza; skaluje prędkość
+     * @param {number} W           szerokość płótna (px)
+     * @returns {number} promień wypuszczonego kółka w px (0, gdy nic nie poszło)
      */
-    emituj(zaczepPx, kierunek, sila, wyrazistosc, dt, W) {
-        const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
-        const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
-        const wyr = Number.isFinite(wyrazistosc) ? Math.max(0, Math.min(1, wyrazistosc)) : 0;
-        if (!zaczepPx || !Number.isFinite(zaczepPx.x) || !Number.isFinite(zaczepPx.y) || s <= 0.01 || krok <= 0) return;
+    wypusc(zaczepPx, kierunek, ladunek, wyrazistosc, W) {
+        if (!zaczepPx || !Number.isFinite(zaczepPx.x) || !Number.isFinite(zaczepPx.y)) return 0;
         const wRef = Number.isFinite(W) && W > 0 ? W : 1920;
+        const lad = Number.isFinite(ladunek) ? Math.max(0, Math.min(1, ladunek)) : 0;
+        const wyr = Number.isFinite(wyrazistosc) ? Math.max(0, Math.min(1, wyrazistosc)) : 0;
+        const { kx, ky } = kierunekJednostkowy(kierunek);
 
-        let kx = Number.isFinite(kierunek?.x) ? kierunek.x : 0;
-        let ky = Number.isFinite(kierunek?.y) ? kierunek.y : -1;
-        const dl = Math.hypot(kx, ky);
-        if (dl < 1e-6) { kx = 0; ky = -1; } else { kx /= dl; ky /= dl; }
+        const R = wRef * (KOLKO_R_MIN_W + lad * (KOLKO_R_MAX_W - KOLKO_R_MIN_W));
+        const n = Math.max(KOLKO_WEZLY_MIN,
+                            Math.min(KOLKO_WEZLY_MAX, Math.round(2 * Math.PI * R / (wRef * ODSTEP_WEZLA_W))));
+        // Środek kółka LEŻY PRZED USTAMI o R - inaczej okrąg otaczałby głowę
+        // gracza zamiast wylecieć z ust.
+        const sx = zaczepPx.x + kx * R, sy = zaczepPx.y + ky * R;
+
+        const v = wRef * KOLKO_V_W_S
+                * (WYRAZISTOSC_PODLOGA + (1 - WYRAZISTOSC_PODLOGA) * wyr)
+                * (1 - KOLKO_SPOWOLNIENIE * lad);
+        const ekspansja = R * EKSPANSJA_R_NA_S;
+
+        const wstega = this._nowaWstega(wRef, true);
+        for (let i = 0; i < n; i++) {
+            const kat = 2 * Math.PI * i / n;
+            const px = Math.cos(kat), py = Math.sin(kat);
+            this._dodajWezel(wstega, wRef, {
+                x: sx + px * R,
+                y: sy + py * R,
+                vx: kx * v,
+                vy: ky * v,
+                promienX: px,
+                promienY: py,
+                ekspansja
+            });
+        }
+        this._aktywna = null;   // smużka następnego ładowania zacznie nową wstęgę
+        this._pilnujSufitu();
+        return R;
+    }
+
+    /**
+     * Smużka podczas ładowania - wołana co klatkę, gdy dłoń jest przy ustach.
+     * Kilka węzłów na sekundę tuż przy ustach, krótkie życie: gracz ma widzieć,
+     * że technika jest "naciągnięta", ale to NIE jest dawny strumień.
+     *
+     * @param {{x,y}} zaczepPx  usta, w PIKSELACH płótna
+     * @param {{x,y}} kierunek  jednostkowy
+     * @param {number} ladunek  0..1 - im pełniejszy, tym gęstsza smużka
+     * @param {number} dt
+     * @param {number} W        szerokość płótna (px)
+     */
+    smuz(zaczepPx, kierunek, ladunek, dt, W) {
+        const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
+        if (!zaczepPx || !Number.isFinite(zaczepPx.x) || !Number.isFinite(zaczepPx.y) || krok <= 0) return;
+        const wRef = Number.isFinite(W) && W > 0 ? W : 1920;
+        const lad = Number.isFinite(ladunek) ? Math.max(0, Math.min(1, ladunek)) : 0;
+        const { kx, ky } = kierunekJednostkowy(kierunek);
 
         this._emitowal = true;
         this._tEmisji += krok;
         const oddech = Dym.oddech(this._tEmisji);
-        const silaCzynnik = 0.7 + 0.3 * s;
 
-        // CO NAJMNIEJ jeden węzeł na klatkę emisji: klatka bez węzła podwaja
-        // odstęp wzdłuż lotu i kreska zaczyna ścinać zakręty. Nadwyżka bywa
-        // przez to UJEMNA - i dobrze, bo średnie tempo zostaje WEZLY_NA_S
-        // także przy 120 Hz.
-        const ile = WEZLY_NA_S * silaCzynnik * oddech * krok + this._nadwyzka;
-        const n = Math.max(1, Math.floor(ile));
-        this._nadwyzka = Math.max(-WEZLY_NA_S * krok, ile - n);
+        const ile = WEZLY_SMUGI_NA_S * (0.6 + 0.4 * lad) * oddech * krok + this._nadwyzka;
+        const n = Math.floor(ile);
+        this._nadwyzka = ile - n;
+        if (n <= 0) return;
 
-        const od = this._poprzZaczep ?? zaczepPx;
-        this._poprzZaczep = { x: zaczepPx.x, y: zaczepPx.y };
-
-        // Prędkość wylotu z WYRAZISTOŚCI ustawienia gracza - patrz nagłówek.
-        const vBazowa = wRef * WYLOT_PREDKOSC_W_S
-                      * (WYRAZISTOSC_PODLOGA + (1 - WYRAZISTOSC_PODLOGA) * wyr) * oddech;
-
+        const v = wRef * KOLKO_V_W_S * 0.12 * oddech;
+        const wstega = this._wstegaDoPisania(wRef);
         for (let i = 0; i < n; i++) {
-            const f = (i + 1) / n;
-            const ux = od.x + (zaczepPx.x - od.x) * f;
-            const uy = od.y + (zaczepPx.y - od.y) * f;
-
-            // ŻADNEGO losowania prędkości ani stożka PER WĘZEŁ: sąsiedzi w
-            // kresce muszą lecieć tak samo, inaczej po sekundzie szybszy
-            // wyprzedza wolniejszego, kolejność w kresce się odwraca i wstęga
-            // zygzakuje. Wariancja jest PER WSTĘGA (szerokość, faza) i z
-            // oddechu; "życie" zostaje per węzeł - rozkłada gaśnięcie w czasie.
-            const wstega = this._wstegaDoPisania(wRef);
-            wstega.wezly.push({
-                x: ux + (Math.random() - 0.5) * ROZRZUT_UST_PX,
-                y: uy + (Math.random() - 0.5) * ROZRZUT_UST_PX,
-                vx: kx * vBazowa,
-                vy: ky * vBazowa,
-                wiek: 0,
-                zycie: ZYCIE_MIN_S + Math.random() * (ZYCIE_MAX_S - ZYCIE_MIN_S),
-                faza: wstega.faza,
-                // Faza WŁASNA i wektor rozbieżności działają dopiero w fazie
-                // rozpadu (waga 1 - spojnosc), więc nie psują kreski kolumny.
-                fazaWlasna: Math.random() * Math.PI * 2,
-                rozbieznoscX: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
-                rozbieznoscY: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
-                szum: 1 + (Math.random() - 0.5) * 2 * SZUM_SZEROKOSCI,
-                r: wRef * R_START_W,
-                rStart: wRef * R_START_W,
-                rCel: wstega.rCel,
-                przerwa: wstega.wezly.length === 0,
-                stan: 'DYM', tZaplonu: 0, tWybuch: 0, rozprzestrzenil: false,
-                ...warianty()
+            this._dodajWezel(wstega, wRef, {
+                x: zaczepPx.x + (Math.random() - 0.5) * ROZRZUT_UST_PX * 3,
+                y: zaczepPx.y + (Math.random() - 0.5) * ROZRZUT_UST_PX * 3,
+                vx: kx * v,
+                vy: ky * v,
+                zycie: ZYCIE_SMUGI_S,
+                rMnoznik: R_SMUGI_MNOZNIK
             });
-            this._ile++;
         }
         this._pilnujSufitu();
     }
 
     /**
-     * Wstęga, do której dopisujemy: nowa po przerwie albo po MAX_WEZLOW_WSTEGI.
-     * Szerokość docelowa i faza są WŁASNOŚCIĄ WSTĘGI, nie węzła - patrz emituj().
+     * Jeden węzeł wstęgi. Wariancja, która MUSI być wspólna dla sąsiadów
+     * (szerokość docelowa, faza), siedzi na wstędze; per węzeł losowane jest
+     * tylko to, co działa dopiero po rozpadzie spójności (faza własna,
+     * rozbieżność) albo nie rusza pozycji (szum szerokości, życie).
      */
+    _dodajWezel(wstega, wRef, { x, y, vx, vy, zycie, promienX = 0, promienY = 0, ekspansja = 0, rMnoznik = 1 }) {
+        wstega.wezly.push({
+            x, y, vx, vy,
+            promienX, promienY, ekspansja,
+            wiek: 0,
+            zycie: Number.isFinite(zycie) ? zycie : ZYCIE_MIN_S + Math.random() * (ZYCIE_MAX_S - ZYCIE_MIN_S),
+            faza: wstega.faza,
+            fazaWlasna: Math.random() * Math.PI * 2,
+            rozbieznoscX: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
+            rozbieznoscY: (Math.random() - 0.5) * 2 * ROZBIEZNOSC_W_S * wRef,
+            szum: 1 + (Math.random() - 0.5) * 2 * SZUM_SZEROKOSCI,
+            r: wRef * R_START_W * rMnoznik,
+            rStart: wRef * R_START_W * rMnoznik,
+            rCel: wstega.rCel * rMnoznik,
+            przerwa: wstega.wezly.length === 0 && !wstega.zamknieta,
+            stan: 'DYM', tZaplonu: 0, tWybuch: 0, rozprzestrzenil: false,
+            ...warianty()
+        });
+        this._ile++;
+    }
+
+    /** Nowa wstęga (kółko: zamknięta w pętlę; smużka: otwarta). */
+    _nowaWstega(wRef, zamknieta = false) {
+        const w = {
+            id: this._nastepneId++,
+            wezly: [],
+            przerzedzen: 0,
+            zamknieta,
+            faza: Math.random() * Math.PI * 2,
+            rCel: wRef * (R_KONIEC_MIN_W + Math.random() * (R_KONIEC_MAX_W - R_KONIEC_MIN_W))
+        };
+        this._wstegi.push(w);
+        return w;
+    }
+
+    /** Wstęga smużki, do której dopisujemy: nowa po przerwie albo po sufycie wstęgi. */
     _wstegaDoPisania(wRef) {
         if (!this._aktywna || this._aktywna.wezly.length >= MAX_WEZLOW_WSTEGI) {
-            this._aktywna = {
-                id: this._nastepneId++,
-                wezly: [],
-                przerzedzen: 0,
-                faza: Math.random() * Math.PI * 2,
-                rCel: wRef * (R_KONIEC_MIN_W + Math.random() * (R_KONIEC_MAX_W - R_KONIEC_MIN_W))
-            };
-            this._wstegi.push(this._aktywna);
+            this._aktywna = this._nowaWstega(wRef, false);
         }
         return this._aktywna;
     }
@@ -495,7 +561,15 @@ export class Dym {
                         c.rozprzestrzenil = true;
                         // Wzdłuż WŁASNEJ wstęgi front idzie zawsze (sąsiedzi w
                         // kresce), na inne wstęgi - przez siatkę, patrz _front().
-                        for (const sasiad of [w.wezly[idx - 1], w.wezly[idx + 1]]) {
+                        const sasiedzi = [w.wezly[idx - 1], w.wezly[idx + 1]];
+                        // Kółko jest ZAMKNIĘTE - front musi obiec cały obwód,
+                        // więc sąsiad zerowego węzła to ostatni (i odwrotnie).
+                        if (w.zamknieta && w.wezly.length > 2) {
+                            const skrajny = idx === 0 ? w.wezly[w.wezly.length - 1]
+                                          : idx === w.wezly.length - 1 ? w.wezly[0] : null;
+                            if (skrajny && polaczone(c, skrajny)) sasiedzi.push(skrajny);
+                        }
+                        for (const sasiad of sasiedzi) {
                             if (sasiad && sasiad.stan === 'DYM') {
                                 sasiad.stan = 'ZAPLON';
                                 sasiad.tZaplonu = 0;
@@ -531,6 +605,14 @@ export class Dym {
                 c.vy += ay * krok * rozpad;
                 c.vx += (c.rozbieznoscX ?? 0) * krok * rozpad;
                 c.vy += (c.rozbieznoscY ?? 0) * krok * rozpad;
+
+                // Ekspansja kółka: gasnąca składowa promieniowa - krąg dymu
+                // puchnie w locie, zanim się rozkłębi.
+                if (c.ekspansja) {
+                    const e = c.ekspansja * Math.exp(-c.wiek / TAU_EKSPANSJI_S) * krok;
+                    c.vx += (c.promienX ?? 0) * e;
+                    c.vy += (c.promienY ?? 0) * e;
+                }
                 c.vx += Math.sign(Math.sin(c.faza)) * ROZLEW_BOK_H_S * hRef * (1 - wznoszenie) * wypor * krok;
 
                 // Opór zmieszany wagą wylotu - JEDEN wektor prędkości, więc
@@ -639,9 +721,9 @@ export class Dym {
      * @returns {number} liczba węzłów, które w tej klatce weszły w WYBUCH
      */
     updateAndDraw(ctx, W, H, dt) {
-        // Przerwa w dmuchaniu urywa wstęgę - po powrocie dłoni zaczyna się nowa,
-        // zamiast łączyć kreską dwa odległe miejsca.
-        if (!this._emitowal) { this._poprzZaczep = null; this._aktywna = null; }
+        // Przerwa w ładowaniu urywa smużkę - po powrocie dłoni zaczyna się
+        // nowa, zamiast łączyć kreską dwa odległe miejsca.
+        if (!this._emitowal) this._aktywna = null;
         this._emitowal = false;
 
         const nowychWybuchow = this._ruszaj(dt, W, H);
@@ -708,9 +790,12 @@ export class Dym {
         // --- Faza KOLUMNY: kreska na wierzchu, gaśnie z rozpadem spójności ---
         const kubelki = new Map();
         for (const w of this._wstegi) {
-            for (let i = 1; i < w.wezly.length; i++) {
-                const a = w.wezly[i - 1], b = w.wezly[i];
-                if (b.przerwa || a.stan !== 'DYM' || b.stan !== 'DYM') continue;
+            // Kółko jest zamknięte: po ostatnim odcinku dochodzi jeszcze
+            // domykający (ostatni -> pierwszy), inaczej obwód ma wycięty kawałek.
+            const domkniecie = w.zamknieta && w.wezly.length > 2 ? 1 : 0;
+            for (let i = 1; i < w.wezly.length + domkniecie; i++) {
+                const a = w.wezly[i - 1], b = w.wezly[i % w.wezly.length];
+                if ((b.przerwa && i < w.wezly.length) || a.stan !== 'DYM' || b.stan !== 'DYM') continue;
                 if (!polaczone(a, b)) continue;
                 const oddech = 1 + ODDECH_SZEROKOSCI * Math.sin(this._t * ODDECH_OMEGA + a.faza);
                 const szer = (a.r + b.r) * skala * oddech * (a.szum ?? 1);
@@ -756,51 +841,23 @@ export class Dym {
         // Płonąca kreska: te same wielokrotne przebiegi co dym (szeroka poświata
         // -> wąski rdzeń), inaczej ogień czyta się jak pomarańczowe rury.
         // Kubełki po STOPNIU barwy i szerokości - stroke'ów są dziesiątki, nie tysiące.
-        // Płonący węzeł czyta tę samą oś czasu co dym: w fazie KOLUMNY jest
-        // odcinkiem kreski, w fazie CHMURY - płonącym kłębem (tekstura mgły
-        // w ciepłym tincie). Bez tego ogień łączył odcinkami węzły oddalone
-        // o setki pikseli i rysował przez ekran wielkie żółte belki.
-        const ogien = new Map();
-        for (const w of this._wstegi) {
-            for (let i = 0; i < w.wezly.length; i++) {
-                const c = w.wezly[i];
-                if (c.stan !== 'ZAPLON') continue;
-                const p = Math.max(0, Math.min(1, c.tZaplonu / CZAS_DO_WYBUCHU_S));
-                const stopien = Math.min(BARWA_ZAPLONU_STOPNIE.length - 1,
-                                          Math.floor(p * BARWA_ZAPLONU_STOPNIE.length));
-                const sp = spojnosc(c.wiek);
-                const poprz = w.wezly[i - 1];
-                if (sp > 0.05 && poprz && !c.przerwa && polaczone(poprz, c)) {
-                    const szer = Math.max(KWANT_SZEROKOSCI_PX,
-                                           Math.round(c.r * (1 + p * 0.4) / KWANT_SZEROKOSCI_PX) * KWANT_SZEROKOSCI_PX);
-                    const kalfa = Math.max(KWANT_ALFY, Math.round(sp / KWANT_ALFY) * KWANT_ALFY);
-                    const klucz = (stopien * 10000 + szer) * 100 + Math.round(kalfa * 100);
-                    let wpis = ogien.get(klucz);
-                    if (!wpis) ogien.set(klucz, wpis = { stopien, szer, alfa: kalfa, p: new Path2D() });
-                    wpis.p.moveTo(poprz.x, poprz.y);
-                    wpis.p.lineTo(c.x, c.y);
-                }
-                if (sp < 0.95) {
-                    const img = obraz(MANIFEST.mgla[c.wariantMgla ?? 0]);
-                    if (!img) continue;
-                    const r = c.r * KLAB_SKALA * 0.8;
-                    ctx.globalAlpha = Math.min(1, (1 - sp) * (0.35 + 0.45 * p));
-                    ctx.drawImage(wypalTintowany(img, BARWA_ZAPLONU_STOPNIE[stopien], KLAB_SPRITE_PX),
-                                   c.x - r, c.y - r, r * 2, r * 2);
-                }
-            }
+        // Płonący węzeł rysowany TAK SAMO jak kłąb dymu - teksturą w ciepłym
+        // tincie, nie kreską. Wersja z odcinkami (v5) dawała przez ekran grube
+        // "kiełbasy": w fazie chmury sąsiedzi są daleko, a kreska jest szeroka,
+        // więc stroke czytał się jak gumowa rura, nie jak płonący dym.
+        for (const c of this.wezly()) {
+            if (c.stan !== 'ZAPLON') continue;
+            const p = Math.max(0, Math.min(1, c.tZaplonu / CZAS_DO_WYBUCHU_S));
+            const stopien = Math.min(BARWA_ZAPLONU_STOPNIE.length - 1,
+                                      Math.floor(p * BARWA_ZAPLONU_STOPNIE.length));
+            const img = obraz(MANIFEST.mgla[c.wariantMgla ?? 0]);
+            if (!img) continue;
+            const r = Math.max(c.r, wRef * 0.012) * KLAB_SKALA * 0.8;
+            ctx.globalAlpha = Math.min(1, 0.35 + 0.45 * p);
+            ctx.drawImage(wypalTintowany(img, BARWA_ZAPLONU_STOPNIE[stopien], KLAB_SPRITE_PX),
+                           c.x - r, c.y - r, r * 2, r * 2);
         }
         ctx.globalAlpha = 1;
-        for (const przebieg of PRZEBIEGI_OGNIA) {
-            ctx.globalCompositeOperation = przebieg.addytywny ? 'lighter' : 'source-over';
-            for (const { stopien, szer, alfa, p } of ogien.values()) {
-                const [cr, cg, cb] = BARWA_ZAPLONU_STOPNIE[stopien];
-                ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${(przebieg.alfa * alfa).toFixed(3)})`;
-                ctx.lineWidth = szer * przebieg.szerokosc;
-                ctx.stroke(p);
-            }
-        }
-        ctx.globalCompositeOperation = 'lighter';
 
         let licznikSprite = 0;
         const krokSprite = Math.max(SPRITE_CO_ILE,
@@ -884,6 +941,15 @@ export function obwiedniaAlfy(wiek, zycie) {
  * rozchodzą się na setki pikseli - kreska między nimi byłaby belką przez pół
  * ekranu, nie dymem.
  */
+/** Kierunek jednostkowy z fallbackiem "w górę" - wspólny dla wypusc() i smuz(). */
+function kierunekJednostkowy(kierunek) {
+    let kx = Number.isFinite(kierunek?.x) ? kierunek.x : 0;
+    let ky = Number.isFinite(kierunek?.y) ? kierunek.y : -1;
+    const dl = Math.hypot(kx, ky);
+    if (dl < 1e-6) return { kx: 0, ky: -1 };
+    return { kx: kx / dl, ky: ky / dl };
+}
+
 function polaczone(a, b) {
     const d = Math.hypot(a.x - b.x, a.y - b.y);
     return d <= (a.r + b.r) * 1.5;
