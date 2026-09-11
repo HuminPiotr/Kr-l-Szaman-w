@@ -225,3 +225,52 @@ dymu**; wzór ulotny — rozpływa się w chmurę po ~10 s.
 **Kompromis do świadomej decyzji:** linia trzyma ~10 s (życzenie „szybko w chmurę"), po czym
 zostaje po niej **rzadki ślad kłębów (~2,8/s), nie kształt**. Jeśli wzór ma zostać czytelny
 dłużej — `KLAB_CO` w dół (32 → 8) i `MAX_STRUMIENIA` w dół (budżet fill-rate).
+
+## v4 (2026-09-11) — wstęga zamiast sprite'ów, cztery strony świata
+
+**Zgłoszenie po trzecim teście:** „ciągle wykorzystujesz tę teksturę kółka. Wypuszczana linia
+powinna być stała i dopiero przez umiejętne zataczanie okręgów tworzyć kółka. Musisz odejść od
+tej tekstury. Ponadto dym powinien móc być wypuszczony w cztery strony świata, mocno w boki
+i w dół, a nie od razu lecieć w górę. Początkowa siła kierunku powinna zależeć od ustawienia
+gracza." Decyzje z pytań: kreska **zmienna** (cienka przy ustach, grubsza dalej), siła
+z **wyrazistości ustawienia**, kształt trzyma pozycję **~8 s**.
+
+**Diagnoza:**
+1. **Rysowanie.** `drawImage(MANIFEST.mgla[...])` na cząstkę — okrągła tekstura. Cząstki
+   sąsiadowały w czasie, ale nic ich nie łączyło: rzadziej = paciorki, gęściej = pasmo kółek.
+   Żadna liczba ani rozmiar sprite'ów tego nie zmieni — trzeba rysować **kreskę**.
+2. **Kierunek.** `SKOS_W_GORE = −0,3` plus pół wagi na pochylenie głowy → składowa Y nigdy
+   nie była dodatnia, więc **w dół dmuchnąć się nie dało**.
+3. **Wyporność.** Waga `1 − exp(−wiek/0,8 s)` — po ~1 s wszystko płynęło w górę.
+4. **Siła.** `gest × moc` nie miała nic wspólnego z ustawieniem gracza.
+
+**Przebudowa:**
+- **Węzły wstęgi zamiast cząstek** (`js/dym.js`). Węzeł ma to, co miała cząstka, ale należy do
+  wstęgi; rysowane są **odcinki** między kolejnymi węzłami (`stroke`, `lineCap/lineJoin: round`)
+  w **pięciu przebiegach** (szeroka poświata → wąski rdzeń) na płótnie **1/3 rozdzielczości**,
+  składanym jednym `drawImage` z `blur(4px)`. Odcinki idą w kubełkach (szerokość × alfa) jako
+  `Path2D` — dziesiątki `stroke()` zamiast tysięcy. Zero `MANIFEST.mgla` w dymie; sprite'y
+  Kenney zostają **wyłącznie** przy zapłonie i wybuchu.
+- `r` to **połowa szerokości**: 0,008 W przy ustach → 0,030–0,042 W (τ 15 s). Alfa cienieje
+  z szerokością (0,42 → 0,14). Szerokość ma szum per-węzeł (±25%) — kreska nie jest rurką.
+- **Wariancja per WSTĘGA, nie per węzeł** (prędkość, faza, szerokość docelowa): losowanie
+  prędkości per węzeł powodowało, że po sekundzie szybszy wyprzedzał wolniejszego, kolejność
+  w kresce się odwracała i wstęga zygzakowała.
+- **Co najmniej jeden węzeł na klatkę emisji** (nadwyżka bywa ujemna) — klatka bez węzła
+  podwajała odstęp i kreska ścinała zakręty.
+- **Cztery strony świata** (`js/dmuchanie.js`): `SKOS_W_GORE` usunięty, `y = −pochylenie`
+  z pełnym wzmocnieniem. Głowa opuszczona → dym w dół, uniesiona → w górę, skręcona → w bok.
+- **Wyporność opóźniona**: waga `1 − exp(−wiek/8 s)` — kształt trzyma pozycję ~8 s, dym
+  wypuszczony w dół naprawdę leci w dół.
+- **`wyrazistosc`** = długość zblendowanego wektora głowa+dłoń **przed** normalizacją, wygładzona
+  tą samą EMA co kierunek. Skaluje prędkość wylotu (podłoga 0,35): zdecydowane wycelowanie →
+  strumień sięga ~0,32 W, poza nijaka → ~0,19 W. EMA liczona na wektorze **nieznormalizowanym**:
+  normalizacja co klatkę zacinała obrót o 180° wzdłuż osi.
+- **Ogień**: front biegnie **wzdłuż wstęgi** (sąsiedzi w kresce) + między wstęgami przez siatkę
+  kubełkową budowaną tylko w klatkach rozprzestrzeniania (O(n²) przy 5000 węzłów odpadło).
+  Płonąca kreska rysowana tymi samymi wielokrotnymi przebiegami; sprite wybuchu co 6. węzeł.
+  Wybuch **przepala kreskę** (`przerwa` na następnym węźle). Przerzedzanie nigdy nie usuwa
+  płonącego węzła.
+
+**Zmierzone w przeglądarce** (1920×1080): 100 s ciągłego dmuchania → 2748 węzłów, rysowanie
+3,2 ms/klatkę, fizyka 0,3 ms; detonacja całej chmury: najgorsza klatka 14,7 ms.

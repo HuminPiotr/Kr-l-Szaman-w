@@ -98,24 +98,33 @@ const SILA_PODLOGA = 0.35;
 
 const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
-// --- Kierunek wydechu (v2) - ZGADNIĘTE, do strojenia na kamerze ---
+// --- Kierunek wydechu (v4) - ZGADNIĘTE, do strojenia na kamerze ---
+// v4: CZTERY STRONY ŚWIATA. Zniknął stały skos w górę (SKOS_W_GORE = -0.3),
+// przez który składowa Y nigdy nie była dodatnia i w dół dmuchnąć się NIE
+// DAŁO; pochylenie głowy dostało pełną wagę zamiast połowy.
 export const WAGA_GLOWY = 0.6;          // reszta to dłoń (usta - nadgarstek)
 const WZMOCNIENIE_SKRETU = 2.5;         // (nos - środek oczu)/rozstaw oczu x to -> [-1,1]
-export const SKOS_W_GORE = -0.3;        // stała składowa Y (ujemna = w górę ekranu)
-const WAGA_POCHYLENIA = 0.5;            // ile uniesienie głowy dokłada do składowej Y
+const WZMOCNIENIE_POCHYLENIA = 2.5;     // to samo dla osi Y (nos względem linii oczu)
 // Nos w twarzy na wprost leży ~0.7 rozstawu oczu PONIŻEJ ich linii (rozstaw
 // źrenic ~63 mm, czubek nosa ~45 mm pod linią oczu). ZGADNIĘTE z anatomii,
 // nie zmierzone - HUD (klawisz D) pokazuje surowe pochylenie, żeby to
 // sprawdzić: przy głowie na wprost ma czytać ~0.
 const NOS_POD_OCZAMI = 0.7;
-const TAU_KIERUNKU_S = 0.25;            // EMA - plume nie drga klatka po klatce
+const TAU_KIERUNKU_S = 0.25;            // EMA - kreska nie drga klatka po klatce
+// WYRAZISTOŚĆ ustawienia gracza = długość zblendowanego wektora PRZED
+// normalizacją. Zgodne, zdecydowane sygnały (wyraźny skręt głowy + dłoń
+// wskazująca to samo) -> ~1; poza nijaka albo sprzeczne sygnały -> bliskie 0.
+// Steruje prędkością wylotu w dym.js (życzenie: "początkowa siła kierunku
+// zależna od ustawienia gracza"), NIGDY nie kończy techniki. Wygładzana tą
+// samą EMA co kierunek - to po prostu jej długość.
 
 export class Dmuchanie {
     constructor() {
         this.stan = 'BEZCZYNNY';
         this.zaczep = null;       // {x,y} znormalizowane - usta, do rysowania (jak plonacyPalec.zaczep)
         this.kierunek = { x: 0, y: -1 };   // jednostkowy, OD dłoni w stronę ust i dalej
-        this.sila = 0;             // 0..1 - grubość strumienia dla dym.emituj
+        this.sila = 0;             // 0..1 - tempo i szerokość kreski dla dym.emituj
+        this.wyrazistosc = 0;      // 0..1 - jak zdecydowanie gracz celuje (prędkość wylotu)
         this.pozostaloS = 0;       // diagnostyka: ile jeszcze żyje potencjał
         this._wygasaO = 0;         // performance.now() + CZAS_POTENCJALU_MS
         this._gest = 0;            // wygładzony wynik gestu, do histerezy
@@ -148,6 +157,7 @@ export class Dmuchanie {
 
         if (this.stan === 'BEZCZYNNY') {
             this.sila = 0;
+            this.wyrazistosc = 0;
             return 0;
         }
 
@@ -195,6 +205,7 @@ export class Dmuchanie {
         this.stan = 'BEZCZYNNY';
         this.zaczep = null;
         this.sila = 0;
+        this.wyrazistosc = 0;
         this.pozostaloS = 0;
         this._gest = 0;
         this._ustaSwiat = null;
@@ -250,7 +261,9 @@ export class Dmuchanie {
      * Blend dwóch sygnałów, wszystko z landmarks 2D (to kierunek na ekranie,
      * nie pomiar - GEMINI.md:49):
      *   GŁOWA (WAGA_GLOWY): skręt = (nos - środek oczu) / rozstaw oczu -> X;
-     *          Y = stały skos w górę + pochylenie głowy (nos względem oczu).
+     *          Y = -pochylenie głowy (nos względem linii oczu). Głowa
+     *          opuszczona = dym leci W DÓŁ, uniesiona = w górę, skręcona =
+     *          w bok: CZTERY STRONY ŚWIATA (v4).
      *          OCZY (2/5), nie uszy (7/8): przy skręcie głowy dalsze ucho
      *          znika za twarzą i jego visibility spada - sygnał gasłby
      *          dokładnie wtedy, gdy gracz celuje. Oczy przy umiarkowanym
@@ -263,28 +276,34 @@ export class Dmuchanie {
      * klatce. Fallbacki: bez oczu - sama dłoń; bez niczego - {0,-1}.
      */
     _kierunek(wl, lm, krok = 0) {
-        let cel = null;
         const glowa = this._kierunekGlowy(lm);
         const dlon = this._kierunekDloni(wl, lm);
-        if (glowa && dlon) {
-            cel = { x: glowa.x * WAGA_GLOWY + dlon.x * (1 - WAGA_GLOWY),
-                    y: glowa.y * WAGA_GLOWY + dlon.y * (1 - WAGA_GLOWY) };
-        } else {
-            cel = glowa ?? dlon ?? { x: 0, y: -1 };
-        }
-        const dl = Math.hypot(cel.x, cel.y);
-        cel = dl > 1e-6 ? { x: cel.x / dl, y: cel.y / dl } : { x: 0, y: -1 };
-
+        // Suma ważona BEZ renormalizacji brakujących sygnałów: głowa na wprost
+        // daje wektor zerowy, brak głowy - tylko 0.4 długości dłoni. Długość
+        // TEJ sumy to wyrazistość (patrz TAU_WYRAZISTOSCI_S).
+        const cel = {
+            x: (glowa ? glowa.x * WAGA_GLOWY : 0) + (dlon ? dlon.x * (1 - WAGA_GLOWY) : 0),
+            y: (glowa ? glowa.y * WAGA_GLOWY : 0) + (dlon ? dlon.y * (1 - WAGA_GLOWY) : 0)
+        };
+        // EMA na wektorze NIEZNORMALIZOWANYM, normalizacja dopiero na wyjściu.
+        // Normalizowanie co klatkę zacinało obrót o 180°: przy odwróceniu
+        // kierunku dokładnie wzdłuż osi wektor po każdym kroku wracał do
+        // długości 1 i nigdy nie przechodził przez zero.
         if (!this._kierunekEma) {
-            this._kierunekEma = cel;
+            this._kierunekEma = { x: cel.x, y: cel.y };
         } else {
             const a = Math.min(1, (Number.isFinite(krok) ? krok : 0) / TAU_KIERUNKU_S);
-            const ex = this._kierunekEma.x + a * (cel.x - this._kierunekEma.x);
-            const ey = this._kierunekEma.y + a * (cel.y - this._kierunekEma.y);
-            const el = Math.hypot(ex, ey);
-            this._kierunekEma = el > 1e-6 ? { x: ex / el, y: ey / el } : cel;
+            this._kierunekEma = {
+                x: this._kierunekEma.x + a * (cel.x - this._kierunekEma.x),
+                y: this._kierunekEma.y + a * (cel.y - this._kierunekEma.y)
+            };
         }
-        return { x: this._kierunekEma.x, y: this._kierunekEma.y };
+        // Ta sama wygładzona długość jest WYRAZISTOŚCIĄ ustawienia gracza.
+        const dl = Math.hypot(this._kierunekEma.x, this._kierunekEma.y);
+        this.wyrazistosc = Math.max(0, Math.min(1, dl));
+        return dl > 1e-6
+            ? { x: this._kierunekEma.x / dl, y: this._kierunekEma.y / dl }
+            : { x: 0, y: -1 };
     }
 
     /** Skręt i pochylenie głowy z nosa (0) i oczu (2/5), 2D. null bez pewnych oczu. */
@@ -297,10 +316,12 @@ export class Dmuchanie {
         if (rozstaw < 1e-4) { this.glowa = null; return null; }
         const sx = (oL.x + oP.x) / 2, sy = (oL.y + oP.y) / 2;
         const skret = Math.max(-1, Math.min(1, (nos.x - sx) / rozstaw * WZMOCNIENIE_SKRETU));
-        // Uniesienie głowy podnosi nos względem oczu -> dodatnie pochylenie.
-        const pochylenie = Math.max(-1, Math.min(1, (sy + NOS_POD_OCZAMI * rozstaw - nos.y) / rozstaw));
+        // Uniesienie głowy podnosi nos względem oczu -> dodatnie pochylenie;
+        // opuszczenie -> ujemne, czyli składowa Y DODATNIA = dym leci w DÓŁ.
+        const pochylenie = Math.max(-1, Math.min(1,
+            (sy + NOS_POD_OCZAMI * rozstaw - nos.y) / rozstaw * WZMOCNIENIE_POCHYLENIA));
         this.glowa = { skret, pochylenie };
-        return { x: skret, y: SKOS_W_GORE - pochylenie * WAGA_POCHYLENIA };
+        return { x: skret, y: -pochylenie };
     }
 
     /** usta - nadgarstek bliższy ustom, 2D. null bez danych. */

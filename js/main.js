@@ -582,6 +582,7 @@ function klatka(now) {
             { x: dmuchanie.zaczep.x * canvas.width, y: dmuchanie.zaczep.y * canvas.height },
             dmuchanie.kierunek,
             dmuchanie.sila,
+            dmuchanie.wyrazistosc,
             dt,
             canvas.width
         );
@@ -772,8 +773,9 @@ function klatka(now) {
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
         // strojenia progu na żywo, patrz debugHud.js.
         dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest,
-                     kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa },
-        dym: { kleby: dym.klebow, strumien: dym.strumienia, plonacych: dym.plonacych },
+                     kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa,
+                     wyrazistosc: dmuchanie.wyrazistosc },
+        dym: { wezlow: dym.liczba, wsteg: dym.wsteg, odcinkow: dym.odcinkow, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,

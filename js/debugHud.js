@@ -492,10 +492,12 @@ export class DebugHud {
             // wyraźnym obrocie, pochylenie ~0 przy głowie na wprost.
             const k = stats.dmuchanie.kierunek, g = stats.dmuchanie.glowa;
             lines.push(`  kierunek ${k ? `${this._num(k.x)} ${this._num(k.y)}` : '-'}` +
+                       `   wyrazistość ${this._num(stats.dmuchanie.wyrazistosc)}` +
                        `   głowa ${g ? `skręt ${this._num(g.skret)} pochyl ${this._num(g.pochylenie)}` : 'brak oczu'}`);
         }
-        if (stats.dym && (stats.dym.kleby > 0 || stats.dym.strumien > 0 || stats.dym.plonacych > 0)) {
-            lines.push(`dym: kłębów ${stats.dym.kleby}  wstęga ${stats.dym.strumien}  płonących ${stats.dym.plonacych}`);
+        if (stats.dym && (stats.dym.wezlow > 0 || stats.dym.plonacych > 0)) {
+            lines.push(`dym: węzłów ${stats.dym.wezlow}  wstęg ${stats.dym.wsteg}` +
+                       `  odcinków ${stats.dym.odcinkow}  płonących ${stats.dym.plonacych}`);
         }
 
         if (stats.maska) lines.push(`maska ${stats.maska}`);

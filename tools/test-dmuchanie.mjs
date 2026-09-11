@@ -9,7 +9,7 @@
  * moc NIGDY nie kończy potencjału; i że jeden zegar 4-minutowy jest
  * jedynym samoistnym sposobem wygaśnięcia.
  */
-import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, SKOS_W_GORE } from '../js/dmuchanie.js';
+import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -25,7 +25,7 @@ const DT = 1 / 60;
  */
 function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
                   usta = [0, -0.78, 0.05], ustaWidoczne = true, brakPozy = false,
-                  skretGlowy = 0, oczyWidoczne = true } = {}) {
+                  skretGlowy = 0, pochylGlowy = 0, oczyWidoczne = true } = {}) {
     if (brakPozy) return null;
     const wl = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
     wl[11] = { x: -0.15, y: -0.55, z: 0, visibility: 0.9 };   // BARK_L
@@ -40,7 +40,9 @@ function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
     const rozstaw = 0.063, oczyY = usta[1] - 0.08;
     wl[2] = { x: usta[0] - rozstaw / 2, y: oczyY, z: usta[2], visibility: oczyWidoczne ? 0.9 : 0.1 };
     wl[5] = { x: usta[0] + rozstaw / 2, y: oczyY, z: usta[2], visibility: oczyWidoczne ? 0.9 : 0.1 };
-    wl[0] = { x: usta[0] + skretGlowy * rozstaw, y: oczyY + 0.7 * rozstaw, z: usta[2], visibility: 0.9 };
+    // `pochylGlowy` dodatni = głowa UNIESIONA (nos wyżej względem oczu).
+    wl[0] = { x: usta[0] + skretGlowy * rozstaw,
+              y: oczyY + (0.7 - pochylGlowy) * rozstaw, z: usta[2], visibility: 0.9 };
     return wl;
 }
 
@@ -189,17 +191,26 @@ console.log('\nKOTWICA UST PRZEŻYWA ZASŁONIĘCIE:');
     spr(`usta zasłonięte przez dłoń - DMUCHA trwa dalej (${d.stan})`, d.stan === 'DMUCHA');
 }
 
-console.log('\nKIERUNEK WYDECHU (v2: głowa + dłoń, EMA):');
+console.log('\nKIERUNEK WYDECHU (v4: cztery strony świata, głowa + dłoń, EMA):');
 {
-    // Głowa na wprost, dłoń P przy ustach z prawej strony -> kłąb leci w lewo
-    // (od dłoni) i w górę (SKOS_W_GORE).
+    // Głowa na wprost, dłoń P przy ustach z prawej strony -> dym leci w lewo
+    // (OD dłoni) i lekko w górę (dłoń jest poniżej ust).
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
     dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr('wynik jest jednostkowy', Math.abs(Math.hypot(d.kierunek.x, d.kierunek.y) - 1) < 1e-6);
-    spr(`składowa Y ujemna - w górę ekranu (${d.kierunek.y.toFixed(2)})`, d.kierunek.y < 0);
+    // v4: ŻADNEGO wbudowanego skosu w górę - dłoń na wysokości ust daje
+    // kierunek poziomy. W v3 SKOS_W_GORE wymuszał tu y < 0 zawsze.
+    spr(`dłoń na wysokości ust -> kierunek poziomy (${d.kierunek.y.toFixed(2)})`, Math.abs(d.kierunek.y) < 0.05);
     spr(`dłoń z prawej -> składowa X w lewo, OD dłoni (${d.kierunek.x.toFixed(2)})`, d.kierunek.x < 0);
+
+    // Dłoń PONIŻEJ ust (naturalne ułożenie) -> dym leci w górę.
+    const g = new Dmuchanie();
+    resetSkali();
+    g.uzbrój(0);
+    dmuchajNKlatek(g, 40, { nadgP: [0.10, -0.70, 0.05], now: 0 });
+    spr(`dłoń poniżej ust -> składowa Y ujemna, w górę (${g.kierunek.y.toFixed(2)})`, g.kierunek.y < 0);
 }
 {
     // Skręt głowy w stronę ucha P przeważa nad dłonią z tej samej strony.
@@ -238,7 +249,68 @@ console.log('\nKIERUNEK WYDECHU (v2: głowa + dłoń, EMA):');
     dmuchajNKlatek(d, 60, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 0.4, now: 0 });
     spr('...ale po sekundzie kierunek dochodzi do nowego skrętu', d.kierunek.x > 0);
 }
-spr('SKOS_W_GORE ujemny (w górę ekranu)', SKOS_W_GORE < 0);
+
+console.log('\nCZTERY STRONY ŚWIATA (v4 - regresja na SKOS_W_GORE):');
+{
+    // Głowa OPUSZCZONA (nos niżej względem oczu) -> dym leci W DÓŁ. W v3 było
+    // to niemożliwe: stały skos -0.3 trzymał składową Y zawsze ujemną.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 60, { nadgP: [0.10, -0.78, 0.05], pochylGlowy: -0.6, now: 0 });
+    spr(`głowa opuszczona -> kierunek.y > 0, dym w DÓŁ (${d.kierunek.y.toFixed(2)})`, d.kierunek.y > 0);
+    spr('surowe pochylenie ujemne (HUD)', d.glowa.pochylenie < 0);
+
+    const e = new Dmuchanie();
+    resetSkali();
+    e.uzbrój(0);
+    dmuchajNKlatek(e, 60, { nadgP: [0.10, -0.78, 0.05], pochylGlowy: 0.6, now: 0 });
+    spr(`głowa uniesiona -> kierunek.y < 0, dym w GÓRĘ (${e.kierunek.y.toFixed(2)})`, e.kierunek.y < 0);
+
+    const f = new Dmuchanie();
+    resetSkali();
+    f.uzbrój(0);
+    dmuchajNKlatek(f, 60, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 1.0, now: 0 });
+    spr(`głowa skręcona mocno w bok -> kierunek prawie poziomy (y ${f.kierunek.y.toFixed(2)})`,
+        Math.abs(f.kierunek.y) < 0.5 && f.kierunek.x > 0.5);
+}
+
+console.log('\nWYRAZISTOŚĆ USTAWIENIA (siła wypchnięcia):');
+{
+    // Zdecydowana poza: mocny skręt głowy + dłoń wskazująca ten sam kierunek.
+    const zdecydowany = new Dmuchanie();
+    resetSkali();
+    zdecydowany.uzbrój(0);
+    dmuchajNKlatek(zdecydowany, 60, { nadgL: [-0.10, -0.78, 0.05], skretGlowy: 1.0, now: 0 });
+    spr(`zgodne, wyraźne sygnały -> wyrazistość wysoka (${zdecydowany.wyrazistosc.toFixed(2)})`,
+        zdecydowany.wyrazistosc > 0.7);
+
+    // Głowa na wprost (wektor zerowy) - zostaje sama dłoń z wagą 1-WAGA_GLOWY.
+    const nijaki = new Dmuchanie();
+    resetSkali();
+    nijaki.uzbrój(0);
+    dmuchajNKlatek(nijaki, 60, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    spr(`głowa na wprost -> wyrazistość ~${(1 - WAGA_GLOWY).toFixed(1)} (${nijaki.wyrazistosc.toFixed(2)})`,
+        Math.abs(nijaki.wyrazistosc - (1 - WAGA_GLOWY)) < 0.1);
+    spr('wyrazistość zawsze w 0..1', zdecydowany.wyrazistosc <= 1 && nijaki.wyrazistosc >= 0);
+
+    // Sprzeczne sygnały: głowa skręcona w PRAWO, dłoń pcha w LEWO - wektory
+    // się znoszą, więc siła wypchnięcia spada (poza jest niejednoznaczna).
+    const sprzeczny = new Dmuchanie();
+    resetSkali();
+    sprzeczny.uzbrój(0);
+    dmuchajNKlatek(sprzeczny, 60, { nadgP: [0.10, -0.78, 0.05], skretGlowy: 1.0, now: 0 });
+    spr(`sprzeczne sygnały -> wyrazistość niższa niż przy zgodnych (${sprzeczny.wyrazistosc.toFixed(2)})`,
+        sprzeczny.wyrazistosc < zdecydowany.wyrazistosc);
+
+    const zgaszony = new Dmuchanie();
+    resetSkali();
+    zgaszony.uzbrój(0);
+    dmuchajNKlatek(zgaszony, 10, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    zgaszony.anuluj();
+    zgaszony.update(klatka({ now: 0 }), 1, DT, 0);
+    spr('po wygaszeniu wyrazistość zeruje się', zgaszony.wyrazistosc === 0);
+}
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');
 spr('PELNY_SKALI < ZERO_SKALI (rampa ma sens)', PELNY_SKALI < ZERO_SKALI);
