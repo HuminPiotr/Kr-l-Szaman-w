@@ -118,7 +118,12 @@ const SILA_PODLOGA = 0.35;
 const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
 // --- Kółko z palców (v8) - ZGADNIĘTE, do strojenia z nakładki (klawisz D) ---
-export const PAMIEC_KOLKA_S = 1.0;         // jak długo żyje ostatni dobry odczyt
+// v8.4: 1.0 -> 1.8 s. Podczas tańca krótkie zgubienie precyzyjnego śledzenia
+// palców (ręka w ruchu, chwilowe zasłonięcie) jest częstsze niż w bezruchu,
+// w którym mierzyliśmy próg. Dłuższa pamięć daje więcej luzu, zanim
+// intensywność spadnie do zera - bez podnoszenia ryzyka fałszywych
+// uruchomień (pamięć trzyma WYŁĄCZNIE ostatni dobry odczyt, nic nie tworzy).
+export const PAMIEC_KOLKA_S = 1.8;         // jak długo żyje ostatni dobry odczyt
 // Najmniejsze kółko daje cienką strużkę, nie zero - technika nigdy nie mówi "źle".
 export const INTENSYWNOSC_PODLOGA = 0.25;
 // Dopasowanie dłoni do ręki przy ustach: nadgarstek dłoni musi być bliżej niż

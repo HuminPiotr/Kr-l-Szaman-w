@@ -562,3 +562,42 @@ stare dane nie wiszą w nieskończoność jako pozornie aktualne.
 Dodatkowo: `dmuchanie.styk` (surowy wynik „dłoń przy ustach" PRZED pomnożeniem przez kółko) jest
 teraz wystawiony osobno — pozwala odróżnić „kółko złe" od „dłoń za daleko od ust", gdyby `gest`
 mimo wszystko nie osiągał progu.
+
+## v8.4 (2026-09-12) — nowa metoda: odległość segmentu + okrągłość pętli
+
+**Zgłoszenie:** trafna obserwacja — „kropki palców przy geście kółka nie stykają się, są bardzo
+blisko, ale nie stykają się". To pasuje do znanej cechy MediaPipe: dwa wzajemnie zasłaniające się
+czubki palców to najbardziej niepewny pomiar w całym modelu dłoni; realny kontakt czytany był jako
+`odl = 0,13` (nie 0,00) — to fizyka pomiaru, nie błąd progu. Stara metoda opierała kluczowy warunek
+na DOKŁADNIE JEDNEJ takiej parze punktów (czubek kciuka ↔ czubek palca).
+
+**Nowa metoda — dwie zmiany w `kolkoPalcow()`:**
+
+1. **Odległość segmentu, nie punktu.** Zamiast jednej pary, liczone jest minimum z **czterech par**
+   punktów na końcowych odcinkach obu palców: kciuk {staw IP, czubek} × palec {staw DIP, czubek}.
+   Realny kontakt „OK" styka opuszki gdzieś w tym rejonie, nie zawsze dokładnie czubek-w-czubek.
+   Celowo bez stawów bliższych (MCP) — to przybliżyłoby wynik do pięści. Nowa miara jest zawsze
+   ≤ starej (czubek-czubek to jedna z czterech par), więc dla gestów, które już działały (0,94),
+   wynik jest taki sam albo lepszy.
+
+2. **Trzeci warunek: okrągłość pętli**, dodany PO tym, jak test wrogi ujawnił realne ryzyko:
+   poszerzenie punktów kontaktu sprawiło, że **pięść z kciukiem na wierzchu zgiętych palców**
+   zaczęła fałszywie wychodzić jako domknięte kółko (`domkniecie = 1,00`!). Samo pole pętli nie
+   wystarczało do odróżnienia — zmierzone: pięść ma pole porównywalne z MAŁYM, prawdziwym kółkiem
+   (0,05 vs 0,02–0,10 dla promieni 0,10–0,18), bo pole naturalnie rośnie z wielkością pętli.
+   Rozwiązanie: **okrągłość** (`4π·pole / obwód²`, isoperimetric quotient) jest niezależna od
+   skali — zmierzone na całym zakresie promieni (0,10–0,45) i wszystkich czterech palców: prawdziwe
+   kółko zawsze daje **0,74–0,84**, ta sama pięść daje **0,15**. Pięciokrotny margines pozwolił
+   postawić próg pewnie pośrodku (rampa 0,30–0,55) bez ryzyka dla żadnej wielkości kółka.
+
+**Dodatkowo:** `PAMIEC_KOLKA_S` w `js/dmuchanie.js` 1,0 s → 1,8 s — podczas tańca krótkie
+zgubienie precyzyjnego śledzenia palców jest częstsze niż w bezruchu, w którym mierzyliśmy próg.
+
+**Nowe testy w `tools/test-kolko.mjs`:** fixture odtwarzający dokładnie zgłoszoną obserwację
+(czubki z widoczną przerwą, stawy IP/DIP blisko) — stara metoda dałaby tu ~0, nowa daje 0,85;
+test wrogi na realistyczną pięść (kciuk na wierzchu, blisko stawów DIP) — bez trzeciego warunku
+dawał fałszywe 1,00, z nim wraca do ~0,00.
+
+Ta poprawka nie wymagała nowego zbioru danych z kamery: nowa miara odległości jest z definicji
+nie gorsza od starej dla gestów już zmierzonych jako działające, a okrągłość została skalibrowana
+na w pełni kontrolowanym, mierzalnym kontraście (0,74–0,84 kontra 0,15), nie na zgadywaniu.

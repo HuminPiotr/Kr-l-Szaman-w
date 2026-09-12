@@ -300,6 +300,15 @@ const ZGIECIE_OTWARTE = 0.12;    // ...i zero (dłoń płaska: zgięcie 0.00)
 // ~0.2 skali, czyli pole ~0.13; pętla kciuk-mały ma promień ~0.4, czyli ~0.5.
 const POLE_MALE = 0.10;
 const POLE_DUZE = 0.50;
+// PIERŚCIEŃ, NIE ZLEPEK - trzeci warunek (v8.4). Poszerzenie punktów kontaktu
+// (patrz niżej) teoretycznie mogłoby pomylić PIĘŚĆ (kciuk leżący NA WIERZCHU
+// zgiętych palców) z kółkiem - zmierzone na dłoni syntetycznej: taka pięść ma
+// POLE porównywalne z małym, realnym kółkiem (0.05 vs 0.02-0.10), bo samo
+// pole zależy od WIELKOŚCI pętli, a mała, prawdziwa pętla i tak jest mała.
+// OKRĄGŁOŚĆ jest za to niezależna od skali - prawdziwe kółko (dowolny
+// promień, dowolny palec) daje 0.74-0.84, ta sama pięść daje 0.15. Duży
+// margines w obie strony pozwala postawić próg pewnie pośrodku.
+const OKRAGLOSC_MIN = 0.30, OKRAGLOSC_PELNA = 0.55;
 
 /** Pole wielokąta wzorem szuwaru (shoelace). Znak nieistotny - bierzemy moduł. */
 function poleWielokata(punkty) {
@@ -309,6 +318,26 @@ function poleWielokata(punkty) {
         s += a.x * b.y - b.x * a.y;
     }
     return Math.abs(s) / 2;
+}
+
+/** Obwód wielokąta - suma długości boków. */
+function obwodWielokata(punkty) {
+    let s = 0;
+    for (let i = 0; i < punkty.length; i++) {
+        const a = punkty[i], b = punkty[(i + 1) % punkty.length];
+        s += dist(a, b);
+    }
+    return s;
+}
+
+/**
+ * Okrągłość (isoperimetric quotient) 4π·pole/obwód² - 1 dla koła, ->0 dla
+ * cienkiej, wydłużonej wstęgi. SKALOWO NIEZALEŻNA (koło dwa razy większe ma
+ * tę samą okrągłość) - w przeciwieństwie do samego pola, które dla MAŁEGO
+ * kółka wychodzi tyle samo, co dla ZUPEŁNIE INNEGO KSZTAŁTU (patrz niżej).
+ */
+function okraglosc(pole, obwod) {
+    return obwod > 1e-9 ? 4 * Math.PI * pole / (obwod * obwod) : 0;
 }
 
 /**
@@ -355,25 +384,48 @@ export function kolkoPalcow(lm) {
     const skala = skalaDloni(lm);
     if (!(skala > 1e-6)) return null;
 
-    const kciuk = lm[4];
+    // v8.4 - ODLEGŁOŚĆ SEGMENTU, NIE SAMEGO CZUBKA. Czubek kciuka i czubek
+    // palca to JEDYNA para punktów w całej dłoni, która przy geście OK
+    // regularnie się WZAJEMNIE ZASŁANIA - MediaPipe zgaduje ich pozycję
+    // z obrazu, na którym oba się nakładają, więc realny kontakt i tak
+    // zostaje odczytany jako kilka centymetrów przerwy (zmierzone: 0.13
+    // skali dłoni przy prawdziwym dotyku, nie 0.00). Zamiast polegać na
+    // TEJ JEDNEJ, najbardziej zaszumionej parze, bierzemy MINIMUM z czterech
+    // par na końcowych odcinkach obu palców (kciuk: staw IP + czubek; palec:
+    // staw DIP + czubek) - realny kontakt "OK" styka opuszki gdzieś w tym
+    // rejonie, nie zawsze dokładnie czubek-w-czubek. CELOWO bez stawów
+    // bliższych (MCP/nasada) - to przybliżyłoby wynik do pięści (kciuk
+    // leżący w poprzek zwiniętych palców blisko ich nasad), patrz test wrogi
+    // w tools/test-kolko.mjs. Minimum z 4 par jest zawsze <= starej miary
+    // (czubek-czubek to jedna z tych par), więc dla gestów, które już
+    // działały, wynik jest taki sam albo lepszy - bez ryzyka regresji.
+    const kciukPunkty = [lm[3], lm[4]];   // IP, czubek
     let najlepszy = null;
     for (const nazwa of ['wskazujacy', 'srodkowy', 'serdeczny', 'maly']) {
         const staw = PALCE[nazwa];
-        const d = dist(kciuk, lm[staw[3]]) / skala;
+        const palecPunkty = [lm[staw[2]], lm[staw[3]]];   // DIP, czubek
+        let d = Infinity;
+        for (const a of kciukPunkty) for (const b of palecPunkty) d = Math.min(d, dist(a, b));
+        d /= skala;
         if (!najlepszy || d < najlepszy.d) najlepszy = { nazwa, staw, d };
     }
     if (!najlepszy) return null;
 
-    // Dwa NIEZALEŻNE warunki, oba muszą być spełnione - iloczyn ciągłych
-    // wyników (reguła nadrzędna: żaden nie jest twardym progiem osobno).
+    const [mcp, pip, dip, tip] = najlepszy.staw;
+    const otoczka = otoczkaWypukla([lm[2], lm[3], lm[4], lm[tip], lm[dip], lm[pip], lm[mcp]]);
+    const pole = poleWielokata(otoczka) / (skala * skala);
+    const obwod = obwodWielokata(otoczka) / skala;
+
+    // TRZY NIEZALEŻNE warunki, wszystkie muszą być spełnione - iloczyn
+    // ciągłych wyników (reguła nadrzędna: żaden nie jest twardym progiem
+    // osobno). Trzeci (okrągłość) odróżnia PRAWDZIWE KÓŁKO od PIĘŚCI z
+    // kciukiem na wierzchu zgiętych palców - patrz nagłówek OKRAGLOSC_MIN.
     const domknieteOpuszki = rampa(najlepszy.d, KOLKO_OTWARTE, KOLKO_ZAMKNIETE);
     const zgiecie = Math.max(1 - wyprostowany(lm, najlepszy.nazwa), 1 - wyprostowany(lm, 'kciuk'));
     const zgiety = rampa(zgiecie, ZGIECIE_OTWARTE, ZGIECIE_ZAMKNIETE);
-    const domkniecie = domknieteOpuszki * zgiety;
+    const pierscien = rampa(okraglosc(pole, obwod), OKRAGLOSC_MIN, OKRAGLOSC_PELNA);
+    const domkniecie = domknieteOpuszki * zgiety * pierscien;
 
-    const [mcp, pip, dip, tip] = najlepszy.staw;
-    const pole = poleWielokata(otoczkaWypukla([lm[2], lm[3], lm[4], lm[tip], lm[dip], lm[pip], lm[mcp]]))
-               / (skala * skala);
     // Wielkość liczy się tylko, gdy pętla FAKTYCZNIE jest zamknięta - bez
     // tego "wielkie kółko" mogłoby wyjść z dłoni, która niczego nie zwarła.
     return {

@@ -14,6 +14,15 @@
  */
 import { kolkoPalcow, PALCE, NADGARSTEK } from '../js/znaki/dlon.js';
 
+// v8.4: METODA ZMIENIONA na odległość SEGMENTU (min z 4 par kciuk{IP,czubek} x
+// palec{DIP,czubek}), zamiast pojedynczej pary czubek-czubek - zgłoszenie
+// "kropki palców nie stykają się, są bardzo blisko, ale nie stykają się"
+// (realny kontakt OK czytany przez MediaPipe jako ~0.13 skali dłoni przerwy,
+// nie 0.00 - dwa wzajemnie zasłaniające się czubki to najbardziej niepewny
+// pomiar w całym modelu dłoni). Dodany TRZECI warunek (okrągłość pętli),
+// bo poszerzenie punktów kontaktu inaczej pozwalałoby pięści z kciukiem na
+// wierzchu zgiętych palców przejść jako kółko - patrz test wrogi niżej.
+
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
 
@@ -60,6 +69,55 @@ function dlonZPetla({ palec = 'wskazujacy', r = 0.2, skala = 0.1, ox = 0.5, oy =
         lm[t2] = { x: bazaX, y: bazaY - 0.75 * skala, z: 0 };
     }
     return lm;
+}
+
+console.log('KONTAKT W POBLIŻU CZUBKÓW, NIE CZUBEK-W-CZUBEK (v8.4):');
+{
+    // Dokładnie zgłoszona obserwacja: same czubki (kciuk[4], palec[tip]) mają
+    // WIDOCZNĄ PRZERWĘ - tuż POZA progiem starej metody (KOLKO_OTWARTE) - ale
+    // sąsiednie stawy (kciuk IP [3], palec DIP) zostają blisko siebie, tak jak
+    // przy realnym dotyku poduszeczkami/stawami zamiast dokładnie czubkami.
+    function dlonKontaktStawem({ skala = 0.1, ox = 0.5, oy = 0.5 } = {}) {
+        const lm = Array.from({ length: 21 }, () => ({ x: ox, y: oy, z: 0 }));
+        lm[NADGARSTEK] = { x: ox, y: oy, z: 0 };
+        lm[9] = { x: ox, y: oy - skala, z: 0 };
+        lm[5] = { x: ox - 0.3 * skala, y: oy - 0.95 * skala, z: 0 };
+        lm[13] = { x: ox + 0.3 * skala, y: oy - 0.95 * skala, z: 0 };
+        lm[17] = { x: ox + 0.6 * skala, y: oy - 0.85 * skala, z: 0 };
+        // Kciuk: łańcuch 1->2->3->4 realnie zgięty, kończący się obok wskazującego.
+        lm[1] = { x: ox - 0.5 * skala, y: oy - 0.2 * skala, z: 0 };
+        lm[2] = { x: ox - 0.55 * skala, y: oy - 0.55 * skala, z: 0 };
+        lm[3] = { x: ox - 0.35 * skala, y: oy - 0.85 * skala, z: 0 };   // IP - blisko DIP wskazującego
+        lm[4] = { x: ox - 0.45 * skala, y: oy - 0.78 * skala, z: 0 };   // TIP - odsunięty od TIP wskazującego
+        // Wskazujący: mcp->pip->dip->tip realnie zgięty, kończący się obok kciuka.
+        const [mcp, pip, dip, tip] = PALCE.wskazujacy;
+        lm[mcp] = { x: ox - 0.3 * skala, y: oy - 0.95 * skala, z: 0 };
+        lm[pip] = { x: ox - 0.3 * skala, y: oy - 1.15 * skala, z: 0 };
+        lm[dip] = { x: ox - 0.32 * skala, y: oy - 0.90 * skala, z: 0 };   // blisko IP kciuka
+        lm[tip] = { x: ox - 0.15 * skala, y: oy - 0.75 * skala, z: 0 };   // odsunięty od TIP kciuka
+        for (const nazwa of ['srodkowy', 'serdeczny', 'maly']) {
+            const [m, p2, d2, t2] = PALCE[nazwa];
+            const bazaX = ox + 0.1 * skala * (nazwa === 'srodkowy' ? 1 : nazwa === 'serdeczny' ? 2 : 3);
+            const bazaY = oy - 0.95 * skala;
+            lm[m] = { x: bazaX, y: bazaY, z: 0 };
+            lm[p2] = { x: bazaX, y: bazaY - 0.3 * skala, z: 0 };
+            lm[d2] = { x: bazaX, y: bazaY - 0.55 * skala, z: 0 };
+            lm[t2] = { x: bazaX, y: bazaY - 0.75 * skala, z: 0 };
+        }
+        return lm;
+    }
+
+    const lm = dlonKontaktStawem();
+    const [, , dipIdx, tipIdx] = PALCE.wskazujacy;
+    const dTipTip = Math.hypot(lm[4].x - lm[tipIdx].x, lm[4].y - lm[tipIdx].y) / 0.1;
+    const dIpDip = Math.hypot(lm[3].x - lm[dipIdx].x, lm[3].y - lm[dipIdx].y) / 0.1;
+    spr(`fixture: czubek-czubek WYRAŹNIE za progiem starej metody (${dTipTip.toFixed(2)} > 0.28)`,
+        dTipTip > 0.28);
+    spr(`fixture: IP-DIP faktycznie blisko (${dIpDip.toFixed(2)})`, dIpDip < 0.10);
+
+    const wynik = kolkoPalcow(lm);
+    spr(`NOWA METODA łapie kontakt mimo przerwy między czubkami (domknięcie ${wynik.domkniecie.toFixed(2)} > 0.6)`,
+        wynik.domkniecie > 0.6);
 }
 
 console.log('DOMKNIĘCIE PĘTLI:');
@@ -160,6 +218,31 @@ console.log('\nREGRESJA (v8.1 - "zwykłe machnięcie otwartą dłonią" nie mia�
     }
     const pn = kolkoPalcow(piesc());
     spr(`pięść -> domknięcie niskie (${pn.domkniecie.toFixed(2)})`, pn.domkniecie < 0.3);
+
+    // TEST WROGI (v8.4): realistyczna pięść z kciukiem POŁOŻONYM NA WIERZCHU
+    // zgiętych palców, blisko ich stawów DIP - dokładnie ten przypadek, który
+    // nowa metoda (minimum z 4 par punktów końcowych, zamiast czubek-czubek)
+    // teoretycznie mogłaby pomylić z kółkiem. Kciuk leży NAD wskazującym,
+    // tak jak w prawdziwej pięści, a nie z boku dłoni jak w fixture wyżej.
+    function piescRealistyczna({ ox = 0.5, oy = 0.5, skala = 0.1 } = {}) {
+        const lm = dlonOtwarta({ ox, oy, skala });
+        for (const nazwa of ['wskazujacy', 'srodkowy', 'serdeczny', 'maly']) {
+            const [m, p2, d2, t2] = PALCE[nazwa];
+            lm[t2] = { x: lm[m].x, y: lm[m].y - 0.15 * skala, z: 0 };
+            lm[d2] = { x: lm[m].x, y: lm[m].y - 0.25 * skala, z: 0 };
+            lm[p2] = { x: lm[m].x, y: lm[m].y - 0.35 * skala, z: 0 };
+        }
+        const [, , dipWsk] = PALCE.wskazujacy;
+        // Kciuk NA WIERZCHU: IP i czubek tuż obok stawu DIP wskazującego -
+        // najgorszy realistyczny przypadek dla metody "minimum z 4 par".
+        lm[3] = { x: lm[dipWsk].x - 0.05 * skala, y: lm[dipWsk].y + 0.03 * skala, z: 0 };
+        lm[4] = { x: lm[dipWsk].x + 0.02 * skala, y: lm[dipWsk].y - 0.02 * skala, z: 0 };
+        lm[2] = { x: ox - 0.5 * skala, y: oy - 0.3 * skala, z: 0 };
+        return lm;
+    }
+    const pnR = kolkoPalcow(piescRealistyczna());
+    spr(`TEST WROGI: pięść z kciukiem NA WIERZCHU zgiętych palców -> domknięcie NISKIE (${pnR.domkniecie.toFixed(2)})`,
+        pnR.domkniecie < 0.3);
 }
 
 console.log('\nMONOTONICZNOŚĆ (v8.2 - progi finalne dojdą z pomiaru na żywej dłoni):');
