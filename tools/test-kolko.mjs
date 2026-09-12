@@ -162,4 +162,21 @@ console.log('\nREGRESJA (v8.1 - "zwykłe machnięcie otwartą dłonią" nie mia�
     spr(`pięść -> domknięcie niskie (${pn.domkniecie.toFixed(2)})`, pn.domkniecie < 0.3);
 }
 
+console.log('\nMONOTONICZNOŚĆ (v8.2 - progi finalne dojdą z pomiaru na żywej dłoni):');
+{
+    // Niezależnie od TEGO, gdzie dokładnie leżą progi KOLKO_ZAMKNIETE/OTWARTE,
+    // domknięcie MUSI rosnąć w miarę zbliżania się opuszków - inaczej żaden
+    // próg nie uratuje gestu. To jest test, który NIE zakłada konkretnej
+    // wartości liczbowej (stąd przetrwa kalibrację progów z HUD).
+    const kroki = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.55, 0.70].map(
+        rozchyl => kolkoPalcow(dlonZPetla({ r: 0.2, rozchyl })).domkniecie
+    );
+    let rosnie = true;
+    for (let i = 1; i < kroki.length; i++) if (kroki[i] > kroki[i - 1] + 1e-9) rosnie = false;
+    spr(`domknięcie NIE ROŚNIE, gdy opuszki się oddalają (${kroki.map(v => v.toFixed(2)).join(' ')})`,
+        rosnie);
+    spr('przy w pełni złączonych opuszkach i zgiętym palcu domknięcie bliskie 1', kroki[0] > 0.9);
+    spr('przy wyraźnie rozwartych opuszkach domknięcie bliskie 0', kroki[kroki.length - 1] < 0.1);
+}
+
 process.exit(ok ? 0 : 1);

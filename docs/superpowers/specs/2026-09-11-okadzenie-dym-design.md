@@ -508,3 +508,34 @@ zgięty) nadal `domkniecie > 0,8`.
 
 Nowe testy w `tools/test-kolko.mjs` odtwarzają dokładnie zgłoszony przypadek (dłoń płaska
 zbudowana wprost, bez pętli) jako regresję.
+
+## v8.2 (2026-09-12) — kółko nigdy się nie zapala (druga strona tego samego błędu)
+
+**Zgłoszenie z kamery:** po v8.1 kółko w ogóle się nie zapala — dym nigdy nie startuje. v8.1
+naprawiła fałszywe pozytywy, ale poszła za daleko w drugą stronę.
+
+**Diagnoza, tym razem z nazwaną granicą narzędzia pomiarowego.** Sprawdziłem `kolkoPalcow()` na
+`tools/_dlon-syntetyczna.mjs` (prawdziwy łańcuch kinematyczny, nie ręcznie sklejony fixture z
+`test-kolko.mjs`) i znalazłem, że **ten model nie potrafi wyprodukować anatomicznie poprawnego
+gestu OK**:
+- kciuk obrócony w poprzek dłoni, ale nie zgięty w żadnym stawie → `zgiecie = 0,00` — miara
+  „prostota = dystans końców / suma odcinków" jest ślepa na **obrót** sztywnego łańcucha, widzi
+  tylko jego wewnętrzne wygięcie. Prawdziwy kciuk robi kółko OK głównie przez **odwiedzenie w
+  stawie nadgarstkowo-śródręcznym**, nie przez zgięcie paliczków;
+- przy kciuku i palcu zgiętych **równo**, dystans opuszków utyka na stałych ~0,32 niezależnie od
+  siły zgięcia (0,3/0,3 → 0,32; 0,5/0,5 → 0,32; 0,9/0,9 → 0,32) — model kciuka w generatorze zgina
+  się w miejscu jak zwykły palec, nie ma opozycji przenoszącej go w stronę innego palca.
+
+**Wniosek:** próg odległości z v8.1 (0,12–0,30) był kalibrowany na modelu, który nigdy nie
+odtworzył realnego domknięcia — czyli nigdy nie był sprawdzony na geometrii, jaką faktycznie da
+żywa dłoń. Zgadywanie kolejnej liczby na tym samym modelu powtórzyłoby błąd.
+
+**Decyzja:** zamiast trzeciej rundy zgadywania — jedno przejście z realnymi liczbami z HUD
+(`odl`/`zgiecie`, dodane właśnie w v8.1 na tę okazję). Do czasu dostarczenia tych liczb progi w
+`js/znaki/dlon.js` zostają jak w v8.1, z dopiskiem w nagłówku `kolkoPalcow()` wprost nazywającym
+granicę modelu syntetycznego, żeby kolejna iteracja nie próbowała znowu kalibrować tego samą
+metodą.
+
+**Niezależnie od finalnych progów** dodany test **monotoniczności** w `tools/test-kolko.mjs`:
+domknięcie musi rosnąć w miarę zbliżania się opuszków, niezależnie od tego, gdzie dokładnie leżą
+progi — ten test przetrwa kalibrację i łapie regresje kierunku, nie tylko wartości.

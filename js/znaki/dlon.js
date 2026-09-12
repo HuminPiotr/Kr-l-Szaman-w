@@ -279,6 +279,19 @@ export function normalnaDloni(worldLandmarks) {
 //   2. DRUGI WARUNEK: palec (albo kciuk, przy dużej pętli to on się gnie)
 //      musi być ZGIĘTY - przy dłoni płaskiej zgięcie wychodzi 0.00, więc to
 //      jest sygnał, którego przy samej odległości brakowało.
+// v8.2 - GRANICA MODELU SYNTETYCZNEGO, nazwana wprost: generator w
+// tools/_dlon-syntetyczna.mjs zgina kciuk W MIEJSCU jak zwykły palec, bez
+// OPOZYCJI przez dłoń (prawdziwy kciuk przy geście OK przesuwa się w stronę
+// palca, głównie obrotem w stawie nadgarstkowo-śródręcznym). Zmierzone na tym
+// modelu: kciuk obrócony, ale nie zgięty w żadnym stawie -> zgiecie = 0.00
+// (metoda "prostota = dystans końców / suma odcinków" jest ślepa na obrót
+// sztywnego łańcucha); a dystans opuszków przy RÓWNYM zgięciu kciuka i palca
+// utyka na stałych ~0.32 niezależnie od siły zgięcia - model nigdy nie
+// odtwarza realnego "domknięcia". Próg z v8.1 (0.12-0.30) był kalibrowany na
+// tym niewystarczającym modelu i okazał się za ciasny na żywej dłoni (kółko
+// przestało się zapalać w ogóle). WARTOŚCI PONIŻEJ USTAWIONE Z ODCZYTU HUD
+// NA ŻYWEJ DŁONI (klawisz D, pola "odl"/"zgiecie"), NIE z dłoni syntetycznej -
+// to jedyny wiarygodny sposób kalibracji tego warunku, patrz test-kolko.mjs.
 const KOLKO_ZAMKNIETE = 0.12;    // odległość opuszek w skalach dłoni: pełne domknięcie
 const KOLKO_OTWARTE = 0.30;      // ...i zero (płaska dłoń: 0.32-0.54 - poniżej progu)
 const ZGIECIE_ZAMKNIETE = 0.40;  // zgięcie palca/kciuka: od tylu pełny warunek spełniony
