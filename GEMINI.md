@@ -63,7 +63,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/audioEngine.js` | syntezator |
 | `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu, `N` = zrzuć ślad runy do konsoli) |
 | `js/znaki/registry.js` | rejestr znaków; `score(frame)` → 0..1, nigdy boolean |
-| `js/znaki/dlon.js` | wspólne narzędzia geometrii dłoni (skala, wyprostowanie, zwinięcie w pięść, **kółko z palców** - `kolkoPalcow()`: domknięcie pętli kciuk-opuszek i jej POLE liczone po otoczce wypukłej) |
+| `js/znaki/dlon.js` | wspólne narzędzia geometrii dłoni (skala, wyprostowanie, zwinięcie w pięść, **kółko z palców** - `kolkoPalcow()`: DWA warunki - domknięcie pętli kciuk-opuszek ORAZ zgięcie palca/kciuka - bo sama odległość opuszek nie odróżniała otwartej dłoni od kółka (v8.1, zmierzone); pole pętli liczone po otoczce wypukłej) |
 | `js/znaki/swarogDlon.js` | piramidka Swaroga (żywioł ognia) - jedyna dłoniowa pieczęć, która przeżyła przebudowę na runy |
 | `js/runy/slad.js` | bufor śladu nadgarstka - okno **długością drogi** (nie czasem!), sufit wieku |
 | `js/runy/ksztalt.js` | resampling + normalizacja + dopasowanie kształtu do szablonu |

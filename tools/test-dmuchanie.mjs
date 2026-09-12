@@ -411,8 +411,11 @@ console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
     spr(`...a intensywność spadła tylko częściowo (${intensywnoscPrzed.toFixed(2)} -> ${d.intensywnosc.toFixed(2)})`,
         d.intensywnosc > INTENSYWNOSC_PODLOGA && d.intensywnosc < intensywnoscPrzed);
     dmuchajNKlatek(d, Math.round((PAMIEC_KOLKA_S + 0.3) / DT), { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
-    spr(`po ${PAMIEC_KOLKA_S} s pamięć wygasa - intensywność na podłodze (${d.intensywnosc.toFixed(2)})`,
-        Math.abs(d.intensywnosc - INTENSYWNOSC_PODLOGA) < 1e-9);
+    // v8.1 "ostro": po wygaśnięciu pamięci intensywność spada do ZERA, nie do
+    // podłogi - "nie widać kółka" ma oznaczać "nie ma dymu", ta sama poprawka,
+    // która usunęła fałszywe uruchomienia z otwartej dłoni.
+    spr(`po ${PAMIEC_KOLKA_S} s pamięć wygasa - intensywność ZERO (${d.intensywnosc.toFixed(2)})`,
+        d.intensywnosc === 0);
     spr('...ale POTENCJAŁ nie gaśnie (technika czeka na powrót dłoni)', d.stan !== 'BEZCZYNNY');
     dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
     spr('powrót dłoni z kółkiem wznawia dmuchanie', d.stan === 'DMUCHA');
@@ -428,6 +431,10 @@ console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');
 spr('PELNY_SKALI < ZERO_SKALI (rampa ma sens)', PELNY_SKALI < ZERO_SKALI);
-spr('ZERO_SKALI daje spory zapas tolerancji (>= 1.0 szerokości barków)', ZERO_SKALI >= 1.0);
+// v8.1: ZWĘŻONE 1.2 -> 0.7 (patrz nagłówek dmuchanie.js "ZERO_SKALI ZWĘŻONE") -
+// dwa niezależne, ciasne warunki (gest x kółko) są odporniejsze na fałszywe
+// uruchomienia niż jeden ciasny i jeden luźny.
+spr('ZERO_SKALI zwężone w v8.1, ale wciąż wybacza (0.6-0.9 szerokości barków)',
+    ZERO_SKALI >= 0.6 && ZERO_SKALI <= 0.9);
 
 process.exit(ok ? 0 : 1);

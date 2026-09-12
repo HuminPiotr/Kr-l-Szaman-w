@@ -270,8 +270,19 @@ export function normalnaDloni(worldLandmarks) {
 // PROGI ZGADNIĘTE, jak wszystkie progi dłoniowe w tym pliku - do potwierdzenia
 // na żywej dłoni z nakładki (klawisz D). Zmierzone na dłoni syntetycznej
 // (tools/_dlon-syntetyczna.mjs) tylko po to, żeby trafić w rząd wielkości.
-const KOLKO_ZAMKNIETE = 0.22;    // odległość opuszek w skalach dłoni: pełne domknięcie
-const KOLKO_OTWARTE = 0.65;      // ...i zero
+// v8.1 - NAPRAWA: zmierzone na dłoni syntetycznej, że przy dłoni PŁASKIEJ
+// (otwartej) kciuk leży 0.32-0.54 skali dłoni od najbliższego opuszka, a
+// stare progi (0.22-0.65) uznawały to za domknięcie 0.77 - "zwykłe
+// machnięcie otwartą dłonią" uruchamiało technikę. Stąd DWA zaostrzenia:
+//   1. odległość opuszek zwężona - domknięcie wymaga NAPRAWDĘ stykających
+//      się opuszków, nie "dłoni w ogóle otwartej w tamtą stronę";
+//   2. DRUGI WARUNEK: palec (albo kciuk, przy dużej pętli to on się gnie)
+//      musi być ZGIĘTY - przy dłoni płaskiej zgięcie wychodzi 0.00, więc to
+//      jest sygnał, którego przy samej odległości brakowało.
+const KOLKO_ZAMKNIETE = 0.12;    // odległość opuszek w skalach dłoni: pełne domknięcie
+const KOLKO_OTWARTE = 0.30;      // ...i zero (płaska dłoń: 0.32-0.54 - poniżej progu)
+const ZGIECIE_ZAMKNIETE = 0.40;  // zgięcie palca/kciuka: od tylu pełny warunek spełniony
+const ZGIECIE_OTWARTE = 0.12;    // ...i zero (dłoń płaska: zgięcie 0.00)
 // Pole pętli w skalach dłoni do kwadratu. Kółko "OK" to pierścień o promieniu
 // ~0.2 skali, czyli pole ~0.13; pętla kciuk-mały ma promień ~0.4, czyli ~0.5.
 const POLE_MALE = 0.10;
@@ -340,9 +351,20 @@ export function kolkoPalcow(lm) {
     }
     if (!najlepszy) return null;
 
-    const domkniecie = rampa(najlepszy.d, KOLKO_OTWARTE, KOLKO_ZAMKNIETE);
+    // Dwa NIEZALEŻNE warunki, oba muszą być spełnione - iloczyn ciągłych
+    // wyników (reguła nadrzędna: żaden nie jest twardym progiem osobno).
+    const domknieteOpuszki = rampa(najlepszy.d, KOLKO_OTWARTE, KOLKO_ZAMKNIETE);
+    const zgiecie = Math.max(1 - wyprostowany(lm, najlepszy.nazwa), 1 - wyprostowany(lm, 'kciuk'));
+    const zgiety = rampa(zgiecie, ZGIECIE_OTWARTE, ZGIECIE_ZAMKNIETE);
+    const domkniecie = domknieteOpuszki * zgiety;
+
     const [mcp, pip, dip, tip] = najlepszy.staw;
     const pole = poleWielokata(otoczkaWypukla([lm[2], lm[3], lm[4], lm[tip], lm[dip], lm[pip], lm[mcp]]))
                / (skala * skala);
-    return { domkniecie, wielkosc: rampa(pole, POLE_MALE, POLE_DUZE), palec: najlepszy.nazwa };
+    // Wielkość liczy się tylko, gdy pętla FAKTYCZNIE jest zamknięta - bez
+    // tego "wielkie kółko" mogłoby wyjść z dłoni, która niczego nie zwarła.
+    return {
+        domkniecie, wielkosc: rampa(pole, POLE_MALE, POLE_DUZE) * domkniecie,
+        odleglosc: najlepszy.d, zgiecie, palec: najlepszy.nazwa
+    };
 }

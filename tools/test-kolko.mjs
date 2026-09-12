@@ -72,7 +72,7 @@ console.log('DOMKNIĘCIE PĘTLI:');
     spr(`kciuk odsunięty -> domknięcie ~0 (${rozwarte.domkniecie.toFixed(2)})`,
         rozwarte.domkniecie < 0.2);
 
-    const polowa = kolkoPalcow(dlonZPetla({ r: 0.2, rozchyl: 0.32 }));
+    const polowa = kolkoPalcow(dlonZPetla({ r: 0.2, rozchyl: 0.14 }));
     spr(`w połowie rozwarte -> wynik POŚREDNI (${polowa.domkniecie.toFixed(2)}) - reguła "nic nie mówi źle"`,
         polowa.domkniecie > 0.2 && polowa.domkniecie < 0.8);
 }
@@ -113,5 +113,53 @@ spr('zdegenerowana dłoń (wszystko w jednym punkcie) nie wywala', (() => {
     const k = kolkoPalcow(lm);
     return k === null || (Number.isFinite(k.domkniecie) && Number.isFinite(k.wielkosc));
 })());
+
+console.log('\nREGRESJA (v8.1 - "zwykłe machnięcie otwartą dłonią" nie miało uruchamiać techniki):');
+{
+    // Dłoń OTWARTA: wszystkie palce proste, nic się nie styka. Budujemy ją
+    // WPROST (nie przez dlonZPetla, która zawsze stawia palec na pętli) -
+    // to jest dokładnie zgłoszony przypadek "zwykłe machnięcie".
+    function dlonOtwarta({ ox = 0.5, oy = 0.5, skala = 0.1 } = {}) {
+        const lm = Array.from({ length: 21 }, () => ({ x: ox, y: oy, z: 0 }));
+        lm[0] = { x: ox, y: oy, z: 0 };
+        lm[9] = { x: ox, y: oy - skala, z: 0 };
+        lm[1] = { x: ox - 0.45 * skala, y: oy - 0.15 * skala, z: 0 };
+        lm[2] = { x: ox - 0.75 * skala, y: oy - 0.35 * skala, z: 0 };
+        lm[3] = { x: ox - 1.0 * skala, y: oy - 0.55 * skala, z: 0 };
+        lm[4] = { x: ox - 1.2 * skala, y: oy - 0.75 * skala, z: 0 };   // kciuk WYPROSTOWANY, z dala od palców
+        const nasady = { wskazujacy: -0.3, srodkowy: -0.1, serdeczny: 0.1, maly: 0.3 };
+        for (const [nazwa, bok] of Object.entries(nasady)) {
+            const [m, p2, d2, t2] = PALCE[nazwa];
+            const bx = ox + bok * skala, by = oy - 0.95 * skala;
+            lm[m] = { x: bx, y: by, z: 0 };
+            lm[p2] = { x: bx, y: by - 0.35 * skala, z: 0 };
+            lm[d2] = { x: bx, y: by - 0.6 * skala, z: 0 };
+            lm[t2] = { x: bx, y: by - 0.8 * skala, z: 0 };            // WSZYSTKIE palce proste w górę
+        }
+        return lm;
+    }
+    const otwarta = kolkoPalcow(dlonOtwarta());
+    spr(`dłoń płaska/otwarta -> domknięcie ~0 (${otwarta.domkniecie.toFixed(2)}) - BYŁ TU BŁĄD (0.77)`,
+        otwarta.domkniecie < 0.1);
+    spr('...i intensywność (wielkość) też ~0', otwarta.wielkosc < 0.1);
+
+    // Pięść: wszystkie palce zwinięte, ale kciuk NIE styka się z żadnym
+    // konkretnym opuszkiem w sensie "OK" - zaciśnięty NA WIERZCHU dłoni.
+    function piesc({ ox = 0.5, oy = 0.5, skala = 0.1 } = {}) {
+        const lm = dlonOtwarta({ ox, oy, skala });
+        for (const nazwa of ['wskazujacy', 'srodkowy', 'serdeczny', 'maly']) {
+            const [m, p2, d2, t2] = PALCE[nazwa];
+            lm[t2] = { x: lm[m].x, y: lm[m].y - 0.15 * skala, z: 0 };
+            lm[d2] = { x: lm[m].x, y: lm[m].y - 0.25 * skala, z: 0 };
+            lm[p2] = { x: lm[m].x, y: lm[m].y - 0.35 * skala, z: 0 };
+        }
+        lm[4] = { x: ox - 0.35 * skala, y: oy - 0.55 * skala, z: 0 };
+        lm[3] = { x: ox - 0.5 * skala, y: oy - 0.4 * skala, z: 0 };
+        lm[2] = { x: ox - 0.6 * skala, y: oy - 0.25 * skala, z: 0 };
+        return lm;
+    }
+    const pn = kolkoPalcow(piesc());
+    spr(`pięść -> domknięcie niskie (${pn.domkniecie.toFixed(2)})`, pn.domkniecie < 0.3);
+}
 
 process.exit(ok ? 0 : 1);

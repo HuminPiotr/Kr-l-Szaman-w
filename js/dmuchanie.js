@@ -81,9 +81,17 @@ export const CZAS_POTENCJALU_MS = 240_000;
 // JEDNOSTKA: SZEROKOŚCI BARKÓW, nie metry - patrz nagłówek pliku. Przy
 // typowej skali ~0.30 m: PELNY_SKALI=0.45 to ~13,5 cm (nadgarstek naprawdę
 // przy twarzy, z zapasem na to, że dłoń zasłania usta i wciska się między
-// nimi a nadgarstkiem), ZERO_SKALI=1.2 to ~36 cm (ręka wyraźnie opuszczona).
+// nimi a nadgarstkiem).
+//
+// ZERO_SKALI ZWĘŻONE w v8.1 (1.2 -> 0.7, czyli ~36 cm -> ~21 cm): przy 1.2
+// "dłoń przy ustach" obejmowało praktycznie CAŁĄ przestrzeń przed twarzą, co
+// samo w sobie nie szkodziło (kółko z palców miało to domykać) - ale gdy
+// warunek kółka miał błąd (patrz kolkoPalcow), luźny gest dłoni był drugim
+// czynnikiem, który pozwalał zwykłemu machnięciu przejść. Kółko jest teraz
+// naprawione, ale dwa niezależne, ciasne warunki są odporniejsze niż jeden
+// ciasny i jeden luźny - stąd zwężenie zostaje, nie tylko łatka na kółku.
 export const PELNY_SKALI = 0.45;   // odległość (szer. barków), przy której gest = 1
-export const ZERO_SKALI = 1.2;     // odległość (szer. barków), przy której gest = 0
+export const ZERO_SKALI = 0.7;     // odległość (szer. barków), przy której gest = 0
 
 // Histereza wejścia/wyjścia w stan DMUCHA - "nic nie migocze na granicy"
 // (GEMINI.md §2). Pasmo WEJŚCIE > WYJŚCIE: dłoń musi podejść wyraźnie
@@ -146,8 +154,10 @@ export class Dmuchanie {
         this.wyrazistosc = 0;      // 0..1 - jak zdecydowanie gracz celuje (prędkość wylotu)
         this.kolko = 0;            // 0..1 - jak domknięte jest kółko z palców
         this.wielkoscKolka = 0;    // 0..1 - jak duże
-        this.intensywnosc = INTENSYWNOSC_PODLOGA;   // 0..1 - ile dymu (z wielkości kółka)
-        this._kolkoOdczyt = null;  // ostatni PEWNY odczyt {domkniecie, wielkosc}
+        this.intensywnosc = 0;     // 0..1 - ile dymu (z wielkości kółka, v8.1: 0 bez kółka)
+        this._kolkoOdczyt = null;  // ostatni PEWNY odczyt {domkniecie, wielkosc, odleglosc, zgiecie}
+        this.kolkoOdleglosc = null; // surowe - do HUD/strojenia (odległość opuszek w skalach dłoni)
+        this.kolkoZgiecie = null;   // surowe - do HUD/strojenia (zgięcie palca/kciuka)
         this._kolkoWiek = Infinity;// ile sekund temu (pamięć, patrz nagłówek V8)
         this.pozostaloS = 0;       // diagnostyka: ile jeszcze żyje potencjał
         this._wygasaO = 0;         // performance.now() + CZAS_POTENCJALU_MS
@@ -202,7 +212,14 @@ export class Dmuchanie {
         const kolko = this._ocenKolko(frame?.hands, wl, lm, krok);
         this.kolko = kolko.domkniecie;
         this.wielkoscKolka = kolko.wielkosc;
-        this.intensywnosc = INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc;
+        this.kolkoOdleglosc = kolko.odleglosc ?? null;
+        this.kolkoZgiecie = kolko.zgiecie ?? null;
+        // v8.1 "ostro": BEZ kółka (domkniecie ~0, w tym po wygaśnięciu pamięci)
+        // intensywność spada do ZERA, nie do podłogi - "nie widać kółka = nie
+        // ma dymu". Podłoga zostaje tylko dla kółka, które JEST, choć małe.
+        this.intensywnosc = kolko.domkniecie > 1e-3
+            ? INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc
+            : 0;
 
         const g = this._ocenGest(wl) * kolko.domkniecie;
         // Wygładzenie: jedna zaszumiona klatka nie ma przełączać stanu.
@@ -240,7 +257,9 @@ export class Dmuchanie {
         this.wyrazistosc = 0;
         this.kolko = 0;
         this.wielkoscKolka = 0;
-        this.intensywnosc = INTENSYWNOSC_PODLOGA;
+        this.kolkoOdleglosc = null;
+        this.kolkoZgiecie = null;
+        this.intensywnosc = 0;
         this._kolkoOdczyt = null;
         this._kolkoWiek = Infinity;
         this.pozostaloS = 0;
@@ -304,7 +323,9 @@ export class Dmuchanie {
         const waga = 1 - this._kolkoWiek / PAMIEC_KOLKA_S;
         return {
             domkniecie: this._kolkoOdczyt.domkniecie * waga,
-            wielkosc: this._kolkoOdczyt.wielkosc * waga
+            wielkosc: this._kolkoOdczyt.wielkosc * waga,
+            odleglosc: this._kolkoOdczyt.odleglosc,
+            zgiecie: this._kolkoOdczyt.zgiecie
         };
     }
 
@@ -330,7 +351,8 @@ export class Dmuchanie {
         }
         if (!najlepsze) return null;
         const k = kolkoPalcow(najlepsze.punkty);
-        return k ? { domkniecie: k.domkniecie, wielkosc: k.wielkosc } : null;
+        return k ? { domkniecie: k.domkniecie, wielkosc: k.wielkosc,
+                     odleglosc: k.odleglosc, zgiecie: k.zgiecie } : null;
     }
 
     /** Lepsza z dwóch dłoni (nadgarstki 15/16 pozy) - ciągły wynik, brak danych = 0. */

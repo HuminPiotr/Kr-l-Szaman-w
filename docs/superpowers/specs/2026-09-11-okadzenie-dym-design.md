@@ -466,3 +466,45 @@ docelowy kłębów (×0,8…×2,35). Prędkość wylotu została przy `wyrazisto
 o zadanym promieniu), bo dłoń syntetyczna z `tools/_dlon-syntetyczna.mjs` ma kciuk jako prosty
 łańcuch równoległy do palców — przy dłoni płaskiej jej opuszek kciuka leży 0,32 skali od
 wskazującego (na żywej ~1,0) i wychodziło „kółko" tam, gdzie go nie ma.
+
+## v8.1 (2026-09-12) — naprawa: otwarta dłoń fałszywie uruchamiała kółko
+
+**Zgłoszenie z kamery:** „nawet zwykłe machnięcie z otwartej dłoni przy twarzy produkuje dym" —
+warunek kółka z v8 nie bramkował niczego.
+
+**Diagnoza, zmierzona na dłoni syntetycznej** (nie zgadnięta):
+
+| układ dłoni | odległość kciuk↔najbliższy opuszek | `domkniecie` (v8) |
+|---|---|---|
+| płaska, otwarta | 0,32 skali dłoni | **0,77** |
+| luźna (palce w pół) | 0,32 | **0,77** |
+| pięść | 0,32 | **0,77** |
+
+Próg wejścia gestu to 0,55 — `styk × 0,77` otwierał technikę przy każdym z tych układów.
+Przyczyna: rampa `domkniecie` (0,22–0,65 skali) zakładała, że w otwartej dłoni kciuk jest daleko
+od pozostałych opuszków; naprawdę leży 0,32–0,54 skali od nich, więc sama odległość **nigdy nie
+mówiła „otwarte"**. Do tego nic nie sprawdzało, że palec jest **zgięty** — czyli że pętla w ogóle
+istnieje.
+
+**Poprawka (`js/znaki/dlon.js::kolkoPalcow`)** — dwa niezależne warunki (iloczyn):
+1. odległość opuszek zwężona do 0,12–0,30 skali (płaska dłoń i pięść, obie ~0,32, spadają poniżej
+   progu i dają 0);
+2. **zgięcie** (`max(1 − wyprostowany(palec), 1 − wyprostowany(kciuk))`) musi przekraczać próg —
+   przy dłoni płaskiej zgięcie wynosi 0,00, przy pięści 1,00 ale bez zamkniętej pętli w konkretnym
+   miejscu (dystans nadal wysoki).
+
+Zmierzone po poprawce (ta sama dłoń syntetyczna): płaska **0,000**, luźna **0,000**, pięść
+**0,000** — wszystkie trzy fałszywe pozytywy usunięte, prawdziwe kółko (opuszki złożone + palec
+zgięty) nadal `domkniecie > 0,8`.
+
+**Dodatkowe zaostrzenia (odpowiedzi na pytania „jak ostro"):**
+- `js/dmuchanie.js`: `ZERO_SKALI` 1,2 → **0,7** szerokości barków — dwa niezależne, ciasne warunki
+  są odporniejsze niż jeden ciasny (kółko) i jeden luźny (odległość dłoni od ust).
+- Po wygaśnięciu pamięci kółka (1 s) `intensywnosc` spada do **zera**, nie do podłogi 0,25 — „nie
+  widać kółka" ma oznaczać „nie ma dymu". Podłoga zostaje tylko wtedy, gdy kółko JEST wykryte,
+  choćby małe.
+- HUD dostał surowe `odleglosc`/`zgiecie` — bez nich strojenie tych dwóch progów na żywej dłoni
+  byłoby kolejną rundą zgadywania.
+
+Nowe testy w `tools/test-kolko.mjs` odtwarzają dokładnie zgłoszony przypadek (dłoń płaska
+zbudowana wprost, bez pętli) jako regresję.
