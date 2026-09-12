@@ -426,3 +426,43 @@ wąska przez **~1 s**, długa na **~1/4 ekranu**.
 
 **Zmierzone w przeglądarce** (1920×1080): 40 s ciągłego dmuchania → sufit 1100 cząstek, pełna
 klatka **1,89 ms**; detonacja całej chmury: najgorsza klatka 19,2 ms.
+
+## v8 (2026-09-12) — kółko z palców: drugi warunek gestu i regulator intensywności
+
+**Życzenie:** do Okadzenia dochodzi drugi warunek — **palce ułożone w kółko** — a **wielkość
+kółka steruje intensywnością** wypuszczanych chmur. Pytanie brzmiało wprost: „jesteś w stanie to
+wykryć?".
+
+**Odpowiedź: tak**, MediaPipe Hands daje 21 punktów na dłoń. Z zastrzeżeniem, które trzeba było
+powiedzieć od razu: GEMINI.md §4 i nagłówek `js/dmuchanie.js` ostrzegają, że **kamera z jednego
+oka gubi palce przy dłoni na twarzy** — właśnie dlatego kierunek wydechu w v2 celowo NIE korzystał
+z palców. Stąd pamięć ostatniego odczytu (niżej).
+
+**Wykrywanie (`js/znaki/dlon.js::kolkoPalcow`)** — czysta funkcja, `null` przy braku danych
+(brak danych to nie zero):
+- `domkniecie` 0..1 — rampa po odległości opuszka kciuka do **najbliższego innego opuszka**,
+  w skalach dłoni (nadgarstek→nasada środkowego). Kciuk + dowolny palec, bo to pozwala regulować
+  wielkość jednym ruchem: kciuk+wskazujący = małe kółko, kciuk+mały = duże.
+- `wielkosc` 0..1 — **pole pętli** (a nie odległość opuszek, która zeruje się przy każdym
+  domknięciu i nie odróżniłaby małego kółka od dużego), liczone po **otoczce wypukłej** punktów
+  `kciuk 2,3,4 → opuszek → DIP → PIP → nasada`. Otoczka, nie surowy wielokąt: przy kciuku sięgającym
+  dalszego palca pętla sama siebie przecina, a wzór szuwaru odejmował wtedy przeciwnie skręconą
+  część i kółko kciuk+środkowy wychodziło **mniejsze** niż kciuk+wskazujący.
+
+**Wpięcie (`js/dmuchanie.js`):** gest = `styk(dłoń przy ustach) × domkniecie` — iloczyn dwóch
+ciągłych wyników, ta sama histereza co dotąd. Dłoń dopasowana do ręki przy ustach po odległości
+nadgarstka dłoni od nadgarstka pozy, więc kółko ułożone drugą, opuszczoną ręką nic nie robi.
+**Pamięć ostatniego dobrego odczytu przez 1 s** z liniowo malejącą wagą: zgubiona na chwilę dłoń
+nie przerywa dymienia, a po sekundzie intensywność schodzi do podłogi, ale **technika nie gaśnie**.
+
+**Intensywność (`js/dym.js::emituj`)**: nowy parametr skaluje tempo emisji (podłoga 0,3) i rozmiar
+docelowy kłębów (×0,8…×2,35). Prędkość wylotu została przy `wyrazistosc` (ustawienie głowy i dłoni),
+żeby dwa pokrętła nie robiły tego samego.
+
+**Zmierzone w przeglądarce:** przy tym samym czasie dmuchania małe kółko daje 99 cząstek, duże 210
+— i widać to gołym okiem (chmura gęstsza i większa).
+
+**Testy:** nowy `tools/test-kolko.mjs` buduje pętlę **wprost** (opuszki złączone, stawy na okręgu
+o zadanym promieniu), bo dłoń syntetyczna z `tools/_dlon-syntetyczna.mjs` ma kciuk jako prosty
+łańcuch równoległy do palców — przy dłoni płaskiej jej opuszek kciuka leży 0,32 skali od
+wskazującego (na żywej ~1,0) i wychodziło „kółko" tam, gdzie go nie ma.

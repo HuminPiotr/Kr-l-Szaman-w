@@ -57,6 +57,10 @@ export const CZASTEK_NA_S = 70;
 // wąski - to ma być wydech w konkretną stronę, nie wachlarz.
 export const WYLOT_W_S = 0.6;
 export const WYRAZISTOSC_PODLOGA = 0.35;   // poza nijaka nadal coś wypuszcza
+// Wielkość kółka z palców (js/dmuchanie.js, v8) skaluje TEMPO i rozmiar kłębów.
+// Podłogi są niezerowe: najmniejsze kółko ma dawać strużkę, nie ciszę.
+export const INTENSYWNOSC_TEMPO_MIN = 0.3;
+const INTENSYWNOSC_SKALA_MIN = 0.8, INTENSYWNOSC_SKALA_ROZPIETOSC = 1.55;
 const STOZEK_RAD = 0.05;                   // ±3° - wylot ma być STRUGĄ, nie wachlarzem
 // Rozrzut prędkości WZDŁUŻ kierunku: bez niego wszystkie cząstki hamują w tym
 // samym miejscu i na końcu strugi robi się zbita kulka (widziane na renderze).
@@ -183,10 +187,11 @@ export class Dym {
      * @param {number} W           szerokość płótna gry (px)
      * @param {number} H           wysokość płótna gry (px)
      */
-    emituj(zaczepPx, kierunek, sila, wyrazistosc, dt, W, H) {
+    emituj(zaczepPx, kierunek, sila, wyrazistosc, intensywnosc, dt, W, H) {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
         const wyr = Number.isFinite(wyrazistosc) ? Math.max(0, Math.min(1, wyrazistosc)) : 0;
+        const inten = Number.isFinite(intensywnosc) ? Math.max(0, Math.min(1, intensywnosc)) : 1;
         if (!zaczepPx || !Number.isFinite(zaczepPx.x) || !Number.isFinite(zaczepPx.y)
             || s <= 0.01 || krok <= 0) return;
 
@@ -195,7 +200,8 @@ export class Dym {
         const skala = 1 / DZIELNIK_PLOTNA;
         const wRef = this._W;
 
-        const ile = CZASTEK_NA_S * (0.5 + 0.5 * s) * krok + this._nadwyzka;
+        const ile = CZASTEK_NA_S * (0.5 + 0.5 * s) * (INTENSYWNOSC_TEMPO_MIN
+                  + (1 - INTENSYWNOSC_TEMPO_MIN) * inten) * krok + this._nadwyzka;
         const n = Math.floor(ile);
         this._nadwyzka = ile - n;
         if (n <= 0) return;
@@ -231,7 +237,13 @@ export class Dym {
         for (let i = Math.max(0, this._czastki.length - n); i < this._czastki.length; i++) {
             const c = this._czastki[i];
             this._przygotuj(c, rozrzut);
-            if (c) { c.kierunekX = kx; c.kierunekY = ky; }
+            if (c) {
+                c.kierunekX = kx;
+                c.kierunekY = ky;
+                // Duże kółko to nie tylko WIĘCEJ dymu, ale i grubsze kłęby.
+                c.finalScale *= INTENSYWNOSC_SKALA_MIN
+                              + (1 - INTENSYWNOSC_SKALA_MIN) * inten * INTENSYWNOSC_SKALA_ROZPIETOSC;
+            }
         }
         this._pilnujSufitu();
     }

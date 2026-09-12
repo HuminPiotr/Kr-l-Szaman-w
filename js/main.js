@@ -583,6 +583,7 @@ function klatka(now) {
             dmuchanie.kierunek,
             dmuchanie.sila,
             dmuchanie.wyrazistosc,
+            dmuchanie.intensywnosc,
             dt,
             canvas.width,
             canvas.height
@@ -776,7 +777,8 @@ function klatka(now) {
         // strojenia progu na żywo, patrz debugHud.js.
         dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest,
                      kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa,
-                     wyrazistosc: dmuchanie.wyrazistosc },
+                     wyrazistosc: dmuchanie.wyrazistosc, kolko: dmuchanie.kolko,
+                     wielkoscKolka: dmuchanie.wielkoscKolka, intensywnosc: dmuchanie.intensywnosc },
         dym: { czastek: dym.liczba, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,

@@ -35,9 +35,19 @@
  * Pobór jest bliski zeru i tylko SKALUJE grubość strumienia (z podłogą,
  * żeby nigdy nie spadł do zera - patrz KOSZT_NA_SEKUNDE niżej).
  *
- * GEST: "sama dłoń przy ustach" (decyzja właściciela gry - żadnego
- * rozpoznawania zgięcia palca, kamera z jednego oka słabo widzi palce
- * zasłonięte dłonią/twarzą). Odległość NADGARSTEK-USTA w SZEROKOŚCIACH
+ * ================== KÓŁKO Z PALCÓW (v8) ==================
+ * Do gestu doszedł DRUGI warunek (życzenie właściciela gry): palce muszą być
+ * ułożone w kółko - kciuk styka się z dowolnym opuszkiem - a WIELKOŚĆ tego
+ * kółka steruje intensywnością chmur. Wykrywa to `kolkoPalcow()` z dlon.js.
+ *
+ * To jest świadome cofnięcie decyzji "żadnego rozpoznawania palców" niżej,
+ * więc ryzyko zostaje takie samo: kamera z jednego oka gubi palce przy dłoni
+ * na twarzy. Stąd PAMIĘĆ OSTATNIEGO DOBREGO ODCZYTU (PAMIEC_KOLKA_S) - przez
+ * sekundę od zgubienia dłoni używamy poprzedniego kółka z malejącą wagą,
+ * zamiast nagle przerywać dym. Po tej sekundzie intensywność schodzi do
+ * podłogi, ale technika NIE GAŚNIE (reguła "nic nigdy nie mówi źle").
+ *
+ * GEST: "dłoń przy ustach" x "kółko z palców". Odległość NADGARSTEK-USTA w SZEROKOŚCIACH
  * BARKÓW (stykPunktow dzieli przez skalaCiala(wl), TEN SAM niezmiennik
  * odległości od kamery co pięć pieczęci styku - PELNY_SKALI/ZERO_SKALI są
  * WIELOKROTNOŚCIAMI skali ciała, NIE metrami, mimo że pierwsza wersja tego
@@ -57,6 +67,7 @@
  */
 import { BARK_L, BARK_P, skalaCiala } from './znaki/postawa.js';
 import { stykPunktow } from './znaki/styk.js';
+import { kolkoPalcow, NADGARSTEK } from './znaki/dlon.js';
 
 // Potencjał żyje 4 minuty OD COMBO (nie od pierwszego dmuchnięcia) - patrz
 // nagłówek "JEDEN ZEGAR" wyżej.
@@ -98,6 +109,14 @@ const SILA_PODLOGA = 0.35;
 
 const PROG_WIDOCZNOSCI_TWARZY = 0.5;
 
+// --- Kółko z palców (v8) - ZGADNIĘTE, do strojenia z nakładki (klawisz D) ---
+export const PAMIEC_KOLKA_S = 1.0;         // jak długo żyje ostatni dobry odczyt
+// Najmniejsze kółko daje cienką strużkę, nie zero - technika nigdy nie mówi "źle".
+export const INTENSYWNOSC_PODLOGA = 0.25;
+// Dopasowanie dłoni do ręki przy ustach: nadgarstek dłoni musi być bliżej niż
+// tyle SZEROKOŚCI EKRANU od nadgarstka pozy (landmarki są znormalizowane).
+const DOPASOWANIE_DLONI = 0.18;
+
 // --- Kierunek wydechu (v4) - ZGADNIĘTE, do strojenia na kamerze ---
 // v4: CZTERY STRONY ŚWIATA. Zniknął stały skos w górę (SKOS_W_GORE = -0.3),
 // przez który składowa Y nigdy nie była dodatnia i w dół dmuchnąć się NIE
@@ -125,6 +144,11 @@ export class Dmuchanie {
         this.kierunek = { x: 0, y: -1 };   // jednostkowy, OD dłoni w stronę ust i dalej
         this.sila = 0;             // 0..1 - tempo i szerokość kreski dla dym.emituj
         this.wyrazistosc = 0;      // 0..1 - jak zdecydowanie gracz celuje (prędkość wylotu)
+        this.kolko = 0;            // 0..1 - jak domknięte jest kółko z palców
+        this.wielkoscKolka = 0;    // 0..1 - jak duże
+        this.intensywnosc = INTENSYWNOSC_PODLOGA;   // 0..1 - ile dymu (z wielkości kółka)
+        this._kolkoOdczyt = null;  // ostatni PEWNY odczyt {domkniecie, wielkosc}
+        this._kolkoWiek = Infinity;// ile sekund temu (pamięć, patrz nagłówek V8)
         this.pozostaloS = 0;       // diagnostyka: ile jeszcze żyje potencjał
         this._wygasaO = 0;         // performance.now() + CZAS_POTENCJALU_MS
         this._gest = 0;            // wygładzony wynik gestu, do histerezy
@@ -172,7 +196,15 @@ export class Dmuchanie {
         const lm = frame?.pose?.landmarks ?? null;
         this._aktualizujUsta(wl, lm);
 
-        const g = this._ocenGest(wl);
+        // KÓŁKO Z PALCÓW - drugi warunek gestu (v8). Iloczyn dwóch CIĄGŁYCH
+        // wyników: dłoń przy ustach x domknięte kółko. Zero kółka = zero gestu,
+        // ale połowa kółka to połowa wyniku, nie odmowa (reguła nadrzędna).
+        const kolko = this._ocenKolko(frame?.hands, wl, lm, krok);
+        this.kolko = kolko.domkniecie;
+        this.wielkoscKolka = kolko.wielkosc;
+        this.intensywnosc = INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc;
+
+        const g = this._ocenGest(wl) * kolko.domkniecie;
         // Wygładzenie: jedna zaszumiona klatka nie ma przełączać stanu.
         const alfa = Math.min(1, krok / 0.05) * ALFA_GESTU;
         this._gest += alfa * (g - this._gest);
@@ -206,6 +238,11 @@ export class Dmuchanie {
         this.zaczep = null;
         this.sila = 0;
         this.wyrazistosc = 0;
+        this.kolko = 0;
+        this.wielkoscKolka = 0;
+        this.intensywnosc = INTENSYWNOSC_PODLOGA;
+        this._kolkoOdczyt = null;
+        this._kolkoWiek = Infinity;
         this.pozostaloS = 0;
         this._gest = 0;
         this._ustaSwiat = null;
@@ -241,6 +278,59 @@ export class Dmuchanie {
         } else if (!this._ustaEkran && lm && pewny(lm[0])) {
             this._ustaEkran = { x: lm[0].x, y: lm[0].y };
         }
+    }
+
+    /**
+     * Kółko z palców tej dłoni, która jest przy ustach - z PAMIĘCIĄ.
+     *
+     * Kamera z jednego oka gubi palce dokładnie wtedy, gdy dłoń jest przy
+     * twarzy (GEMINI.md §4), więc pojedyncza klatka bez dłoni NIE MOŻE gasić
+     * dymu. Ostatni pewny odczyt żyje PAMIEC_KOLKA_S z liniowo malejącą wagą;
+     * dopiero potem kółko schodzi do zera i gest przestaje się utrzymywać.
+     *
+     * @returns {{domkniecie:number, wielkosc:number}}
+     */
+    _ocenKolko(hands, wl, lm, krok) {
+        const swiezy = this._kolkoZDloni(hands, lm);
+        if (swiezy) {
+            this._kolkoOdczyt = swiezy;
+            this._kolkoWiek = 0;
+            return swiezy;
+        }
+        this._kolkoWiek += Number.isFinite(krok) ? krok : 0;
+        if (!this._kolkoOdczyt || this._kolkoWiek >= PAMIEC_KOLKA_S) {
+            return { domkniecie: 0, wielkosc: 0 };
+        }
+        const waga = 1 - this._kolkoWiek / PAMIEC_KOLKA_S;
+        return {
+            domkniecie: this._kolkoOdczyt.domkniecie * waga,
+            wielkosc: this._kolkoOdczyt.wielkosc * waga
+        };
+    }
+
+    /**
+     * Dłoń dopasowana do ręki przy ustach: po odległości nadgarstka dłoni
+     * (punkt 0) od nadgarstków POZY (15/16) w koordynatach ekranu. Bez tego
+     * kółko ułożone drugą, opuszczoną ręką sterowałoby techniką.
+     */
+    _kolkoZDloni(hands, lm) {
+        if (!Array.isArray(hands) || !hands.length || !lm) return null;
+        let najlepsze = null;
+        for (const dlon of hands) {
+            const punkty = dlon?.landmarks;
+            if (!punkty?.[NADGARSTEK]) continue;
+            for (const i of [15, 16]) {
+                const nadg = lm[i];
+                if (!nadg || !Number.isFinite(nadg.x) || !Number.isFinite(nadg.y)) continue;
+                const d = Math.hypot(punkty[NADGARSTEK].x - nadg.x, punkty[NADGARSTEK].y - nadg.y);
+                if (d < DOPASOWANIE_DLONI && (!najlepsze || d < najlepsze.d)) {
+                    najlepsze = { d, punkty };
+                }
+            }
+        }
+        if (!najlepsze) return null;
+        const k = kolkoPalcow(najlepsze.punkty);
+        return k ? { domkniecie: k.domkniecie, wielkosc: k.wielkosc } : null;
     }
 
     /** Lepsza z dwóch dłoni (nadgarstki 15/16 pozy) - ciągły wynik, brak danych = 0. */

@@ -9,7 +9,8 @@
  * moc NIGDY nie kończy potencjału; i że jeden zegar 4-minutowy jest
  * jedynym samoistnym sposobem wygaśnięcia.
  */
-import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY } from '../js/dmuchanie.js';
+import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY,
+         PAMIEC_KOLKA_S, INTENSYWNOSC_PODLOGA } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -46,9 +47,67 @@ function cialo({ nadgL = [-0.25, 0.05, 0], nadgP = [0.25, 0.05, 0],
     return wl;
 }
 
+/**
+ * Dłoń ułożona w kółko, zaczepiona przy podanym nadgarstku (v8).
+ *
+ * Kółko budujemy WPROST - opuszki kciuka i wskazującego w jednym punkcie,
+ * stawy na okręgu o promieniu `promien` skali dłoni. Dłoń syntetyczna
+ * z tools/_dlon-syntetyczna.mjs się tu nie nadaje (jej kciuk jest prostym
+ * łańcuchem równoległym do palców) - powód opisany w tools/test-kolko.mjs.
+ * `rozchyl` odsuwa kciuk, czyli ROZPINA kółko.
+ */
+function dlonZKolkiem(nadgarstek, { promien = 0.3, rozchyl = 0, skala = 0.09 } = {}) {
+    const [ox, oy] = nadgarstek;
+    const lm = Array.from({ length: 21 }, () => ({ x: ox, y: oy, z: 0 }));
+    lm[0] = { x: ox, y: oy, z: 0 };
+    lm[9] = { x: ox, y: oy - skala, z: 0 };
+    lm[5] = { x: ox - 0.3 * skala, y: oy - 0.95 * skala, z: 0 };
+    lm[13] = { x: ox + 0.3 * skala, y: oy - 0.95 * skala, z: 0 };
+    lm[17] = { x: ox + 0.6 * skala, y: oy - 0.85 * skala, z: 0 };
+    lm[1] = { x: ox - 0.5 * skala, y: oy - 0.2 * skala, z: 0 };
+
+    const R = promien * skala;
+    const srodek = { x: ox - 0.1 * skala, y: oy - (0.95 * skala + R) };
+    const naOkregu = (kat) => ({ x: srodek.x + R * Math.sin(kat), y: srodek.y - R * Math.cos(kat), z: 0 });
+    const styk = naOkregu(0);
+    lm[4] = { x: styk.x - rozchyl * skala, y: styk.y + rozchyl * skala, z: 0 };
+    lm[3] = naOkregu(-2.0);
+    lm[2] = naOkregu(-2.9);
+    lm[8] = { ...styk };
+    lm[7] = naOkregu(2.0);
+    lm[6] = naOkregu(2.9);
+    lm[5] = naOkregu(3.6);
+    for (const [m, p2, d2, t2] of [[9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]]) {
+        lm[p2] = { x: lm[m].x, y: lm[m].y - 0.3 * skala, z: 0 };
+        lm[d2] = { x: lm[m].x, y: lm[m].y - 0.55 * skala, z: 0 };
+        lm[t2] = { x: lm[m].x, y: lm[m].y - 0.75 * skala, z: 0 };
+    }
+    return lm;
+}
+
+/**
+ * Klatka. `kolko: false` = dłonie w kadrze, ale BEZ kółka; `kolko: null` =
+ * dłoni nie widać wcale (tracking zgubiony) - to dwa różne sygnały.
+ */
 function klatka(opts = {}) {
     const wl = cialo(opts);
-    return { hands: [], pose: wl ? { landmarks: wl, worldLandmarks: wl } : null,
+    const hands = [];
+    if (wl && opts.kolko !== null) {
+        // Kółko układa ta ręka, która jest bliżej ust.
+        const nadg = opts.nadgP ?? [0.25, 0.05, 0];
+        const nadgL = opts.nadgL ?? [-0.25, 0.05, 0];
+        const usta = opts.usta ?? [0, -0.78, 0.05];
+        const d = (n) => Math.hypot(n[0] - usta[0], n[1] - usta[1]);
+        const bliższa = d(nadg) <= d(nadgL) ? nadg : nadgL;
+        hands.push({
+            landmarks: dlonZKolkiem(bliższa, {
+                promien: opts.promienKolka ?? 0.3,
+                rozchyl: opts.kolko === false ? 0.7 : (opts.rozchylKolka ?? 0)
+            }),
+            worldLandmarks: null, handedness: null
+        });
+    }
+    return { hands, pose: wl ? { landmarks: wl, worldLandmarks: wl } : null,
              width: 1920, height: 1080, dt: DT, now: opts.now ?? 0 };
 }
 
@@ -309,6 +368,62 @@ console.log('\nWYRAZISTOŚĆ USTAWIENIA (siła wypchnięcia):');
     zgaszony.anuluj();
     zgaszony.update(klatka({ now: 0 }), 1, DT, 0);
     spr('po wygaszeniu wyrazistość zeruje się', zgaszony.wyrazistosc === 0);
+}
+
+console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
+{
+    // REGRESJA: dłoń przy ustach, ale palce płasko - technika NIE rusza.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], kolko: false, now: 0 });
+    spr(`dłoń przy ustach BEZ kółka -> nie dmucha (${d.stan})`, d.stan === 'GOTOWY');
+    spr(`...a wskaźnik kółka jest niski (${d.kolko.toFixed(2)})`, d.kolko < 0.3);
+
+    // Z kółkiem rusza.
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    spr(`to samo ułożenie ręki + kółko -> DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
+    spr(`kółko domknięte (${d.kolko.toFixed(2)})`, d.kolko > 0.8);
+}
+{
+    // Wielkość kółka steruje intensywnością.
+    const male = new Dmuchanie(); resetSkali(); male.uzbrój(0);
+    dmuchajNKlatek(male, 40, { nadgP: [0.10, -0.78, 0.05], promienKolka: 0.16, now: 0 });
+    const duze = new Dmuchanie(); resetSkali(); duze.uzbrój(0);
+    dmuchajNKlatek(duze, 40, { nadgP: [0.10, -0.78, 0.05], promienKolka: 0.5, now: 0 });
+    spr(`większe kółko -> większa intensywność (${male.intensywnosc.toFixed(2)} < ${duze.intensywnosc.toFixed(2)})`,
+        duze.intensywnosc > male.intensywnosc + 0.2);
+    spr(`najmniejsze kółko i tak coś wypuszcza (podłoga ${INTENSYWNOSC_PODLOGA})`,
+        male.intensywnosc >= INTENSYWNOSC_PODLOGA);
+    spr('intensywność zawsze w 0..1', male.intensywnosc <= 1 && duze.intensywnosc <= 1);
+    spr('obie dmuchają - wielkość kółka NIE jest warunkiem, tylko regulatorem',
+        male.stan === 'DMUCHA' && duze.stan === 'DMUCHA');
+}
+{
+    // PAMIĘĆ: zgubiona dłoń nie przerywa dymienia od razu.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    const intensywnoscPrzed = d.intensywnosc;
+    dmuchajNKlatek(d, Math.round(0.4 / DT), { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
+    spr(`dłoń zgubiona na 0.4 s - dalej DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
+    spr(`...a intensywność spadła tylko częściowo (${intensywnoscPrzed.toFixed(2)} -> ${d.intensywnosc.toFixed(2)})`,
+        d.intensywnosc > INTENSYWNOSC_PODLOGA && d.intensywnosc < intensywnoscPrzed);
+    dmuchajNKlatek(d, Math.round((PAMIEC_KOLKA_S + 0.3) / DT), { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
+    spr(`po ${PAMIEC_KOLKA_S} s pamięć wygasa - intensywność na podłodze (${d.intensywnosc.toFixed(2)})`,
+        Math.abs(d.intensywnosc - INTENSYWNOSC_PODLOGA) < 1e-9);
+    spr('...ale POTENCJAŁ nie gaśnie (technika czeka na powrót dłoni)', d.stan !== 'BEZCZYNNY');
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    spr('powrót dłoni z kółkiem wznawia dmuchanie', d.stan === 'DMUCHA');
+}
+{
+    // Kółko ułożone DRUGĄ, opuszczoną ręką nie steruje techniką.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.25, 0.05, 0], nadgL: [-0.25, 0.05, 0], now: 0 });
+    spr('kółko daleko od ust nie uruchamia techniki', d.stan === 'GOTOWY');
 }
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');

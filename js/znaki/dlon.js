@@ -260,3 +260,89 @@ export function normalnaDloni(worldLandmarks) {
     const d = Math.hypot(n.x, n.y, n.z);
     return d > 1e-9 ? { x: n.x / d, y: n.y / d, z: n.z / d } : null;
 }
+
+// --- KÓŁKO Z PALCÓW (Okadzenie v8) ---
+//
+// Kciuk styka się z DOWOLNYM innym opuszkiem i zamyka pętlę: kciuk+wskazujący
+// to małe kółko, kciuk+serdeczny albo mały - duże. Dzięki temu gracz reguluje
+// wielkość jednym ruchem dłoni, a nie precyzją rozchylenia dwóch palców.
+//
+// PROGI ZGADNIĘTE, jak wszystkie progi dłoniowe w tym pliku - do potwierdzenia
+// na żywej dłoni z nakładki (klawisz D). Zmierzone na dłoni syntetycznej
+// (tools/_dlon-syntetyczna.mjs) tylko po to, żeby trafić w rząd wielkości.
+const KOLKO_ZAMKNIETE = 0.22;    // odległość opuszek w skalach dłoni: pełne domknięcie
+const KOLKO_OTWARTE = 0.65;      // ...i zero
+// Pole pętli w skalach dłoni do kwadratu. Kółko "OK" to pierścień o promieniu
+// ~0.2 skali, czyli pole ~0.13; pętla kciuk-mały ma promień ~0.4, czyli ~0.5.
+const POLE_MALE = 0.10;
+const POLE_DUZE = 0.50;
+
+/** Pole wielokąta wzorem szuwaru (shoelace). Znak nieistotny - bierzemy moduł. */
+function poleWielokata(punkty) {
+    let s = 0;
+    for (let i = 0; i < punkty.length; i++) {
+        const a = punkty[i], b = punkty[(i + 1) % punkty.length];
+        s += a.x * b.y - b.x * a.y;
+    }
+    return Math.abs(s) / 2;
+}
+
+/**
+ * Otoczka wypukła (Andrew monotone chain) - pole liczymy po NIEJ, nie po
+ * surowej pętli. Powód zmierzony na dłoni syntetycznej: gdy kciuk sięga do
+ * dalszego palca, wielokąt pętli SAM SIEBIE PRZECINA, a wzór szuwaru odejmuje
+ * wtedy przeciwnie skręconą część - kółko kciuk+środkowy wychodziło MNIEJSZE
+ * niż kciuk+wskazujący, czyli odwrotnie niż w rzeczywistości.
+ */
+function otoczkaWypukla(punkty) {
+    const p = [...punkty].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    if (p.length < 3) return p;
+    const krzyz = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const dol = [], gora = [];
+    for (const q of p) {
+        while (dol.length >= 2 && krzyz(dol[dol.length - 2], dol[dol.length - 1], q) <= 0) dol.pop();
+        dol.push(q);
+    }
+    for (let i = p.length - 1; i >= 0; i--) {
+        const q = p[i];
+        while (gora.length >= 2 && krzyz(gora[gora.length - 2], gora[gora.length - 1], q) <= 0) gora.pop();
+        gora.push(q);
+    }
+    dol.pop(); gora.pop();
+    return dol.concat(gora);
+}
+
+/**
+ * Kółko ułożone z palców jednej dłoni.
+ *
+ * Zwraca `null`, gdy punktów nie ma - BRAK DANYCH TO NIE ZERO. Wywołujący
+ * (js/dmuchanie.js) ma na to własną pamięć ostatniego dobrego odczytu, bo
+ * kamera z jednego oka gubi palce przy dłoni na twarzy (GEMINI.md §4).
+ *
+ * WIELKOŚĆ liczymy jako POLE pętli, nie odległość opuszek: odległość zeruje
+ * się przy KAŻDYM domknięciu, więc nie odróżniłaby małego kółka od dużego.
+ * Pętla to wielokąt kciuk(2,3,4) -> opuszek -> DIP -> PIP -> nasada palca.
+ *
+ * @param {Array} lm  21 punktów dłoni (landmarks 2D)
+ * @returns {{domkniecie:number, wielkosc:number, palec:string}|null}
+ */
+export function kolkoPalcow(lm) {
+    if (!pelnaDlon(lm)) return null;
+    const skala = skalaDloni(lm);
+    if (!(skala > 1e-6)) return null;
+
+    const kciuk = lm[4];
+    let najlepszy = null;
+    for (const nazwa of ['wskazujacy', 'srodkowy', 'serdeczny', 'maly']) {
+        const staw = PALCE[nazwa];
+        const d = dist(kciuk, lm[staw[3]]) / skala;
+        if (!najlepszy || d < najlepszy.d) najlepszy = { nazwa, staw, d };
+    }
+    if (!najlepszy) return null;
+
+    const domkniecie = rampa(najlepszy.d, KOLKO_OTWARTE, KOLKO_ZAMKNIETE);
+    const [mcp, pip, dip, tip] = najlepszy.staw;
+    const pole = poleWielokata(otoczkaWypukla([lm[2], lm[3], lm[4], lm[tip], lm[dip], lm[pip], lm[mcp]]))
+               / (skala * skala);
+    return { domkniecie, wielkosc: rampa(pole, POLE_MALE, POLE_DUZE), palec: najlepszy.nazwa };
+}
