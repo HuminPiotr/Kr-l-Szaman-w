@@ -10,7 +10,7 @@
  * jedynym samoistnym sposobem wygaśnięcia.
  */
 import { Dmuchanie, CZAS_POTENCJALU_MS, PELNY_SKALI, ZERO_SKALI, WAGA_GLOWY,
-         PAMIEC_KOLKA_S, INTENSYWNOSC_PODLOGA } from '../js/dmuchanie.js';
+         PAMIEC_KOLKA_S, INTENSYWNOSC_PODLOGA, SZCZYT_OKNO_MS } from '../js/dmuchanie.js';
 import { resetSkali } from '../js/znaki/postawa.js';
 
 let ok = true;
@@ -427,6 +427,32 @@ console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
     d.uzbrój(0);
     dmuchajNKlatek(d, 40, { nadgP: [0.25, 0.05, 0], nadgL: [-0.25, 0.05, 0], now: 0 });
     spr('kółko daleko od ust nie uruchamia techniki', d.stan === 'GOTOWY');
+}
+
+console.log('\nSZCZYT (v8.3 - odczyt HUD po opuszczeniu ręki):');
+{
+    // Gest wymaga obu rąk zajętych, więc żywy HUD nie da się zrzucić w tej
+    // samej chwili co gest - SZCZYT trzyma najlepszy wynik przez kilka sekund.
+    const d = new Dmuchanie();
+    resetSkali();
+    d.uzbrój(0);
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
+    const szczytPrzy = d.szczyt.gest;
+    spr(`szczyt złapał dobry gest (${szczytPrzy.toFixed(2)})`, szczytPrzy > 0.5);
+
+    // Ręka opuszczona - gest spada, ale SZCZYT ZOSTAJE (to jest cały sens).
+    dmuchajNKlatek(d, 20, { nadgP: [0.25, 0.05, 0], now: 0 });
+    spr(`po opuszczeniu ręki bieżący gest spadł (${d._gest.toFixed(2)} < ${szczytPrzy.toFixed(2)})`,
+        d._gest < szczytPrzy);
+    spr(`...ale szczyt wciąż pokazuje najlepszy wynik (${d.szczyt.gest.toFixed(2)})`,
+        Math.abs(d.szczyt.gest - szczytPrzy) < 1e-9);
+
+    // Po SZCZYT_OKNO_MS bez nowego, lepszego wyniku - szczyt "wygasa" (spada
+    // do bieżącego), zamiast pokazywać dane sprzed minuty jako aktualne.
+    const out = d.update(klatka({ nadgP: [0.25, 0.05, 0], now: SZCZYT_OKNO_MS + 100 }),
+                          1, DT, SZCZYT_OKNO_MS + 100);
+    spr('po SZCZYT_OKNO_MS szczyt wygasa do bieżącego (niskiego) wyniku',
+        d.szczyt.gest < szczytPrzy);
 }
 
 console.log('\nSTAŁE PROGÓW (dokumentacja - duża tolerancja na życzenie):');

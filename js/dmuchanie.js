@@ -125,6 +125,13 @@ export const INTENSYWNOSC_PODLOGA = 0.25;
 // tyle SZEROKOŚCI EKRANU od nadgarstka pozy (landmarki są znormalizowane).
 const DOPASOWANIE_DLONI = 0.18;
 
+// SZCZYT DO STROJENIA (v8.3) - gest wymaga DWÓCH rąk zajętych (jedna trzyma
+// kółko przy ustach, głowa/ciało w pozie) i JEDNOCZEŚNIE zrzutu ekranu -
+// fizycznie niewykonalne w jednej chwili. Zamiast żywego odczytu HUD trzyma
+// NAJLEPSZY wynik z ostatnich SZCZYT_OKNO_MS - gracz robi gest, opuszcza
+// rękę, i DOPIERO WTEDY, mając obie ręce wolne, robi zrzut.
+export const SZCZYT_OKNO_MS = 4000;
+
 // --- Kierunek wydechu (v4) - ZGADNIĘTE, do strojenia na kamerze ---
 // v4: CZTERY STRONY ŚWIATA. Zniknął stały skos w górę (SKOS_W_GORE = -0.3),
 // przez który składowa Y nigdy nie była dodatnia i w dół dmuchnąć się NIE
@@ -158,6 +165,8 @@ export class Dmuchanie {
         this._kolkoOdczyt = null;  // ostatni PEWNY odczyt {domkniecie, wielkosc, odleglosc, zgiecie}
         this.kolkoOdleglosc = null; // surowe - do HUD/strojenia (odległość opuszek w skalach dłoni)
         this.kolkoZgiecie = null;   // surowe - do HUD/strojenia (zgięcie palca/kciuka)
+        this.styk = 0;              // surowe - dłoń-przy-ustach PRZED pomnożeniem przez kółko
+        this.szczyt = null;         // {styk, kolko, wielkosc, intensywnosc, gest, odleglosc, zgiecie, czas} - patrz SZCZYT_OKNO_MS
         this._kolkoWiek = Infinity;// ile sekund temu (pamięć, patrz nagłówek V8)
         this.pozostaloS = 0;       // diagnostyka: ile jeszcze żyje potencjał
         this._wygasaO = 0;         // performance.now() + CZAS_POTENCJALU_MS
@@ -221,10 +230,23 @@ export class Dmuchanie {
             ? INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc
             : 0;
 
-        const g = this._ocenGest(wl) * kolko.domkniecie;
+        this.styk = this._ocenGest(wl);
+        const g = this.styk * kolko.domkniecie;
         // Wygładzenie: jedna zaszumiona klatka nie ma przełączać stanu.
         const alfa = Math.min(1, krok / 0.05) * ALFA_GESTU;
         this._gest += alfa * (g - this._gest);
+
+        // SZCZYT (patrz nagłówek SZCZYT_OKNO_MS): trzyma NAJLEPSZY gest z
+        // ostatnich kilku sekund, żeby dało się go odczytać PO opuszczeniu
+        // ręki, gdy obie dłonie są znów wolne do zrzutu ekranu.
+        const now_ = Number.isFinite(now) ? now : this.szczyt?.czas ?? 0;
+        if (!this.szczyt || this._gest >= this.szczyt.gest || now_ - this.szczyt.czas > SZCZYT_OKNO_MS) {
+            this.szczyt = {
+                styk: this.styk, kolko: this.kolko, wielkosc: this.wielkoscKolka,
+                intensywnosc: this.intensywnosc, gest: this._gest,
+                odleglosc: this.kolkoOdleglosc, zgiecie: this.kolkoZgiecie, czas: now_
+            };
+        }
 
         if (this.stan === 'GOTOWY' && this._gest >= PROG_WEJSCIA) this.stan = 'DMUCHA';
         else if (this.stan === 'DMUCHA' && this._gest < PROG_WYJSCIA) this.stan = 'GOTOWY';

@@ -539,3 +539,26 @@ metodą.
 **Niezależnie od finalnych progów** dodany test **monotoniczności** w `tools/test-kolko.mjs`:
 domknięcie musi rosnąć w miarę zbliżania się opuszków, niezależnie od tego, gdzie dokładnie leżą
 progi — ten test przetrwa kalibrację i łapie regresje kierunku, nie tylko wartości.
+
+## v8.3 (2026-09-12) — szczyt do odczytu po opuszczeniu ręki
+
+**Zgłoszenie:** poprosiłem o zrzut HUD zrobiony W TRAKCIE gestu (dłoń przy ustach) — użytkownik
+słusznie zwrócił uwagę, że to fizycznie niewykonalne: obie ręce zajęte gestem/tańcem, żadna nie
+jest wolna do zrobienia zrzutu ekranu w tej samej chwili.
+
+**Zmierzone przy okazji (dane z realnej kamery, nie z dłoni syntetycznej):** gest OK dał
+`odl 0.13, zgięcie 0.74 → domknięcie 0.94`; dłoń otwarta `odl 0.85, zgięcie 0.00 → domknięcie
+0.00`. **Progi z v8.1/v8.2 są poprawne** — obawa z v8.2 o niewystarczający model syntetyczny nie
+przełożyła się na problem z realną anatomią tego użytkownika. Pozostało ustalić, czy problem leży
+w dopasowaniu dłoni do ręki przy ustach (`_kolkoZDloni`) — do tego potrzebny był zrzut PO geście.
+
+**Rozwiązanie: SZCZYT** (`js/dmuchanie.js`, `SZCZYT_OKNO_MS = 4000`). `update()` zapamiętuje
+najlepszy (najwyższy) wynik `_gest` z ostatnich 4 sekund wraz z towarzyszącymi mu `styk`,
+`kolko`, `wielkosc`, `intensywnosc`, `odleglosc`, `zgiecie` — gracz robi gest, opuszcza rękę i
+DOPIERO WTEDY, mając obie dłonie wolne, robi zrzut ekranu. HUD dostał osobny wiersz `SZCZYT (4s):
+...` obok żywego odczytu. Zegar resetuje się po `SZCZYT_OKNO_MS` bez nowego, lepszego wyniku —
+stare dane nie wiszą w nieskończoność jako pozornie aktualne.
+
+Dodatkowo: `dmuchanie.styk` (surowy wynik „dłoń przy ustach" PRZED pomnożeniem przez kółko) jest
+teraz wystawiony osobno — pozwala odróżnić „kółko złe" od „dłoń za daleko od ust", gdyby `gest`
+mimo wszystko nie osiągał progu.
