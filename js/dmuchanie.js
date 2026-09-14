@@ -35,19 +35,26 @@
  * Pobór jest bliski zeru i tylko SKALUJE grubość strumienia (z podłogą,
  * żeby nigdy nie spadł do zera - patrz KOSZT_NA_SEKUNDE niżej).
  *
- * ================== KÓŁKO Z PALCÓW (v8) ==================
- * Do gestu doszedł DRUGI warunek (życzenie właściciela gry): palce muszą być
- * ułożone w kółko - kciuk styka się z dowolnym opuszkiem - a WIELKOŚĆ tego
- * kółka steruje intensywnością chmur. Wykrywa to `kolkoPalcow()` z dlon.js.
+ * ================== KÓŁKO Z PALCÓW (v8-v8.4, UPROSZCZONE w v8.5) ==================
+ * v8 dodało DRUGI warunek gestu (życzenie właściciela gry): palce ułożone
+ * w kółko - kciuk styka się z dowolnym opuszkiem - z WIELKOŚCIĄ kółka
+ * sterującą intensywnością chmur (`kolkoPalcow()` z dlon.js). Pięć rund
+ * strojenia (v8-v8.4: dwa fałszywe pozytywy, jeden fałszywy negatyw, nowa
+ * metoda odległości+okrągłości) nie dało gestu niezawodnego w REALNEJ grze -
+ * "robię kółko, trzymam przy twarzy i żaden dym nie wylatuje". Ryzyko było
+ * znane od początku (to świadome cofnięcie decyzji "żadnego rozpoznawania
+ * palców" niżej: kamera z jednego oka gubi palce przy dłoni na twarzy) i się
+ * potwierdziło mocniej, niż dało się to naprawić samym strojeniem progów.
  *
- * To jest świadome cofnięcie decyzji "żadnego rozpoznawania palców" niżej,
- * więc ryzyko zostaje takie samo: kamera z jednego oka gubi palce przy dłoni
- * na twarzy. Stąd PAMIĘĆ OSTATNIEGO DOBREGO ODCZYTU (PAMIEC_KOLKA_S) - przez
- * sekundę od zgubienia dłoni używamy poprzedniego kółka z malejącą wagą,
- * zamiast nagle przerywać dym. Po tej sekundzie intensywność schodzi do
- * podłogi, ale technika NIE GAŚNIE (reguła "nic nigdy nie mówi źle").
+ * v8.5: KÓŁKO PRZESTAJE BYĆ WARUNKIEM. Detekcja ZOSTAJE (liczona, widoczna
+ * w HUD i `SZCZYT`) i dalej daje BONUS do intensywności, gdy się złapie -
+ * ale nigdy nie ścina jej do zera i nie blokuje samego dmuchania. "Na ten
+ * moment" - nie usunięte na stałe, tylko zdjęte z krytycznej ścieżki.
+ * PAMIEC_KOLKA_S i reszta infrastruktury kółka zostają nietknięte na
+ * wypadek powrotu do tego pomysłu z lepszym sygnałem niż pojedyncza klatka
+ * kamery z jednego oka.
  *
- * GEST: "dłoń przy ustach" x "kółko z palców". Odległość NADGARSTEK-USTA w SZEROKOŚCIACH
+ * GEST: SAMA "dłoń przy ustach" (v8.5 - jak przed v8). Odległość NADGARSTEK-USTA w SZEROKOŚCIACH
  * BARKÓW (stykPunktow dzieli przez skalaCiala(wl), TEN SAM niezmiennik
  * odległości od kamery co pięć pieczęci styku - PELNY_SKALI/ZERO_SKALI są
  * WIELOKROTNOŚCIAMI skali ciała, NIE metrami, mimo że pierwsza wersja tego
@@ -220,23 +227,26 @@ export class Dmuchanie {
         const lm = frame?.pose?.landmarks ?? null;
         this._aktualizujUsta(wl, lm);
 
-        // KÓŁKO Z PALCÓW - drugi warunek gestu (v8). Iloczyn dwóch CIĄGŁYCH
-        // wyników: dłoń przy ustach x domknięte kółko. Zero kółka = zero gestu,
-        // ale połowa kółka to połowa wyniku, nie odmowa (reguła nadrzędna).
+        // KÓŁKO Z PALCÓW (v8-v8.4) - UPROSZCZONE (v8.5) na życzenie właściciela
+        // gry: pięć rund strojenia (v8-v8.4) nie dało gestu, który dałoby się
+        // niezawodnie złapać w realnej grze, zwłaszcza w ruchu/tańcu przy
+        // twarzy - "robię kółko, trzymam przy twarzy i żaden dym nie
+        // wylatuje". Kółko PRZESTAJE BYĆ WARUNKIEM: samo "dłoń przy ustach"
+        // (styk) znowu wystarcza do dmuchania, tak jak przed v8. Detekcja
+        // kółka ZOSTAJE (liczona, widoczna w HUD/SZCZYT) i dalej daje BONUS
+        // do intensywności, gdy się złapie - ale nigdy nie ścina jej do zera.
+        // "Na ten moment" - nie usunięte na stałe, tylko zdjęte z krytycznej
+        // ścieżki, żeby dało się grać, dopóki gest nie będzie bardziej
+        // niezawodny (patrz docs spec, sekcja v8.5).
         const kolko = this._ocenKolko(frame?.hands, wl, lm, krok);
         this.kolko = kolko.domkniecie;
         this.wielkoscKolka = kolko.wielkosc;
         this.kolkoOdleglosc = kolko.odleglosc ?? null;
         this.kolkoZgiecie = kolko.zgiecie ?? null;
-        // v8.1 "ostro": BEZ kółka (domkniecie ~0, w tym po wygaśnięciu pamięci)
-        // intensywność spada do ZERA, nie do podłogi - "nie widać kółka = nie
-        // ma dymu". Podłoga zostaje tylko dla kółka, które JEST, choć małe.
-        this.intensywnosc = kolko.domkniecie > 1e-3
-            ? INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc
-            : 0;
+        this.intensywnosc = INTENSYWNOSC_PODLOGA + (1 - INTENSYWNOSC_PODLOGA) * kolko.wielkosc;
 
         this.styk = this._ocenGest(wl);
-        const g = this.styk * kolko.domkniecie;
+        const g = this.styk;
         // Wygładzenie: jedna zaszumiona klatka nie ma przełączać stanu.
         const alfa = Math.min(1, krok / 0.05) * ALFA_GESTU;
         this._gest += alfa * (g - this._gest);

@@ -492,7 +492,9 @@ export class DebugHud {
             // wyraźnym obrocie, pochylenie ~0 przy głowie na wprost.
             const k = stats.dmuchanie.kierunek, g = stats.dmuchanie.glowa;
             const kOdl = stats.dmuchanie.kolkoOdleglosc, kZg = stats.dmuchanie.kolkoZgiecie;
-            lines.push(`  styk ${this._num(stats.dmuchanie.styk)}   kółko ${this._num(stats.dmuchanie.kolko)}` +
+            // v8.5: kółko już NIE JEST warunkiem gestu (gest = styk) - tylko
+            // bonus do intensywności, stąd etykieta "(bonus)".
+            lines.push(`  styk ${this._num(stats.dmuchanie.styk)}   kółko (bonus) ${this._num(stats.dmuchanie.kolko)}` +
                        `  (odl ${kOdl == null ? '-' : this._num(kOdl)}` +
                        ` zgięcie ${kZg == null ? '-' : this._num(kZg)}` +
                        ` -> wielkość ${this._num(stats.dmuchanie.wielkoscKolka)}` +

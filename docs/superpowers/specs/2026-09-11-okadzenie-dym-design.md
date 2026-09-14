@@ -601,3 +601,22 @@ dawał fałszywe 1,00, z nim wraca do ~0,00.
 Ta poprawka nie wymagała nowego zbioru danych z kamery: nowa miara odległości jest z definicji
 nie gorsza od starej dla gestów już zmierzonych jako działające, a okrągłość została skalibrowana
 na w pełni kontrolowanym, mierzalnym kontraście (0,74–0,84 kontra 0,15), nie na zgadywaniu.
+
+## v8.5 (2026-09-14) — kółko przestaje być warunkiem (uproszczenie)
+
+**Zgłoszenie:** po pięciu rundach strojenia (v8–v8.4) — poprawnym progom, nowej metodzie
+odległości, dodanym trzecim warunku (okrągłość), dłuższej pamięci — gest dalej nie działał
+niezawodnie w realnej grze: „robię kółko, trzymam przy twarzy i żaden dym nie wylatuje".
+Użytkownik poprosił wprost o uproszczenie **na ten moment**.
+
+**Decyzja:** kółko z palców przestaje być warunkiem wejścia w `DMUCHA`. Gest wraca do stanu
+sprzed v8 — sama „dłoń przy ustach" (`styk`) wystarcza. Detekcja kółka (`kolkoPalcow`,
+`PAMIEC_KOLKA_S`, cała infrastruktura z v8–v8.4) **zostaje w kodzie i dalej działa**, ale
+przestawiona z bramki na **bonus**: `intensywnosc = INTENSYWNOSC_PODLOGA + (1 − PODLOGA) ×
+wielkość`, bez zerowania do zera przy braku/wygaśnięciu odczytu. Gracz, który nie złoży kółka,
+dalej dmucha z pełną gęstością wynikającą z gestu i mocy — kółko, jeśli się złapie, tylko
+podbija intensywność.
+
+To jest świadomie **tymczasowe cofnięcie**, nie skasowanie pomysłu: cała matematyka (odległość
+segmentu, okrągłość pętli, testy w `tools/test-kolko.mjs`) zostaje nietknięta na wypadek powrotu
+do tego kierunku z lepszym sygnałem niż pojedyncza klatka kamery z jednego oka pozwala dziś dać.

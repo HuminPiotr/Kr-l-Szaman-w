@@ -370,37 +370,42 @@ console.log('\nWYRAZISTOŚĆ USTAWIENIA (siła wypchnięcia):');
     spr('po wygaszeniu wyrazistość zeruje się', zgaszony.wyrazistosc === 0);
 }
 
-console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
+console.log('\nKÓŁKO Z PALCÓW - BONUS DO INTENSYWNOŚCI, NIE WARUNEK (v8.5):');
 {
-    // REGRESJA: dłoń przy ustach, ale palce płasko - technika NIE rusza.
+    // UPROSZCZONE (v8.5): sama dłoń przy ustach WYSTARCZA do dmuchania,
+    // niezależnie od tego, czy palce układają kółko - pięć rund strojenia
+    // (v8-v8.4) nie dało gestu niezawodnego w realnej grze. To jest
+    // regresja na STARE zachowanie v8 (gdzie ten sam test oczekiwał GOTOWY).
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
     dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], kolko: false, now: 0 });
-    spr(`dłoń przy ustach BEZ kółka -> nie dmucha (${d.stan})`, d.stan === 'GOTOWY');
-    spr(`...a wskaźnik kółka jest niski (${d.kolko.toFixed(2)})`, d.kolko < 0.3);
-
-    // Z kółkiem rusza.
-    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    spr(`to samo ułożenie ręki + kółko -> DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
-    spr(`kółko domknięte (${d.kolko.toFixed(2)})`, d.kolko > 0.8);
+    spr(`dłoń przy ustach BEZ kółka -> i tak DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
+    spr(`...a wskaźnik kółka jest niski (${d.kolko.toFixed(2)}) - tylko telemetria, nic nie blokuje`,
+        d.kolko < 0.3);
 }
 {
-    // Wielkość kółka steruje intensywnością.
+    // Wielkość kółka steruje intensywnością - jako BONUS, gdy się złapie.
+    const bezKolka = new Dmuchanie(); resetSkali(); bezKolka.uzbrój(0);
+    dmuchajNKlatek(bezKolka, 40, { nadgP: [0.10, -0.78, 0.05], kolko: false, now: 0 });
     const male = new Dmuchanie(); resetSkali(); male.uzbrój(0);
     dmuchajNKlatek(male, 40, { nadgP: [0.10, -0.78, 0.05], promienKolka: 0.16, now: 0 });
     const duze = new Dmuchanie(); resetSkali(); duze.uzbrój(0);
     dmuchajNKlatek(duze, 40, { nadgP: [0.10, -0.78, 0.05], promienKolka: 0.5, now: 0 });
     spr(`większe kółko -> większa intensywność (${male.intensywnosc.toFixed(2)} < ${duze.intensywnosc.toFixed(2)})`,
         duze.intensywnosc > male.intensywnosc + 0.2);
+    spr(`brak kółka -> intensywność na PODŁODZE, nie zero (${bezKolka.intensywnosc.toFixed(2)})`,
+        Math.abs(bezKolka.intensywnosc - INTENSYWNOSC_PODLOGA) < 1e-9);
     spr(`najmniejsze kółko i tak coś wypuszcza (podłoga ${INTENSYWNOSC_PODLOGA})`,
         male.intensywnosc >= INTENSYWNOSC_PODLOGA);
     spr('intensywność zawsze w 0..1', male.intensywnosc <= 1 && duze.intensywnosc <= 1);
-    spr('obie dmuchają - wielkość kółka NIE jest warunkiem, tylko regulatorem',
-        male.stan === 'DMUCHA' && duze.stan === 'DMUCHA');
+    spr('wszystkie trzy dmuchają - kółko NIGDZIE nie jest warunkiem',
+        bezKolka.stan === 'DMUCHA' && male.stan === 'DMUCHA' && duze.stan === 'DMUCHA');
 }
 {
-    // PAMIĘĆ: zgubiona dłoń nie przerywa dymienia od razu.
+    // PAMIĘĆ: zgubiona dłoń nie przerywa dymienia (i tak już nie przerywała,
+    // skoro kółko nie jest warunkiem - ale intensywność dalej powinna płynnie
+    // spadać do podłogi, nie do zera).
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
@@ -409,25 +414,26 @@ console.log('\nKÓŁKO Z PALCÓW - DRUGI WARUNEK GESTU (v8):');
     dmuchajNKlatek(d, Math.round(0.4 / DT), { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
     spr(`dłoń zgubiona na 0.4 s - dalej DMUCHA (${d.stan})`, d.stan === 'DMUCHA');
     spr(`...a intensywność spadła tylko częściowo (${intensywnoscPrzed.toFixed(2)} -> ${d.intensywnosc.toFixed(2)})`,
-        d.intensywnosc > INTENSYWNOSC_PODLOGA && d.intensywnosc < intensywnoscPrzed);
+        d.intensywnosc >= INTENSYWNOSC_PODLOGA && d.intensywnosc < intensywnoscPrzed);
     dmuchajNKlatek(d, Math.round((PAMIEC_KOLKA_S + 0.3) / DT), { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
-    // v8.1 "ostro": po wygaśnięciu pamięci intensywność spada do ZERA, nie do
-    // podłogi - "nie widać kółka" ma oznaczać "nie ma dymu", ta sama poprawka,
-    // która usunęła fałszywe uruchomienia z otwartej dłoni.
-    spr(`po ${PAMIEC_KOLKA_S} s pamięć wygasa - intensywność ZERO (${d.intensywnosc.toFixed(2)})`,
-        d.intensywnosc === 0);
-    spr('...ale POTENCJAŁ nie gaśnie (technika czeka na powrót dłoni)', d.stan !== 'BEZCZYNNY');
-    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], now: 0 });
-    spr('powrót dłoni z kółkiem wznawia dmuchanie', d.stan === 'DMUCHA');
+    // v8.5: po wygaśnięciu pamięci intensywność wraca do PODŁOGI (dym dalej
+    // leci, tylko bez bonusu) - kółko przestało być warunkiem "wszystko albo
+    // nic", jest czystym regulatorem w górę.
+    spr(`po ${PAMIEC_KOLKA_S} s pamięć wygasa - intensywność na PODŁODZE (${d.intensywnosc.toFixed(2)})`,
+        Math.abs(d.intensywnosc - INTENSYWNOSC_PODLOGA) < 1e-9);
+    spr('...i technika DALEJ DMUCHA (kółko nigdy nie gasiło dymu)', d.stan === 'DMUCHA');
 }
 {
-    // Kółko ułożone DRUGĄ, opuszczoną ręką nie steruje techniką.
+    // Sama dłoń przy ustach, bez żadnej dłoni robiącej kółko w kadrze -
+    // dalej dmucha (kółko: null = tracking dłoni w ogóle zgubiony).
     const d = new Dmuchanie();
     resetSkali();
     d.uzbrój(0);
-    dmuchajNKlatek(d, 40, { nadgP: [0.25, 0.05, 0], nadgL: [-0.25, 0.05, 0], now: 0 });
-    spr('kółko daleko od ust nie uruchamia techniki', d.stan === 'GOTOWY');
+    dmuchajNKlatek(d, 40, { nadgP: [0.10, -0.78, 0.05], kolko: null, now: 0 });
+    spr('brak jakiejkolwiek dłoni w kadrze - dmuchanie i tak rusza (styk wystarcza)',
+        d.stan === 'DMUCHA');
 }
+
 
 console.log('\nSZCZYT (v8.3 - odczyt HUD po opuszczeniu ręki):');
 {
