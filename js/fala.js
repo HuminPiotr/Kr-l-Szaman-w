@@ -45,7 +45,32 @@
  *
  * Plus dwie rzeczy wspólne z ogniem: SPRITE WYPALONY RAZ (gradient na
  * cząstkę na klatkę zabija FPS) i SORTOWANIE PO Z (dalsze pod bliższymi).
+ *
+ * ================= AARD v2: TWARDE CZOŁO, SMUGI, WIR =================
+ * Same cząstki-plamki dawały czoło MIĘKKIE - chmurę bez krawędzi. Aard
+ * z Wiedźmina ma krawędź. Trzy warstwy dołożone NAD cząstkami:
+ *
+ * 1. KRESKA CZOŁA - proceduralna, nie sprite. Zewnętrzna krawędź pierścienia
+ *    (punktyCzola, ten sam rzut co cząstki) rysowana stroke'iem: szeroki
+ *    miękki ślad pod spodem i cienka jasna linia na wierzchu. Lekcja
+ *    z Okadzenia: dla efektu, który ma KSZTAŁT, kreska po węzłach czyta się
+ *    lepiej niż dowolna liczba sprite'ów. Gaśnie szybciej niż cząstki -
+ *    krawędź ma być ostra w chwili uderzenia, potem rozmyć się w chmurę.
+ * 2. SMUGI WIATRU - kilka półksiężyców zamachu (assety.js smugaWiatru,
+ *    tintowane barwą fali) rozstawionych po obwodzie czoła, STYCZNIE, wypukłą
+ *    stroną na zewnątrz, dryfujących wzdłuż obwodu. To są "cięcia
+ *    powietrza", których gradientowa plamka nie umie udać. Brak assetu
+ *    (jeszcze się ładuje) = smuga się nie rysuje, nic więcej (GEMINI.md §2).
+ * 3. WIR W DŁONI - jeden sprite wiru (assety.js wir) w punkcie zaczepu,
+ *    obraca się i puchnie przez ćwierć sekundy. Zamienia moment "fala się
+ *    pojawia" w "coś wystrzeliło z dłoni". Osobna metoda wir(), NIE część
+ *    wystrzel() - main.js woła ją tylko przy Aardzie; Grom w Ziemię
+ *    współdzieli falę, ale wybucha z ziemi, nie z dłoni.
+ *
+ * Cząstek jest przez to mniej (NA_WYSTRZAL 420 -> 260): robią za objętość,
+ * kształt daje kreska i smugi.
  */
+import { MANIFEST, obraz, losowyWariant, wypalTintowany } from './assety.js';
 
 const OGNISKO_DOMYSLNE = 900;      // px - ZGADNIĘTE, stroić klawiszem D
 export const OGNISKO = OGNISKO_DOMYSLNE;
@@ -60,7 +85,7 @@ const BARWA_DOMYSLNA = [214, 240, 255];     // blady błękit - patrz efekty.js 
 const BARWA_RDZEN = [255, 255, 255];  // rozbłysk uderzenia - czysta biel, WSPÓLNA dla wszystkich barw
 
 // --- czoło fali ---
-const NA_WYSTRZAL = 420;           // cząstek przy pełnej sile (jednorazowo)
+const NA_WYSTRZAL = 260;           // cząstek przy pełnej sile (jednorazowo) - było 420, patrz nagłówek "AARD v2"
 const PREDKOSC_BAZOWA = 900;       // px/s wzdłuż kierunku, przy pełnej sile
 const ROZRZUT_PREDKOSCI = 260;     // px/s losowego rozrzutu, PRZY PEŁNEJ SILE
 const PROMIEN_START = 26;          // px - czoło ma szerokość już w chwili emisji
@@ -78,6 +103,24 @@ const RDZEN_ZYCIE = 0.32;          // s - gaśnie ~3x szybciej niż fala
 const RDZEN_ROZMIAR = 1.5;
 
 const MAX_CZASTECZEK = 900;        // sufit bezpieczeństwa dla klatkażu
+
+// --- czoło: kreska + smugi wiatru (Aard v2) ---
+const CZOLO_ZYCIE = 0.7;           // s - krócej niż cząstki: krawędź ostra na starcie, potem chmura
+const KRESKA_PUNKTOW = 72;
+const KRESKA_SZEROKA_PX = 14;      // miękki ślad pod cienką linią
+const KRESKA_CIENKA_PX = 2.5;
+const SMUG_NA_CZOLO = 8;
+const SMUGA_ROZMIAR = 0.62;        // ułamek promienia czoła - długość półksiężyca
+const SMUGA_DRYF_MAX = 0.9;        // rad/s - smugi ślizgają się po obwodzie
+const SMUGA_SPRITE_PX = 160;
+const MAX_CZOL = 6;
+
+// --- wir w dłoni (Aard v2) ---
+const WIR_ZYCIE = 0.28;            // s
+const WIR_ROZMIAR_OD = 70, WIR_ROZMIAR_DO = 300;   // px przy pełnej sile
+const WIR_OBROTY = 1.4;            // pełnych obrotów przez całe życie
+const WIR_SPRITE_PX = 256;
+const MAX_WIROW = 3;
 
 /**
  * Rzut perspektywiczny: mniejsze/ujemne z (bliżej kamery) -> większe s.
@@ -148,11 +191,37 @@ export function polozenieCzola(sila, t) {
 }
 
 /**
+ * Wspólna geometria czoła dla punktyCzola()/punktCzolaPodKatem(): oś, baza
+ * płaszczyzny pierścienia, środek 3D i rzutowany, promień. Null, gdy
+ * zaczep/kierunek są nieprawidłowe.
+ */
+function geometriaCzola(zaczep, kierunek, sila, t, mnoznikPromienia) {
+    if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y) || !kierunek) return null;
+    const dl = Math.hypot(kierunek.x, kierunek.y, kierunek.z);
+    if (!(dl > 1e-6)) return null;
+    const os = { x: kierunek.x / dl, y: kierunek.y / dl, z: kierunek.z / dl };
+    const { wzdluz, promien } = polozenieCzola(sila, t);
+    const r = promien * (Number.isFinite(mnoznikPromienia) ? Math.max(0, mnoznikPromienia) : 1);
+    const [p1, p2] = prostopadleDo(os);
+    const cx = zaczep.x + os.x * wzdluz, cy = zaczep.y + os.y * wzdluz, cz = os.z * wzdluz;
+    const srodek = rzutujPozycje(zaczep, { x: cx, y: cy }, rzutPerspektywiczny(cz));
+    return { p1, p2, cx, cy, cz, r, srodek };
+}
+
+function rzutPunktuCzola(zaczep, g, kat) {
+    const c = Math.cos(kat), sn = Math.sin(kat);
+    const x = g.cx + (g.p1.x * c + g.p2.x * sn) * g.r;
+    const y = g.cy + (g.p1.y * c + g.p2.y * sn) * g.r;
+    const z = g.cz + (g.p1.z * c + g.p2.z * sn) * g.r;
+    return rzutujPozycje(zaczep, { x, y }, rzutPerspektywiczny(z));
+}
+
+/**
  * Rzut pierścienia czoła na ekran: n punktów (w px płótna) po obwodzie
  * plus rzutowany środek. Ta sama geometria i ten sam rzut perspektywiczny,
  * co przy cząstkach (pierścień prostopadły do `kierunek`, przesunięty
  * wzdłuż niego, każdy punkt przez rzutPerspektywiczny/rzutujPozycje) -
- * dzięki temu soczewka i kreska leżą DOKŁADNIE na czole cząstek.
+ * dzięki temu soczewka (ekran.js) i kreska leżą DOKŁADNIE na czole cząstek.
  *
  * @param {{x,y}} zaczep     px płótna
  * @param {{x,y,z}} kierunek  wektor 3D, nie musi być jednostkowy
@@ -163,30 +232,23 @@ export function polozenieCzola(sila, t) {
  * @returns {{srodek:{x,y}, punkty:{x,y}[]}}  punkty puste, gdy kierunek/zaczep są nieprawidłowe
  */
 export function punktyCzola(zaczep, kierunek, sila, t, n = 48, mnoznikPromienia = 1) {
-    if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y) || !kierunek) {
-        return { srodek: { x: 0, y: 0 }, punkty: [] };
-    }
-    const dl = Math.hypot(kierunek.x, kierunek.y, kierunek.z);
-    if (!(dl > 1e-6)) return { srodek: { x: zaczep.x, y: zaczep.y }, punkty: [] };
-    const os = { x: kierunek.x / dl, y: kierunek.y / dl, z: kierunek.z / dl };
-    const { wzdluz, promien } = polozenieCzola(sila, t);
-    const r = promien * (Number.isFinite(mnoznikPromienia) ? Math.max(0, mnoznikPromienia) : 1);
-    const [p1, p2] = prostopadleDo(os);
-
-    const cx = zaczep.x + os.x * wzdluz, cy = zaczep.y + os.y * wzdluz, cz = os.z * wzdluz;
-    const srodek = rzutujPozycje(zaczep, { x: cx, y: cy }, rzutPerspektywiczny(cz));
-
+    const g = geometriaCzola(zaczep, kierunek, sila, t, mnoznikPromienia);
+    if (!g) return { srodek: { x: zaczep?.x ?? 0, y: zaczep?.y ?? 0 }, punkty: [] };
     const punkty = [];
     const liczba = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
-    for (let i = 0; i < liczba; i++) {
-        const kat = (i / liczba) * Math.PI * 2;
-        const c = Math.cos(kat), sn = Math.sin(kat);
-        const x = cx + (p1.x * c + p2.x * sn) * r;
-        const y = cy + (p1.y * c + p2.y * sn) * r;
-        const z = cz + (p1.z * c + p2.z * sn) * r;
-        punkty.push(rzutujPozycje(zaczep, { x, y }, rzutPerspektywiczny(z)));
-    }
-    return { srodek, punkty };
+    for (let i = 0; i < liczba; i++) punkty.push(rzutPunktuCzola(zaczep, g, (i / liczba) * Math.PI * 2));
+    return { srodek: g.srodek, punkty };
+}
+
+/**
+ * Jeden punkt czoła pod zadanym kątem po obwodzie (dla smug wiatru, które
+ * mają WŁASNY, dryfujący kąt - nie siatkę z punktyCzola). Null przy złych
+ * argumentach.
+ */
+export function punktCzolaPodKatem(zaczep, kierunek, sila, t, mnoznikPromienia, kat) {
+    const g = geometriaCzola(zaczep, kierunek, sila, t, mnoznikPromienia);
+    if (!g || !Number.isFinite(kat)) return null;
+    return { srodek: g.srodek, punkt: rzutPunktuCzola(zaczep, g, kat) };
 }
 
 export class Fala {
@@ -198,9 +260,36 @@ export class Fala {
         // document.createElement nie istnieje w Node, patrz tools/test-fala.mjs).
         this._spriteRdzen = null;
         this._spriteFala = new Map();
+        // Aard v2: czoła (kreska + smugi) i wiry - osobne od cząstek, bo
+        // żyją innym rytmem i nie są "cząstkami" w sensie _ruszaj/_rysuj.
+        this.czola = [];
+        this.wiry = [];
     }
 
     get liczba() { return this.czastki.length; }
+
+    /**
+     * Wir w dłoni w chwili rzutu - patrz nagłówek "AARD v2". Wołany przez
+     * main.js OBOK wystrzel(), tylko dla Aarda.
+     *
+     * @param {{x,y}} zaczep  px płótna
+     * @param {number} sila   0..1
+     * @param {[number,number,number]} [barwa]
+     */
+    wir(zaczep, sila, barwa = BARWA_DOMYSLNA) {
+        if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y)) return;
+        const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
+        if (s <= 0.01) return;
+        const b = (Array.isArray(barwa) && barwa.length === 3 && barwa.every(Number.isFinite))
+            ? barwa : BARWA_DOMYSLNA;
+        if (this.wiry.length >= MAX_WIROW) this.wiry.shift();
+        this.wiry.push({
+            zaczep: { x: zaczep.x, y: zaczep.y }, sila: s, barwa: b, wiek: 0,
+            // Losowy zwrot obrotu - dwa rzuty pod rząd nie mają wyglądać identycznie.
+            zwrot: Math.random() < 0.5 ? -1 : 1,
+            kat0: Math.random() * Math.PI * 2
+        });
+    }
 
     /**
      * @param {{x,y}} zaczep  źródło w PIKSELACH płótna
@@ -223,6 +312,22 @@ export class Fala {
             ? barwa : BARWA_DOMYSLNA;
 
         const [p1, p2] = prostopadleDo(os);
+
+        // --- CZOŁO v2: kreska + smugi (nagłówek "AARD v2") ---
+        if (this.czola.length >= MAX_CZOL) this.czola.shift();
+        const smugi = [];
+        for (let i = 0; i < SMUG_NA_CZOLO; i++) {
+            smugi.push({
+                kat: (i / SMUG_NA_CZOLO) * Math.PI * 2 + (Math.random() - 0.5) * 0.5,
+                dryf: (Math.random() - 0.5) * 2 * SMUGA_DRYF_MAX,
+                promien: 0.86 + Math.random() * 0.14,   // tuż pod zewnętrzną krawędzią
+                skala: 0.8 + Math.random() * 0.5,
+                // Obraz wybrany RAZ (nie co klatkę - losowanie per klatka migałoby).
+                // null, gdy asset jeszcze się ładuje - _rysuj spróbuje raz jeszcze.
+                obraz: losowyWariant(MANIFEST.smugaWiatru)
+            });
+        }
+        this.czola.push({ zaczep: { x: zaczep.x, y: zaczep.y }, kierunek: os, sila: s, barwa: b, wiek: 0, smugi });
 
         // --- CZOŁO FALI: pierścień prostopadły do kierunku ---
         const n = Math.round(NA_WYSTRZAL * (0.4 + 0.6 * s));
@@ -290,6 +395,17 @@ export class Fala {
     _ruszaj(dt) {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.05, dt)) : 0;
         if (krok <= 0) return;
+
+        // Czoła i wiry: tylko zegar, geometria liczy się w chwili rysowania
+        // z polozenieCzola/punktyCzola (jedno źródło prawdy z soczewką w ekran.js).
+        for (const c of this.czola) {
+            c.wiek += krok;
+            for (const m of c.smugi) m.kat += m.dryf * krok;
+        }
+        this.czola = this.czola.filter(c => c.wiek < CZOLO_ZYCIE);
+        for (const w of this.wiry) w.wiek += krok;
+        this.wiry = this.wiry.filter(w => w.wiek < WIR_ZYCIE);
+
         const zywe = [];
         for (const c of this.czastki) {
             c.wiek += krok;
@@ -320,6 +436,97 @@ export class Fala {
     }
 
     _rysuj(ctx) {
+        this._rysujCzastki(ctx);
+        this._rysujCzola(ctx);
+        this._rysujWiry(ctx);
+    }
+
+    /** Kreska czoła + smugi wiatru - NAD cząstkami (krawędź ma być czytelna). */
+    _rysujCzola(ctx) {
+        if (!this.czola.length) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (const c of this.czola) {
+            const p = c.wiek / CZOLO_ZYCIE;
+            const gasniecie = Math.pow(1 - p, 1.5);
+            const { srodek, punkty } = punktyCzola(c.zaczep, c.kierunek, c.sila, c.wiek, KRESKA_PUNKTOW, 1);
+            if (punkty.length < 3) continue;
+            const [r, g, b] = c.barwa;
+
+            // --- smugi wiatru: POD kreską, żeby krawędź została najjaśniejsza ---
+            const promienNominalny = polozenieCzola(c.sila, c.wiek).promien;
+            for (const m of c.smugi) {
+                if (!m.obraz) m.obraz = losowyWariant(MANIFEST.smugaWiatru);   // asset mógł doładować się w locie
+                if (!m.obraz) continue;
+                // Punkt na obwodzie pod kątem smugi - ten sam rzut co kreska,
+                // więc smuga siedzi na czole także przy rzucie w bok.
+                const pc = punktCzolaPodKatem(c.zaczep, c.kierunek, c.sila, c.wiek, m.promien, m.kat);
+                if (!pc) continue;
+                const pkt = pc.punkt;
+                const naZewn = { x: pkt.x - srodek.x, y: pkt.y - srodek.y };
+                const odl = Math.hypot(naZewn.x, naZewn.y);
+                if (odl < 1e-3) continue;
+                // Rozmiar w px EKRANU: odległość rzutowana / nominalna = skala
+                // perspektywy w tym punkcie (bliższy brzeg czoła = większa smuga).
+                const rozmiar = promienNominalny * SMUGA_ROZMIAR * m.skala
+                              * (odl / Math.max(1, promienNominalny * m.promien));
+                if (rozmiar < 4) continue;
+                // Sprite: półksiężyc wypukły w +y obrazu -> +y ma wskazywać NA ZEWNĄTRZ.
+                const kat = Math.atan2(naZewn.y, naZewn.x) - Math.PI / 2;
+                const spr = wypalTintowany(m.obraz, c.barwa, SMUGA_SPRITE_PX);
+                ctx.globalAlpha = Math.max(0, Math.min(1, 0.85 * gasniecie * c.sila));
+                ctx.translate(pkt.x, pkt.y);
+                ctx.rotate(kat);
+                ctx.drawImage(spr, -rozmiar / 2, -rozmiar / 2, rozmiar, rozmiar);
+                ctx.rotate(-kat);
+                ctx.translate(-pkt.x, -pkt.y);
+            }
+
+            // --- kreska: szeroki miękki ślad + cienka jasna linia ---
+            ctx.beginPath();
+            ctx.moveTo(punkty[0].x, punkty[0].y);
+            for (let i = 1; i < punkty.length; i++) ctx.lineTo(punkty[i].x, punkty[i].y);
+            ctx.closePath();
+            ctx.strokeStyle = `rgb(${r},${g},${b})`;
+            ctx.lineWidth = KRESKA_SZEROKA_PX * (1 - 0.5 * p);
+            ctx.globalAlpha = 0.28 * gasniecie * c.sila;
+            ctx.stroke();
+            ctx.strokeStyle = `rgb(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)})`;
+            ctx.lineWidth = KRESKA_CIENKA_PX;
+            ctx.globalAlpha = 0.95 * gasniecie * c.sila;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    /** Wir w dłoni - obrót + puchnięcie, najkrótsza warstwa całego efektu. */
+    _rysujWiry(ctx) {
+        if (!this.wiry.length) return;
+        const img = obraz(MANIFEST.wir);
+        if (!img) return;   // asset jeszcze się ładuje - warstwa po prostu nie rysuje się (GEMINI.md §2)
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const w of this.wiry) {
+            const p = w.wiek / WIR_ZYCIE;
+            const wyjscie = 1 - Math.pow(1 - p, 3);   // ease-out: szybki start, dobieg
+            const rozmiar = (WIR_ROZMIAR_OD + (WIR_ROZMIAR_DO - WIR_ROZMIAR_OD) * wyjscie) * (0.5 + 0.5 * w.sila);
+            const kat = w.kat0 + w.zwrot * WIR_OBROTY * Math.PI * 2 * wyjscie;
+            const spr = wypalTintowany(img, w.barwa, WIR_SPRITE_PX);
+            ctx.globalAlpha = Math.max(0, Math.min(1, (1 - p) * (0.6 + 0.4 * w.sila)));
+            ctx.translate(w.zaczep.x, w.zaczep.y);
+            ctx.rotate(kat);
+            ctx.drawImage(spr, -rozmiar / 2, -rozmiar / 2, rozmiar, rozmiar);
+            ctx.rotate(-kat);
+            ctx.translate(-w.zaczep.x, -w.zaczep.y);
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    _rysujCzastki(ctx) {
         if (!this.czastki.length) return;
         if (!this._spriteRdzen) this._spriteRdzen = sprite(BARWA_RDZEN, 1.0);
 

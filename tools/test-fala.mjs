@@ -213,4 +213,40 @@ spr('mnożnik promienia zmniejsza pierścień (wewnętrzna krawędź soczewki)',
 spr('zły kierunek (zerowy) -> pusta lista punktów, bez wyjątku',
     punktyCzola(zaczep11, { x: 0, y: 0, z: 0 }, 1, 0.4, 16).punkty.length === 0);
 
+// --- 12. Aard v2: czoło (kreska + smugi) i wir jako OSOBNY stan od cząstek ---
+console.log('\nCZOŁO I WIR (stan, bez rysowania):');
+const f12 = new Fala();
+spr('świeża fala nie ma czół ani wirów', f12.czola.length === 0 && f12.wiry.length === 0);
+f12.wystrzel({ x: 500, y: 400 }, { x: 0, y: 0, z: -1 }, 1, [140, 235, 195]);
+spr('wystrzał rejestruje JEDNO czoło (kreska + smugi jadą z tym samym rekordem)', f12.czola.length === 1);
+spr('czoło pamięta zaczep, kierunek, siłę i barwę',
+    f12.czola[0].zaczep.x === 500 && f12.czola[0].kierunek.z === -1
+    && f12.czola[0].sila === 1 && f12.czola[0].barwa[1] === 235);
+spr(`czoło ma smugi wiatru z kątami po obwodzie (${f12.czola[0].smugi.length})`,
+    f12.czola[0].smugi.length >= 6 && f12.czola[0].smugi.every(m => Number.isFinite(m.kat) && Number.isFinite(m.dryf)));
+spr('smugi w Node nie mają obrazu (asset niezaładowany) - i to nie jest błąd',
+    f12.czola[0].smugi.every(m => m.obraz === null));
+spr('wystrzał NIE tworzy wiru - wir jest osobną decyzją main.js (tylko Aard, nie Grom)', f12.wiry.length === 0);
+let klatek12 = 0;
+while (f12.czola.length > 0 && klatek12 < 600) { f12._ruszaj(DT); klatek12++; }
+spr(`czoło wygasa samo (po ${(klatek12 * DT).toFixed(2)} s, < 1.5 s)`, f12.czola.length === 0 && klatek12 * DT < 1.5);
+
+const f12b = new Fala();
+f12b.wir({ x: 500, y: 400 }, 1, [140, 235, 195]);
+spr('wir() rejestruje wir', f12b.wiry.length === 1 && f12b.wiry[0].zaczep.x === 500);
+let klatek12b = 0;
+while (f12b.wiry.length > 0 && klatek12b < 600) { f12b._ruszaj(DT); klatek12b++; }
+spr(`wir wygasa szybciej niż czoło (po ${(klatek12b * DT).toFixed(2)} s, < 0.5 s)`, f12b.wiry.length === 0 && klatek12b * DT < 0.5);
+
+const f12c = new Fala();
+f12c.wir({ x: NaN, y: 400 }, 1, [140, 235, 195]);
+f12c.wir({ x: 500, y: 400 }, 0, [140, 235, 195]);
+f12c.wir({ x: 500, y: 400 }, NaN, [140, 235, 195]);
+spr('wir(): NaN zaczep / zero siły / NaN siła -> nic, bez wyjątku', f12c.wiry.length === 0);
+f12c.wir({ x: 500, y: 400 }, 1, 'zła');
+spr('wir(): zła barwa -> fallback na domyślną, bez wyjątku', f12c.wiry.length === 1 && f12c.wiry[0].barwa[0] === 214);
+const f12d = new Fala();
+f12d.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 0 }, 1);
+spr('nieprawidłowy wystrzał nie rejestruje czoła', f12d.czola.length === 0);
+
 process.exit(ok ? 0 : 1);

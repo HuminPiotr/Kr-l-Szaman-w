@@ -33,7 +33,14 @@ export const MANIFEST = {
               'assets/czastki/flame_05.png', 'assets/czastki/flame_06.png'],
     ogienRdzen: ['assets/czastki/fire_01.png', 'assets/czastki/fire_02.png'],
     rozblyskUderzenia: ['assets/czastki/scorch_01.png', 'assets/czastki/scorch_02.png',
-                         'assets/czastki/scorch_03.png']
+                         'assets/czastki/scorch_03.png'],
+    // Aard v2 (2026-09-14): smugi wiatru na czole fali (miękkie półksiężyce
+    // zamachu - 01/02 z ogonem, 04 szeroka wstęga; 03 pominięta, bo to
+    // cienka ostra szabla i czyta się jak cięcie, nie jak podmuch) i wir
+    // w dłoni w chwili rzutu (otwarty zawijas C).
+    smugaWiatru: ['assets/czastki/slash_01.png', 'assets/czastki/slash_02.png',
+                  'assets/czastki/slash_04.png'],
+    wir: 'assets/czastki/twirl_01.png'
 };
 
 const _obrazy = new Map();   // ścieżka -> HTMLImageElement, WPISYWANY dopiero po onload

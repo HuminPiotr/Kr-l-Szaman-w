@@ -732,6 +732,9 @@ function klatka(now) {
         // grać jedną barwą - ten sam powód, dla którego Grom w Ziemię
         // podaje BARWA_GROMU zamiast polegać na domyślnej.
         fala.wystrzel(zaczepPx, wystrzal.kierunek, wystrzal.sila, BARWA_ZAPLONU.aard);
+        // Wir w dłoni TYLKO tu, nie w wystrzel(): Grom w Ziemię dzieli falę,
+        // ale wybucha z ziemi - wir z dłoni nie miałby tam sensu.
+        fala.wir(zaczepPx, wystrzal.sila, BARWA_ZAPLONU.aard);
         // Odpowiedź ekranu W CHWILI WYSTRZAŁU, nie tylko przy uzbrojeniu
         // combo (blok 6b wyżej): wstrząs+bloom i soczewka refrakcyjna to
         // dwa osobne zdarzenia o różnych zegarach (ekran.js nagłówek).
