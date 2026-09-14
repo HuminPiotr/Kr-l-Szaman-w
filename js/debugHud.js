@@ -491,28 +491,9 @@ export class DebugHud {
             // NOS_POD_OCZAMI byłoby zgadywaniem. Głowa surowa: skręt ma sięgać ±1 przy
             // wyraźnym obrocie, pochylenie ~0 przy głowie na wprost.
             const k = stats.dmuchanie.kierunek, g = stats.dmuchanie.glowa;
-            const kOdl = stats.dmuchanie.kolkoOdleglosc, kZg = stats.dmuchanie.kolkoZgiecie;
-            // v8.5: kółko już NIE JEST warunkiem gestu (gest = styk) - tylko
-            // bonus do intensywności, stąd etykieta "(bonus)".
-            lines.push(`  styk ${this._num(stats.dmuchanie.styk)}   kółko (bonus) ${this._num(stats.dmuchanie.kolko)}` +
-                       `  (odl ${kOdl == null ? '-' : this._num(kOdl)}` +
-                       ` zgięcie ${kZg == null ? '-' : this._num(kZg)}` +
-                       ` -> wielkość ${this._num(stats.dmuchanie.wielkoscKolka)}` +
-                       ` intensywność ${this._num(stats.dmuchanie.intensywnosc)})`);
             lines.push(`  kierunek ${k ? `${this._num(k.x)} ${this._num(k.y)}` : '-'}` +
                        `   wyrazistość ${this._num(stats.dmuchanie.wyrazistosc)}` +
                        `   głowa ${g ? `skręt ${this._num(g.skret)} pochyl ${this._num(g.pochylenie)}` : 'brak oczu'}`);
-            // SZCZYT z ostatnich kilku sekund (js/dmuchanie.js: SZCZYT_OKNO_MS) -
-            // gest wymaga obu rąk zajętych, więc żywy odczyt nie da się zrzucić
-            // ekranem w tej samej chwili. Ta linia zostaje czytelna PO opuszczeniu
-            // ręki, przez SZCZYT_OKNO_MS.
-            const sz = stats.dmuchanie.szczyt;
-            if (sz) {
-                lines.push(`  SZCZYT (4s): styk ${this._num(sz.styk)}  kółko ${this._num(sz.kolko)}` +
-                           ` (odl ${sz.odleglosc == null ? '-' : this._num(sz.odleglosc)}` +
-                           ` zgięcie ${sz.zgiecie == null ? '-' : this._num(sz.zgiecie)})` +
-                           `  -> gest ${this._num(sz.gest)}  intensywność ${this._num(sz.intensywnosc)}`);
-            }
         }
         if (stats.dym && (stats.dym.czastek > 0 || stats.dym.plonacych > 0)) {
             lines.push(`dym: cząstek ${stats.dym.czastek}  płonących ${stats.dym.plonacych}`);

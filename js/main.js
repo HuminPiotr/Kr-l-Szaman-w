@@ -30,7 +30,7 @@ import { Kolowrot, BARWA_MGLA as BARWA_KOLOWROTU, kregSylwetki } from './kolowro
 import { zaladuj as zaladujAssety } from './assety.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
-         skierowanaWGore, rownolegle, NAZWY_PALCOW, kolkoPalcow } from './znaki/dlon.js';
+         skierowanaWGore, rownolegle, NAZWY_PALCOW } from './znaki/dlon.js';
 
 // ODPIĘTE, NIE USUNIĘTE: powerBall.js, wiatr.js, znaki/szczurDlon.js,
 // znaki/welesDlon.js, znaki/perunDlon.js, znaki/mokoszSplot.js, js/runy/*
@@ -327,18 +327,8 @@ function opiszDlonie(frame) {
         const w = wzorPalcow(d.landmarks);
         const wzor = w.map(v => v > 0.6 ? '1' : (v > 0.25 ? '~' : '0')).join('');
         const suma = w.reduce((a, b) => a + b, 0);
-        // Kółko z palców (Okadzenie v8) - ZAWSZE widoczne, NIEZALEŻNIE od tego,
-        // czy technika jest uzbrojona. Kalibracja progów w js/znaki/dlon.js
-        // wymaga tych liczb z żywej dłoni (v8.2 - dłoń syntetyczna do tego
-        // nie wystarcza), a wymaganie complete comba tylko po to, żeby je
-        // zobaczyć, jest zbędnym tarciem - stąd czytamy je tu wprost.
-        const k = kolkoPalcow(d.landmarks);
-        const kolko = k
-            ? `  kółko odl ${k.odleglosc.toFixed(2)} zgięcie ${k.zgiecie.toFixed(2)}` +
-              ` -> domkn ${k.domkniecie.toFixed(2)} (${k.palec})`
-            : '';
         return `${(d.handedness ?? '?').slice(0, 1)} ${wzor} ${suma.toFixed(1)} palc.` +
-               `  góra ${skierowanaWGore(d.landmarks).toFixed(2)}${kolko}`;
+               `  góra ${skierowanaWGore(d.landmarks).toFixed(2)}`;
     });
 
     if (h.length === 2) {
@@ -593,7 +583,6 @@ function klatka(now) {
             dmuchanie.kierunek,
             dmuchanie.sila,
             dmuchanie.wyrazistosc,
-            dmuchanie.intensywnosc,
             dt,
             canvas.width,
             canvas.height
@@ -787,10 +776,7 @@ function klatka(now) {
         // strojenia progu na żywo, patrz debugHud.js.
         dmuchanie: { stan: dmuchanie.stan, sila: dmuchanie.sila, pozostaloS: dmuchanie.pozostaloS, gest: dmuchanie._gest,
                      kierunek: dmuchanie.kierunek, glowa: dmuchanie.glowa,
-                     wyrazistosc: dmuchanie.wyrazistosc, kolko: dmuchanie.kolko,
-                     wielkoscKolka: dmuchanie.wielkoscKolka, intensywnosc: dmuchanie.intensywnosc,
-                     kolkoOdleglosc: dmuchanie.kolkoOdleglosc, kolkoZgiecie: dmuchanie.kolkoZgiecie,
-                     styk: dmuchanie.styk, szczyt: dmuchanie.szczyt },
+                     wyrazistosc: dmuchanie.wyrazistosc },
         dym: { czastek: dym.liczba, plonacych: dym.plonacych },
         ekran: { sila: ekran.sila },
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,

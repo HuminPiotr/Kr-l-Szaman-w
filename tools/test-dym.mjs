@@ -54,10 +54,9 @@ const przepusc = (d, sekundy) => {
     return suma;
 };
 /** Dmucha przez `sekundy`: emituj + updateAndDraw co klatkę, dokładnie jak main.js. */
-function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1, wyrazistosc = 1,
-                                intensywnosc = 1, usta = USTA } = {}) {
+function dmuchaj(d, sekundy, { kierunek = W_PRAWO, sila = 1, wyrazistosc = 1, usta = USTA } = {}) {
     for (let i = 0; i < Math.round(sekundy / DT); i++) {
-        d.emituj(usta, kierunek, sila, wyrazistosc, intensywnosc, DT, W, H);
+        d.emituj(usta, kierunek, sila, wyrazistosc, DT, W, H);
         d.updateAndDraw(null, W, H, DT);
     }
 }
@@ -69,8 +68,8 @@ const wszystkie = (d) => d._czastki;
  */
 function pierwszaCzastka(d, opts = {}) {
     for (let i = 0; i < 30 && d.liczba === 0; i++) {
-        d.emituj(opts.usta ?? USTA, opts.kierunek ?? W_PRAWO, opts.sila ?? 1,
-                  opts.wyrazistosc ?? 1, opts.intensywnosc ?? 1, DT, W, H);
+        d.emituj(opts.usta ?? USTA, opts.kierunek ?? W_PRAWO,
+                  opts.sila ?? 1, opts.wyrazistosc ?? 1, DT, W, H);
     }
     return wszystkie(d)[wszystkie(d).length - 1];
 }
@@ -95,7 +94,7 @@ console.log('\nEMISJA CIĄGŁA:');
     const przyrosty = [];
     for (let i = 0; i < 60; i++) {
         const przed = d.liczba;
-        d.emituj(USTA, W_PRAWO, 1, 1, 1, DT, W, H);
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
         przyrosty.push(d.liczba - przed);
         d.updateAndDraw(null, W, H, DT);
     }
@@ -126,8 +125,8 @@ console.log('\nPOCZĄTKOWA SIŁA KIERUNKU:');
     // (ROZRZUT_PREDKOSCI), więc pojedyncza para potrafi się minąć.
     const mocno = new Dym(), slabo = new Dym();
     for (let i = 0; i < 20; i++) {
-        mocno.emituj(USTA, W_PRAWO, 1, 1, 1, DT, W, H);
-        slabo.emituj(USTA, W_PRAWO, 1, 0, 1, DT, W, H);
+        mocno.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+        slabo.emituj(USTA, W_PRAWO, 1, 0, DT, W, H);
     }
     const srednieV = (d) => wszystkie(d).reduce((a, c) => a + Math.hypot(c.vxGry, c.vyGry), 0) / d.liczba;
     const vM = srednieV(mocno), vS = srednieV(slabo);
@@ -138,25 +137,6 @@ console.log('\nPOCZĄTKOWA SIŁA KIERUNKU:');
     const s = srodek(wszystkie(mocno));
     spr(`po 2 s obłok przesunął się w PRAWO (${((s.x / POL - USTA.x) / W).toFixed(2)} W)`,
         s.x / POL - USTA.x > 0.05 * W);
-}
-
-// --- 3b. Intensywność z wielkości kółka (v8) ---
-console.log('\nINTENSYWNOŚĆ (wielkość kółka z palców):');
-{
-    const duze = new Dym(), male = new Dym();
-    dmuchaj(duze, 1, { intensywnosc: 1 });
-    dmuchaj(male, 1, { intensywnosc: 0 });
-    spr(`duże kółko daje >= 2x więcej dymu (${duze.liczba} vs ${male.liczba})`,
-        duze.liczba >= 2 * male.liczba);
-    spr('...a małe NIGDY nie daje zera (reguła "nic nie mówi źle")', male.liczba > 0);
-    const rDuze = Math.max(...wszystkie(duze).map(c => c.finalScale));
-    const rMale = Math.max(...wszystkie(male).map(c => c.finalScale));
-    spr(`duże kółko daje też grubsze kłęby (${rMale.toFixed(1)} -> ${rDuze.toFixed(1)})`, rDuze > rMale);
-    spr('brak parametru (undefined) = pełna intensywność, nie zero', (() => {
-        const x = new Dym();
-        for (let i = 0; i < 60; i++) { x.emituj(USTA, W_PRAWO, 1, 1, undefined, DT, W, H); x.updateAndDraw(null, W, H, DT); }
-        return x.liczba >= duze.liczba * 0.8;
-    })());
 }
 
 // --- 4. Cztery strony świata i wyporność ---
@@ -341,9 +321,9 @@ console.log('\nSUFIT CZĄSTEK:');
     // Dosypujemy, aż sufit zacznie ciąć (sama emisja, bez fizyki - inaczej
     // pętla byłaby nieskończona: po przycięciu długość zawsze == MAX_CZASTEK).
     for (let i = 0; i < MAX_CZASTEK * 3 && wszystkie(d).length < MAX_CZASTEK; i++) {
-        d.emituj(USTA, W_PRAWO, 1, 1, 1, DT, W, H);
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
     }
-    d.emituj(USTA, W_PRAWO, 1, 1, 1, DT, W, H);
+    d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
     spr('sufit wyrzucił cząstkę najbliższą końca życia', !wszystkie(d).includes(skazana));
     spr('...a nie tę najstarszą, której daleko do końca', wszystkie(d).includes(swiezaStara));
 }
@@ -355,7 +335,7 @@ console.log('\nODPORNOŚĆ:');
     spr('updateAndDraw na pusto = 0', d.updateAndDraw(null, W, H, DT) === 0);
     spr('NaN dt nie wywala', d.updateAndDraw(null, W, H, NaN) === 0);
     spr('emituj z NaN w zaczepie nie tworzy cząstek',
-        (() => { d.emituj({ x: NaN, y: 1 }, W_PRAWO, 1, 1, 1, DT, W, H); return d.liczba === 0; })());
+        (() => { d.emituj({ x: NaN, y: 1 }, W_PRAWO, 1, 1, DT, W, H); return d.liczba === 0; })());
     spr('kierunek zerowy -> fallback w górę, bez NaN', (() => {
         const x = new Dym();
         dmuchaj(x, 0.3, { kierunek: { x: 0, y: 0 } });
