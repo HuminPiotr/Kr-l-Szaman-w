@@ -173,6 +173,8 @@ function prostopadleDo(os) {
  *
  * JEDNO ŹRÓDŁO PRAWDY dla wszystkiego, co ma "jechać razem z falą", a nie
  * jest cząstką: soczewka refrakcyjna w ekran.js i kreska czoła niżej.
+ * KIERUNEK ZALEŻNOŚCI JEST NOŚNY: ekran.js importuje fala.js, więc fala.js
+ * NIE MOŻE importować ekran.js (cykl modułów ES) - geometria zostaje liściem.
  * Gdyby każdy z tych efektów miał własne stałe, po pierwszej zmianie
  * strojenia rozjechałyby się z cząstkami. Czysta funkcja - testowana
  * w tools/test-fala.mjs względem symulacji.
@@ -474,14 +476,20 @@ export class Fala {
                               * (odl / Math.max(1, promienNominalny * m.promien));
                 if (rozmiar < 4) continue;
                 // Sprite: półksiężyc wypukły w +y obrazu -> +y ma wskazywać NA ZEWNĄTRZ.
+                // LUSTRO (CSS scaleX(-1), GEMINI.md §4) NIE psuje tego: odbicie
+                // odbija środek, punkt i sprite RAZEM, więc "wypukłością od
+                // środka" zostaje prawdą po obu stronach. Półksiężyc nie ma
+                // strony "właściwej" jak glif w runa.js - nie odkręcamy lustra.
                 const kat = Math.atan2(naZewn.y, naZewn.x) - Math.PI / 2;
                 const spr = wypalTintowany(m.obraz, c.barwa, SMUGA_SPRITE_PX);
+                // save/restore per sprite (idiom z runa.js), nie rotate(-kat):
+                // odwracanie transformacji dryfuje numerycznie po 8 smugach x N klatek.
+                ctx.save();
                 ctx.globalAlpha = Math.max(0, Math.min(1, 0.85 * gasniecie * c.sila));
                 ctx.translate(pkt.x, pkt.y);
                 ctx.rotate(kat);
                 ctx.drawImage(spr, -rozmiar / 2, -rozmiar / 2, rozmiar, rozmiar);
-                ctx.rotate(-kat);
-                ctx.translate(-pkt.x, -pkt.y);
+                ctx.restore();
             }
 
             // --- kreska: szeroki miękki ślad + cienka jasna linia ---
@@ -515,12 +523,15 @@ export class Fala {
             const rozmiar = (WIR_ROZMIAR_OD + (WIR_ROZMIAR_DO - WIR_ROZMIAR_OD) * wyjscie) * (0.5 + 0.5 * w.sila);
             const kat = w.kat0 + w.zwrot * WIR_OBROTY * Math.PI * 2 * wyjscie;
             const spr = wypalTintowany(img, w.barwa, WIR_SPRITE_PX);
+            // Wir jest CHIRALNY - lustro (CSS scaleX(-1)) odwraca zwrot
+            // spirali. Zwrot obrotu i tak losujemy (`zwrot`), więc żaden
+            // z dwóch nie jest "zły" - decyzja świadoma, lustra nie odkręcamy.
+            ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, (1 - p) * (0.6 + 0.4 * w.sila)));
             ctx.translate(w.zaczep.x, w.zaczep.y);
             ctx.rotate(kat);
             ctx.drawImage(spr, -rozmiar / 2, -rozmiar / 2, rozmiar, rozmiar);
-            ctx.rotate(-kat);
-            ctx.translate(-w.zaczep.x, -w.zaczep.y);
+            ctx.restore();
         }
         ctx.globalAlpha = 1;
         ctx.restore();
