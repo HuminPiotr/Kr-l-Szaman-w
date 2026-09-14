@@ -14,7 +14,10 @@ import { mokosz } from './znaki/mokosz.js';
 import { aktualizujSkale } from './znaki/postawa.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
-import { Efekty } from './efekty.js';
+import { Efekty, TABELA as EFEKTY_TABELA, srodekDloni } from './efekty.js';
+import { zaladujFont } from './glify.js';
+import { Runy } from './runa.js';
+import { PasekSekwencji } from './sekwencja.js';
 import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
 import { Dmuchanie } from './dmuchanie.js';
@@ -51,6 +54,19 @@ import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
 // Dłonie są WPIĘTE - piramidka Swaroga ich potrzebuje. Zmierzone na żywym
 // tańcu: ~60 FPS z ciałem i maską, więc 8 ms na dłonie mieści się z ogromnym
 // zapasem.
+
+// Ikony HUD instrukcji - runy zamiast emoji (Król Szamanów, 2026-09-14).
+// CELOWO OSOBNY zestaw od GLIFY w js/glify.js (ᚲ ᚦ ᚢ ᚨ ᛚ - pięć pieczęci):
+// HUD mówi o STANIE GRY (czekanie, ruch, pełnia mocy), nie o konkretnej
+// pieczęci, więc dostaje własne, tematyczne runy. ᚲ i ᛚ są reużyte z GLIFY
+// (ogień/przepływ pasują też tutaj), ᛞ (Dagaz - świt, przełom) i ᛗ (Mannaz -
+// człowiek) są nowe. Żaden z zestawu ZAKAZANE (js/glify.js) tu nie wchodzi.
+const IKONA = {
+    ogien: 'ᚲ',       // czekanie na moc / ładowanie - żar
+    plynie: 'ᛚ',       // ruch/przepływ - dzielona z Laguz (woda/przepływ)
+    swit: 'ᛞ',         // pełna moc, technika, pieczęć złożona - przełom
+    czlowiek: 'ᛗ'      // "pokaż się kamerze" - sylwetka człowieka
+};
 
 // Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
 // PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
@@ -89,6 +105,9 @@ const uiInstructionText = document.getElementById('instruction-text');
 const uiEnergyHud = document.getElementById('energy-hud');
 const uiEnergyFill = document.getElementById('energy-fill');
 const uiEnergyPercentage = document.getElementById('energy-percentage');
+const uiSekwencjaRun = document.getElementById('sekwencja-run');
+const uiSekwencjaSloty = document.getElementById('sekwencja-sloty');
+const uiSekwencjaNazwa = document.getElementById('sekwencja-nazwa');
 
 const startBtn = document.getElementById('start-btn');
 const video = document.getElementById('webcam');
@@ -117,6 +136,12 @@ znaki.zarejestruj(mokosz);       // woda
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 let efekty = new Efekty();
+// Wielka runa przy dłoniach (js/runa.js) zastępuje dawny pierścień składania
+// pieczęci; pasek sekwencji (js/sekwencja.js) czyta TEN SAM bufor kombosów
+// przez kombosy.aktywne(now) co klatkę - PULL, nie zdarzenia, ten sam
+// wzorzec co zarzewia dymu (main.js:625 nagłówek "pull-based").
+let runy = new Runy();
+let sekwencja = new PasekSekwencji(uiSekwencjaSloty, uiSekwencjaNazwa);
 let ogien = new Ogien();
 let plonacyPalec = new PlonacyPalec();
 let dmuchanie = new Dmuchanie();
@@ -181,10 +206,13 @@ startBtn.addEventListener('click', async () => {
         });
         video.play();
 
-        // 3. Inicjalizacja AI (MediaPipe)
+        // 3. Inicjalizacja AI (MediaPipe) + font run (js/glify.js: 3 s
+        // limit, NIGDY nie odrzuca - brak fontu nie blokuje startu gry,
+        // js/runa.js po prostu pominie glif, dopóki się nie doczeka).
         await Promise.all([
             poseTracker.initialize(),
-            handTracker.initialize()
+            handTracker.initialize(),
+            zaladujFont()
         ]);
 
         // 3a. Assety Kołowrotu (js/assety.js) - CELOWO NIE await. Pobieranie
@@ -204,6 +232,7 @@ startBtn.addEventListener('click', async () => {
         uiLoadingScreen.classList.add('hidden');
         uiInstructionHud.classList.remove('hidden');
         uiEnergyHud.classList.remove('hidden');
+        uiSekwencjaRun.classList.remove('hidden');
 
         isRunning = true;
         requestAnimationFrame(renderLoop);
@@ -288,7 +317,8 @@ function rysujDlonie(frame) {
         if (!lm || lm.length < 21) continue;
         const px = (i) => ({ x: lm[i].x * frame.width, y: lm[i].y * frame.height });
 
-        ctx.strokeStyle = 'rgba(150, 220, 255, 0.30)';
+        // Kość/żar zamiast dawnego cyjanu - Król Szamanów.
+        ctx.strokeStyle = 'rgba(239, 227, 200, 0.28)';
         ctx.lineWidth = 3;
         for (const lancuch of SZKIELET) {
             ctx.beginPath();
@@ -303,7 +333,7 @@ function rysujDlonie(frame) {
         for (let i = 0; i < 21; i++) {
             const p = px(i);
             const opuszek = i === 4 || i === 8 || i === 12 || i === 16 || i === 20;
-            ctx.fillStyle = opuszek ? 'rgba(200, 240, 255, 0.85)' : 'rgba(150, 220, 255, 0.45)';
+            ctx.fillStyle = opuszek ? 'rgba(255, 178, 71, 0.85)' : 'rgba(239, 227, 200, 0.40)';
             ctx.beginPath();
             ctx.arc(p.x, p.y, opuszek ? 5 : 3, 0, Math.PI * 2);
             ctx.fill();
@@ -396,8 +426,10 @@ function klatka(now) {
     // Płótno jest odwrócone przez CSS (scaleX(-1)), więc wideo działa jak lustro
     drawVideoCover(ctx, video, fit);
 
-    // Przyciemnienie dla kontrastu - aura ma się na czym odcinać
-    ctx.fillStyle = 'rgba(5, 5, 16, 0.55)';
+    // Przyciemnienie dla kontrastu - aura ma się na czym odcinać. Ciepły,
+    // węglowy odcień (Król Szamanów) zamiast dawnego zimnego granatu -
+    // paleta ognia/węgla z GEMINI.md §7.3.
+    ctx.fillStyle = 'rgba(10, 5, 2, 0.55)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // --- 2. Wykrywanie ciała (detekcja idzie na pomniejszonej klatce) ---
@@ -461,6 +493,11 @@ function klatka(now) {
     if (skl.zlozona) {
         motionMeter.zuzyj(skl.zlozona.koszt);
         efekty.odpal(skl.zlozona.id);
+        // Wielka runa (js/runa.js) - zastępuje dawny pierścień. Zaczep
+        // TEN SAM, którego używa efekty.js dla wszystkich efektów pieczęci
+        // (środek dłoni), barwa z TEJ SAMEJ tabeli - jedno źródło prawdy.
+        runy.odpal(skl.zlozona.id, srodekDloni(frame, canvas.width, canvas.height),
+                   EFEKTY_TABELA[skl.zlozona.id]?.barwa);
         aura.rozblysk(1);
         // playFireSFX, NIE update('FIRING'): 'FIRING' tylko WYCISZA hum
         // (audioEngine.js:100-103), a klatkę później update('CHARGING') na
@@ -472,6 +509,12 @@ function klatka(now) {
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
             efekty.odpal(technika.id);
+            // Pasek sekwencji "wiąże" ogon bufora, który właśnie trafił -
+            // po t (znacznik czasu), NIE po pozycji, więc kolejne pieczęcie
+            // dodane PO tym combo nie dziedziczą więzi (js/sekwencja.js
+            // nagłówek). Bufor sam NIE jest czyszczony - kombosy.js
+            // nagłówek, łańcuchy są celowe.
+            sekwencja.oznaczCombo(kombosy.bufor.slice(-technika.sekwencja.length), technika.nazwa, now);
             aura.rozblysk(1);
             // Zapłon sylwetki (js/zaplon.js) i wstrząs ekranu (js/ekran.js) -
             // WARSTWA WSPÓLNA dla WSZYSTKICH czterech technik, nie tylko
@@ -540,7 +583,7 @@ function klatka(now) {
             // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
             if (technika.uzbraja !== 'dym') dmuchanie.anuluj();
             audioEngine.playFireSFX(1.0);
-            ostatniKomunikat = `${technika.nazwa} ✨`;
+            ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
             ostatniKomunikat = `${znak?.nazwa ?? 'Pieczęć'} złożona`;
@@ -655,6 +698,9 @@ function klatka(now) {
     // --- 7a. Efekty pieczęci i technik ---
     efekty.updateAndDraw(ctx, frame, dt);
 
+    // --- 7a2. Wielka runa przy dłoniach (zastępuje dawny pierścień) ---
+    runy.updateAndDraw(ctx, canvas.width, canvas.height, dt);
+
     // --- 7b. Płonący palec ---
     // Technika kanałowana: zjada moc tak długo, jak gracz ją prowadzi.
     // Pobranie idzie przez motionMeter.zuzyj(), żeby moc miała JEDNEGO
@@ -680,11 +726,20 @@ function klatka(now) {
     const wystrzal = podmuch.update(frame, motionMeter.moc, dt);
     if (wystrzal) {
         motionMeter.zuzyj(wystrzal.pobor);
-        fala.wystrzel(
-            { x: wystrzal.zaczep.x * canvas.width, y: wystrzal.zaczep.y * canvas.height },
-            wystrzal.kierunek,
-            wystrzal.sila
-        );
+        const zaczepPx = { x: wystrzal.zaczep.x * canvas.width, y: wystrzal.zaczep.y * canvas.height };
+        // BARWA_ZAPLONU.aard, nie domyślny błękit fala.js: zapłon sylwetki
+        // przy uzbrojeniu i fala przy wystrzale to JEDNO zdarzenie i mają
+        // grać jedną barwą - ten sam powód, dla którego Grom w Ziemię
+        // podaje BARWA_GROMU zamiast polegać na domyślnej.
+        fala.wystrzel(zaczepPx, wystrzal.kierunek, wystrzal.sila, BARWA_ZAPLONU.aard);
+        // Odpowiedź ekranu W CHWILI WYSTRZAŁU, nie tylko przy uzbrojeniu
+        // combo (blok 6b wyżej): wstrząs+bloom i soczewka refrakcyjna to
+        // dwa osobne zdarzenia o różnych zegarach (ekran.js nagłówek).
+        // Siła z wystrzału (0.15..1, patrz podmuch.js) - słaby podmuch
+        // słabiej trzęsie, ale ZAWSZE coś się dzieje (GEMINI.md §2).
+        ekran.uderz(wystrzal.sila);
+        ekran.falaPowietrza(zaczepPx, wystrzal.kierunek, wystrzal.sila);
+        audioEngine.playAardSFX(wystrzal.sila);
     }
     // Piorun PRZED falą/iskrami - uderza z góry, dopiero potem pęka ziemia.
     piorun.updateAndDraw(ctx, dt);
@@ -704,36 +759,43 @@ function klatka(now) {
     uiEnergyPercentage.textContent = `${mocPct}%`;
     uiEnergyFill.style.width = `${mocPct}%`;
     uiEnergyFill.classList.toggle('charged-glow', moc >= 0.95);
-    document.body.className = moc >= 0.95 ? 'ready-pulse' : '';
+    // toggle(), NIE className = ... - przypisanie kasowało CAŁĄ listę klas
+    // elementu co klatkę, więc każda inna klasa dołożona do <body> ginęłaby
+    // najdalej za jedną klatkę.
+    document.body.classList.toggle('ready-pulse', moc >= 0.95);
+
+    // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
+    // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
+    sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
 
     // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
     let text, icon;
     if (ostatniKomunikat && now < ostatniKomunikatDo) {
         text = ostatniKomunikat;
-        icon = "✨";
+        icon = IKONA.swit;
     } else if (!frame.pose) {
-        text = "Odsuń się, żeby kamera widziała całą sylwetkę 🕺";
-        icon = "🕺";
+        text = `Odsuń się, żeby kamera widziała całą sylwetkę ${IKONA.czlowiek}`;
+        icon = IKONA.czlowiek;
     } else if (skl.brakMocy) {
         // ZAPROSZENIE, nie odmowa. Nigdy "za mało mocy" ani "nie stać cię".
-        text = "Pieczęć czeka — tańcz jeszcze chwilę 🔥";
-        icon = "🔥";
+        text = `Pieczęć czeka — tańcz jeszcze chwilę ${IKONA.ogien}`;
+        icon = IKONA.ogien;
     } else if (skl.skladana) {
-        text = "Trzymaj — pieczęć się składa 🌀";
-        icon = "🌀";
+        text = `Trzymaj — pieczęć się składa ${IKONA.plynie}`;
+        icon = IKONA.plynie;
     } else if (moc >= 0.95) {
-        text = "Moc wypełniła cię po brzegi — układaj pieczęcie ✨";
-        icon = "✨";
+        text = `Moc wypełniła cię po brzegi — układaj pieczęcie ${IKONA.swit}`;
+        icon = IKONA.swit;
     } else if (plynnoscMiara.aktywnychStawow === 0) {
-        text = "Zacznij się poruszać — moc budzi się w ruchu 🔥";
-        icon = "🔥";
+        text = `Zacznij się poruszać — moc budzi się w ruchu ${IKONA.ogien}`;
+        icon = IKONA.ogien;
     } else if (plynnosc > 0.6) {
-        text = "Płyniesz. Moc rośnie 🌀";
-        icon = "🌀";
+        text = `Płyniesz. Moc rośnie ${IKONA.plynie}`;
+        icon = IKONA.plynie;
     } else {
         // Zaproszenie, nie poprawka. Nadal ładuje, tylko wolniej.
-        text = "Rozpuść ruch w łagodne łuki, a moc popłynie szybciej 〰️";
-        icon = "〰️";
+        text = `Rozpuść ruch w łagodne łuki, a moc popłynie szybciej ${IKONA.plynie}`;
+        icon = IKONA.plynie;
     }
     uiInstructionText.textContent = text;
     uiInstructionIcon.textContent = icon;

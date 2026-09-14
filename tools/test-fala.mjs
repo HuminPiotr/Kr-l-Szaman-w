@@ -9,7 +9,7 @@
  * Fizykę testujemy przez _ruszaj(dt) bezpośrednio, jak tools/test-aura-impuls.mjs
  * czyta aura._impuls.
  */
-import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO } from '../js/fala.js';
+import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO, polozenieCzola, punktyCzola } from '../js/fala.js';
 
 const DT = 1 / 60;
 
@@ -135,5 +135,82 @@ for (let i = 0; i < 18; i++) f8._ruszaj(DT);   // 0.3 s
 const promienPo = sredniPromien(f8);
 spr(`pierścień ROŚNIE w czasie (${promienPrzed.toFixed(0)} -> ${promienPo.toFixed(0)} px)`,
     promienPo > promienPrzed * 2);
+
+// --- 9. BARWA jest parametrem wystrzel(), nie stałą globalną ---
+// fala.js jest współdzielona między Aardem i Gromem w Ziemię (main.js) -
+// bez tego testu ktoś mógłby przypadkiem cofnąć parametryzację i oba
+// combosy znów świeciłyby identycznym błękitem Aarda.
+console.log('\nBARWA JEST PARAMETREM:');
+const f9domyslna = new Fala();
+f9domyslna.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 1 }, 1);
+spr('bez podanej barwy cząstki dostają barwę domyślną (Aard)',
+    f9domyslna.czastki.filter(c => !c.rdzen).every(c => c.barwa[0] === 214 && c.barwa[1] === 240 && c.barwa[2] === 255));
+
+const f9wlasna = new Fala();
+const BARWA_TEST = [190, 100, 255];
+f9wlasna.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 1 }, 1, BARWA_TEST);
+spr('podana barwa trafia na cząstki czoła fali',
+    f9wlasna.czastki.filter(c => !c.rdzen).every(c => c.barwa[0] === 190 && c.barwa[1] === 100 && c.barwa[2] === 255));
+
+const f9zla = new Fala();
+f9zla.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 1 }, 1, [NaN, 1, 2]);
+spr('nieprawidłowa barwa (NaN w składowej) -> fallback na domyślną, bez wyjątku',
+    f9zla.czastki.filter(c => !c.rdzen).every(c => c.barwa[0] === 214));
+
+// --- 10. polozenieCzola(): analityczna kinematyka czoła (jedno źródło prawdy) ---
+// Refrakcja powietrza w ekran.js i kreska czoła rysują się z TEJ funkcji,
+// nie z własnych stałych - inaczej soczewka i cząstki rozjeżdżałyby się.
+console.log('\nPOŁOŻENIE CZOŁA (funkcja czysta):');
+const c0 = polozenieCzola(1, 0);
+spr(`t=0: czoło na starcie ma promień > 0 (${c0.promien.toFixed(0)} px) i zero przesunięcia`,
+    c0.promien > 0 && c0.wzdluz === 0);
+const c1 = polozenieCzola(1, 0.3), c2 = polozenieCzola(1, 0.6);
+spr(`promień ROŚNIE w czasie (${c0.promien.toFixed(0)} < ${c1.promien.toFixed(0)} < ${c2.promien.toFixed(0)})`,
+    c0.promien < c1.promien && c1.promien < c2.promien);
+spr(`przesunięcie wzdłuż kierunku rośnie i WYSYCA SIĘ (${c1.wzdluz.toFixed(0)} -> ${c2.wzdluz.toFixed(0)}, przyrost maleje)`,
+    c1.wzdluz > 0 && c2.wzdluz > c1.wzdluz && (c2.wzdluz - c1.wzdluz) < c1.wzdluz);
+// Zgodność z symulacją cząstek: średni promień cząstek po 0.5 s musi mieścić
+// się blisko analitycznego (cząstki mają warstwę 0.55..1 i rozrzut, więc
+// średnia leży PONIŻEJ pełnego promienia czoła, ale w tym samym rzędzie).
+const f10 = new Fala();
+f10.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 1 }, 1);
+for (let i = 0; i < 30; i++) f10._ruszaj(DT);
+const czolo10 = f10.czastki.filter(c => !c.rdzen);
+const srPromien10 = czolo10.reduce((s, c) => s + Math.hypot(c.x, c.y), 0) / czolo10.length;
+const anal10 = polozenieCzola(1, 0.5).promien;
+spr(`analityczny promień (${anal10.toFixed(0)}) zgadza się z symulacją cząstek (śr. ${srPromien10.toFixed(0)}, 0.5..1.0x)`,
+    srPromien10 > anal10 * 0.5 && srPromien10 <= anal10 * 1.0);
+spr('słabsza siła daje mniejszy promień i przesunięcie',
+    polozenieCzola(0.3, 0.5).promien < anal10 && polozenieCzola(0.3, 0.5).wzdluz < polozenieCzola(1, 0.5).wzdluz);
+spr('NaN/ujemne argumenty -> skończone wartości, bez wyjątku',
+    Number.isFinite(polozenieCzola(NaN, NaN).promien) && Number.isFinite(polozenieCzola(-1, -1).wzdluz));
+
+// --- 11. punktyCzola(): rzut pierścienia na ekran ---
+console.log('\nPUNKTY CZOŁA (rzut na ekran):');
+const zaczep11 = { x: 500, y: 400 };
+const wKamere = punktyCzola(zaczep11, { x: 0, y: 0, z: -1 }, 1, 0.4, 32);
+spr(`daje żądaną liczbę punktów (${wKamere.punkty.length})`, wKamere.punkty.length === 32);
+spr('wszystkie punkty skończone', wKamere.punkty.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)));
+// Rzut W KAMERĘ: pierścień leży w płaszczyźnie ekranu -> koło wokół zaczepu,
+// większe niż promień analityczny (cząstki bliżej kamery rosną w rzucie).
+const odl11 = wKamere.punkty.map(p => Math.hypot(p.x - zaczep11.x, p.y - zaczep11.y));
+const rozrzut11 = Math.max(...odl11) - Math.min(...odl11);
+spr(`rzut w kamerę daje KOŁO (rozrzut promieni ${rozrzut11.toFixed(1)} px)`, rozrzut11 < 1);
+spr(`  ...powiększone perspektywą (${Math.min(...odl11).toFixed(0)} > ${polozenieCzola(1, 0.4).promien.toFixed(0)})`,
+    Math.min(...odl11) > polozenieCzola(1, 0.4).promien);
+spr('  ...ze środkiem w zaczepie', Math.hypot(wKamere.srodek.x - zaczep11.x, wKamere.srodek.y - zaczep11.y) < 1);
+// Rzut W BOK (+x): pierścień prostopadły do x -> na ekranie spłaszczony
+// (szeroki w y, wąski w x) i przesunięty w +x.
+const wBok = punktyCzola(zaczep11, { x: 1, y: 0, z: 0 }, 1, 0.4, 32);
+const xs = wBok.punkty.map(p => p.x), ys = wBok.punkty.map(p => p.y);
+spr(`rzut w bok: czoło SPŁASZCZONE (szer. x ${(Math.max(...xs) - Math.min(...xs)).toFixed(0)} < wys. y ${(Math.max(...ys) - Math.min(...ys)).toFixed(0)})`,
+    (Math.max(...xs) - Math.min(...xs)) < (Math.max(...ys) - Math.min(...ys)));
+spr(`  ...i przesunięte w kierunku wystrzału (środek x ${wBok.srodek.x.toFixed(0)} > ${zaczep11.x})`,
+    wBok.srodek.x > zaczep11.x + 20);
+spr('mnożnik promienia zmniejsza pierścień (wewnętrzna krawędź soczewki)',
+    Math.max(...punktyCzola(zaczep11, { x: 0, y: 0, z: -1 }, 1, 0.4, 16, 0.6).punkty.map(p => Math.hypot(p.x - zaczep11.x, p.y - zaczep11.y)))
+    < Math.min(...odl11));
+spr('zły kierunek (zerowy) -> pusta lista punktów, bez wyjątku',
+    punktyCzola(zaczep11, { x: 0, y: 0, z: 0 }, 1, 0.4, 16).punkty.length === 0);
 
 process.exit(ok ? 0 : 1);

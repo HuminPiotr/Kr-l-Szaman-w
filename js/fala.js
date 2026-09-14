@@ -51,8 +51,13 @@ const OGNISKO_DOMYSLNE = 900;      // px - ZGADNIĘTE, stroić klawiszem D
 export const OGNISKO = OGNISKO_DOMYSLNE;
 
 const SPRITE_PX = 64;              // większy niż w ogniu - fala to ściana, nie iskry
-const BARWA = [214, 240, 255];     // blady błękit - patrz efekty.js (aard)
-const BARWA_RDZEN = [255, 255, 255];  // rozbłysk uderzenia - czysta biel
+// BARWA JEST PARAMETREM wystrzel(), NIE STAŁĄ - Fala jest współdzielona
+// między Aardem (Stribog) i Gromem w Ziemię (Weles), i oba muszą się dać
+// odróżnić na pierwszy rzut oka. BARWA_DOMYSLNA to dawna jedyna barwa
+// (blady błękit Aarda) - zostaje jako fallback, gdy wystrzel() dostanie
+// argument pominięty albo nieprawidłowy.
+const BARWA_DOMYSLNA = [214, 240, 255];     // blady błękit - patrz efekty.js (aard)
+const BARWA_RDZEN = [255, 255, 255];  // rozbłysk uderzenia - czysta biel, WSPÓLNA dla wszystkich barw
 
 // --- czoło fali ---
 const NA_WYSTRZAL = 420;           // cząstek przy pełnej sile (jednorazowo)
@@ -117,10 +122,82 @@ function prostopadleDo(os) {
     return [p1, p2];
 }
 
+/**
+ * ANALITYCZNA kinematyka czoła fali: gdzie (średnio) jest pierścień po
+ * czasie t od wystrzału o sile s. To zamknięta postać tego, co _ruszaj()
+ * liczy cząstka po cząstce (tłumienie wykładnicze, patrz OPOR_*), przy
+ * warstwa=1 i bez losowego rozrzutu - czyli ZEWNĘTRZNA krawędź czoła.
+ *
+ * JEDNO ŹRÓDŁO PRAWDY dla wszystkiego, co ma "jechać razem z falą", a nie
+ * jest cząstką: soczewka refrakcyjna w ekran.js i kreska czoła niżej.
+ * Gdyby każdy z tych efektów miał własne stałe, po pierwszej zmianie
+ * strojenia rozjechałyby się z cząstkami. Czysta funkcja - testowana
+ * w tools/test-fala.mjs względem symulacji.
+ *
+ * @param {number} sila 0..1
+ * @param {number} t    s od wystrzału
+ * @returns {{wzdluz:number, promien:number}}  px: przesunięcie wzdłuż kierunku i promień pierścienia
+ */
+export function polozenieCzola(sila, t) {
+    const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
+    const tt = Number.isFinite(t) ? Math.max(0, t) : 0;
+    // Całka z v0*exp(-k*t) = v0*(1-exp(-k*t))/k - droga przy tłumieniu wykładniczym.
+    const wzdluz = PREDKOSC_BAZOWA * s * (1 - Math.exp(-OPOR_WZDLUZ * tt)) / OPOR_WZDLUZ;
+    const promien = PROMIEN_START + PROMIEN_PREDKOSC * s * (1 - Math.exp(-OPOR_PROMIEN * tt)) / OPOR_PROMIEN;
+    return { wzdluz, promien };
+}
+
+/**
+ * Rzut pierścienia czoła na ekran: n punktów (w px płótna) po obwodzie
+ * plus rzutowany środek. Ta sama geometria i ten sam rzut perspektywiczny,
+ * co przy cząstkach (pierścień prostopadły do `kierunek`, przesunięty
+ * wzdłuż niego, każdy punkt przez rzutPerspektywiczny/rzutujPozycje) -
+ * dzięki temu soczewka i kreska leżą DOKŁADNIE na czole cząstek.
+ *
+ * @param {{x,y}} zaczep     px płótna
+ * @param {{x,y,z}} kierunek  wektor 3D, nie musi być jednostkowy
+ * @param {number} sila       0..1
+ * @param {number} t          s od wystrzału
+ * @param {number} [n]        liczba punktów po obwodzie
+ * @param {number} [mnoznikPromienia]  1 = zewnętrzna krawędź; <1 = wewnętrzna (grubość soczewki)
+ * @returns {{srodek:{x,y}, punkty:{x,y}[]}}  punkty puste, gdy kierunek/zaczep są nieprawidłowe
+ */
+export function punktyCzola(zaczep, kierunek, sila, t, n = 48, mnoznikPromienia = 1) {
+    if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y) || !kierunek) {
+        return { srodek: { x: 0, y: 0 }, punkty: [] };
+    }
+    const dl = Math.hypot(kierunek.x, kierunek.y, kierunek.z);
+    if (!(dl > 1e-6)) return { srodek: { x: zaczep.x, y: zaczep.y }, punkty: [] };
+    const os = { x: kierunek.x / dl, y: kierunek.y / dl, z: kierunek.z / dl };
+    const { wzdluz, promien } = polozenieCzola(sila, t);
+    const r = promien * (Number.isFinite(mnoznikPromienia) ? Math.max(0, mnoznikPromienia) : 1);
+    const [p1, p2] = prostopadleDo(os);
+
+    const cx = zaczep.x + os.x * wzdluz, cy = zaczep.y + os.y * wzdluz, cz = os.z * wzdluz;
+    const srodek = rzutujPozycje(zaczep, { x: cx, y: cy }, rzutPerspektywiczny(cz));
+
+    const punkty = [];
+    const liczba = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    for (let i = 0; i < liczba; i++) {
+        const kat = (i / liczba) * Math.PI * 2;
+        const c = Math.cos(kat), sn = Math.sin(kat);
+        const x = cx + (p1.x * c + p2.x * sn) * r;
+        const y = cy + (p1.y * c + p2.y * sn) * r;
+        const z = cz + (p1.z * c + p2.z * sn) * r;
+        punkty.push(rzutujPozycje(zaczep, { x, y }, rzutPerspektywiczny(z)));
+    }
+    return { srodek, punkty };
+}
+
 export class Fala {
     constructor() {
         this.czastki = [];
-        this._sprites = null;
+        // Sprite'y RDZENIA są zawsze białe, więc jeden wystarcza. Sprite'y
+        // CZOŁA FALI zależą od barwy przekazanej do wystrzel() - Mapa
+        // kluczowana stringiem "r,g,b", budowana LENIWIE w _rysuj() (nie tu -
+        // document.createElement nie istnieje w Node, patrz tools/test-fala.mjs).
+        this._spriteRdzen = null;
+        this._spriteFala = new Map();
     }
 
     get liczba() { return this.czastki.length; }
@@ -129,8 +206,9 @@ export class Fala {
      * @param {{x,y}} zaczep  źródło w PIKSELACH płótna
      * @param {{x,y,z}} kierunek  wektor 3D (nie musi być jednostkowy)
      * @param {number} sila  0..1
+     * @param {[number,number,number]} [barwa]  RGB czoła fali; domyślnie blady błękit Aarda
      */
-    wystrzel(zaczep, kierunek, sila) {
+    wystrzel(zaczep, kierunek, sila, barwa = BARWA_DOMYSLNA) {
         if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y)) return;
         if (!kierunek) return;
         const dl = Math.hypot(kierunek.x, kierunek.y, kierunek.z);
@@ -138,6 +216,11 @@ export class Fala {
         const os = { x: kierunek.x / dl, y: kierunek.y / dl, z: kierunek.z / dl };
         const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
         if (s <= 0.01) return;
+
+        // Barwa nieprawidłowa (spoza kontraktu) -> fallback, NIE wyjątek -
+        // ten sam wzorzec odporności co przy zaczepie/kierunku/sile wyżej.
+        const b = (Array.isArray(barwa) && barwa.length === 3 && barwa.every(Number.isFinite))
+            ? barwa : BARWA_DOMYSLNA;
 
         const [p1, p2] = prostopadleDo(os);
 
@@ -171,7 +254,8 @@ export class Fala {
                 zycie: ZYCIE_MIN + Math.random() * (ZYCIE_MAX - ZYCIE_MIN),
                 skala: ROZMIAR_OD + Math.random() * (ROZMIAR_DO - ROZMIAR_OD),
                 wiek: 0,
-                rdzen: false
+                rdzen: false,
+                barwa: b
             });
         }
 
@@ -227,9 +311,17 @@ export class Fala {
         this.czastki = zywe;
     }
 
+    /** Sprite czoła fali dla danej barwy - budowany raz, potem z Mapy. */
+    _spriteDlaBarwy(b) {
+        const klucz = `${b[0]},${b[1]},${b[2]}`;
+        let s = this._spriteFala.get(klucz);
+        if (!s) { s = sprite(b, 0.85); this._spriteFala.set(klucz, s); }
+        return s;
+    }
+
     _rysuj(ctx) {
         if (!this.czastki.length) return;
-        if (!this._sprites) this._sprites = zrobSprites();
+        if (!this._spriteRdzen) this._spriteRdzen = sprite(BARWA_RDZEN, 1.0);
 
         // DALSZE POD BLIŻSZYMI: sortujemy W MIEJSCU malejąco po z (kolejność
         // w this.czastki nie ma znaczenia dla niczego innego, więc kopiowanie
@@ -252,7 +344,7 @@ export class Fala {
             const poz = rzutujPozycje({ x: c.zx0, y: c.zy0 }, { x: c.x, y: c.y }, s);
 
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * s * (c.rdzen ? 1 : 0.7)));
-            ctx.drawImage(c.rdzen ? this._sprites.rdzen : this._sprites.fala,
+            ctx.drawImage(c.rdzen ? this._spriteRdzen : this._spriteDlaBarwy(c.barwa),
                           poz.x - r / 2, poz.y - r / 2, r, r);
         }
         ctx.globalAlpha = 1;
@@ -266,11 +358,7 @@ export class Fala {
     }
 }
 
-/** Sprite'y wypalone RAZ - patrz ogien.js:215-236 dla tego samego wzorca. */
-function zrobSprites() {
-    return { fala: sprite(BARWA, 0.85), rdzen: sprite(BARWA_RDZEN, 1.0) };
-}
-
+/** Sprite wypalony RAZ na barwę - patrz ogien.js:215-236 dla tego samego wzorca. */
 function sprite([r, g, b], moc) {
     const c = document.createElement('canvas');
     c.width = c.height = SPRITE_PX;

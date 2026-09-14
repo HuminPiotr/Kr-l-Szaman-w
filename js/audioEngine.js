@@ -270,4 +270,64 @@ export class AudioEngine {
         zrodlo.start();
         zrodlo.stop(now + 0.35);
     }
+
+    /**
+     * Wystrzał Aarda (Podmuch, js/podmuch.js) - "whoomp": pchnięcie
+     * powietrza, nie trzask i nie whoosh. Do tej pory Podmuch odpalał
+     * BEZ ŻADNEGO dźwięku - jedyna technika w grze, która milczała.
+     *
+     * Dwie warstwy: SZUM przez lowpass opadający z góry w dół (sprężone
+     * powietrze, które ucieka - to samo tworzywo co playWybuchSFX, ale
+     * szeroki lowpass zamiast wąskiego bandpassu, więc "dmuchnięcie", nie
+     * "pęknięcie") plus SUB-TĄPNIĘCIE sinusem 60->35 Hz (masa uderzenia,
+     * czuć bardziej niż słychać). Krótsze od grzmotu (1.1 s), dłuższe od
+     * wybuchu (0.35 s) - w rytmie CZAS_FALI z js/ekran.js (0.6 s).
+     *
+     * @param {number} [sila] 0..1 - głośność i odrobinę wysokość (słaby podmuch = cichszy, nie wyższy)
+     */
+    playAardSFX(sila = 1) {
+        if (!this.initialized || !this.audioCtx) return;
+        const now = this.audioCtx.currentTime;
+        const s = Number.isFinite(sila) ? Math.max(0.15, Math.min(1, sila)) : 1;
+        const czas = 0.55;
+
+        // --- warstwa 1: szum sprężonego powietrza ---
+        const dlugoscBufora = Math.floor(this.audioCtx.sampleRate * czas);
+        const buforSzumu = this.audioCtx.createBuffer(1, dlugoscBufora, this.audioCtx.sampleRate);
+        const dane = buforSzumu.getChannelData(0);
+        for (let i = 0; i < dlugoscBufora; i++) dane[i] = Math.random() * 2 - 1;
+        const szum = this.audioCtx.createBufferSource();
+        szum.buffer = buforSzumu;
+
+        const lowpass = this.audioCtx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.Q.value = 0.9;
+        lowpass.frequency.setValueAtTime(500 + 500 * s, now);
+        lowpass.frequency.exponentialRampToValueAtTime(70, now + czas * 0.7);
+
+        const szumGain = this.audioCtx.createGain();
+        szumGain.gain.setValueAtTime(0.0001, now);
+        szumGain.gain.exponentialRampToValueAtTime(0.32 * s, now + 0.03);
+        szumGain.gain.exponentialRampToValueAtTime(0.0001, now + czas);
+
+        szum.connect(lowpass);
+        lowpass.connect(szumGain);
+        szumGain.connect(this.audioCtx.destination);
+
+        // --- warstwa 2: sub-tąpnięcie ---
+        const sub = this.audioCtx.createOscillator();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(60, now);
+        sub.frequency.exponentialRampToValueAtTime(35, now + 0.25);
+        const subGain = this.audioCtx.createGain();
+        subGain.gain.setValueAtTime(0.0001, now);
+        subGain.gain.exponentialRampToValueAtTime(0.35 * s, now + 0.02);
+        subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+        sub.connect(subGain);
+        subGain.connect(this.audioCtx.destination);
+
+        szum.start(); sub.start();
+        szum.stop(now + czas + 0.05);
+        sub.stop(now + 0.35);
+    }
 }
