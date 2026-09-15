@@ -7,28 +7,56 @@
  * prostszy: brak stanu odpowiadającego PŁONIE - podmuch nie trwa, odpala
  * się i wraca do BEZCZYNNY w tej samej klatce.
  *
- * KIERUNEK: oś z normalnej dłoni (worldLandmarks, znak niejednoznaczny),
- * zwrot z wektora machnięcia (landmarks + zmiana skali dłoni na oś głębi).
- * Zobacz docs/superpowers/specs/2026-08-11-szczur-i-podmuch-design.md §3.
+ * ====================== KIERUNEK = WEKTOR MACHNIĘCIA ======================
+ * Fala leci tam, gdzie RĘKA SIĘ RUSZYŁA - jak Aard w Wiedźminie: pchasz,
+ * fala leci tam, gdzie pchnąłeś. Wcześniejsza wersja brała oś z NORMALNEJ
+ * DŁONI (normalnaDloni z worldLandmarks), a ruch ustalał tylko znak; przy
+ * dłoni zwróconej do kamery i machnięciu w bok iloczyn skalarny był ~0,
+ * "bezpieczny fallback" wymuszał +z i machnięcie w lewo i w prawo dawały
+ * IDENTYCZNĄ falę w głąb ekranu. Normalna została wyłącznie w diagnostyce
+ * (HUD) - nie doważa kierunku nawet trochę, bo w tym właśnie przypadku jej
+ * znak byłby losowany z szumu i dokładał losowe ±z do czysto bocznej fali.
+ *
+ * Wszystkie trzy osie ruchu liczone w JEDNEJ jednostce - "szerokościach
+ * dłoni" (odległość nadgarstek -> nasada środkowego palca na ekranie):
+ *   x, y: przesunięcie na ekranie / skala dłoni (x poprawione o proporcje
+ *         płótna - landmarki są normalizowane osobno w x i y, więc bez tego
+ *         0.1 w poziomie na 16:9 to 1.78x więcej pikseli niż 0.1 w pionie);
+ *   z:    z KAMERY OTWORKOWEJ. Odległość D = f·Hw/s (Hw - prawdziwa
+ *         szerokość dłoni, s - jej skala na ekranie), więc
+ *         ΔD/Hw = f·(1/s_nowa − 1/s_stara). Dłoń ROŚNIE -> ujemne -> KU
+ *         KAMERZE. To jest jedyne miejsce, gdzie ustala się znak osi Z.
+ *
+ * Ruch bierze się z BUFORA ostatnich świeżych detekcji (OKNO_MACHNIECIA_S),
+ * nie z jednej różnicy klatek: main.js woła update() co klatkę rysowania,
+ * a frame.hands odświeża się w tempie kamery, więc pojedyncza różnica raz
+ * jest zerem, raz skokiem. Bufor jest jednocześnie "trzymaniem ostatniej
+ * wartości" - klatki bez nowej detekcji go nie tykają. Prędkość i kierunek
+ * liczą się z TEGO SAMEGO okna w klatce odpalenia - nie da się odpalić na
+ * skoku z jednego przedziału, a kierunek wziąć z innego.
+ *
+ * BRAMKA GŁĘBI: surowe z mnoży drżenie skali przez f/s ≈ 10-17x, więc
+ * 3 % szumu w spoczynku dawałoby kilkanaście szerokości dłoni na sekundę
+ * "pchnięcia w kamerę". Względna zmiana skali w oknie przechodzi przez
+ * rampa() (ciągłą, nie skokową - GEMINI.md §2): poniżej PROG_GLEBI_OD to
+ * drżenie i z=0, powyżej PROG_GLEBI_PELNY to prawdziwe pchnięcie.
  *
  * KONWENCJA OSI Z: z ROŚNIE W GŁĄB EKRANU (dalej od gracza), UJEMNE z jest
  * BLIŻEJ gracza/kamery. To ta sama konwencja, w której liczy rzut
  * perspektywiczny w js/fala.js (`s = OGNISKO/(OGNISKO+z)` - rosnące z daje
- * MNIEJSZE s, czyli dalszą/mniejszą cząstkę). Obie strony MUSZĄ się zgadzać -
- * były niezgodne we wcześniejszej wersji (rosnąca dłoń dawała dodatnie z tu,
- * a fala.js traktowała dodatnie z jako "dalej", więc pchnięcie w kamerę
- * wizualnie uciekało w głąb ekranu). Zmiana znaku przy `dSkala` w
- * `_kandydaci` jest jedynym miejscem, gdzie ta konwencja się ustala.
+ * MNIEJSZE s, czyli dalszą/mniejszą cząstkę). Obie strony MUSZĄ się zgadzać.
  */
-import { pelnaDlon, wzorPalcow, skalaDloni, normalnaDloni } from './znaki/dlon.js';
+import { pelnaDlon, wzorPalcow, normalnaDloni, rampa } from './znaki/dlon.js';
 
 // ZGADNIĘTE - potwierdzić z nakładki (klawisz D).
 export const PROG_OTWARCIA = 0.55;      // średnie wyprostowanie 4 palców bez kciuka
-export const PROG_PREDKOSCI = 4.0;      // skale dłoni na sekundę
+// Szerokości dłoni na sekundę. Było 4.0 przy pomiarze bez poprawki proporcji
+// płótna - poprawka podnosi odczyty ruchu poziomego ~1.78x na 16:9.
+export const PROG_PREDKOSCI = 7.0;
 const KOSZT_PODMUCHU = 0.25;     // ułamek paska mocy za jedno pchnięcie
 
-// Ile KOLEJNYCH klatek z rzędu kandydat musi spełniać oba progi, zanim
-// odpali. Chroni przed jednoklatkowym artefaktem trackingu (przeskok
+// Ile KOLEJNYCH świeżych detekcji z rzędu kandydat musi spełniać oba progi,
+// zanim odpali. Chroni przed jednoklatkowym artefaktem trackingu (przeskok
 // pozycji, zamiana stronności) - prawdziwe machnięcie z natury trwa więcej
 // niż jedną klatkę, artefakt trwa dokładnie jedną. Ten sam problem, który
 // plonacyPalec.js rozwiązuje ogranicznikiem skoku (MAX_PREDKOSC_ZACZEPU) -
@@ -36,28 +64,50 @@ const KOSZT_PODMUCHU = 0.25;     // ułamek paska mocy za jedno pchnięcie
 // dłoni długoterminowo (jest jednorazowy).
 const POTWIERDZENIE_KLATEK = 2;
 
-// Próg niejednoznaczności iloczynu skalarnego (znormalizowanego względem
-// długości wektora machnięcia - inaczej silne machnięcie zawsze "wygrywałoby"
-// próg niezależnie od kąta). Poniżej tej wartości dłoń jest praktycznie
-// PROSTOPADŁA do kierunku machnięcia (naturalny gest: dłoń frontem do
-// kamery, machnięcie w bok) i znak iloczynu jest szumem numerycznym, nie
-// gestem - używamy wtedy bezpiecznego kierunku domyślnego zamiast surowego
-// znaku.
-const PROG_NIEJEDNOZNACZNOSCI = 0.15;
+// --- bufor machnięcia ---
+const OKNO_MACHNIECIA_S = 0.12;  // s - przy 30 Hz detekcji 3-4 próbki, tyle co potwierdzenie
+const MIN_PROBEK = 2;            // poniżej nie ma ruchu do policzenia
+const MAX_PROBEK = 6;            // sufit przy szybkiej detekcji
+
+// Ogniskowa kamery w jednostkach WYSOKOŚCI płótna: f/H = 1/(2·tan(FOVv/2)).
+// Typowa webcam 60° w poziomie na 16:9 -> FOVv ≈ 36° -> ~1.5. ZGADNIĘTE.
+// Wynik jest normalizowany, więc ta stała ustawia tylko PROPORCJĘ x:z -
+// za mała spłaszcza pchnięcia w kamerę do ruchu bocznego, za duża każdą
+// zmianę skali robi pchnięciem. NIE mylić z OGNISKO z js/fala.js - tamto
+// jest artystyczną stałą RZUTU cząstek, nie modelem kamery.
+export const OGNISKO_KAMERY = 1.5;
+// Bramka głębi - względna zmiana skali dłoni |Δs/s| w oknie machnięcia.
+const PROG_GLEBI_OD = 0.06;      // poniżej: drżenie trackingu, z = 0
+const PROG_GLEBI_PELNY = 0.15;   // powyżej: pełna głębia
+
+/**
+ * Skala dłoni NA EKRANIE z poprawką proporcji płótna: nadgarstek -> nasada
+ * środkowego palca, w jednostkach wysokości płótna. Lokalna, NIE skalaDloni
+ * z dlon.js - na tamtej wiszą progi pieczęci (ZGADNIĘTE względem niej) i
+ * miesza jednostki x/y, co tu psułoby proporcję x:z.
+ */
+function skalaEkranowa(lm, prop) {
+    return Math.max(1e-6, Math.hypot((lm[9].x - lm[0].x) * prop, lm[9].y - lm[0].y));
+}
 
 export class Podmuch {
     constructor() {
         this.stan = 'BEZCZYNNY';
-        // reka -> { x, y, skala, czasAkumulowany, predkosc, ruch }
-        // `czasAkumulowany`/`predkosc`/`ruch` obsługują to, że main.js
-        // odświeża frame.hands WOLNIEJ niż klatki renderowania (detekcja
-        // idzie na video.currentTime !== lastVideoTime) - patrz komentarz
-        // w _kandydaci.
-        this._poprzednie = {};
+        // reka -> [{ x, y, skala, t }] - świeże detekcje z ostatnich
+        // OKNO_MACHNIECIA_S (nagłówek "KIERUNEK = WEKTOR MACHNIĘCIA").
+        this._bufory = {};
         this._klatekPowyzejProgu = {};   // reka -> licznik z POTWIERDZENIE_KLATEK
+        // Lokalny zegar próbek (suma klamrowanych dt) - frame.now nie jest
+        // częścią kontraktu klatki w testach, a dt już jest klamrowane.
+        this._zegar = 0;
         // Diagnostyka do nakładki - NAJLEPSZY kandydat w tej klatce, nawet
         // gdy nic się nie odpaliło. Bez tego nie da się wystroić progów.
-        this.diagnostyka = { predkosc: 0, otwarcie: 0, kierunek: null };
+        // `normalna` to TYLKO podgląd - nie wpływa na kierunek (nagłówek).
+        this.diagnostyka = this._pustaDiagnostyka();
+    }
+
+    _pustaDiagnostyka() {
+        return { predkosc: 0, otwarcie: 0, kierunek: null, ruch: null, zmianaSkali: 0, normalna: null };
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności. */
@@ -73,13 +123,15 @@ export class Podmuch {
      */
     update(frame, moc, dt) {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
-        const kandydaci = this._kandydaci(frame, krok);
+        this._zegar += krok;
+        const kandydaci = this._kandydaci(frame);
 
         let najlepszy = null;
         for (const k of kandydaci) if (!najlepszy || k.waga > najlepszy.waga) najlepszy = k;
         this.diagnostyka = najlepszy
-            ? { predkosc: najlepszy.predkosc, otwarcie: najlepszy.otwarcie, kierunek: najlepszy.kierunek }
-            : { predkosc: 0, otwarcie: 0, kierunek: null };
+            ? { predkosc: najlepszy.predkosc, otwarcie: najlepszy.otwarcie, kierunek: najlepszy.kierunek,
+                ruch: najlepszy.ruch, zmianaSkali: najlepszy.zmianaSkali, normalna: najlepszy.normalna }
+            : this._pustaDiagnostyka();
 
         const noweLiczniki = {};
         for (const k of kandydaci) {
@@ -93,7 +145,9 @@ export class Podmuch {
                 noweLiczniki[k.reka] = this._klatekPowyzejProgu[k.reka] ?? 0;
                 continue;
             }
-            const spelnia = k.predkosc >= PROG_PREDKOSCI && k.otwarcie >= PROG_OTWARCIA && !!k.kierunek;
+            // Niezerowa prędkość gwarantuje kierunek (oba z tego samego wektora
+            // ruchu) - normalna dłoni nie jest już warunkiem.
+            const spelnia = k.predkosc >= PROG_PREDKOSCI && k.otwarcie >= PROG_OTWARCIA;
             noweLiczniki[k.reka] = spelnia ? (this._klatekPowyzejProgu[k.reka] ?? 0) + 1 : 0;
         }
         this._klatekPowyzejProgu = noweLiczniki;
@@ -118,103 +172,90 @@ export class Podmuch {
     }
 
     /**
-     * Kandydaci na machnięcie: dla każdej widocznej dłoni liczymy otwartość,
-     * prędkość nadgarstka w skalach dłoni na sekundę, i kierunek 3D. Przy
-     * okazji aktualizuje `this._poprzednie` na potrzeby następnej klatki.
+     * Kandydaci na machnięcie: dla każdej widocznej dłoni otwartość, wektor
+     * ruchu z bufora świeżych detekcji (w szerokościach dłoni), prędkość
+     * i kierunek. Przy okazji aktualizuje `this._bufory`.
      *
      * `waga` (otwartość x prędkość) decyduje, KTÓRA dłoń wygrywa, gdy obie
      * spełniają warunki naraz - ta sama zasada co przy wyborze pieczęci.
      */
-    _kandydaci(frame, dt) {
+    _kandydaci(frame) {
         const out = [];
-        const nowePoprzednie = {};
+        const noweBufory = {};
+        const prop = (Number.isFinite(frame.width) && Number.isFinite(frame.height) && frame.height > 0)
+            ? frame.width / frame.height : 1;
+
         for (const d of (frame.hands ?? [])) {
             if (!pelnaDlon(d.landmarks)) continue;
             const lm = d.landmarks;
-            const reka = d.handedness ?? 'brak';
-            const poprz = this._poprzednie[reka];
+            // Klucz bufora = stronność. Dwie dłonie pod tym samym kluczem
+            // (np. obie bez stronności) dostają osobne klucze ('brak', 'brak+'),
+            // żeby jeden bufor nie mieszał pozycji dwóch dłoni. Zamiana
+            // kolejności między klatkami to ten sam rodzaj zakłócenia, co
+            // zamiana stronności - pochłania go licznik potwierdzeń.
+            let reka = d.handedness ?? 'brak';
+            while (noweBufory[reka]) reka += '+';
 
             const w = wzorPalcow(lm);
             const otwarcie = (w[1] + w[2] + w[3] + w[4]) / 4;
-
-            const skala = skalaDloni(lm);
+            const skala = skalaEkranowa(lm, prop);
             // Nasada środkowego palca - stabilniejszy zaczep niż opuszek,
-            // ten sam punkt, którego używa efekty.js:27 do środka dłoni.
+            // ten sam punkt, którego używa efekty.js do środka dłoni.
             const zaczep = { x: lm[9].x, y: lm[9].y };
 
-            let predkosc = 0, ruch = null, czasAkumulowany = 0;
-            // `swiezy` = ta klatka niesie FAKTYCZNIE NOWY pomiar ruchu, nie
-            // trzymaną wartość z poprzedniej detekcji. Licznik potwierdzeń
-            // w update() (POTWIERDZENIE_KLATEK) awansuje TYLKO na świeżych
-            // próbkach - inaczej jeden prawdziwy skok pozycji (artefakt)
-            // "potwierdzałby się" sam, powtarzany na kolejnych nieruchomych
-            // klatkach dzięki trzymaniu wartości poniżej.
+            const buf = (this._bufory[reka] ?? []).slice();
+            const ostatnia = buf.length ? buf[buf.length - 1] : null;
+
+            // `swiezy` = ta klatka niesie FAKTYCZNIE NOWY pomiar. main.js
+            // odświeża frame.hands tylko gdy video.currentTime się zmieni,
+            // a ta funkcja jest wołana co klatkę rysowania - identyczna
+            // pozycja to brak nowej detekcji, nie bezruch. Licznik potwierdzeń
+            // w update() awansuje TYLKO na świeżych próbkach - inaczej jeden
+            // skok pozycji (artefakt) "potwierdzałby się" sam na kolejnych
+            // nieruchomych klatkach. Pierwsze pojawienie się dłoni też nie
+            // jest świeże - nie ma jeszcze ruchu do zmierzenia.
             let swiezy = false;
+            if (!ostatnia) {
+                buf.push({ x: zaczep.x, y: zaczep.y, skala, t: this._zegar });
+            } else if (zaczep.x !== ostatnia.x || zaczep.y !== ostatnia.y) {
+                swiezy = true;
+                buf.push({ x: zaczep.x, y: zaczep.y, skala, t: this._zegar });
+                // Wiek liczony względem NAJNOWSZEJ próbki; zostaje co najmniej
+                // MIN_PROBEK, żeby po pauzie pierwsza świeża próbka miała
+                // z czym się porównać (da małą prędkość - dokładnie tak, jak
+                // wcześniej robił czas akumulowany od ostatniej detekcji).
+                while (buf.length > MIN_PROBEK && this._zegar - buf[0].t > OKNO_MACHNIECIA_S) buf.shift();
+                while (buf.length > MAX_PROBEK) buf.shift();
+            }
 
-            if (poprz) {
-                const dx = zaczep.x - poprz.x, dy = zaczep.y - poprz.y;
-
-                if (dx === 0 && dy === 0) {
-                    // BRAK NOWEJ DETEKCJI w tej klatce renderowania - main.js
-                    // odświeża frame.hands tylko gdy video.currentTime się
-                    // zmieni (tempo faktycznej detekcji), a ta funkcja jest
-                    // wołana co klatkę requestAnimationFrame (szybciej).
-                    // Licząc prędkość z zerowego przesunięcia dostalibyśmy 0,
-                    // choć dłoń naprawdę się rusza - zamiast tego TRZYMAMY
-                    // ostatni dobry odczyt i akumulujemy czas do następnej
-                    // faktycznej zmiany pozycji.
-                    predkosc = poprz.predkosc ?? 0;
-                    ruch = poprz.ruch ?? null;
-                    czasAkumulowany = poprz.czasAkumulowany + dt;
+            let ruch = null, predkosc = 0, kierunek = null, zmianaSkali = 0;
+            if (buf.length >= MIN_PROBEK) {
+                const stara = buf[0], nowa = buf[buf.length - 1];
+                const dtOkna = nowa.t - stara.t;
+                zmianaSkali = (nowa.skala - stara.skala) / nowa.skala;
+                const bramka = rampa(Math.abs(zmianaSkali), PROG_GLEBI_OD, PROG_GLEBI_PELNY);
+                ruch = {
+                    x: (nowa.x - stara.x) * prop / nowa.skala,
+                    y: (nowa.y - stara.y) / nowa.skala,
+                    // Kamera otworkowa (nagłówek): rosnąca dłoń -> ujemne z -> ku kamerze.
+                    z: OGNISKO_KAMERY * (1 / nowa.skala - 1 / stara.skala) * bramka
+                };
+                const dl = Math.hypot(ruch.x, ruch.y, ruch.z);
+                if (Number.isFinite(dl) && dl > 1e-9 && dtOkna > 0) {
+                    predkosc = dl / dtOkna;
+                    kierunek = { x: ruch.x / dl, y: ruch.y / dl, z: ruch.z / dl };
                 } else {
-                    swiezy = true;
-                    // Faktyczna zmiana pozycji - dzielimy przez CAŁY czas od
-                    // OSTATNIEJ faktycznej detekcji (poprz.czasAkumulowany +
-                    // dt tej klatki), nie tylko przez dt tej klatki. Bez tego,
-                    // gdy detekcja idzie wolniej niż renderowanie, jeden pełny
-                    // skok dzielony przez pojedynczy krótki dt zawyżałby
-                    // prędkość kilkukrotnie - i odczyt migałby między zerem
-                    // (klatki bez nowej detekcji) a zawyżoną wartością.
-                    const czasCalkowity = poprz.czasAkumulowany + dt;
-                    if (czasCalkowity > 0) {
-                        const dSkala = skala - poprz.skala;
-                        predkosc = Math.hypot(dx, dy) / skala / czasCalkowity;
-                        // Głębia z ZMIANY SKALI DŁONI: rosnąca dłoń = ruch ku
-                        // kamerze = UJEMNE z (patrz komentarz o konwencji osi
-                        // Z na górze pliku). Wektor NIE jest metrycznie
-                        // dokładny - służy wyłącznie do ustalenia ZNAKU osi
-                        // normalnej, więc przybliżenie wystarcza.
-                        ruch = { x: dx, y: dy, z: -dSkala };
-                    }
-                    czasAkumulowany = 0;
+                    ruch = null;
                 }
             }
 
-            const os = normalnaDloni(d.worldLandmarks);
-            let kierunek = null;
-            if (os && ruch) {
-                const zgodnosc = os.x * ruch.x + os.y * ruch.y + os.z * ruch.z;
-                const dlRuch = Math.hypot(ruch.x, ruch.y, ruch.z);
-                // Znormalizowane WZGLĘDEM DŁUGOŚCI RUCHU - inaczej silne
-                // machnięcie zawsze "wygrywałoby" próg niejednoznaczności
-                // niezależnie od kąta między dłonią a kierunkiem ruchu.
-                const zgodnoscZnorm = dlRuch > 1e-9 ? zgodnosc / dlRuch : 0;
-                if (Math.abs(zgodnoscZnorm) < PROG_NIEJEDNOZNACZNOSCI) {
-                    // Dłoń niemal PROSTOPADŁA do kierunku machnięcia - znak
-                    // iloczynu skalarnego byłby szumem numerycznym, nie
-                    // gestem. Bezpieczny wybór domyślny: zwrot OD gracza
-                    // (dodatnie z - patrz konwencja osi Z na górze pliku),
-                    // nigdy w jego stronę.
-                    kierunek = os.z >= 0 ? os : { x: -os.x, y: -os.y, z: -os.z };
-                } else {
-                    kierunek = zgodnosc >= 0 ? os : { x: -os.x, y: -os.y, z: -os.z };
-                }
-            }
-
-            out.push({ reka, predkosc, otwarcie, kierunek, zaczep, swiezy, waga: otwarcie * predkosc });
-            nowePoprzednie[reka] = { x: zaczep.x, y: zaczep.y, skala, czasAkumulowany, predkosc, ruch };
+            const normalna = normalnaDloni(d.worldLandmarks);   // TYLKO diagnostyka
+            out.push({ reka, predkosc, otwarcie, kierunek, ruch, zmianaSkali, normalna,
+                       zaczep, swiezy, waga: otwarcie * predkosc });
+            noweBufory[reka] = buf;
         }
-        this._poprzednie = nowePoprzednie;
+        // Tylko dłonie obecne w tej klatce - zniknięcie dłoni czyści jej bufor.
+        this._bufory = noweBufory;
         return out;
     }
 }

@@ -15,25 +15,33 @@ const S = 0.09;
 const OTWARTA = [0, 0, 0, 0, 0];
 const PIESC = [1, 1, 1, 1, 1];
 
-/** Klatka z jedną dłonią o zadanym ox (pozycja pozioma) i pochyleniu 3D. */
-function klatka(ox, zgiecia, pochylY = 0, pochylX = 0) {
+/**
+ * Klatka z jedną dłonią o zadanej pozycji (ox, oy), skali i pochyleniu 3D.
+ * `bezSwiata` = brak worldLandmarks (MediaPipe ich nie dał) - kierunek ma
+ * wychodzić z samego ruchu, normalna jest tylko diagnostyką.
+ */
+function klatka(ox, zgiecia, pochylY = 0, pochylX = 0, oy = 0.5, skala = S, bezSwiata = false) {
     return {
         hands: [{
-            landmarks: dlon({ ox, oy: 0.5, zgiecia, skala: S }),
-            worldLandmarks: worldDlon({ zgiecia, skala: S, pochylY, pochylX }),
+            landmarks: dlon({ ox, oy, zgiecia, skala }),
+            worldLandmarks: bezSwiata ? null : worldDlon({ zgiecia, skala, pochylY, pochylX }),
             handedness: 'Right'
         }],
         pose: null, width: 1920, height: 1080
     };
 }
 
-/** Przesuwa dłoń o `krok` na klatkę, `n` klatek - to jest "machnięcie". */
-function machnij(p, moc, { n = 8, ox0 = 0.3, krok = 0.08, zgiecia = OTWARTA,
-                           pochylY = 0, pochylX = 0 } = {}) {
-    let ox = ox0, wynik = null;
+/**
+ * Machnięcie: przesuwa dłoń o (krok, krokY) na klatkę i mnoży skalę przez
+ * `mnoznikSkali` (>1 = dłoń rośnie = ruch ku kamerze), `n` klatek.
+ */
+function machnij(p, moc, { n = 8, ox0 = 0.3, krok = 0.08, oy0 = 0.5, krokY = 0,
+                           mnoznikSkali = 1, zgiecia = OTWARTA,
+                           pochylY = 0, pochylX = 0, bezSwiata = false } = {}) {
+    let ox = ox0, oy = oy0, skala = S, wynik = null;
     for (let i = 0; i < n && !wynik; i++) {
-        wynik = p.update(klatka(ox, zgiecia, pochylY, pochylX), moc, DT);
-        ox += krok;
+        wynik = p.update(klatka(ox, zgiecia, pochylY, pochylX, oy, skala, bezSwiata), moc, DT);
+        ox += krok; oy += krokY; skala *= mnoznikSkali;
     }
     return wynik;
 }
@@ -87,28 +95,31 @@ spr(`swipe w lewo:  kierunek ${JSON.stringify(w5b.kierunek)}`, true);
 spr(`przeciwne machnięcia dają PRZECIWNE kierunki (iloczyn skalarny ${iloczyn.toFixed(2)})`,
     iloczyn < -0.9);
 
-// --- 6. Cztery pochylenia dłoni + dopasowany ruch dają cztery różne kierunki ---
-console.log('\nCZTERY KIERUNKI 3D:');
-const przypadki = [
-    { nazwa: 'w głąb (ku kamerze)', pochylY: 0, krok: 0, ox0: 0.5, dodatkowo: k => k }, // patrz niżej
-];
-// Cztery niezależne uzbrojenia, każde z ruchem "naturalnym" dla swojego
-// pochylenia - tak jak w prawdziwym geście gracz macha W STRONĘ, w którą
-// dłoń jest zwrócona.
-function jednKierunek({ zgiecia = OTWARTA, pochylY = 0, pochylX = 0, ox0, krok } = {}) {
+// --- 6. Kierunek idzie ZA RUCHEM ręki, nie za tym, gdzie patrzy dłoń ---
+// Trzy machnięcia w trzy strony ekranu, wszystkie z dłonią ZWRÓCONĄ DO
+// KAMERY (pochyl 0) - wcześniejsza wersja brała oś z normalnej dłoni i
+// wszystkie trzy dawałyby tę samą falę w głąb ekranu.
+console.log('\nKIERUNEK ZA RUCHEM (dłoń do kamery, trzy strony):');
+function jednKierunek(opcje = {}) {
     const p = new Podmuch(); p.uzbrój();
-    return machnij(p, 1.0, { ox0, krok, pochylY, pochylX, zgiecia });
+    return machnij(p, 1.0, opcje);
 }
-const wPrawo = jednKierunek({ pochylY: Math.PI / 2, ox0: 0.2, krok: 0.08 });
-const wLewo  = jednKierunek({ pochylY: -Math.PI / 2, ox0: 0.8, krok: -0.08 });
-const wGore  = jednKierunek({ pochylX: Math.PI / 2, ox0: 0.5, krok: 0.08 });
+const wPrawo = jednKierunek({ ox0: 0.2, krok: 0.08 });
+const wLewo  = jednKierunek({ ox0: 0.8, krok: -0.08 });
+const wGore  = jednKierunek({ ox0: 0.5, krok: 0, oy0: 0.8, krokY: -0.08 });
+spr(`w prawo: (${wPrawo.kierunek.x.toFixed(2)}, ${wPrawo.kierunek.y.toFixed(2)}, ${wPrawo.kierunek.z.toFixed(2)}) - x dominuje`,
+    wPrawo.kierunek.x > 0.9);
+spr(`w lewo:  (${wLewo.kierunek.x.toFixed(2)}, ${wLewo.kierunek.y.toFixed(2)}, ${wLewo.kierunek.z.toFixed(2)}) - -x dominuje`,
+    wLewo.kierunek.x < -0.9);
+spr(`w górę:  (${wGore.kierunek.x.toFixed(2)}, ${wGore.kierunek.y.toFixed(2)}, ${wGore.kierunek.z.toFixed(2)}) - -y dominuje`,
+    wGore.kierunek.y < -0.9);
 const cztery = [wPrawo, wLewo, wGore].map(w => w.kierunek);
 const odl = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 let minOdl = Infinity;
 for (let i = 0; i < cztery.length; i++)
     for (let j = i + 1; j < cztery.length; j++)
         minOdl = Math.min(minOdl, odl(cztery[i], cztery[j]));
-spr(`trzy różne pochylenia dają trzy różne kierunki (min. odległość ${minOdl.toFixed(2)})`, minOdl > 0.5);
+spr(`trzy różne machnięcia dają trzy różne kierunki (min. odległość ${minOdl.toFixed(2)})`, minOdl > 0.5);
 
 // --- 7. Moc poniżej kosztu -> siła słabsza, NIE brak fali ---
 console.log('\nMOC PONIŻEJ KOSZTU:');
@@ -213,24 +224,87 @@ console.log('\nPRĘDKOŚĆ WZGLĘDEM CZASU AKUMULOWANEGO (throttling detekcji):'
         min > 0 && max / min < 1.5);
 }
 
-// --- 13. Zabezpieczenie przy niejednoznacznym (bliskim zeru) iloczynie
-// skalarnym normalnej i ruchu - dłoń niemal PROSTOPADŁA do machnięcia.
-// Bez zabezpieczenia znak byłby szumem numerycznym; fala mogłaby polecieć
-// w gracza. Bezpieczny domyślny kierunek: OD gracza (kierunek.z > 0). ---
-console.log('\nNIEJEDNOZNACZNY KIERUNEK (dłoń prostopadła do machnięcia):');
+// --- 13. Dłoń do kamery + machnięcie w bok = fala W BOK, nie w głąb ---
+// Wcześniejsza wersja traktowała ten przypadek jako "niejednoznaczny"
+// i wymuszała +z (fala w głąb ekranu) - dokładnie błąd, który użytkownik
+// widział jako "macham w jednym kierunku, a fala leci w innym". Stała skala
+// dłoni = brak ruchu w głąb, bramka głębi daje dokładnie zero.
+console.log('\nDŁOŃ DO KAMERY, MACHNIĘCIE W BOK:');
 {
     const p = new Podmuch(); p.uzbrój();
-    let ox = 0.3, wynik = null;
-    // Dłoń frontem do kamery (pochylY=0, normalna ~(0,0,1) - "ku kamerze"),
-    // machnięcie CZYSTO POZIOME (dx duży, dy=0, brak zmiany skali) - niemal
-    // prostopadłe do normalnej, iloczyn skalarny bliski zeru.
+    const wynik = machnij(p, 1.0, { ox0: 0.3, krok: 0.08, pochylY: 0 });
+    spr(`odpala`, wynik !== null);
+    spr(`  ...kierunek.x dominuje (${wynik?.kierunek.x.toFixed(2)})`, wynik !== null && wynik.kierunek.x > 0.9);
+    spr(`  ...kierunek.z ≈ 0 - bez ruchu w głąb nie ma składowej z (${wynik?.kierunek.z.toFixed(3)})`,
+        wynik !== null && Math.abs(wynik.kierunek.z) < 0.05);
+}
+
+// --- 14. Ukośnie: bok + wzrost dłoni = obie składowe ---
+console.log('\nUKOŚNIE (bok + ku kamerze):');
+{
+    const p = new Podmuch(); p.uzbrój();
+    const wynik = machnij(p, 1.0, { ox0: 0.3, krok: 0.08, mnoznikSkali: 1.15 });
+    spr(`odpala i ma OBIE składowe: x ${wynik?.kierunek.x.toFixed(2)} > 0.3, z ${wynik?.kierunek.z.toFixed(2)} < -0.3`,
+        wynik !== null && wynik.kierunek.x > 0.3 && wynik.kierunek.z < -0.3);
+}
+
+// --- 15. Bez worldLandmarks kierunek dalej wychodzi z ruchu ---
+console.log('\nBEZ WORLDLANDMARKS (normalna niedostępna):');
+{
+    const p = new Podmuch(); p.uzbrój();
+    const wynik = machnij(p, 1.0, { ox0: 0.3, krok: 0.08, bezSwiata: true });
+    spr(`odpala mimo braku normalnej dłoni`, wynik !== null);
+    spr(`  ...x dominuje (${wynik?.kierunek.x.toFixed(2)})`, wynik !== null && wynik.kierunek.x > 0.9);
+    spr(`  ...diagnostyka.normalna jest null, bez wyjątku`, p.diagnostyka.normalna === null);
+}
+
+// --- 16. Drżenie trackingu w spoczynku NIE odpala (bramka głębi) ---
+// Pozycja ±0.002, skala ×(1±0.02) naprzemiennie - typowy szum detekcji.
+// Surowa głębia z kamery otworkowej mnoży drżenie skali przez ~10-17x;
+// bez bramki dawałoby to "pchnięcie" kilkunastu szerokości dłoni na sekundę.
+console.log('\nDRŻENIE W SPOCZYNKU:');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let wynik = null, maxPredkosc = 0;
+    for (let i = 0; i < 30 && !wynik; i++) {
+        const znak = i % 2 ? 1 : -1;
+        wynik = p.update(klatka(0.5 + 0.002 * znak, OTWARTA, 0, 0, 0.5, S * (1 + 0.02 * znak)), 1.0, DT);
+        maxPredkosc = Math.max(maxPredkosc, p.diagnostyka.predkosc);
+    }
+    spr(`drżenie NIE odpala (max prędkość ${maxPredkosc.toFixed(2)} sz.dł./s, stan ${p.stan})`,
+        wynik === null && p.stan === 'UZBROJONY');
+}
+
+// --- 17. Zniknięcie dłoni w środku machnięcia i powrót ---
+console.log('\nZNIKNIĘCIE DŁONI W TRAKCIE:');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let wynik = null;
+    wynik = p.update(klatka(0.3, OTWARTA), 1.0, DT) || wynik;
+    wynik = p.update(klatka(0.38, OTWARTA), 1.0, DT) || wynik;
+    wynik = p.update({ hands: [], pose: null, width: 1920, height: 1080 }, 1.0, DT) || wynik;
+    spr('klatka bez dłoni w środku machnięcia - bez wyjątku, nie odpala', wynik === null);
+    const potem = machnij(p, 1.0, { ox0: 0.5, krok: 0.08 });
+    spr(`po powrocie dłoni machnięcie odpala normalnie`, potem !== null && p.stan === 'BEZCZYNNY');
+}
+
+// --- 18. Dwie dłonie bez stronności (handedness null) - ten sam klucz ---
+console.log('\nDWIE DŁONIE BEZ STRONNOŚCI:');
+{
+    const p = new Podmuch(); p.uzbrój();
+    let wynik = null, ox = 0.3;
     for (let i = 0; i < 8 && !wynik; i++) {
-        wynik = p.update(klatka(ox, OTWARTA, 0, 0), 1.0, DT);
+        const f = {
+            hands: [
+                { landmarks: dlon({ ox, oy: 0.5, zgiecia: OTWARTA, skala: S }), worldLandmarks: null, handedness: null },
+                { landmarks: dlon({ ox: 0.5, oy: 0.8, zgiecia: OTWARTA, skala: S }), worldLandmarks: null, handedness: null }
+            ], pose: null, width: 1920, height: 1080
+        };
+        wynik = p.update(f, 1.0, DT);
         ox += 0.08;
     }
-    spr(`niejednoznaczny gest nadal odpala (bezpieczny fallback)`, wynik !== null);
-    spr(`  ...kierunek.z jest DODATNI - OD gracza, nigdy w jego stronę (${wynik?.kierunek.z.toFixed(2)})`,
-        wynik !== null && wynik.kierunek.z >= 0);
+    spr(`bez wyjątku; ruchoma dłoń odpala z kierunkiem +x (${wynik?.kierunek.x.toFixed(2)})`,
+        wynik !== null && wynik.kierunek.x > 0.9);
 }
 
 process.exit(ok ? 0 : 1);

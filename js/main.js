@@ -22,7 +22,7 @@ import { Ogien } from './ogien.js';
 import { PlonacyPalec } from './plonacyPalec.js';
 import { Dmuchanie } from './dmuchanie.js';
 import { Dym } from './dym.js';
-import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA } from './podmuch.js';
+import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA, OGNISKO_KAMERY } from './podmuch.js';
 import { Fala } from './fala.js';
 import { Tecza } from './tecza.js';
 import { Iskry, pekniecieZiemi } from './iskry.js';
@@ -829,7 +829,8 @@ function klatka(now) {
                  barkiNiepewne: plonacyPalec.barkiNiepewne },
         podmuch: { stan: podmuch.stan, diagnostyka: podmuch.diagnostyka,
                    czastkiFali: fala.liczba,
-                   progPredkosci: PROG_PREDKOSCI, progOtwarcia: PROG_OTWARCIA },
+                   progPredkosci: PROG_PREDKOSCI, progOtwarcia: PROG_OTWARCIA,
+                   ogniskoKamery: OGNISKO_KAMERY },
         tecza: { aktywna: tecza.aktywna, pozostaloS: tecza.pozostaloS,
                  barwaHue: tecza.barwaHue, silaSladu: tecza.silaSladu },
         iskry: { czastki: iskry.liczba },

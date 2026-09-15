@@ -236,9 +236,11 @@ export function rozstawOpuszek(lm) {
  *
  * ZNAK JEST NIEJEDNOZNACZNY. Dla lewej i prawej dłoni iloczyn wektorowy
  * wychodzi w przeciwne strony, a przy obróconej dłoni MediaPipe bywa też
- * niepewne co do samej stronności. Ta funkcja daje wyłącznie OŚ - zwrot
- * (który z dwóch kierunków tej osi) rozstrzyga js/podmuch.js wektorem
- * machnięcia. Zobacz docs/superpowers/specs/2026-08-11-szczur-i-podmuch-design.md §3.
+ * niepewne co do samej stronności. Ta funkcja daje wyłącznie OŚ.
+ * Od 2026-09-15 js/podmuch.js pokazuje ją TYLKO w diagnostyce (HUD) -
+ * kierunek fali bierze z wektora ruchu ręki, nie z tej osi (patrz nagłówek
+ * podmuch.js "KIERUNEK = WEKTOR MACHNIĘCIA"). Pierwotny projekt:
+ * docs/superpowers/specs/2026-08-11-szczur-i-podmuch-design.md §3.
  *
  * @param {Array|null} worldLandmarks
  * @returns {{x:number,y:number,z:number}|null}

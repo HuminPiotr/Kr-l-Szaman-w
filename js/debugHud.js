@@ -444,6 +444,16 @@ export class DebugHud {
             if (d.kierunek) {
                 lines.push(`      kierunek (${d.kierunek.x.toFixed(2)}, ${d.kierunek.y.toFixed(2)}, ${d.kierunek.z.toFixed(2)})`);
             }
+            // Wektor ruchu w SZEROKOŚCIACH DŁONI i względna zmiana skali w oknie -
+            // do strojenia OGNISKO_KAMERY i bramki głębi (podmuch.js nagłówek).
+            if (d.ruch) {
+                lines.push(`      ruch (${d.ruch.x.toFixed(2)}, ${d.ruch.y.toFixed(2)}, ${d.ruch.z.toFixed(2)}) sz.dł.` +
+                           `   Δskala/skala ${this._num(d.zmianaSkali)} (bramka 0.06..0.15)` +
+                           `   ognisko ${this._num(stats.podmuch.ogniskoKamery)}`);
+            }
+            if (d.normalna) {
+                lines.push(`      normalna (${d.normalna.x.toFixed(2)}, ${d.normalna.y.toFixed(2)}, ${d.normalna.z.toFixed(2)})  [podgląd, nie wpływa na kierunek]`);
+            }
         }
 
         // Stan Wstęgi Mokoszy - progi Splotu (KRZYZ_MIN/PELNY, WYSOKOSC_*)
