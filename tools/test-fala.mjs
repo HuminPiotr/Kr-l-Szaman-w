@@ -9,7 +9,7 @@
  * Fizykę testujemy przez _ruszaj(dt) bezpośrednio, jak tools/test-aura-impuls.mjs
  * czyta aura._impuls.
  */
-import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO, polozenieCzola, punktyCzola } from '../js/fala.js';
+import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO, polozenieCzola, punktyCzola, pchniecieCzola } from '../js/fala.js';
 
 const DT = 1 / 60;
 
@@ -248,5 +248,28 @@ spr('wir(): zła barwa -> fallback na domyślną, bez wyjątku', f12c.wiry.lengt
 const f12d = new Fala();
 f12d.wystrzel({ x: 0, y: 0 }, { x: 0, y: 0, z: 0 }, 1);
 spr('nieprawidłowy wystrzał nie rejestruje czoła', f12d.czola.length === 0);
+
+// --- 13. pchniecieCzola(): punkty czoła z prędkością 2D dla dym.pchnij() ---
+console.log('\nPCHNIĘCIE CZOŁA (dla dymu):');
+{
+    const zaczep = { x: 800, y: 500 };
+    const wKamere = pchniecieCzola(zaczep, { x: 0, y: 0, z: -1 }, 1, 0.3, DT, 24);
+    spr(`daje żądaną liczbę punktów (${wKamere.length})`, wKamere.length === 24);
+    spr('każdy punkt ma skończone x, y, vx, vy, r>0, sila',
+        wKamere.every(p => [p.x, p.y, p.vx, p.vy, p.r, p.sila].every(Number.isFinite) && p.r > 0));
+    // Rzut w kamerę: czoło rośnie na ekranie -> prędkość NA ZEWNĄTRZ od zaczepu.
+    spr('rzut w kamerę: prędkości promieniście NA ZEWNĄTRZ od środka',
+        wKamere.every(p => (p.x - zaczep.x) * p.vx + (p.y - zaczep.y) * p.vy > 0));
+    const wBok = pchniecieCzola(zaczep, { x: 1, y: 0, z: 0 }, 1, 0.3, DT, 24);
+    const srVx = wBok.reduce((s, p) => s + p.vx, 0) / wBok.length;
+    spr(`rzut w bok (+x): średnie vx > 0 (${srVx.toFixed(0)} px/s)`, srVx > 0);
+    spr('siła słabsza -> mniejsze prędkości',
+        pchniecieCzola(zaczep, { x: 1, y: 0, z: 0 }, 0.3, 0.3, DT, 8).reduce((s, p) => s + Math.hypot(p.vx, p.vy), 0)
+        < wBok.slice(0, 8).reduce((s, p) => s + Math.hypot(p.vx, p.vy), 0) * 8 / 8 + 1e-9 && true);
+    spr('dt=0 -> pusta lista, bez wyjątku', pchniecieCzola(zaczep, { x: 1, y: 0, z: 0 }, 1, 0.3, 0, 8).length === 0);
+    spr('zły kierunek -> pusta lista, bez wyjątku', pchniecieCzola(zaczep, { x: 0, y: 0, z: 0 }, 1, 0.3, DT, 8).length === 0);
+    spr('t < dt (pierwsza klatka) -> nadal skończone prędkości',
+        pchniecieCzola(zaczep, { x: 1, y: 0, z: 0 }, 1, 0.005, DT, 8).every(p => Number.isFinite(p.vx)));
+}
 
 process.exit(ok ? 0 : 1);

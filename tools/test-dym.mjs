@@ -273,6 +273,51 @@ console.log('\nREAKCJA NA RĘCE (taniec):');
                   return wszystkie(f).every(c => Number.isFinite(c.x) && Number.isFinite(c.y)); })());
 }
 
+// --- 6b. Podmuch (Aard) rozdmuchuje dym: odrzut + rozrzedzenie ---
+console.log('\nPODMUCH AARDA (odrzut + rozrzedzenie):');
+{
+    // Kłąb, potem punkt czoła fali (px gry, px/s) PRZY kłębie: cząstki
+    // w zasięgu dostają pęd W KIERUNKU fali i starzeją się szybciej niż dt.
+    const d = new Dym();
+    dmuchaj(d, 0.3, { wyrazistosc: 0 });
+    const cz = wszystkie(d);
+    const cel = cz[Math.floor(cz.length / 2)];
+    const przedV = cz.map(c => c.vxGry);
+    const przedWiek = cz.map(c => c.wiekGry);
+    d.pchnij([{ x: cel.x / POL, y: cel.y / POL, r: 120, vx: 2000, vy: 0, sila: 1 }]);
+    d.updateAndDraw(null, W, H, DT);
+    const dV = cz.map((c, i) => c.vxGry - przedV[i]);
+    const dWiek = cz.map((c, i) => c.wiekGry - przedWiek[i]);
+    const wZasiegu = cz.map(c => Math.hypot(c.x - cel.x, c.y - cel.y) < 120 * POL * 0.5);
+    spr(`cząstki w zasięgu czoła dostają pęd w kierunku fali (max Δvx ${Math.max(...dV).toFixed(3)})`,
+        cz.some((c, i) => wZasiegu[i] && dV[i] > 0));
+    spr('  ...i starzeją się SZYBCIEJ niż dt (rozrzedzenie)',
+        cz.some((c, i) => wZasiegu[i] && dWiek[i] > DT * 1.5));
+    // Punkt czoła daleko: przyrost prędkości jak bez pchnięcia (opór i pole
+    // przepływu i tak zmieniają v co klatkę - porównujemy WZGLĘDEM bliskiego,
+    // jak w teście rąk wyżej), wiek rośnie dokładnie o dt.
+    const e = new Dym();
+    dmuchaj(e, 0.3, { wyrazistosc: 0 });
+    const czE = wszystkie(e);
+    const przedVE = czE.map(c => c.vxGry), przedWiekE = czE.map(c => c.wiekGry);
+    e.pchnij([{ x: USTA.x + 3000, y: USTA.y, r: 120, vx: 2000, vy: 0, sila: 1 }]);
+    e.updateAndDraw(null, W, H, DT);
+    const dalekoMax = Math.max(...czE.map((c, i) => Math.abs(c.vxGry - przedVE[i])));
+    spr(`czoło DALEKO rusza dym ${(dalekoMax / Math.max(...dV) * 100).toFixed(0)}x słabiej niż blisko i nie postarza go`,
+        dalekoMax < 0.1 * Math.max(...dV) && czE.every((c, i) => c.wiekGry - przedWiekE[i] <= DT + 1e-9));
+    // Lista jest jednorazowa - kolejna klatka bez pchnij() już nie pcha.
+    const przedV2 = cz.map(c => c.vxGry);
+    d.updateAndDraw(null, W, H, DT);
+    // Opór tylko ZMNIEJSZA |v|; wzrost vx bez nowego pchnij() oznaczałby,
+    // że lista nie została wyczyszczona.
+    spr('pchnięcie jest konsumowane raz - następna klatka bez pchnij() nie dokłada pędu',
+        cz.every((c, i) => c.vxGry <= przedV2[i] + 1e-9 || przedV2[i] < 0));
+    spr('pchnij() z pustą listą / null / NaN nie wywala',
+        (() => { d.pchnij([]); d.pchnij(null); d.pchnij([{ x: NaN, y: NaN, r: NaN, vx: NaN, vy: NaN, sila: NaN }]);
+                  d.updateAndDraw(null, W, H, DT);
+                  return wszystkie(d).every(c => Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.vxGry)); })());
+}
+
 // --- 7. Ogień: zapłon, front, detonacja ---
 console.log('\nPODPALENIE I FRONT OGNIA:');
 {

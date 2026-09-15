@@ -114,6 +114,8 @@ const SMUGA_ROZMIAR = 0.62;        // ułamek promienia czoła - długość pó�
 const SMUGA_DRYF_MAX = 0.9;        // rad/s - smugi ślizgają się po obwodzie
 const SMUGA_SPRITE_PX = 160;
 const MAX_CZOL = 6;
+const GRUBOSC_PCHNIECIA = 0.35;    // ułamek promienia czoła, w którym fala pcha dym
+const PCHNIECIE_R_MIN_PX = 24;     // px ekranu - tuż po wystrzale czoło jest małe, ale ma pchać
 
 // --- wir w dłoni (Aard v2) ---
 const WIR_ZYCIE = 0.28;            // s
@@ -251,6 +253,46 @@ export function punktCzolaPodKatem(zaczep, kierunek, sila, t, mnoznikPromienia, 
     const g = geometriaCzola(zaczep, kierunek, sila, t, mnoznikPromienia);
     if (!g || !Number.isFinite(kat)) return null;
     return { srodek: g.srodek, punkt: rzutPunktuCzola(zaczep, g, kat) };
+}
+
+/**
+ * Czoło fali jako lista PUNKTÓW Z PRĘDKOŚCIĄ na ekranie - wejście dla
+ * dym.pchnij() (Aard rozdmuchuje dym Okadzenia). Prędkość każdego punktu to
+ * różnica skończona jego rzutowanej pozycji między t-dt a t, więc obejmuje
+ * rozszerzanie pierścienia, ruch wzdłuż kierunku I perspektywę: fala w
+ * kamerę rośnie na ekranie i pcha promieniście od środka, fala w głąb
+ * ekranu kurczy się. `r` to grubość czoła W PIKSELACH EKRANU (odległość
+ * zewnętrznej krawędzi od wewnętrznej pod tym samym kątem), nie stała.
+ *
+ * dym.js NIE importuje fala.js (geometria zostaje liściem) - main.js
+ * mapuje fala.czola przez tę funkcję i podaje wynik do dym.pchnij(),
+ * tym samym wzorcem PULL co zarzewia dla dym.podpal().
+ *
+ * @param {{x,y}} zaczep      px płótna
+ * @param {{x,y,z}} kierunek  wektor 3D
+ * @param {number} sila       0..1
+ * @param {number} t          s od wystrzału
+ * @param {number} dt         s - krok, z którego liczona jest prędkość
+ * @param {number} [n]        punktów po obwodzie
+ * @returns {{x:number,y:number,vx:number,vy:number,r:number,sila:number}[]}  pusta lista przy złych argumentach
+ */
+export function pchniecieCzola(zaczep, kierunek, sila, t, dt, n = 24) {
+    if (!Number.isFinite(dt) || dt <= 0 || !Number.isFinite(t)) return [];
+    // Przy t < dt cofamy okno do przodu (różnica w przód), żeby pierwsza
+    // klatka po wystrzale też dawała prędkość, a nie dzielenie ujemnego czasu.
+    const tA = Math.max(0, t - dt), tB = tA + dt;
+    const teraz = punktyCzola(zaczep, kierunek, sila, tB, n, 1);
+    const przed = punktyCzola(zaczep, kierunek, sila, tA, n, 1);
+    const wewn = punktyCzola(zaczep, kierunek, sila, tB, n, 1 - GRUBOSC_PCHNIECIA);
+    if (!teraz.punkty.length || przed.punkty.length !== teraz.punkty.length) return [];
+    const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
+    const out = [];
+    for (let i = 0; i < teraz.punkty.length; i++) {
+        const a = przed.punkty[i], b = teraz.punkty[i], w = wewn.punkty[i];
+        const r = Math.max(PCHNIECIE_R_MIN_PX, Math.hypot(b.x - w.x, b.y - w.y));
+        out.push({ x: b.x, y: b.y, vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt, r, sila: s });
+    }
+    return out;
 }
 
 export class Fala {

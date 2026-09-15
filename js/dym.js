@@ -124,6 +124,16 @@ const ROZGARNIJ_SILA = 0.15;             // ile prędkości dłoni przechodzi na
 const WIR_SILA = 0.22;                   // składowa STYCZNA - za ręką zostaje wir
 const ROZGARNIJ_MAX_V = 4000;            // px/s - zasłonięta dłoń potrafi "skoczyć"
 
+// --- Podmuch Aarda (js/fala.js pchniecieCzola -> main.js -> pchnij()) ---
+// OSOBNE stałe, nie ROZGARNIJ_*: dla ręki "wywiewanie całego obłoku" było
+// wadą (komentarz wyżej), dla fali uderzeniowej jest CELEM. Kłąb dostaje
+// pęd czoła i starzeje się szybciej - przez wiekBiblioteki() blednie i
+// rośnie tak, jak naturalnie u kresu życia, czyli ROZWIEWA SIĘ, a nie
+// znika. Decyzja użytkownika (2026-09-15): odrzut + rozrzedzenie.
+const PODMUCH_SILA = 0.6;                // ile prędkości czoła przechodzi na cząstkę
+const PODMUCH_ROZRZEDZENIE_S = 6;        // s życia tracone na 1 s pełnego trafienia
+const PODMUCH_MAX_V = 6000;              // px/s - czoło w kamerę rośnie na ekranie bardzo szybko
+
 // --- Zapłon, front, detonacja (bez zmian od v5/v6 - tę część właściciel lubi) ---
 const ZAPLON_KONTAKT_MNOZNIK = 0.55;     // promień kontaktu = promień kłębu * to (kłąb bywa 300 px)
 const FRONT_PROMIEN_MNOZNIK = 0.45;      // zarażanie sąsiadek
@@ -158,6 +168,7 @@ export class Dym {
         this._nadwyzka = 0;          // ułamki cząstek przeniesione na następną klatkę
         this._t = 0;                 // zegar pola przepływu
         this._dlonie = [];           // nadgarstki i łokcie z prędkościami (rozgarnij)
+        this._podmuchy = [];         // punkty czoła fali Aarda z prędkościami (pchnij)
         this._nowychWybuchow = 0;    // liczone w callbacku, zwracane z updateAndDraw
         this._wybuchajacych = 0;
     }
@@ -278,6 +289,19 @@ export class Dym {
     }
 
     /**
+     * Fala uderzeniowa (Aard) rozdmuchuje dym - punkty czoła z prędkością
+     * w px gry / px/s (js/fala.js pchniecieCzola). Ten sam kontrakt co
+     * rozgarnij(): USTAW listę, _fizyka konsumuje raz, updateAndDraw czyści.
+     * Pchane są WSZYSTKIE stany (płonący kłąb też leci z wiatrem).
+     *
+     * @param {Array<{x,y,r,vx,vy,sila}>} punktyPx
+     */
+    pchnij(punktyPx) {
+        this._podmuchy = Array.isArray(punktyPx) ? punktyPx.filter(
+            p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.r) && p.r > 0) : [];
+    }
+
+    /**
      * Podpal cząstki DYM w zasięgu zarzewi. Front (zarażanie sąsiadek) biegnie
      * w fizyce - tu wyłącznie PIERWSZY kontakt z zewnętrznym źródłem ognia.
      *
@@ -319,6 +343,7 @@ export class Dym {
         // wpina się w środku, przez setPreDrawCallback (patrz konstruktor).
         maszyna.step(krok * 1000);
         this._dlonie = [];
+        this._podmuchy = [];
 
         if (ctx && this._plotno) {
             ctx.save();
@@ -465,6 +490,24 @@ export class Dym {
                 const strona = Math.sign(vx * dy - vy * dx) || 1;
                 c.vxGry += -vy * strona * wplyw * WIR_SILA;
                 c.vyGry += vx * strona * wplyw * WIR_SILA;
+            }
+
+            // --- Podmuch Aarda: odrzut + rozrzedzenie (patrz PODMUCH_*) ---
+            for (const p of this._podmuchy) {
+                const promien = p.r * skalaDloni;
+                const dist = Math.hypot(c.x - p.x * skalaDloni, c.y - p.y * skalaDloni);
+                if (dist >= promien) continue;
+                const sila = Number.isFinite(p.sila) ? Math.max(0, Math.min(1, p.sila)) : 0;
+                const wplyw = (1 - dist / promien) * sila;
+                if (wplyw <= 0) continue;
+                const vx = ograniczPodmuch(p.vx) * skalaDloni / 1000;
+                const vy = ograniczPodmuch(p.vy) * skalaDloni / 1000;
+                c.vxGry += vx * wplyw * PODMUCH_SILA;
+                c.vyGry += vy * wplyw * PODMUCH_SILA;
+                // Rozrzedzenie: dodatkowy wiek -> wiekBiblioteki() w następnej
+                // klatce da bledszy, większy kłąb. Nie skok do końca życia -
+                // kilka klatek w czole to kilka sekund życia, nie cały zapas.
+                c.wiekGry += dt * PODMUCH_ROZRZEDZENIE_S * wplyw;
             }
 
             if (!Number.isFinite(c.x) || !Number.isFinite(c.y)
@@ -668,6 +711,10 @@ function kierunekJednostkowy(kierunek) {
 function ograniczV(v) {
     if (!Number.isFinite(v)) return 0;
     return Math.max(-ROZGARNIJ_MAX_V, Math.min(ROZGARNIJ_MAX_V, v));
+}
+function ograniczPodmuch(v) {
+    if (!Number.isFinite(v)) return 0;
+    return Math.max(-PODMUCH_MAX_V, Math.min(PODMUCH_MAX_V, v));
 }
 
 function warianty() {

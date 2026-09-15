@@ -23,7 +23,7 @@ import { PlonacyPalec } from './plonacyPalec.js';
 import { Dmuchanie } from './dmuchanie.js';
 import { Dym } from './dym.js';
 import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA, OGNISKO_KAMERY } from './podmuch.js';
-import { Fala } from './fala.js';
+import { Fala, pchniecieCzola } from './fala.js';
 import { Tecza } from './tecza.js';
 import { Iskry, pekniecieZiemi } from './iskry.js';
 import { Zaplon } from './zaplon.js';
@@ -680,6 +680,17 @@ function klatka(now) {
         }
     }
     if (zarzewia.length) dym.podpal(zarzewia);
+
+    // Aard rozdmuchuje dym: czoła fali z POPRZEDNIEJ klatki (fala.czola -
+    // wystrzał w tej klatce dzieje się niżej, w 7c) zamienione na punkty
+    // z prędkością przez pchniecieCzola(). Jedna klatka spóźnienia jak przy
+    // zarzewiach wyżej, ten sam PULL - dym.js nie zna fala.js. Grom w Ziemię
+    // dzieli Fala, więc jego fala też rozdmucha dym - jedna fizyka fali.
+    const podmuchy = [];
+    for (const c of fala.czola) {
+        podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
+    }
+    if (podmuchy.length) dym.pchnij(podmuchy);
 
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
     if (wybuchyDymu > 0) {
