@@ -303,7 +303,7 @@ console.log('\nPODMUCH AARDA (odrzut + rozrzedzenie):');
     e.pchnij([{ x: USTA.x + 3000, y: USTA.y, r: 120, vx: 2000, vy: 0, sila: 1 }]);
     e.updateAndDraw(null, W, H, DT);
     const dalekoMax = Math.max(...czE.map((c, i) => Math.abs(c.vxGry - przedVE[i])));
-    spr(`czoło DALEKO rusza dym ${(dalekoMax / Math.max(...dV) * 100).toFixed(0)}x słabiej niż blisko i nie postarza go`,
+    spr(`czoło DALEKO: przyrost prędkości ${(dalekoMax / Math.max(...dV) * 100).toFixed(1)} % tego, co blisko (próg 10 %), wiek rośnie tylko o dt`,
         dalekoMax < 0.1 * Math.max(...dV) && czE.every((c, i) => c.wiekGry - przedWiekE[i] <= DT + 1e-9));
     // Lista jest jednorazowa - kolejna klatka bez pchnij() już nie pcha.
     const przedV2 = cz.map(c => c.vxGry);

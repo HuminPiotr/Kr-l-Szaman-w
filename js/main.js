@@ -686,11 +686,15 @@ function klatka(now) {
     // z prędkością przez pchniecieCzola(). Jedna klatka spóźnienia jak przy
     // zarzewiach wyżej, ten sam PULL - dym.js nie zna fala.js. Grom w Ziemię
     // dzieli Fala, więc jego fala też rozdmucha dym - jedna fizyka fali.
-    const podmuchy = [];
-    for (const c of fala.czola) {
-        podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
+    // Guard na dym.liczba: bez kłębów nie ma czego pchać, a 72 rzuty na czoło
+    // co klatkę przez 0.7 s po każdym Aardzie/Gromie byłyby pracą na darmo.
+    if (dym.liczba > 0 && fala.czola.length) {
+        const podmuchy = [];
+        for (const c of fala.czola) {
+            podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
+        }
+        if (podmuchy.length) dym.pchnij(podmuchy);
     }
-    if (podmuchy.length) dym.pchnij(podmuchy);
 
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
     if (wybuchyDymu > 0) {
