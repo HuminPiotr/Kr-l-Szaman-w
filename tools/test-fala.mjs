@@ -9,7 +9,7 @@
  * Fizykę testujemy przez _ruszaj(dt) bezpośrednio, jak tools/test-aura-impuls.mjs
  * czyta aura._impuls.
  */
-import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO, polozenieCzola, punktyCzola, pchniecieCzola } from '../js/fala.js';
+import { Fala, rzutPerspektywiczny, rzutujPozycje, OGNISKO, polozenieCzola, punktyCzola, pchniecieCzola, NASTAWY } from '../js/fala.js';
 
 const DT = 1 / 60;
 
@@ -270,6 +270,29 @@ console.log('\nPCHNIĘCIE CZOŁA (dla dymu):');
     spr('zły kierunek -> pusta lista, bez wyjątku', pchniecieCzola(zaczep, { x: 0, y: 0, z: 0 }, 1, 0.3, DT, 8).length === 0);
     spr('t < dt (pierwsza klatka) -> nadal skończone prędkości',
         pchniecieCzola(zaczep, { x: 1, y: 0, z: 0 }, 1, 0.005, DT, 8).every(p => Number.isFinite(p.vx)));
+}
+
+// --- NASTAWY - eksportowane i mutowalne (dla suwaków tools/scena.html) ---
+console.log('\nNASTAWY (mutowalność dla stanowiska):');
+{
+    const domyslnyNaWystrzal = NASTAWY.NA_WYSTRZAL;
+    const domyslnyRdzen = NASTAWY.RDZEN_NA_WYSTRZAL;
+    NASTAWY.NA_WYSTRZAL = 10;
+    NASTAWY.RDZEN_NA_WYSTRZAL = 0;   // wyzerowany, żeby liczba mierzyła TYLKO czoło
+    const f9 = new Fala();
+    f9.wystrzel({ x: 0, y: 0 }, { x: 1, y: 0, z: 0 }, 1);
+    spr(`zmiana NASTAWY.NA_WYSTRZAL widoczna w wystrzel() (${f9.liczba})`, f9.liczba === 10);
+    NASTAWY.NA_WYSTRZAL = domyslnyNaWystrzal;
+    NASTAWY.RDZEN_NA_WYSTRZAL = domyslnyRdzen;
+
+    const domyslneOgnisko = NASTAWY.OGNISKO;
+    NASTAWY.OGNISKO = 100;
+    const sPrzy100 = rzutPerspektywiczny(200); // ognisko=100 -> 100/(100+200)
+    NASTAWY.OGNISKO = domyslneOgnisko;
+    const sPrzyDomyslnym = rzutPerspektywiczny(200); // ognisko=900 -> 900/(900+200)
+    spr(`wartości różne dla różnych NASTAWY.OGNISKO (${sPrzy100.toFixed(3)} vs ${sPrzyDomyslnym.toFixed(3)})`,
+        Math.abs(sPrzy100 - sPrzyDomyslnym) > 0.01);
+    spr('OGNISKO (eksport snapshot) nadal równy domyślnej wartości NASTAWY', OGNISKO === 900);
 }
 
 process.exit(ok ? 0 : 1);

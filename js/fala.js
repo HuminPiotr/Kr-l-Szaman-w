@@ -72,57 +72,71 @@
  */
 import { MANIFEST, obraz, losowyWariant, wypalTintowany } from './assety.js';
 
-const OGNISKO_DOMYSLNE = 900;      // px - ZGADNIĘTE, stroić klawiszem D
-export const OGNISKO = OGNISKO_DOMYSLNE;
+/**
+ * Nastawy strojeniowe - eksportowane i MUTOWALNE, żeby tools/scena.html
+ * mogło podpiąć suwaki. polozenieCzola()/rzutPerspektywiczny() czytają
+ * NASTAWY.* na żywo - jedna prawda dla suwaków i formy zamkniętej (patrz
+ * nagłówek polozenieCzola). Po zmianie SPRITE_PX/BARWA_RDZEN wywołaj
+ * wyczyscCache() (sprite'y wypalone raz).
+ */
+export const NASTAWY = {
+    OGNISKO: 900,      // px - ZGADNIĘTE, stroić klawiszem D
 
-const SPRITE_PX = 64;              // większy niż w ogniu - fala to ściana, nie iskry
-// BARWA JEST PARAMETREM wystrzel(), NIE STAŁĄ - Fala jest współdzielona
-// między Aardem (Stribog) i Gromem w Ziemię (Weles), i oba muszą się dać
-// odróżnić na pierwszy rzut oka. BARWA_DOMYSLNA to dawna jedyna barwa
-// (blady błękit Aarda) - zostaje jako fallback, gdy wystrzel() dostanie
-// argument pominięty albo nieprawidłowy.
-const BARWA_DOMYSLNA = [214, 240, 255];     // blady błękit - patrz efekty.js (aard)
-const BARWA_RDZEN = [255, 255, 255];  // rozbłysk uderzenia - czysta biel, WSPÓLNA dla wszystkich barw
+    SPRITE_PX: 64,              // większy niż w ogniu - fala to ściana, nie iskry
+    // BARWA JEST PARAMETREM wystrzel(), NIE STAŁĄ - Fala jest współdzielona
+    // między Aardem (Stribog) i Gromem w Ziemię (Weles), i oba muszą się dać
+    // odróżnić na pierwszy rzut oka. BARWA_DOMYSLNA to dawna jedyna barwa
+    // (blady błękit Aarda) - zostaje jako fallback, gdy wystrzel() dostanie
+    // argument pominięty albo nieprawidłowy.
+    BARWA_DOMYSLNA: [214, 240, 255],     // blady błękit - patrz efekty.js (aard)
+    BARWA_RDZEN: [255, 255, 255],  // rozbłysk uderzenia - czysta biel, WSPÓLNA dla wszystkich barw
 
-// --- czoło fali ---
-const NA_WYSTRZAL = 260;           // cząstek przy pełnej sile (jednorazowo) - było 420, patrz nagłówek "AARD v2"
-const PREDKOSC_BAZOWA = 900;       // px/s wzdłuż kierunku, przy pełnej sile
-const ROZRZUT_PREDKOSCI = 260;     // px/s losowego rozrzutu, PRZY PEŁNEJ SILE
-const PROMIEN_START = 26;          // px - czoło ma szerokość już w chwili emisji
-const PROMIEN_PREDKOSC = 720;      // px/s rozszerzania pierścienia
-const GRUBOSC_MIN = 0.55;          // mnożnik promienia - czoło ma GRUBOŚĆ
-const OPOR_WZDLUZ = 2.4;           // 1/s - ruch do przodu wytraca się szybko
-const OPOR_PROMIEN = 0.35;         // 1/s - ale rozchodzenie się trwa
-const ZYCIE_MIN = 0.75, ZYCIE_MAX = 1.15;    // s
-const ROZMIAR_OD = 0.9, ROZMIAR_DO = 2.2;    // cząstki PUCHNĄ z wiekiem
+    // --- czoło fali ---
+    NA_WYSTRZAL: 260,           // cząstek przy pełnej sile (jednorazowo) - było 420, patrz nagłówek "AARD v2"
+    PREDKOSC_BAZOWA: 900,       // px/s wzdłuż kierunku, przy pełnej sile
+    ROZRZUT_PREDKOSCI: 260,     // px/s losowego rozrzutu, PRZY PEŁNEJ SILE
+    PROMIEN_START: 26,          // px - czoło ma szerokość już w chwili emisji
+    PROMIEN_PREDKOSC: 720,      // px/s rozszerzania pierścienia
+    GRUBOSC_MIN: 0.55,          // mnożnik promienia - czoło ma GRUBOŚĆ
+    OPOR_WZDLUZ: 2.4,           // 1/s - ruch do przodu wytraca się szybko
+    OPOR_PROMIEN: 0.35,         // 1/s - ale rozchodzenie się trwa
+    ZYCIE_MIN: 0.75, ZYCIE_MAX: 1.15,    // s
+    ROZMIAR_OD: 0.9, ROZMIAR_DO: 2.2,    // cząstki PUCHNĄ z wiekiem
 
-// --- rozbłysk rdzenia (moment uderzenia) ---
-const RDZEN_NA_WYSTRZAL = 90;
-const RDZEN_PREDKOSC = 420;        // px/s - rozlatuje się na wszystkie strony
-const RDZEN_ZYCIE = 0.32;          // s - gaśnie ~3x szybciej niż fala
-const RDZEN_ROZMIAR = 1.5;
+    // --- rozbłysk rdzenia (moment uderzenia) ---
+    RDZEN_NA_WYSTRZAL: 90,
+    RDZEN_PREDKOSC: 420,        // px/s - rozlatuje się na wszystkie strony
+    RDZEN_ZYCIE: 0.32,          // s - gaśnie ~3x szybciej niż fala
+    RDZEN_ROZMIAR: 1.5,
 
-const MAX_CZASTECZEK = 900;        // sufit bezpieczeństwa dla klatkażu
+    MAX_CZASTECZEK: 900,        // sufit bezpieczeństwa dla klatkażu
 
-// --- czoło: kreska + smugi wiatru (Aard v2) ---
-const CZOLO_ZYCIE = 0.7;           // s - krócej niż cząstki: krawędź ostra na starcie, potem chmura
-const KRESKA_PUNKTOW = 72;
-const KRESKA_SZEROKA_PX = 14;      // miękki ślad pod cienką linią
-const KRESKA_CIENKA_PX = 2.5;
-const SMUG_NA_CZOLO = 8;
-const SMUGA_ROZMIAR = 0.62;        // ułamek promienia czoła - długość półksiężyca
-const SMUGA_DRYF_MAX = 0.9;        // rad/s - smugi ślizgają się po obwodzie
-const SMUGA_SPRITE_PX = 160;
-const MAX_CZOL = 6;
-const GRUBOSC_PCHNIECIA = 0.35;    // ułamek promienia czoła, w którym fala pcha dym
-const PCHNIECIE_R_MIN_PX = 24;     // px ekranu - tuż po wystrzale czoło jest małe, ale ma pchać
+    // --- czoło: kreska + smugi wiatru (Aard v2) ---
+    CZOLO_ZYCIE: 0.7,           // s - krócej niż cząstki: krawędź ostra na starcie, potem chmura
+    KRESKA_PUNKTOW: 72,
+    KRESKA_SZEROKA_PX: 14,      // miękki ślad pod cienką linią
+    KRESKA_CIENKA_PX: 2.5,
+    SMUG_NA_CZOLO: 8,
+    SMUGA_ROZMIAR: 0.62,        // ułamek promienia czoła - długość półksiężyca
+    SMUGA_DRYF_MAX: 0.9,        // rad/s - smugi ślizgają się po obwodzie
+    SMUGA_SPRITE_PX: 160,
+    MAX_CZOL: 6,
+    GRUBOSC_PCHNIECIA: 0.35,    // ułamek promienia czoła, w którym fala pcha dym
+    PCHNIECIE_R_MIN_PX: 24,     // px ekranu - tuż po wystrzale czoło jest małe, ale ma pchać
 
-// --- wir w dłoni (Aard v2) ---
-const WIR_ZYCIE = 0.28;            // s
-const WIR_ROZMIAR_OD = 70, WIR_ROZMIAR_DO = 300;   // px przy pełnej sile
-const WIR_OBROTY = 1.4;            // pełnych obrotów przez całe życie
-const WIR_SPRITE_PX = 256;
-const MAX_WIROW = 3;
+    // --- wir w dłoni (Aard v2) ---
+    WIR_ZYCIE: 0.28,            // s
+    WIR_ROZMIAR_OD: 70, WIR_ROZMIAR_DO: 300,   // px przy pełnej sile
+    WIR_OBROTY: 1.4,            // pełnych obrotów przez całe życie
+    WIR_SPRITE_PX: 256,
+    MAX_WIROW: 3,
+};
+
+// Snapshot dla importujących { OGNISKO } (dziś tylko tools/test-fala.mjs) -
+// NIE jest live: zmiana NASTAWY.OGNISKO w locie (stanowisko) nie zaktualizuje
+// tego eksportu, ale rzutPerspektywiczny() poniżej czyta NASTAWY.OGNISKO na
+// żywo przez domyślny parametr, więc gra i tak reaguje na suwak.
+export const OGNISKO = NASTAWY.OGNISKO;
 
 /**
  * Rzut perspektywiczny: mniejsze/ujemne z (bliżej kamery) -> większe s.
@@ -132,7 +146,7 @@ const MAX_WIROW = 3;
  * `zc_min = -ognisko*0.6` daje to `s_max = 1/0.4 = 2.5` - to i tak jest
  * jedyna górna granica na s, więc osobny klamr na s byłby martwy kod.
  */
-export function rzutPerspektywiczny(z, ognisko = OGNISKO) {
+export function rzutPerspektywiczny(z, ognisko = NASTAWY.OGNISKO) {
     const zc = Number.isFinite(z) ? Math.max(z, -ognisko * 0.6) : 0;
     return ognisko / (ognisko + zc);
 }
@@ -189,8 +203,8 @@ export function polozenieCzola(sila, t) {
     const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
     const tt = Number.isFinite(t) ? Math.max(0, t) : 0;
     // Całka z v0*exp(-k*t) = v0*(1-exp(-k*t))/k - droga przy tłumieniu wykładniczym.
-    const wzdluz = PREDKOSC_BAZOWA * s * (1 - Math.exp(-OPOR_WZDLUZ * tt)) / OPOR_WZDLUZ;
-    const promien = PROMIEN_START + PROMIEN_PREDKOSC * s * (1 - Math.exp(-OPOR_PROMIEN * tt)) / OPOR_PROMIEN;
+    const wzdluz = NASTAWY.PREDKOSC_BAZOWA * s * (1 - Math.exp(-NASTAWY.OPOR_WZDLUZ * tt)) / NASTAWY.OPOR_WZDLUZ;
+    const promien = NASTAWY.PROMIEN_START + NASTAWY.PROMIEN_PREDKOSC * s * (1 - Math.exp(-NASTAWY.OPOR_PROMIEN * tt)) / NASTAWY.OPOR_PROMIEN;
     return { wzdluz, promien };
 }
 
@@ -283,13 +297,13 @@ export function pchniecieCzola(zaczep, kierunek, sila, t, dt, n = 24) {
     const tA = Math.max(0, t - dt), tB = tA + dt;
     const teraz = punktyCzola(zaczep, kierunek, sila, tB, n, 1);
     const przed = punktyCzola(zaczep, kierunek, sila, tA, n, 1);
-    const wewn = punktyCzola(zaczep, kierunek, sila, tB, n, 1 - GRUBOSC_PCHNIECIA);
+    const wewn = punktyCzola(zaczep, kierunek, sila, tB, n, 1 - NASTAWY.GRUBOSC_PCHNIECIA);
     if (!teraz.punkty.length || przed.punkty.length !== teraz.punkty.length) return [];
     const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
     const out = [];
     for (let i = 0; i < teraz.punkty.length; i++) {
         const a = przed.punkty[i], b = teraz.punkty[i], w = wewn.punkty[i];
-        const r = Math.max(PCHNIECIE_R_MIN_PX, Math.hypot(b.x - w.x, b.y - w.y));
+        const r = Math.max(NASTAWY.PCHNIECIE_R_MIN_PX, Math.hypot(b.x - w.x, b.y - w.y));
         out.push({ x: b.x, y: b.y, vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt, r, sila: s });
     }
     return out;
@@ -308,9 +322,13 @@ export class Fala {
         // żyją innym rytmem i nie są "cząstkami" w sensie _ruszaj/_rysuj.
         this.czola = [];
         this.wiry = [];
+        this.odrzucone = 0;   // licznik cząstek odrzuconych przez sufit MAX_CZASTECZEK - panel kontroli tools/scena.html
     }
 
     get liczba() { return this.czastki.length; }
+
+    /** Wywołać po zmianie NASTAWY.SPRITE_PX/BARWA_RDZEN - stare sprite'y zostały wypalone ze starymi wartościami. */
+    wyczyscCache() { this._spriteRdzen = null; this._spriteFala.clear(); }
 
     /**
      * Wir w dłoni w chwili rzutu - patrz nagłówek "AARD v2". Wołany przez
@@ -320,13 +338,13 @@ export class Fala {
      * @param {number} sila   0..1
      * @param {[number,number,number]} [barwa]
      */
-    wir(zaczep, sila, barwa = BARWA_DOMYSLNA) {
+    wir(zaczep, sila, barwa = NASTAWY.BARWA_DOMYSLNA) {
         if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y)) return;
         const s = Number.isFinite(sila) ? Math.max(0, Math.min(1, sila)) : 0;
         if (s <= 0.01) return;
         const b = (Array.isArray(barwa) && barwa.length === 3 && barwa.every(Number.isFinite))
-            ? barwa : BARWA_DOMYSLNA;
-        if (this.wiry.length >= MAX_WIROW) this.wiry.shift();
+            ? barwa : NASTAWY.BARWA_DOMYSLNA;
+        if (this.wiry.length >= NASTAWY.MAX_WIROW) this.wiry.shift();
         this.wiry.push({
             zaczep: { x: zaczep.x, y: zaczep.y }, sila: s, barwa: b, wiek: 0,
             // Losowy zwrot obrotu - dwa rzuty pod rząd nie mają wyglądać identycznie.
@@ -341,7 +359,7 @@ export class Fala {
      * @param {number} sila  0..1
      * @param {[number,number,number]} [barwa]  RGB czoła fali; domyślnie blady błękit Aarda
      */
-    wystrzel(zaczep, kierunek, sila, barwa = BARWA_DOMYSLNA) {
+    wystrzel(zaczep, kierunek, sila, barwa = NASTAWY.BARWA_DOMYSLNA) {
         if (!zaczep || !Number.isFinite(zaczep.x) || !Number.isFinite(zaczep.y)) return;
         if (!kierunek) return;
         const dl = Math.hypot(kierunek.x, kierunek.y, kierunek.z);
@@ -353,17 +371,17 @@ export class Fala {
         // Barwa nieprawidłowa (spoza kontraktu) -> fallback, NIE wyjątek -
         // ten sam wzorzec odporności co przy zaczepie/kierunku/sile wyżej.
         const b = (Array.isArray(barwa) && barwa.length === 3 && barwa.every(Number.isFinite))
-            ? barwa : BARWA_DOMYSLNA;
+            ? barwa : NASTAWY.BARWA_DOMYSLNA;
 
         const [p1, p2] = prostopadleDo(os);
 
         // --- CZOŁO v2: kreska + smugi (nagłówek "AARD v2") ---
-        if (this.czola.length >= MAX_CZOL) this.czola.shift();
+        if (this.czola.length >= NASTAWY.MAX_CZOL) this.czola.shift();
         const smugi = [];
-        for (let i = 0; i < SMUG_NA_CZOLO; i++) {
+        for (let i = 0; i < NASTAWY.SMUG_NA_CZOLO; i++) {
             smugi.push({
-                kat: (i / SMUG_NA_CZOLO) * Math.PI * 2 + (Math.random() - 0.5) * 0.5,
-                dryf: (Math.random() - 0.5) * 2 * SMUGA_DRYF_MAX,
+                kat: (i / NASTAWY.SMUG_NA_CZOLO) * Math.PI * 2 + (Math.random() - 0.5) * 0.5,
+                dryf: (Math.random() - 0.5) * 2 * NASTAWY.SMUGA_DRYF_MAX,
                 promien: 0.86 + Math.random() * 0.14,   // tuż pod zewnętrzną krawędzią
                 skala: 0.8 + Math.random() * 0.5,
                 // Obraz wybrany RAZ (nie co klatkę - losowanie per klatka migałoby).
@@ -374,34 +392,34 @@ export class Fala {
         this.czola.push({ zaczep: { x: zaczep.x, y: zaczep.y }, kierunek: os, sila: s, barwa: b, wiek: 0, smugi });
 
         // --- CZOŁO FALI: pierścień prostopadły do kierunku ---
-        const n = Math.round(NA_WYSTRZAL * (0.4 + 0.6 * s));
+        const n = Math.round(NASTAWY.NA_WYSTRZAL * (0.4 + 0.6 * s));
         for (let i = 0; i < n; i++) {
             // Kąt rozłożony RÓWNOMIERNIE po obwodzie plus drobny jitter -
             // czysto losowy kąt zostawiałby widoczne dziury w pierścieniu.
             const kat = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
             // Mnożnik promienia daje czołu GRUBOŚĆ zamiast cienkiej obręczy.
-            const warstwa = GRUBOSC_MIN + Math.random() * (1 - GRUBOSC_MIN);
+            const warstwa = NASTAWY.GRUBOSC_MIN + Math.random() * (1 - NASTAWY.GRUBOSC_MIN);
             // Wektor "na zewnątrz" w płaszczyźnie pierścienia.
             const promX = p1.x * Math.cos(kat) + p2.x * Math.sin(kat);
             const promY = p1.y * Math.cos(kat) + p2.y * Math.sin(kat);
             const promZ = p1.z * Math.cos(kat) + p2.z * Math.sin(kat);
 
-            const predkosc = (PREDKOSC_BAZOWA * s) * (0.8 + Math.random() * 0.4)
-                            + (Math.random() - 0.5) * ROZRZUT_PREDKOSCI * s;
-            const vProm = PROMIEN_PREDKOSC * warstwa * (0.75 + Math.random() * 0.5) * s;
+            const predkosc = (NASTAWY.PREDKOSC_BAZOWA * s) * (0.8 + Math.random() * 0.4)
+                            + (Math.random() - 0.5) * NASTAWY.ROZRZUT_PREDKOSCI * s;
+            const vProm = NASTAWY.PROMIEN_PREDKOSC * warstwa * (0.75 + Math.random() * 0.5) * s;
 
             this._dodaj({
                 // Start NA pierścieniu, nie w punkcie - fala ma czoło od razu.
-                x: zaczep.x + promX * PROMIEN_START * warstwa,
-                y: zaczep.y + promY * PROMIEN_START * warstwa,
-                z: promZ * PROMIEN_START * warstwa,
+                x: zaczep.x + promX * NASTAWY.PROMIEN_START * warstwa,
+                y: zaczep.y + promY * NASTAWY.PROMIEN_START * warstwa,
+                z: promZ * NASTAWY.PROMIEN_START * warstwa,
                 zx0: zaczep.x, zy0: zaczep.y,
                 // Prędkość = ruch DO PRZODU + rozchodzenie się NA ZEWNĄTRZ.
                 // Rozdzielone, bo tłumią się z różną siłą (patrz _ruszaj).
                 vx: os.x * predkosc, vy: os.y * predkosc, vz: os.z * predkosc,
                 vpx: promX * vProm, vpy: promY * vProm, vpz: promZ * vProm,
-                zycie: ZYCIE_MIN + Math.random() * (ZYCIE_MAX - ZYCIE_MIN),
-                skala: ROZMIAR_OD + Math.random() * (ROZMIAR_DO - ROZMIAR_OD),
+                zycie: NASTAWY.ZYCIE_MIN + Math.random() * (NASTAWY.ZYCIE_MAX - NASTAWY.ZYCIE_MIN),
+                skala: NASTAWY.ROZMIAR_OD + Math.random() * (NASTAWY.ROZMIAR_DO - NASTAWY.ROZMIAR_OD),
                 wiek: 0,
                 rdzen: false,
                 barwa: b
@@ -409,7 +427,7 @@ export class Fala {
         }
 
         // --- ROZBŁYSK RDZENIA: moment uderzenia w punkcie zaczepu ---
-        const nr = Math.round(RDZEN_NA_WYSTRZAL * (0.4 + 0.6 * s));
+        const nr = Math.round(NASTAWY.RDZEN_NA_WYSTRZAL * (0.4 + 0.6 * s));
         for (let i = 0; i < nr; i++) {
             // Kierunek losowy na pełnej sferze - rozbłysk nie ma kształtu,
             // ma być błyskiem, nie falą.
@@ -417,14 +435,14 @@ export class Fala {
             const fi = Math.random() * Math.PI * 2;
             const r = Math.sqrt(1 - u * u);
             const dir = { x: r * Math.cos(fi), y: r * Math.sin(fi), z: u };
-            const predkosc = RDZEN_PREDKOSC * s * (0.4 + Math.random() * 0.9);
+            const predkosc = NASTAWY.RDZEN_PREDKOSC * s * (0.4 + Math.random() * 0.9);
             this._dodaj({
                 x: zaczep.x, y: zaczep.y, z: 0,
                 zx0: zaczep.x, zy0: zaczep.y,
                 vx: dir.x * predkosc, vy: dir.y * predkosc, vz: dir.z * predkosc,
                 vpx: 0, vpy: 0, vpz: 0,
-                zycie: RDZEN_ZYCIE * (0.7 + Math.random() * 0.6),
-                skala: RDZEN_ROZMIAR * (0.6 + Math.random() * 0.8),
+                zycie: NASTAWY.RDZEN_ZYCIE * (0.7 + Math.random() * 0.6),
+                skala: NASTAWY.RDZEN_ROZMIAR * (0.6 + Math.random() * 0.8),
                 wiek: 0,
                 rdzen: true
             });
@@ -432,7 +450,7 @@ export class Fala {
     }
 
     _dodaj(cz) {
-        if (this.czastki.length >= MAX_CZASTECZEK) return;
+        if (this.czastki.length >= NASTAWY.MAX_CZASTECZEK) { this.odrzucone++; return; }
         this.czastki.push(cz);
     }
 
@@ -446,9 +464,9 @@ export class Fala {
             c.wiek += krok;
             for (const m of c.smugi) m.kat += m.dryf * krok;
         }
-        this.czola = this.czola.filter(c => c.wiek < CZOLO_ZYCIE);
+        this.czola = this.czola.filter(c => c.wiek < NASTAWY.CZOLO_ZYCIE);
         for (const w of this.wiry) w.wiek += krok;
-        this.wiry = this.wiry.filter(w => w.wiek < WIR_ZYCIE);
+        this.wiry = this.wiry.filter(w => w.wiek < NASTAWY.WIR_ZYCIE);
 
         const zywe = [];
         for (const c of this.czastki) {
@@ -457,8 +475,8 @@ export class Fala {
 
             // DWA RÓŻNE TŁUMIENIA - to one dają kształt fali uderzeniowej:
             // czoło wytraca pęd do przodu, ale nie przestaje się rozchodzić.
-            const oporWzdluz = 1 - OPOR_WZDLUZ * krok;
-            const oporProm = 1 - OPOR_PROMIEN * krok;
+            const oporWzdluz = 1 - NASTAWY.OPOR_WZDLUZ * krok;
+            const oporProm = 1 - NASTAWY.OPOR_PROMIEN * krok;
             c.vx *= oporWzdluz; c.vy *= oporWzdluz; c.vz *= oporWzdluz;
             c.vpx *= oporProm; c.vpy *= oporProm; c.vpz *= oporProm;
 
@@ -493,9 +511,9 @@ export class Fala {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         for (const c of this.czola) {
-            const p = c.wiek / CZOLO_ZYCIE;
+            const p = c.wiek / NASTAWY.CZOLO_ZYCIE;
             const gasniecie = Math.pow(1 - p, 1.5);
-            const { srodek, punkty } = punktyCzola(c.zaczep, c.kierunek, c.sila, c.wiek, KRESKA_PUNKTOW, 1);
+            const { srodek, punkty } = punktyCzola(c.zaczep, c.kierunek, c.sila, c.wiek, NASTAWY.KRESKA_PUNKTOW, 1);
             if (punkty.length < 3) continue;
             const [r, g, b] = c.barwa;
 
@@ -514,7 +532,7 @@ export class Fala {
                 if (odl < 1e-3) continue;
                 // Rozmiar w px EKRANU: odległość rzutowana / nominalna = skala
                 // perspektywy w tym punkcie (bliższy brzeg czoła = większa smuga).
-                const rozmiar = promienNominalny * SMUGA_ROZMIAR * m.skala
+                const rozmiar = promienNominalny * NASTAWY.SMUGA_ROZMIAR * m.skala
                               * (odl / Math.max(1, promienNominalny * m.promien));
                 if (rozmiar < 4) continue;
                 // Sprite: półksiężyc wypukły w +y obrazu -> +y ma wskazywać NA ZEWNĄTRZ.
@@ -523,7 +541,7 @@ export class Fala {
                 // środka" zostaje prawdą po obu stronach. Półksiężyc nie ma
                 // strony "właściwej" jak glif w runa.js - nie odkręcamy lustra.
                 const kat = Math.atan2(naZewn.y, naZewn.x) - Math.PI / 2;
-                const spr = wypalTintowany(m.obraz, c.barwa, SMUGA_SPRITE_PX);
+                const spr = wypalTintowany(m.obraz, c.barwa, NASTAWY.SMUGA_SPRITE_PX);
                 // save/restore per sprite (idiom z runa.js), nie rotate(-kat):
                 // odwracanie transformacji dryfuje numerycznie po 8 smugach x N klatek.
                 ctx.save();
@@ -540,11 +558,11 @@ export class Fala {
             for (let i = 1; i < punkty.length; i++) ctx.lineTo(punkty[i].x, punkty[i].y);
             ctx.closePath();
             ctx.strokeStyle = `rgb(${r},${g},${b})`;
-            ctx.lineWidth = KRESKA_SZEROKA_PX * (1 - 0.5 * p);
+            ctx.lineWidth = NASTAWY.KRESKA_SZEROKA_PX * (1 - 0.5 * p);
             ctx.globalAlpha = 0.28 * gasniecie * c.sila;
             ctx.stroke();
             ctx.strokeStyle = `rgb(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)})`;
-            ctx.lineWidth = KRESKA_CIENKA_PX;
+            ctx.lineWidth = NASTAWY.KRESKA_CIENKA_PX;
             ctx.globalAlpha = 0.95 * gasniecie * c.sila;
             ctx.stroke();
         }
@@ -560,11 +578,11 @@ export class Fala {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         for (const w of this.wiry) {
-            const p = w.wiek / WIR_ZYCIE;
+            const p = w.wiek / NASTAWY.WIR_ZYCIE;
             const wyjscie = 1 - Math.pow(1 - p, 3);   // ease-out: szybki start, dobieg
-            const rozmiar = (WIR_ROZMIAR_OD + (WIR_ROZMIAR_DO - WIR_ROZMIAR_OD) * wyjscie) * (0.5 + 0.5 * w.sila);
-            const kat = w.kat0 + w.zwrot * WIR_OBROTY * Math.PI * 2 * wyjscie;
-            const spr = wypalTintowany(img, w.barwa, WIR_SPRITE_PX);
+            const rozmiar = (NASTAWY.WIR_ROZMIAR_OD + (NASTAWY.WIR_ROZMIAR_DO - NASTAWY.WIR_ROZMIAR_OD) * wyjscie) * (0.5 + 0.5 * w.sila);
+            const kat = w.kat0 + w.zwrot * NASTAWY.WIR_OBROTY * Math.PI * 2 * wyjscie;
+            const spr = wypalTintowany(img, w.barwa, NASTAWY.WIR_SPRITE_PX);
             // Wir jest CHIRALNY - lustro (CSS scaleX(-1)) odwraca zwrot
             // spirali. Zwrot obrotu i tak losujemy (`zwrot`), więc żaden
             // z dwóch nie jest "zły" - decyzja świadoma, lustra nie odkręcamy.
@@ -581,7 +599,7 @@ export class Fala {
 
     _rysujCzastki(ctx) {
         if (!this.czastki.length) return;
-        if (!this._spriteRdzen) this._spriteRdzen = sprite(BARWA_RDZEN, 1.0);
+        if (!this._spriteRdzen) this._spriteRdzen = sprite(NASTAWY.BARWA_RDZEN, 1.0);
 
         // DALSZE POD BLIŻSZYMI: sortujemy W MIEJSCU malejąco po z (kolejność
         // w this.czastki nie ma znaczenia dla niczego innego, więc kopiowanie
@@ -600,7 +618,7 @@ export class Fala {
             // Cząstki czoła PUCHNĄ z wiekiem (fala się rozrzedza); rdzeń nie -
             // ma być ostrym błyskiem, nie rozmywającą się chmurą.
             const rosniecie = c.rdzen ? 1 : (0.6 + 0.8 * p);
-            const r = SPRITE_PX * c.skala * s * rosniecie;
+            const r = NASTAWY.SPRITE_PX * c.skala * s * rosniecie;
             const poz = rzutujPozycje({ x: c.zx0, y: c.zy0 }, { x: c.x, y: c.y }, s);
 
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * s * (c.rdzen ? 1 : 0.7)));
@@ -621,14 +639,14 @@ export class Fala {
 /** Sprite wypalony RAZ na barwę - patrz ogien.js:215-236 dla tego samego wzorca. */
 function sprite([r, g, b], moc) {
     const c = document.createElement('canvas');
-    c.width = c.height = SPRITE_PX;
+    c.width = c.height = NASTAWY.SPRITE_PX;
     const x = c.getContext('2d');
-    const grd = x.createRadialGradient(SPRITE_PX / 2, SPRITE_PX / 2, 0,
-                                       SPRITE_PX / 2, SPRITE_PX / 2, SPRITE_PX / 2);
+    const grd = x.createRadialGradient(NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2, 0,
+                                       NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2);
     grd.addColorStop(0.0, `rgba(${r},${g},${b},${moc})`);
     grd.addColorStop(0.35, `rgba(${r},${g},${b},${moc * 0.45})`);
     grd.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
     x.fillStyle = grd;
-    x.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
+    x.fillRect(0, 0, NASTAWY.SPRITE_PX, NASTAWY.SPRITE_PX);
     return c;
 }
