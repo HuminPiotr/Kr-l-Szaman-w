@@ -272,4 +272,25 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     spr('wyczyscCache() istnieje i nie rzuca (deleguje do assety.js)', (k9.wyczyscCache(), true));
 }
 
+// --- DOKŁADNOŚĆ TŁUMIENIA (P2b) - jedna drobina vs forma zamknięta ---
+console.log('\nDOKŁADNOŚĆ TŁUMIENIA (krokTlumienia w drobinach, patrz js/czastki.js):');
+{
+    const k9 = new Kolowrot();
+    const V_STYCZNA = 100, V_PROM = 60;
+    // wznoszenie=0 izoluje czysty opór dwuskładnikowy - wiek=0 (nie ujemny),
+    // żeby fizyka liczyła się od pierwszego kroku (pominięcie opóźnionego startu).
+    k9._drobiny.push({ x: 0, y: 0, vtx: V_STYCZNA, vty: 0, vrx: 0, vry: V_PROM,
+                        wznoszenie: 0, zycie: 10, wiek: 0, skala: 1, wariant: 0 });
+    const N = 30;
+    const T = N * DT;
+    for (let i = 0; i < N; i++) k9._ruszaj(DT);
+    const stycznaOczekiwana = V_STYCZNA * (1 - Math.exp(-NASTAWY.DROBINY_OPOR_STYCZNY * T)) / NASTAWY.DROBINY_OPOR_STYCZNY;
+    const promOczekiwany = V_PROM * (1 - Math.exp(-NASTAWY.DROBINY_OPOR_PROMIENIOWY * T)) / NASTAWY.DROBINY_OPOR_PROMIENIOWY;
+    const c = k9._drobiny[0];
+    spr(`styczna (x) zgadza się z formą zamkniętą co do 1e-6 (${c.x.toFixed(6)} vs ${stycznaOczekiwana.toFixed(6)})`,
+        Math.abs(c.x - stycznaOczekiwana) < 1e-6);
+    spr(`promieniowa (y) zgadza się z formą zamkniętą co do 1e-6 (${c.y.toFixed(6)} vs ${promOczekiwany.toFixed(6)})`,
+        Math.abs(c.y - promOczekiwany) < 1e-6);
+}
+
 process.exit(ok ? 0 : 1);

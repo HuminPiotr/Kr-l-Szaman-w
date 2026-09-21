@@ -80,6 +80,7 @@
  * pojawi się we właściwym miejscu, nie skacze.
  */
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
+import { krokTlumienia, obwiedniaCzastki } from './czastki.js';
 
 // x2 (2026-09-09, na żądanie po teście na żywo). Obwiednia() liczy we
 // FRAKCJACH p=t/CZAS_TRWANIA_PIERSCIEN, więc kształt narostu/gaśnięcia
@@ -341,13 +342,16 @@ export class Kolowrot {
             c.wiek += krok;
             if (c.wiek >= c.zycie) continue;
             if (c.wiek >= 0) {
-                const oporT = 1 - NASTAWY.DROBINY_OPOR_STYCZNY * krok;
-                const oporR = 1 - NASTAWY.DROBINY_OPOR_PROMIENIOWY * krok;
-                c.vtx *= oporT; c.vty *= oporT;
-                c.vrx *= oporR; c.vry *= oporR;
+                // Siła wymuszona (wznoszenie) najpierw, potem dokładna
+                // całka pozycji + zanik prędkości (krokTlumienia, patrz
+                // js/czastki.js) - mirror iskry.js.
                 c.vry -= c.wznoszenie * krok;
-                c.x += (c.vtx + c.vrx) * krok;
-                c.y += (c.vty + c.vry) * krok;
+                const t = krokTlumienia(NASTAWY.DROBINY_OPOR_STYCZNY, krok);
+                const r = krokTlumienia(NASTAWY.DROBINY_OPOR_PROMIENIOWY, krok);
+                c.x += c.vtx * t.s + c.vrx * r.s;
+                c.y += c.vty * t.s + c.vry * r.s;
+                c.vtx *= t.e; c.vty *= t.e;
+                c.vrx *= r.e; c.vry *= r.e;
             }
             if (Number.isFinite(c.x) && Number.isFinite(c.y)) drobinyZywe.push(c);
         }
@@ -431,7 +435,7 @@ export class Kolowrot {
             const img = obraz(MANIFEST.drobina[c.wariant]);
             if (!img) continue;
             const lp = c.wiek / c.zycie;
-            const alfa = Math.sin(Math.min(1, lp * 6) * Math.PI * 0.5) * (1 - lp) * (1 - lp);
+            const alfa = obwiedniaCzastki(lp);
             const sprite = wypalTintowany(img, BARWA_DROBINY, 64);
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * this._sila));
             ctx.drawImage(sprite, zx + c.x - c.skala / 2, zy + c.y - c.skala / 2, c.skala, c.skala);
