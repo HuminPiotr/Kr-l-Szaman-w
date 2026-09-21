@@ -6,7 +6,7 @@
  *
  *   node tools/test-runa.mjs
  */
-import { Runy, fazaRuny, CZAS_NARODZINY_S, CZAS_ZAR_DO_S, CZAS_CALKOWITY_S, NASTAWY } from '../js/runa.js';
+import { Runy, fazaRuny, CZAS_NARODZINY_S, CZAS_ZAR_DO_S, CZAS_CALKOWITY_S, NASTAWY, hslNaRgb } from '../js/runa.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -97,6 +97,21 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
 
     const r9 = new Runy();
     spr('wyczyscCache() istnieje i nie rzuca', (r9.wyczyscCache(), true));
+}
+
+// --- hslNaRgb (P2d) - wejście do wypalonego sprite'a iskier ---
+console.log('\nHSL -> RGB (sprite iskier, patrz _rysujIskry):');
+{
+    spr('czerwony (0, 100%, 50%) -> [255,0,0]', JSON.stringify(hslNaRgb('0, 100%, 50%')) === '[255,0,0]');
+    spr('zielony (120, 100%, 50%) -> [0,255,0]', JSON.stringify(hslNaRgb('120, 100%, 50%')) === '[0,255,0]');
+    spr('niebieski (240, 100%, 50%) -> [0,0,255]', JSON.stringify(hslNaRgb('240, 100%, 50%')) === '[0,0,255]');
+    spr('biały (0, 0%, 100%) -> [255,255,255]', JSON.stringify(hslNaRgb('0, 0%, 100%')) === '[255,255,255]');
+    spr('czarny (0, 0%, 0%) -> [0,0,0]', JSON.stringify(hslNaRgb('0, 0%, 0%')) === '[0,0,0]');
+    spr('szary (0, 0%, 50%) -> [128,128,128]', JSON.stringify(hslNaRgb('0, 0%, 50%')) === '[128,128,128]');
+    // Rzeczywiste barwy z efekty.js TABELA (swarog=25°, weles=280°) nie rzucają.
+    spr('barwa swaroga (25, 100%, 60%) daje trzy skończone składowe',
+        hslNaRgb('25, 100%, 60%').every(Number.isFinite));
+    spr('nieprawidłowy string -> skończone RGB, bez wyjątku', hslNaRgb('nonsens').every(Number.isFinite));
 }
 
 process.exit(ok ? 0 : 1);

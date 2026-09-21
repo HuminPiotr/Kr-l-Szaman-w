@@ -41,6 +41,7 @@
  * każdym odpaleniu tej samej pieczęci.
  */
 import { glif, fontGotowy } from './glify.js';
+import { spriteRadialny } from './czastki.js';
 
 export const CZAS_NARODZINY_S = 0.25;
 export const CZAS_ZAR_DO_S = 0.9;
@@ -65,9 +66,38 @@ export const NASTAWY = {
     ISKRY_UNOS: 30,             // px/s^2 w górę, jak żar w ogien.js/iskry.js
     ISKRY_PROMIEN: 2.5,
     ISKRY_POSWIATA_MNOZNIK: 2.2,   // promień gradientu poświaty = ISKRY_PROMIEN * to
+    ISKRY_SPRITE_PX: 24,        // rozmiar wypalonego sprite'a (P2d) - iskry są małe, zapas nad typowym promieniem ~11px
 };
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+
+/**
+ * "H, S%, L%" (format efekty.js TABELA, taki sam jak r.barwa) -> [r,g,b]
+ * 0..255. Potrzebne WYŁĄCZNIE do wypalenia sprite'a iskier (P2d,
+ * 2026-09-21) - spriteRadialny() z czastki.js bierze surowe RGB, jak
+ * sprite() w iskry.js/ogien.js/fala.js. Reszta modułu (glif, pierścień,
+ * poświata) dalej rysuje wprost przez hsla() - nie ma tam per-klatka
+ * gradientu do wypalenia, więc nie ma powodu, żeby i one przechodziły
+ * przez RGB.
+ */
+export function hslNaRgb(hslString) {
+    const czesci = String(hslString).split(',').map(s => parseFloat(s));
+    const h = Number.isFinite(czesci[0]) ? czesci[0] : 0;
+    const s = (Number.isFinite(czesci[1]) ? czesci[1] : 0) / 100;
+    const l = (Number.isFinite(czesci[2]) ? czesci[2] : 50) / 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const hp = ((h % 360) + 360) % 360 / 60;
+    const x = c * (1 - Math.abs(hp % 2 - 1));
+    let r1, g1, b1;
+    if (hp < 1) [r1, g1, b1] = [c, x, 0];
+    else if (hp < 2) [r1, g1, b1] = [x, c, 0];
+    else if (hp < 3) [r1, g1, b1] = [0, c, x];
+    else if (hp < 4) [r1, g1, b1] = [0, x, c];
+    else if (hp < 5) [r1, g1, b1] = [x, 0, c];
+    else [r1, g1, b1] = [c, 0, x];
+    const m = l - c / 2;
+    return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
+}
 
 /**
  * Obwiednia jednej runy - CZYSTA FUNKCJA, testowalna bez document.
@@ -128,14 +158,19 @@ export class Runy {
     constructor() {
         this.aktywne = [];        // [{ id, znak, x, y, t, barwa, iskryOdpalone, iskry }]
         this._punktyGlifu = new Map();   // znak -> [{x,y}] znormalizowane -0.5..0.5
+        this._spriteIskier = new Map();  // "H, S%, L%" -> canvas, wypalony RAZ (P2d)
     }
 
     get liczba() {
         return this.aktywne.reduce((n, r) => n + (r.iskry?.length ?? 0), 0);
     }
 
-    /** Wywołać po zmianie NASTAWY.RASTER_PX - stare rastry glifów mają stary rozmiar/próbkowanie. */
-    wyczyscCache() { this._punktyGlifu.clear(); }
+    /**
+     * Wywołać po zmianie NASTAWY.RASTER_PX (stare rastry glifów mają stary
+     * rozmiar/próbkowanie) albo NASTAWY.ISKRY_PROMIEN/ISKRY_POSWIATA_MNOZNIK
+     * (stary sprite iskier ma stary rozmiar/gradient).
+     */
+    wyczyscCache() { this._punktyGlifu.clear(); this._spriteIskier.clear(); }
 
     /**
      * @param {string} id       id pieczęci (swarog/weles/perun/stribog/mokosz)
@@ -224,7 +259,7 @@ export class Runy {
             ctx.restore();
         }
 
-        this._rysujIskry(ctx, r, kolor);
+        this._rysujIskry(ctx, r);
     }
 
     /** Iskry rozsypania - odrywają się z pikseli glifu, unoszą i gasną. */
@@ -269,20 +304,30 @@ export class Runy {
         r.iskry = zywe;
     }
 
-    _rysujIskry(ctx, r, kolor) {
+    /**
+     * Sprite WYPALONY RAZ per barwa (P2d, 2026-09-21) - poprzednia wersja
+     * budowała createRadialGradient PER CZĄSTKA PER KLATKĘ, jedyne takie
+     * miejsce w całej grze (reszta modułów VFX piecze gradient raz przy
+     * starcie - patrz iskry.js/ogien.js/fala.js "sprite wypalony raz").
+     * Cache kluczowany r.barwa (Map, per instancję Runy - różne pieczęcie
+     * mają różne barwy, każda dostaje własny wpis).
+     */
+    _rysujIskry(ctx, r) {
         if (!r.iskry.length) return;
+        let sprite = this._spriteIskier.get(r.barwa);
+        if (!sprite) {
+            const [red, green, blue] = hslNaRgb(r.barwa);
+            sprite = spriteRadialny(red, green, blue, NASTAWY.ISKRY_SPRITE_PX);
+            this._spriteIskier.set(r.barwa, sprite);
+        }
         for (const c of r.iskry) {
             const p = c.wiek / c.zycie;
             const alfa = (1 - p) * (1 - p);
-            const rad = NASTAWY.ISKRY_PROMIEN * (1 - p * 0.5);
-            const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad * NASTAWY.ISKRY_POSWIATA_MNOZNIK);
-            g.addColorStop(0, kolor(alfa));
-            g.addColorStop(1, kolor(0));
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(c.x, c.y, rad * NASTAWY.ISKRY_POSWIATA_MNOZNIK, 0, Math.PI * 2);
-            ctx.fill();
+            const rad = NASTAWY.ISKRY_PROMIEN * (1 - p * 0.5) * NASTAWY.ISKRY_POSWIATA_MNOZNIK;
+            ctx.globalAlpha = Math.max(0, Math.min(1, alfa));
+            ctx.drawImage(sprite, c.x - rad, c.y - rad, rad * 2, rad * 2);
         }
+        ctx.globalAlpha = 1;
     }
 
     /** Wypala glif na płótno pomocnicze RAZ, próbkuje piksele > próg alfy. */
