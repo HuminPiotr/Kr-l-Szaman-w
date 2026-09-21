@@ -35,7 +35,7 @@ const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki,
         CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK,
         WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
         OPOZNIENIE_FRONTU_S, CZAS_WYBUCHU_S,
-        SUFIT_Y_H, SPADEK_OD_Y_H } = await import('../js/dym.js');
+        SUFIT_Y_H, SPADEK_OD_Y_H, NASTAWY } = await import('../js/dym.js');
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
@@ -388,6 +388,33 @@ console.log('\nODPORNOŚĆ:');
             && wszystkie(x).every(c => Number.isFinite(c.vxGry) && Number.isFinite(c.vyGry) && c.vyGry <= 0);
     })());
     spr('brak W/H używa domyślnej skali', Number.isFinite(d.updateAndDraw(null, undefined, undefined, DT)));
+}
+
+// --- NASTAWY - eksportowane i mutowalne (dla suwaków tools/scena.html) ---
+console.log('\nNASTAWY (mutowalność dla stanowiska):');
+{
+    // Nie zakładamy KIERUNKU efektu (geometria smoke.js ma własny układ
+    // współrzędnych płótna biblioteki, przeliczany przez DZIELNIK_PLOTNA) -
+    // sprawdzamy tylko, że suwak w ogóle COŚ zmienia w fizyce, tym samym
+    // wzorcem co "dłoń DALEKO rusza dym 8x słabiej niż BLISKO" wyżej.
+    const domyslnyOpor = NASTAWY.OPOR;
+    NASTAWY.OPOR = 8;   // wyraźnie większy niż domyślne ~2
+    const d9 = new Dym();
+    for (let i = 0; i < 30; i++) { d9.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d9.updateAndDraw(null, W, H, DT); }
+    const dxDuzyOpor = d9._czastki.length
+        ? d9._czastki.reduce((s, c) => s + (c.x - USTA.x), 0) / d9._czastki.length
+        : 0;
+    NASTAWY.OPOR = domyslnyOpor;
+
+    const d10 = new Dym();
+    for (let i = 0; i < 30; i++) { d10.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d10.updateAndDraw(null, W, H, DT); }
+    const dxDomyslny = d10._czastki.length
+        ? d10._czastki.reduce((s, c) => s + (c.x - USTA.x), 0) / d10._czastki.length
+        : 0;
+    spr(`zmiana NASTAWY.OPOR widoczna w fizyce (śr. przesunięcie x: ${dxDuzyOpor.toFixed(0)} vs ${dxDomyslny.toFixed(0)})`,
+        Math.abs(dxDuzyOpor - dxDomyslny) > 10);
+
+    spr('wyczyscCache() istnieje i nie rzuca (resetuje leniwą maszynę)', (d10.wyczyscCache(), true));
 }
 
 process.exit(ok ? 0 : 1);

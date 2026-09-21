@@ -57,106 +57,104 @@ export const CZASTEK_NA_S = 70;
 // wąski - to ma być wydech w konkretną stronę, nie wachlarz.
 export const WYLOT_W_S = 0.6;
 export const WYRAZISTOSC_PODLOGA = 0.35;   // poza nijaka nadal coś wypuszcza
-const STOZEK_RAD = 0.05;                   // ±3° - wylot ma być STRUGĄ, nie wachlarzem
-// Rozrzut prędkości WZDŁUŻ kierunku: bez niego wszystkie cząstki hamują w tym
-// samym miejscu i na końcu strugi robi się zbita kulka (widziane na renderze).
-const ROZRZUT_PREDKOSCI_MIN = 0.55, ROZRZUT_PREDKOSCI_MAX = 1.35;
-const ROZRZUT_UST_W = 0.004;
+
+// --- KOLUMNA -> KŁĘBIENIE (v7.1) ---
+export const KOLUMNA_S = 1.0;            // tyle cząstka trzyma się wąskiej kolumny
+export const SKALA_KOLUMNY = 3;          // ~60 px promienia na płótnie gry
+export const TAU_ROZROSTU_S = 5;         // 90% docelowego rozmiaru po ~11 s
 
 // --- Życie i rozmiar ---
 // 20-40 s: kompromis (życzenie) między naturalnym rozwiewaniem smoke.js (2-8 s)
 // a dawnym okadzaniem ekranu na minuty - gracz ma zdążyć złożyć combo ognia.
 export const ZYCIE_MIN_S = 20, ZYCIE_MAX_S = 40;
-// Skala liczona względem sprite'a 20 px: 9-15 x sqrt(0.5) daje na plateau kłąb
-// ~130-210 px promienia na płótnie gry. WIĘCEJ MNIEJSZYCH kłębów czyta się jak
-// dym; kilka wielkich - jak mleko.
-const SKALA_MIN = 9, SKALA_MAX = 15;
-const SKALA_STARTOWA = 0.5;
 
-// --- KOLUMNA -> KŁĘBIENIE (v7.1) ---
-// Życzenie: "żeby dym wydobywał się z początku bardziej kolumnowo, jak mocno
-// wydychany dym, a potem kłębił się na boki i naturalnie rozszerzał praktycznie
-// na cały ekran". Rozmiar MUSI być odsprzęgnięty od alfy: smoke.js liczy jedno
-// i drugie z age/lifetime, a alfa ma dochodzić do szczytu szybko (v7), więc
-// sprite był wielki już przy ustach. `scale` nadpisujemy w callbacku -
-// biblioteka rysuje PO nim, więc nasza wartość wygrywa.
-export const KOLUMNA_S = 1.0;            // tyle cząstka trzyma się wąskiej kolumny
-export const SKALA_KOLUMNY = 3;          // ~60 px promienia na płótnie gry
-export const TAU_ROZROSTU_S = 5;         // 90% docelowego rozmiaru po ~11 s
-const TAU_ROZEJSCIA_S = 4;               // z tą stałą narasta rozpychanie na boki
-const ROZPYCHANIE_W_S2 = 0.09;           // ułamek W/s² w poprzek kierunku wylotu
-const ROZLEW_POD_SUFITEM_W_S = 0.035;    // dryf w bok rosnący blisko górnej krawędzi
-
-// --- Obwiednia: STEROWANIE CZASEM BIBLIOTEKI ---
-// smoke.js liczy i alfę, i skalę z `age/lifetime`: alfa to trójkąt ze szczytem
-// w połowie życia, skala rośnie jak sqrt. Przy życiu 20-40 s dawałoby to dym
-// prawie niewidoczny przez pierwsze kilkanaście sekund (alfa 0.008 po sekundzie
-// - zmierzone). Zamiast przerabiać bibliotekę, STERUJEMY JEJ CZASEM: `lifetime`
-// zostaje krótki i stały, a `age` wyliczamy z prawdziwego wieku cząstki tak,
-// żeby szybko dojść do szczytu (NAROST_S), trzymać się go przez większość życia
-// i zejść na końcu (ZANIK_S). Biblioteka usuwa cząstkę dokładnie wtedy, gdy
-// kończy się nasze życie - bo wtedy age dobija do lifetime.
-const ZYCIE_BIBLIOTEKI_MS = 6000;
 export const NAROST_S = 0.8;
 export const ZANIK_S = 3;
 
 // --- Sufit cząstek (biblioteka nie ogranicza niczego) ---
 export const MAX_CZASTEK = 1100;
 
-// --- Fizyka dokładana w setPreDrawCallback ---
-const OPOR = 2.0;                        // 1/s - z WYLOT_W_S daje kolumnę długą na ~1/4 ekranu
-                                         // (zasięg ≈ WYLOT_W_S / OPOR = 0.30 W)
-const WZNOSZENIE_W_S = 0.022;             // ułamek SZEROKOŚCI płótna na sekundę
 export const SUFIT_Y_H = 0.12;           // górna granica - tu wznoszenie prawie zanika
 export const SPADEK_OD_Y_H = 0.55;       // poniżej tego Y (w dół ekranu) pełne wznoszenie
-const SUFIT_MIN_CZYNNIK = 0.12;          // NIGDY do zera - lekkie mrowienie zostaje
-const TAU_WYPORU_S = 2.5;                // wyporność wchodzi z opóźnieniem: da się dmuchnąć W DÓŁ
-const POLE_AMPLITUDA_W_S2 = 0.012;       // pole przepływu - spójne wiry, nie per-cząstka szum
-const POLE_DLUGOSC_FALI_W = 0.35;
-const POLE_OMEGA_1 = 0.35, POLE_OMEGA_2 = 0.27;
 
 // --- Reakcja na ręce i taniec (życzenie: "dym reaguje na ręce") ---
 export const ROZGARNIJ_PROMIEN_W = 0.12;
-// STROJONE na renderach: przy 0.65/0.55 machnięcie ręką wywiewało CAŁY obłok
-// poza ekran (dłoń jedzie 1500-2000 px/s, a opór to tylko 0.9/s). Dym ma się
-// rozstąpić i zawirować, nie odlecieć.
-const ROZGARNIJ_SILA = 0.15;             // ile prędkości dłoni przechodzi na cząstkę
-const WIR_SILA = 0.22;                   // składowa STYCZNA - za ręką zostaje wir
-const ROZGARNIJ_MAX_V = 4000;            // px/s - zasłonięta dłoń potrafi "skoczyć"
-
-// --- Podmuch Aarda (js/fala.js pchniecieCzola -> main.js -> pchnij()) ---
-// OSOBNE stałe, nie ROZGARNIJ_*: dla ręki "wywiewanie całego obłoku" było
-// wadą (komentarz wyżej), dla fali uderzeniowej jest CELEM. Kłąb dostaje
-// pęd czoła i starzeje się szybciej - przez wiekBiblioteki() blednie i
-// rośnie tak, jak naturalnie u kresu życia, czyli ROZWIEWA SIĘ, a nie
-// znika. Decyzja użytkownika (2026-09-15): odrzut + rozrzedzenie.
-const PODMUCH_SILA = 0.6;                // ile prędkości czoła przechodzi na cząstkę
-const PODMUCH_ROZRZEDZENIE_S = 6;        // s życia tracone na 1 s pełnego trafienia
-const PODMUCH_MAX_V = 6000;              // px/s - czoło w kamerę rośnie na ekranie bardzo szybko
 
 // --- Zapłon, front, detonacja (bez zmian od v5/v6 - tę część właściciel lubi) ---
-const ZAPLON_KONTAKT_MNOZNIK = 0.55;     // promień kontaktu = promień kłębu * to (kłąb bywa 300 px)
-const FRONT_PROMIEN_MNOZNIK = 0.45;      // zarażanie sąsiadek
 export const OPOZNIENIE_FRONTU_S = 0.25;
 export const CZAS_DO_WYBUCHU_S = 0.35;
 export const CZAS_WYBUCHU_S = 0.4;
 export const SPRITE_CO_ILE = 4;
 export const MAX_SPRITE_WYBUCHU = 110;   // sufit kul ognia na klatkę - inaczej detonacja wybiela ekran
-const R_WYBUCHU_MIN_W = 0.035, R_WYBUCHU_MAX_W = 0.07;
 
-// --- Rysowanie ---
-const DZIELNIK_PLOTNA = 2;               // płótno biblioteki w połowie rozdzielczości
-const KLAB_SPRITE_PX = 128;
-const BARWA_DYMU = [205, 205, 214];      // jasna, chłodna szarość
-const BARWA_ZAPLONU_STOPNIE = [
-    [130, 100, 75],
-    [225, 155, 75],
-    [255, 150, 50],
-    [255, 95, 25],
-    [205, 35, 10]
-];
-const BARWA_RDZENIA = [255, 238, 200];
-const BARWA_ROZBLYSKU = [255, 225, 170];
+/**
+ * Nastawy strojeniowe PRYWATNE - eksportowane i MUTOWALNE dla
+ * tools/scena.html. Stałe powyżej zostają zwykłym `export const`: to jest
+ * kontrakt testowy (tools/test-dym.mjs je destrukturyzuje po nazwie) i/albo
+ * geometria współdzielona z main.js (main.js:640-697 czyta SUFIT_Y_H,
+ * ROZGARNIJ_PROMIEN_W itd. wprost). Po zmianie DZIELNIK_PLOTNA/BARWA_DYMU
+ * (wypalone w _maszyna przy budowie) wywołaj wyczyscCache() - zresetuje
+ * leniwie budowaną maszynę smoke.js.
+ */
+export const NASTAWY = {
+    STOZEK_RAD: 0.05,                   // ±3° - wylot ma być STRUGĄ, nie wachlarzem
+    // Rozrzut prędkości WZDŁUŻ kierunku: bez niego wszystkie cząstki hamują w tym
+    // samym miejscu i na końcu strugi robi się zbita kulka (widziane na renderze).
+    ROZRZUT_PREDKOSCI_MIN: 0.55, ROZRZUT_PREDKOSCI_MAX: 1.35,
+    ROZRZUT_UST_W: 0.004,
+
+    // Skala liczona względem sprite'a 20 px: 9-15 x sqrt(0.5) daje na plateau kłąb
+    // ~130-210 px promienia na płótnie gry. WIĘCEJ MNIEJSZYCH kłębów czyta się jak
+    // dym; kilka wielkich - jak mleko.
+    SKALA_MIN: 9, SKALA_MAX: 15,
+    SKALA_STARTOWA: 0.5,
+
+    TAU_ROZEJSCIA_S: 4,               // z tą stałą narasta rozpychanie na boki
+    ROZPYCHANIE_W_S2: 0.09,           // ułamek W/s² w poprzek kierunku wylotu
+    ROZLEW_POD_SUFITEM_W_S: 0.035,    // dryf w bok rosnący blisko górnej krawędzi
+
+    // --- Obwiednia: STEROWANIE CZASEM BIBLIOTEKI (patrz nagłówek wyżej) ---
+    ZYCIE_BIBLIOTEKI_MS: 6000,
+
+    // --- Fizyka dokładana w setPreDrawCallback ---
+    OPOR: 2.0,                        // 1/s - z WYLOT_W_S daje kolumnę długą na ~1/4 ekranu (zasięg ≈ WYLOT_W_S / OPOR = 0.30 W)
+    WZNOSZENIE_W_S: 0.022,             // ułamek SZEROKOŚCI płótna na sekundę
+    SUFIT_MIN_CZYNNIK: 0.12,          // NIGDY do zera - lekkie mrowienie zostaje
+    TAU_WYPORU_S: 2.5,                // wyporność wchodzi z opóźnieniem: da się dmuchnąć W DÓŁ
+    POLE_AMPLITUDA_W_S2: 0.012,       // pole przepływu - spójne wiry, nie per-cząstka szum
+    POLE_DLUGOSC_FALI_W: 0.35,
+    POLE_OMEGA_1: 0.35, POLE_OMEGA_2: 0.27,
+
+    // STROJONE na renderach: przy 0.65/0.55 machnięcie ręką wywiewało CAŁY obłok
+    // poza ekran (dłoń jedzie 1500-2000 px/s, a opór to tylko 0.9/s). Dym ma się
+    // rozstąpić i zawirować, nie odlecieć.
+    ROZGARNIJ_SILA: 0.15,             // ile prędkości dłoni przechodzi na cząstkę
+    WIR_SILA: 0.22,                   // składowa STYCZNA - za ręką zostaje wir
+    ROZGARNIJ_MAX_V: 4000,            // px/s - zasłonięta dłoń potrafi "skoczyć"
+
+    // --- Podmuch Aarda - OSOBNE stałe, nie ROZGARNIJ_* (patrz nagłówek wyżej) ---
+    PODMUCH_SILA: 0.6,                // ile prędkości czoła przechodzi na cząstkę
+    PODMUCH_ROZRZEDZENIE_S: 6,        // s życia tracone na 1 s pełnego trafienia
+    PODMUCH_MAX_V: 6000,              // px/s - czoło w kamerę rośnie na ekranie bardzo szybko
+
+    ZAPLON_KONTAKT_MNOZNIK: 0.55,     // promień kontaktu = promień kłębu * to (kłąb bywa 300 px)
+    FRONT_PROMIEN_MNOZNIK: 0.45,      // zarażanie sąsiadek
+    R_WYBUCHU_MIN_W: 0.035, R_WYBUCHU_MAX_W: 0.07,
+
+    // --- Rysowanie ---
+    DZIELNIK_PLOTNA: 2,               // płótno biblioteki w połowie rozdzielczości
+    KLAB_SPRITE_PX: 128,
+    BARWA_DYMU: [205, 205, 214],      // jasna, chłodna szarość - wypalona w _maszyna przy budowie, patrz wyczyscCache()
+    BARWA_ZAPLONU_STOPNIE: [
+        [130, 100, 75],
+        [225, 155, 75],
+        [255, 150, 50],
+        [255, 95, 25],
+        [205, 35, 10]
+    ],
+    BARWA_RDZENIA: [255, 238, 200],
+    BARWA_ROZBLYSKU: [255, 225, 170],
+};
 
 export class Dym {
     constructor() {
@@ -171,9 +169,19 @@ export class Dym {
         this._podmuchy = [];         // punkty czoła fali Aarda z prędkościami (pchnij)
         this._nowychWybuchow = 0;    // liczone w callbacku, zwracane z updateAndDraw
         this._wybuchajacych = 0;
+        this.odrzucone = 0;          // licznik cząstek wymuszenie usuniętych przez sufit MAX_CZASTEK (_pilnujSufitu) - panel kontroli tools/scena.html
     }
 
     get liczba() { return this._czastki.length; }
+
+    /**
+     * Wywołać po zmianie NASTAWY.DZIELNIK_PLOTNA/BARWA_DYMU - obie są
+     * wypalone w _maszyna przy pierwszej budowie (leniwa, `if (!this._maszyna)`
+     * w kodzie budującym), więc zwykła zmiana NASTAWY ich nie dotknie. Reset
+     * na null wymusza pełną odbudowę (płótno + smokemachine) przy następnym
+     * wywołaniu, które jej potrzebuje.
+     */
+    wyczyscCache() { this._maszyna = null; }
     get plonacych() {
         let n = 0;
         for (const c of this._czastki) if (c.stan === 'ZAPLON') n++;
@@ -203,7 +211,7 @@ export class Dym {
 
         const maszyna = this._maszynaDla(W, H);
         if (!maszyna) return;
-        const skala = 1 / DZIELNIK_PLOTNA;
+        const skala = 1 / NASTAWY.DZIELNIK_PLOTNA;
         const wRef = this._W;
 
         const ile = CZASTEK_NA_S * (0.5 + 0.5 * s) * krok + this._nadwyzka;
@@ -220,14 +228,14 @@ export class Dym {
         // wąski stożek w poprzek. Rozrzut wzdłuż jest kluczowy - przy jednej
         // prędkości wszystkie cząstki hamują w TYM SAMYM miejscu i zamiast
         // kłębiącej się chmury robi się kulka na końcu strugi.
-        const bokX = Math.abs(ky * Math.tan(STOZEK_RAD) * v);
-        const bokY = Math.abs(kx * Math.tan(STOZEK_RAD) * v);
+        const bokX = Math.abs(ky * Math.tan(NASTAWY.STOZEK_RAD) * v);
+        const bokY = Math.abs(kx * Math.tan(NASTAWY.STOZEK_RAD) * v);
         const zakres = (skladowa) => {
-            const a = skladowa * v * ROZRZUT_PREDKOSCI_MIN, b = skladowa * v * ROZRZUT_PREDKOSCI_MAX;
+            const a = skladowa * v * NASTAWY.ROZRZUT_PREDKOSCI_MIN, b = skladowa * v * NASTAWY.ROZRZUT_PREDKOSCI_MAX;
             return { min: Math.min(a, b), max: Math.max(a, b) };
         };
         const zX = zakres(kx), zY = zakres(ky);
-        const rozrzut = wRef * ROZRZUT_UST_W * skala;
+        const rozrzut = wRef * NASTAWY.ROZRZUT_UST_W * skala;
 
         // UWAGA: minScale/maxScale przekazane do biblioteki ustawiają NARAZ
         // skalę startową i docelową (patrz createParticle w vendor/smoke.js),
@@ -236,7 +244,7 @@ export class Dym {
         maszyna.addsmoke(zaczepPx.x * skala, zaczepPx.y * skala, n, {
             minVx: zX.min - bokX - 1e-6, maxVx: zX.max + bokX + 1e-6,
             minVy: zY.min - bokY - 1e-6, maxVy: zY.max + bokY + 1e-6,
-            minLifetime: ZYCIE_BIBLIOTEKI_MS, maxLifetime: ZYCIE_BIBLIOTEKI_MS
+            minLifetime: NASTAWY.ZYCIE_BIBLIOTEKI_MS, maxLifetime: NASTAWY.ZYCIE_BIBLIOTEKI_MS
         });
 
         for (let i = Math.max(0, this._czastki.length - n); i < this._czastki.length; i++) {
@@ -257,8 +265,8 @@ export class Dym {
         if (!c) return;
         c.x += (Math.random() - 0.5) * rozrzut;
         c.y += (Math.random() - 0.5) * rozrzut;
-        c.scale = SKALA_STARTOWA;
-        c.finalScale = SKALA_MIN + Math.random() * (SKALA_MAX - SKALA_MIN);
+        c.scale = NASTAWY.SKALA_STARTOWA;
+        c.finalScale = NASTAWY.SKALA_MIN + Math.random() * (NASTAWY.SKALA_MAX - NASTAWY.SKALA_MIN);
         c.vxGry = c.vx;
         c.vyGry = c.startvy;
         c.startvy = 0;               // biblioteka przestaje mieszać w vy
@@ -309,10 +317,10 @@ export class Dym {
      */
     podpal(zarzewiaPx) {
         if (!zarzewiaPx?.length || !this._czastki.length) return;
-        const skala = 1 / DZIELNIK_PLOTNA;
+        const skala = 1 / NASTAWY.DZIELNIK_PLOTNA;
         for (const c of this._czastki) {
             if (c.stan !== 'DYM') continue;
-            const promien = promienCzastki(c) * ZAPLON_KONTAKT_MNOZNIK;
+            const promien = promienCzastki(c) * NASTAWY.ZAPLON_KONTAKT_MNOZNIK;
             for (const z of zarzewiaPx) {
                 if (!Number.isFinite(z?.x) || !Number.isFinite(z?.y)) continue;
                 const kontakt = promien + (Number.isFinite(z.r) ? z.r : 0) * skala;
@@ -366,8 +374,8 @@ export class Dym {
 
         this._W = wRef;
         this._H = hRef;
-        const bw = Math.max(1, Math.round(wRef / DZIELNIK_PLOTNA));
-        const bh = Math.max(1, Math.round(hRef / DZIELNIK_PLOTNA));
+        const bw = Math.max(1, Math.round(wRef / NASTAWY.DZIELNIK_PLOTNA));
+        const bh = Math.max(1, Math.round(hRef / NASTAWY.DZIELNIK_PLOTNA));
         if (typeof document === 'undefined') return this._maszyna;   // brak DOM: nic nie zbudujemy
 
         if (!this._plotno) {
@@ -378,7 +386,7 @@ export class Dym {
         this._plotno.height = bh;
 
         if (!this._maszyna) {
-            this._maszyna = smokemachine(this._ctxPom, BARWA_DYMU);
+            this._maszyna = smokemachine(this._ctxPom, NASTAWY.BARWA_DYMU);
             this._maszyna.setPreDrawCallback((dtMs, czastki) => {
                 this._czastki = czastki;
                 this._fizyka(Math.max(0, Math.min(50, dtMs)) / 1000);
@@ -402,13 +410,13 @@ export class Dym {
         if (!czastki.length || dt <= 0) return;
         this._t += dt;
 
-        const wRef = this._W / DZIELNIK_PLOTNA;      // wymiary PŁÓTNA BIBLIOTEKI
-        const hRef = this._H / DZIELNIK_PLOTNA;
-        const k = 2 * Math.PI / (wRef * POLE_DLUGOSC_FALI_W);
-        const A = POLE_AMPLITUDA_W_S2 * wRef / 1e6;  // px/ms² (jednostki biblioteki)
-        const opor = Math.max(0, 1 - OPOR * dt);
+        const wRef = this._W / NASTAWY.DZIELNIK_PLOTNA;      // wymiary PŁÓTNA BIBLIOTEKI
+        const hRef = this._H / NASTAWY.DZIELNIK_PLOTNA;
+        const k = 2 * Math.PI / (wRef * NASTAWY.POLE_DLUGOSC_FALI_W);
+        const A = NASTAWY.POLE_AMPLITUDA_W_S2 * wRef / 1e6;  // px/ms² (jednostki biblioteki)
+        const opor = Math.max(0, 1 - NASTAWY.OPOR * dt);
         const promienDloni = wRef * ROZGARNIJ_PROMIEN_W;
-        const skalaDloni = 1 / DZIELNIK_PLOTNA;
+        const skalaDloni = 1 / NASTAWY.DZIELNIK_PLOTNA;
 
         let plonace = null;
         let wybuchajacych = 0;
@@ -435,7 +443,7 @@ export class Dym {
                 }
             }
 
-            // Sterowanie czasem biblioteki (patrz stała ZYCIE_BIBLIOTEKI_MS).
+            // Sterowanie czasem biblioteki (patrz stała NASTAWY.ZYCIE_BIBLIOTEKI_MS).
             c.wiekGry = (c.wiekGry ?? 0) + dt;
             c.age = wiekBiblioteki(c.wiekGry, c.zycieGry ?? ZYCIE_MIN_S, c.lifetime);
 
@@ -448,31 +456,31 @@ export class Dym {
             c.vxGry *= opor;
             c.vyGry *= opor;
 
-            // Wyporność z opóźnieniem (TAU_WYPORU_S): dym wypuszczony w DÓŁ
+            // Wyporność z opóźnieniem (NASTAWY.TAU_WYPORU_S): dym wypuszczony w DÓŁ
             // naprawdę leci w dół, zanim zacznie się unosić.
             const wiekS = c.wiekGry;
-            const wypor = 1 - Math.exp(-wiekS / TAU_WYPORU_S);
+            const wypor = 1 - Math.exp(-wiekS / NASTAWY.TAU_WYPORU_S);
             const wznoszenie = wznoszenieCzynnik(c.y, hRef);
-            c.vyGry -= WZNOSZENIE_W_S * wRef / 1000 * wznoszenie * wypor * dt;
+            c.vyGry -= NASTAWY.WZNOSZENIE_W_S * wRef / 1000 * wznoszenie * wypor * dt;
 
             // --- Kłębienie i rozejście po ekranie (v7.1) ---
             // Wszystko poniżej wchodzi z wagą `rozejscie`, więc W KOLUMNIE nie
             // działa nic z tego - struga zostaje strugą.
             const rozejscie = c.wiekGry <= KOLUMNA_S
                 ? 0
-                : 1 - Math.exp(-(c.wiekGry - KOLUMNA_S) / TAU_ROZEJSCIA_S);
+                : 1 - Math.exp(-(c.wiekGry - KOLUMNA_S) / NASTAWY.TAU_ROZEJSCIA_S);
             const faza = Number.isFinite(c.faza) ? c.faza : 0;
-            c.vxGry += A * Math.sin(c.y * k + this._t * POLE_OMEGA_1 + faza) * dt * 1000 * rozejscie;
-            c.vyGry += A * Math.cos(c.x * k * 0.8 + this._t * POLE_OMEGA_2 + faza * 0.5) * dt * 1000 * rozejscie;
+            c.vxGry += A * Math.sin(c.y * k + this._t * NASTAWY.POLE_OMEGA_1 + faza) * dt * 1000 * rozejscie;
+            c.vyGry += A * Math.cos(c.x * k * 0.8 + this._t * NASTAWY.POLE_OMEGA_2 + faza * 0.5) * dt * 1000 * rozejscie;
 
             // Rozpychanie W POPRZEK kierunku wylotu - to jest "kłębi się na boki".
-            const rozp = (c.rozpychanie ?? 0) * ROZPYCHANIE_W_S2 * wRef / 1e6 * dt * 1000 * rozejscie;
+            const rozp = (c.rozpychanie ?? 0) * NASTAWY.ROZPYCHANIE_W_S2 * wRef / 1e6 * dt * 1000 * rozejscie;
             c.vxGry += -(c.kierunekY ?? 0) * rozp;
             c.vyGry += (c.kierunekX ?? 0) * rozp;
 
             // Rozlew pod sufitem: im wyżej, tym więcej dryfu w bok - dym uderza
             // o górną krawędź i rozchodzi się na całą szerokość ekranu.
-            c.vxGry += Math.sign(c.rozpychanie ?? 1) * ROZLEW_POD_SUFITEM_W_S * wRef / 1000
+            c.vxGry += Math.sign(c.rozpychanie ?? 1) * NASTAWY.ROZLEW_POD_SUFITEM_W_S * wRef / 1000
                      * (1 - wznoszenie) * rozejscie * dt;
 
             // --- Reakcja na ręce i taniec ---
@@ -483,13 +491,13 @@ export class Dym {
                 const wplyw = (1 - dist / promienDloni);
                 const vx = ograniczV(d.vx) * skalaDloni / 1000;
                 const vy = ograniczV(d.vy) * skalaDloni / 1000;
-                c.vxGry += vx * wplyw * ROZGARNIJ_SILA;
-                c.vyGry += vy * wplyw * ROZGARNIJ_SILA;
+                c.vxGry += vx * wplyw * NASTAWY.ROZGARNIJ_SILA;
+                c.vyGry += vy * wplyw * NASTAWY.ROZGARNIJ_SILA;
                 // Składowa STYCZNA (prostopadła do ruchu ręki, znak z tego, po
                 // której stronie toru leży cząstka) - za ręką zostaje wir.
                 const strona = Math.sign(vx * dy - vy * dx) || 1;
-                c.vxGry += -vy * strona * wplyw * WIR_SILA;
-                c.vyGry += vx * strona * wplyw * WIR_SILA;
+                c.vxGry += -vy * strona * wplyw * NASTAWY.WIR_SILA;
+                c.vyGry += vx * strona * wplyw * NASTAWY.WIR_SILA;
             }
 
             // --- Podmuch Aarda: odrzut + rozrzedzenie (patrz PODMUCH_*) ---
@@ -502,12 +510,12 @@ export class Dym {
                 if (wplyw <= 0) continue;
                 const vx = ograniczPodmuch(p.vx) * skalaDloni / 1000;
                 const vy = ograniczPodmuch(p.vy) * skalaDloni / 1000;
-                c.vxGry += vx * wplyw * PODMUCH_SILA;
-                c.vyGry += vy * wplyw * PODMUCH_SILA;
+                c.vxGry += vx * wplyw * NASTAWY.PODMUCH_SILA;
+                c.vyGry += vy * wplyw * NASTAWY.PODMUCH_SILA;
                 // Rozrzedzenie: dodatkowy wiek -> wiekBiblioteki() w następnej
                 // klatce da bledszy, większy kłąb. Nie skok do końca życia -
                 // kilka klatek w czole to kilka sekund życia, nie cały zapas.
-                c.wiekGry += dt * PODMUCH_ROZRZEDZENIE_S * wplyw;
+                c.wiekGry += dt * NASTAWY.PODMUCH_ROZRZEDZENIE_S * wplyw;
             }
 
             if (!Number.isFinite(c.x) || !Number.isFinite(c.y)
@@ -536,7 +544,7 @@ export class Dym {
             const r = promienCzastki(c);
             if (r > maxR) maxR = r;
         }
-        const bok = Math.max(1, maxR * 2 * FRONT_PROMIEN_MNOZNIK);
+        const bok = Math.max(1, maxR * 2 * NASTAWY.FRONT_PROMIEN_MNOZNIK);
         const siatka = new Map();
         for (const c of this._czastki) {
             if (c.stan !== 'DYM') continue;
@@ -553,7 +561,7 @@ export class Dym {
                     if (!kubelek) continue;
                     for (const inny of kubelek) {
                         if (inny.stan !== 'DYM') continue;
-                        const zasieg = (promienCzastki(c) + promienCzastki(inny)) * FRONT_PROMIEN_MNOZNIK;
+                        const zasieg = (promienCzastki(c) + promienCzastki(inny)) * NASTAWY.FRONT_PROMIEN_MNOZNIK;
                         if (Math.hypot(c.x - inny.x, c.y - inny.y) < zasieg) {
                             inny.stan = 'ZAPLON';
                             inny.tZaplonu = 0;
@@ -582,6 +590,7 @@ export class Dym {
             const i = this._czastki.indexOf(c);
             if (i >= 0) this._czastki.splice(i, 1);
         }
+        this.odrzucone += doWyrzucenia.length;
     }
 
     /**
@@ -591,20 +600,20 @@ export class Dym {
     _rysujOgien(ctx) {
         if (!this._czastki.length) return;
         const wRef = this._W;
-        const mnoznik = DZIELNIK_PLOTNA;   // z płótna biblioteki na płótno gry
+        const mnoznik = NASTAWY.DZIELNIK_PLOTNA;   // z płótna biblioteki na płótno gry
         ctx.globalCompositeOperation = 'lighter';
 
         // Płonące: ta sama tekstura mgły, tyle że w ciepłym tincie.
         for (const c of this._czastki) {
             if (c.stan !== 'ZAPLON') continue;
             const p = Math.max(0, Math.min(1, c.tZaplonu / CZAS_DO_WYBUCHU_S));
-            const stopien = Math.min(BARWA_ZAPLONU_STOPNIE.length - 1,
-                                      Math.floor(p * BARWA_ZAPLONU_STOPNIE.length));
+            const stopien = Math.min(NASTAWY.BARWA_ZAPLONU_STOPNIE.length - 1,
+                                      Math.floor(p * NASTAWY.BARWA_ZAPLONU_STOPNIE.length));
             const img = obraz(MANIFEST.mgla[c.wariantMgla ?? 0]);
             if (!img) continue;
             const r = promienCzastki(c) * mnoznik * 0.8;
             ctx.globalAlpha = Math.min(1, 0.25 + 0.35 * p);
-            ctx.drawImage(wypalTintowany(img, BARWA_ZAPLONU_STOPNIE[stopien], KLAB_SPRITE_PX),
+            ctx.drawImage(wypalTintowany(img, NASTAWY.BARWA_ZAPLONU_STOPNIE[stopien], NASTAWY.KLAB_SPRITE_PX),
                            c.x * mnoznik - r, c.y * mnoznik - r, r * 2, r * 2);
         }
         ctx.globalAlpha = 1;
@@ -622,25 +631,25 @@ export class Dym {
             const plomien = obraz(MANIFEST.plomien[c.wariantPlomien ?? 0]);
             const rozblysk = obraz(MANIFEST.rozblyskUderzenia[c.wariantRozblysk ?? 0]);
             const skalaOgnia = 0.6 + 0.8 * Math.min(1, p * 4);
-            const r = Math.min(wRef * R_WYBUCHU_MAX_W,
-                                Math.max(wRef * R_WYBUCHU_MIN_W, promienCzastki(c) * mnoznik * 0.5))
+            const r = Math.min(wRef * NASTAWY.R_WYBUCHU_MAX_W,
+                                Math.max(wRef * NASTAWY.R_WYBUCHU_MIN_W, promienCzastki(c) * mnoznik * 0.5))
                     * (0.7 + 0.3 * skalaOgnia);
             const x = c.x * mnoznik, y = c.y * mnoznik;
 
             if (rozblysk && p < 0.35) {
                 ctx.globalAlpha = Math.max(0, (1 - p / 0.35)) * 0.9;
-                ctx.drawImage(wypalTintowany(rozblysk, BARWA_ROZBLYSKU, 320),
+                ctx.drawImage(wypalTintowany(rozblysk, NASTAWY.BARWA_ROZBLYSKU, 320),
                                x - r * 1.3, y - r * 1.3, r * 2.6, r * 2.6);
             }
             if (plomien) {
                 ctx.globalAlpha = Math.max(0, zanik * zanik);
-                ctx.drawImage(wypalTintowany(plomien, BARWA_ZAPLONU_STOPNIE[3], 220),
+                ctx.drawImage(wypalTintowany(plomien, NASTAWY.BARWA_ZAPLONU_STOPNIE[3], 220),
                                x - r, y - r, r * 2, r * 2);
             }
             if (rdzen) {
                 ctx.globalAlpha = Math.max(0, zanik);
                 const rr = r * 0.6;
-                ctx.drawImage(wypalTintowany(rdzen, BARWA_RDZENIA, 160), x - rr, y - rr, rr * 2, rr * 2);
+                ctx.drawImage(wypalTintowany(rdzen, NASTAWY.BARWA_RDZENIA, 160), x - rr, y - rr, rr * 2, rr * 2);
             }
         }
         ctx.globalAlpha = 1;
@@ -657,7 +666,7 @@ export class Dym {
  * @param {number} lifetime  `lifetime` cząstki w bibliotece (ms)
  */
 export function wiekBiblioteki(wiekGry, zycieGry, lifetime) {
-    const L = Number.isFinite(lifetime) && lifetime > 0 ? lifetime : ZYCIE_BIBLIOTEKI_MS;
+    const L = Number.isFinite(lifetime) && lifetime > 0 ? lifetime : NASTAWY.ZYCIE_BIBLIOTEKI_MS;
     const zycie = Number.isFinite(zycieGry) && zycieGry > 0 ? zycieGry : ZYCIE_MIN_S;
     const w = Number.isFinite(wiekGry) ? Math.max(0, wiekGry) : 0;
     if (w >= zycie) return L;
@@ -673,7 +682,7 @@ export function wiekBiblioteki(wiekGry, zycieGry, lifetime) {
  * testowalna bez cząstek, jak wiekBiblioteki().
  */
 export function skalaCzastki(wiekGry, finalScale) {
-    const cel = Number.isFinite(finalScale) ? finalScale : SKALA_MIN;
+    const cel = Number.isFinite(finalScale) ? finalScale : NASTAWY.SKALA_MIN;
     const w = Number.isFinite(wiekGry) ? Math.max(0, wiekGry) : 0;
     if (w <= KOLUMNA_S) return Math.min(SKALA_KOLUMNY, cel);
     const p = 1 - Math.exp(-(w - KOLUMNA_S) / TAU_ROZROSTU_S);
@@ -686,16 +695,16 @@ export function promienCzastki(c) {
 }
 
 /**
- * Czynnik wznoszenia SUFIT_MIN_CZYNNIK..1 wg pozycji Y (px). 1 daleko od
+ * Czynnik wznoszenia NASTAWY.SUFIT_MIN_CZYNNIK..1 wg pozycji Y (px). 1 daleko od
  * sufitu, opada do minimum blisko górnej krawędzi - NIGDY do zera, żeby dym
  * pod sufitem dalej lekko "mrowił", zamiast zamarznąć w miejscu.
  */
 export function wznoszenieCzynnik(y, H) {
     const sufit = H * SUFIT_Y_H, start = H * SPADEK_OD_Y_H;
     if (y >= start) return 1;
-    if (y <= sufit) return SUFIT_MIN_CZYNNIK;
+    if (y <= sufit) return NASTAWY.SUFIT_MIN_CZYNNIK;
     const t = (y - sufit) / (start - sufit);
-    return SUFIT_MIN_CZYNNIK + (1 - SUFIT_MIN_CZYNNIK) * t;
+    return NASTAWY.SUFIT_MIN_CZYNNIK + (1 - NASTAWY.SUFIT_MIN_CZYNNIK) * t;
 }
 
 /** Kierunek jednostkowy z fallbackiem "w górę". */
@@ -710,11 +719,11 @@ function kierunekJednostkowy(kierunek) {
 /** Prędkość dłoni bywa skokowa przy zgubionym landmarku - ucinamy szarpnięcia. */
 function ograniczV(v) {
     if (!Number.isFinite(v)) return 0;
-    return Math.max(-ROZGARNIJ_MAX_V, Math.min(ROZGARNIJ_MAX_V, v));
+    return Math.max(-NASTAWY.ROZGARNIJ_MAX_V, Math.min(NASTAWY.ROZGARNIJ_MAX_V, v));
 }
 function ograniczPodmuch(v) {
     if (!Number.isFinite(v)) return 0;
-    return Math.max(-PODMUCH_MAX_V, Math.min(PODMUCH_MAX_V, v));
+    return Math.max(-NASTAWY.PODMUCH_MAX_V, Math.min(NASTAWY.PODMUCH_MAX_V, v));
 }
 
 function warianty() {
