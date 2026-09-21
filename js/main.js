@@ -384,7 +384,16 @@ function klatka(now) {
     // Infinity i WSZYSTKIE przemapowane punkty stają się NaN.
     if (!video.videoWidth || !video.videoHeight) return;
 
-    const dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0;
+    // Klamrowane do 0.1 s (P2, 2026-09-21) - zakładka przeglądarki
+    // uśpiona na kilka sekund (tab w tle, laptop wznowiony ze snu) dawałaby
+    // JEDNĄ klatkę z gigantycznym dt: cząstki skaczą w jednej klatce
+    // o setki pikseli, zegary technik przeskakują całe fazy naraz. Każdy
+    // moduł VFX i tak klamrował dt LOKALNIE (0.05 w stepperach fizyki,
+    // 0.1 w zegarach) jako osłonę - to jest ta sama osłona u ŹRÓDŁA, więc
+    // wszystkie moduły (łącznie z aura.js, które NIE miało własnego
+    // clampu) dostają rozsądny dt od samego początku, nie tylko te, które
+    // pamiętały o obronie.
+    const dt = lastFrameTime ? Math.min(0.1, Math.max(0, (now - lastFrameTime) / 1000)) : 0;
     lastFrameTime = now;
     debugHud.tick(now);
 

@@ -134,4 +134,32 @@ const teczaWygasajaca = { aktywna: true, barwaHue: 180, silaSladu: 0 };
 spr(`silaSladu=0 daje barwę PRAKTYCZNIE normalną (h=${barwaAury(1, teczaWygasajaca).h.toFixed(1)} ≈ 35)`,
     Math.abs(barwaAury(1, teczaWygasajaca).h - 35) < 0.01);
 
+console.log('\nCLAMP DT (P2, 2026-09-21 - jedyny moduł bez WŁASNEGO clampu):');
+{
+    // Zakładka uśpiona na minuty - jedna gigantyczna klatka nie może dać NaN
+    // ani ujemnego impulsu/mocy (ten sam wzorzec co main.js:387 - lokalny
+    // clamp jest tu osłoną NIEZALEŻNĄ od tego, że wywołujący już klamruje).
+    const a9 = nowa();
+    a9.rozblysk(1);
+    a9.updateAndDraw(null, 0, 0, 0.7, 1, fit, 600);   // 10 minut w jednej klatce
+    spr(`ogromne dt nie daje NaN w mocy (${a9._moc})`, Number.isFinite(a9._moc));
+    spr(`ogromne dt nie daje NaN w impulsie (${a9._impuls})`, Number.isFinite(a9._impuls));
+    // Clamp ogranicza KROK do 0.1s per wywołanie - jedna klatka z dt=600
+    // dekrementuje impuls o JEDEN klamrowany krok, nie skacze od razu do
+    // zera. To jest poprawne: obrona jest przed NaN/eksplozją, nie przed
+    // "wolniejszym" zanikiem przy rzadkich klatkach - dokładnie tak samo
+    // zachowują się steppery fizyki w iskry.js/ogien.js/fala.js.
+    spr(`impuls zmalał, ale zostaje w [0,1] po jednym klamrowanym kroku (${a9._impuls.toFixed(3)})`,
+        a9._impuls > 0 && a9._impuls < 1);
+
+    const a10 = nowa();
+    a10.updateAndDraw(null, 0, 0, 0.5, 1, fit, NaN);
+    spr('NaN dt nie zatruwa mocy', Number.isFinite(a10._moc));
+    spr('NaN dt nie zatruwa fazy tętna', Number.isFinite(a10._faza));
+
+    const a11 = nowa();
+    a11.updateAndDraw(null, 0, 0, 0.5, 1, fit, -1);
+    spr('ujemne dt traktowane jak 0, bez wyjątku', Number.isFinite(a11._moc));
+}
+
 process.exit(ok ? 0 : 1);

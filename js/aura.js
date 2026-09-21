@@ -126,16 +126,22 @@ export class Aura {
      * @param {number} dt
      */
     updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null) {
+        // Jedyny moduł VFX bez WŁASNEGO clampu na dt (P2, 2026-09-21) -
+        // main.js:387 klamruje u źródła do 0.1 s, ale test-aura-impuls.mjs
+        // i przyszli wywołujący mogą podać dt wprost, więc lokalna osłona
+        // zostaje - ten sam wzorzec co zaplon.js/piorun.js/runa.js.
+        const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
+
         // Wygładzanie sterowania. Bez tego aura drga razem z trackingiem.
-        const a = Math.min(1, dt / TAU_WYGLADZANIA);
+        const a = Math.min(1, krok / TAU_WYGLADZANIA);
         this._moc += a * ((Number.isFinite(moc) ? moc : 0) - this._moc);
         this._plynnosc += a * ((Number.isFinite(plynnosc) ? plynnosc : 1) - this._plynnosc);
 
-        this._faza = (this._faza + dt / OKRES_TETNA_S) % 1;
+        this._faza = (this._faza + krok / OKRES_TETNA_S) % 1;
 
         // Rozpad MUSI być przed wczesnym powrotem niżej - inaczej impuls
         // zamarza, gdy maski chwilowo nie ma, i wraca jako przebłysk.
-        this._impuls *= Math.max(0, 1 - dt / TAU_IMPULSU);
+        this._impuls *= Math.max(0, 1 - krok / TAU_IMPULSU);
         if (!Number.isFinite(this._impuls)) this._impuls = 0;
 
         // Ten sam powód co komentarz o rozpadzie impulsu tuż wyżej: zanik
@@ -147,7 +153,7 @@ export class Aura {
         // klatce gry bufora jeszcze nie ma, więc zanik jest wtedy no-opem
         // (nie ma czego blaknąć - to poprawne zachowanie).
         if (this._slad) {
-            const zanikWczesny = 1 - Math.exp(-dt / TAU_SLADU);
+            const zanikWczesny = 1 - Math.exp(-krok / TAU_SLADU);
             this._sladCtx.globalCompositeOperation = 'destination-out';
             this._sladCtx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, zanikWczesny)).toFixed(3)})`;
             this._sladCtx.fillRect(0, 0, this._slad.width, this._slad.height);
