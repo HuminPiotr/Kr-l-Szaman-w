@@ -29,43 +29,48 @@
  *    cząsteczkę na klatkę to różnica między 60 a kilkoma FPS.
  */
 
-// Rampa barw od rdzenia do wygaśnięcia. Ostatnia jest ciemnoczerwona, nie
-// szara - patrz punkt 1 wyżej.
-// Pierwsza barwa jest CIEPŁĄ bielą, nie czystą. Czysta biel czyta się jak
-// palnik albo kometa - w prawdziwym płomieniu punkt przegrzania jest mały,
-// a większość objętości jest żółto-pomarańczowa.
-const RAMPA = [
-    [255, 243, 214],  // ciepła biel - tylko sam rdzeń
-    [255, 216, 132],
-    [255, 168, 56],
-    [252, 104, 18],
-    [176, 36, 8]      // dogasająca czerwień
-];
+/**
+ * Nastawy strojeniowe - eksportowane i MUTOWALNE, żeby tools/scena.html
+ * mogło podpiąć suwaki. Po zmianie RAMPA/KRZYWA_BARWY/SPRITE_PX wywołaj
+ * wyczyscCache() (sprite'y są wypalone raz przy starcie).
+ */
+export const NASTAWY = {
+    // Rampa barw od rdzenia do wygaśnięcia. Ostatnia jest ciemnoczerwona, nie
+    // szara - patrz punkt 1 w nagłówku. Pierwsza barwa jest CIEPŁĄ bielą, nie
+    // czystą - w prawdziwym płomieniu punkt przegrzania jest mały.
+    RAMPA: [
+        [255, 243, 214],  // ciepła biel - tylko sam rdzeń
+        [255, 216, 132],
+        [255, 168, 56],
+        [252, 104, 18],
+        [176, 36, 8]      // dogasająca czerwień
+    ],
 
-// Pozycja na rampie rośnie SZYBCIEJ niż wiek cząsteczki: dzięki temu biel
-// zajmuje tylko początek życia, a nie jego pierwszą piątą część.
-const KRZYWA_BARWY = 0.6;
+    // Pozycja na rampie rośnie SZYBCIEJ niż wiek cząsteczki: dzięki temu biel
+    // zajmuje tylko początek życia, a nie jego pierwszą piątą część.
+    KRZYWA_BARWY: 0.6,
 
-const SPRITE_PX = 48;
+    SPRITE_PX: 48,
 
-// --- płomień ---
-const NA_SEKUNDE = 260;        // cząsteczek na sekundę przy pełnej sile
-const ZYCIE_MIN = 0.5, ZYCIE_MAX = 1.05;   // s - dłuższe życie = wyższy, smuklejszy płomień
-const WYPORNOSC = 900;         // px/s^2 w górę
-const DZIEDZICZENIE = 0.45;    // ile prędkości palca przejmuje cząsteczka
-const ROZRZUT = 90;            // px/s losowego rozrzutu
-const TURBULENCJA = 300;       // px/s^2 bocznego chwiania (jęzory płomienia)
-const OPOR = 1.15;             // 1/s - mniejszy opór pozwala płomieniowi się wyciągnąć
-const ROZMIAR_OD = 0.38, ROZMIAR_DO = 1.6;  // ciasny rdzeń, szeroki wierzch
+    // --- płomień ---
+    NA_SEKUNDE: 260,        // cząsteczek na sekundę przy pełnej sile
+    ZYCIE_MIN: 0.5, ZYCIE_MAX: 1.05,   // s - dłuższe życie = wyższy, smuklejszy płomień
+    WYPORNOSC: 900,         // px/s^2 w górę
+    DZIEDZICZENIE: 0.45,    // ile prędkości palca przejmuje cząsteczka
+    ROZRZUT: 90,            // px/s losowego rozrzutu
+    TURBULENCJA: 300,       // px/s^2 bocznego chwiania (jęzory płomienia)
+    OPOR: 1.15,             // 1/s - mniejszy opór pozwala płomieniowi się wyciągnąć
+    ROZMIAR_OD: 0.38, ROZMIAR_DO: 1.6,  // ciasny rdzeń, szeroki wierzch
 
-// --- żar wiszący w powietrzu ---
-const ZAR_NA_SEKUNDE = 90;
-const ZAR_ZYCIE = 1.5;         // s - tyle dopala się smuga
-const ZAR_WYPORNOSC = 120;     // znacznie mniej: żar ma WISIEĆ, nie ulatywać
-const ZAR_DZIEDZICZENIE = 0.15;
-const ZAR_ROZRZUT = 30;
+    // --- żar wiszący w powietrzu ---
+    ZAR_NA_SEKUNDE: 90,
+    ZAR_ZYCIE: 1.5,         // s - tyle dopala się smuga
+    ZAR_WYPORNOSC: 120,     // znacznie mniej: żar ma WISIEĆ, nie ulatywać
+    ZAR_DZIEDZICZENIE: 0.15,
+    ZAR_ROZRZUT: 30,
 
-const MAX_CZASTECZEK = 900;    // sufit bezpieczeństwa dla klatkażu
+    MAX_CZASTECZEK: 900,    // sufit bezpieczeństwa dla klatkażu
+};
 
 export class Ogien {
     constructor() {
@@ -74,9 +79,13 @@ export class Ogien {
         this._poprzZaczep = null;
         this._nadwyzka = 0;      // ułamki cząsteczek przeniesione na następną klatkę
         this._nadwyzkaZaru = 0;
+        this.odrzucone = 0;      // licznik cząstek odrzuconych przez sufit MAX_CZASTECZEK - panel kontroli tools/scena.html
     }
 
     get liczba() { return this.czastki.length; }
+
+    /** Wywołać po zmianie NASTAWY.RAMPA/KRZYWA_BARWY/SPRITE_PX - stare sprite'y zostały wypalone ze starymi wartościami. */
+    wyczyscCache() { this._sprites = null; }
 
     /**
      * @param {CanvasRenderingContext2D} ctx
@@ -114,11 +123,11 @@ export class Ogien {
     }
 
     _emituj(teraz, przed, vx, vy, sila, dt) {
-        const ile = NA_SEKUNDE * sila * dt + this._nadwyzka;
+        const ile = NASTAWY.NA_SEKUNDE * sila * dt + this._nadwyzka;
         const n = Math.floor(ile);
         this._nadwyzka = ile - n;
 
-        const ileZaru = ZAR_NA_SEKUNDE * sila * dt + this._nadwyzkaZaru;
+        const ileZaru = NASTAWY.ZAR_NA_SEKUNDE * sila * dt + this._nadwyzkaZaru;
         const nz = Math.floor(ileZaru);
         this._nadwyzkaZaru = ileZaru - nz;
 
@@ -128,11 +137,11 @@ export class Ogien {
             this._dodaj({
                 x: przed.x + (teraz.x - przed.x) * t,
                 y: przed.y + (teraz.y - przed.y) * t,
-                vx: vx * DZIEDZICZENIE + (Math.random() - 0.5) * ROZRZUT,
-                vy: vy * DZIEDZICZENIE + (Math.random() - 0.5) * ROZRZUT,
-                zycie: ZYCIE_MIN + Math.random() * (ZYCIE_MAX - ZYCIE_MIN),
-                wyporn: WYPORNOSC * (0.75 + Math.random() * 0.5),
-                turb: TURBULENCJA * (Math.random() < 0.5 ? -1 : 1),
+                vx: vx * NASTAWY.DZIEDZICZENIE + (Math.random() - 0.5) * NASTAWY.ROZRZUT,
+                vy: vy * NASTAWY.DZIEDZICZENIE + (Math.random() - 0.5) * NASTAWY.ROZRZUT,
+                zycie: NASTAWY.ZYCIE_MIN + Math.random() * (NASTAWY.ZYCIE_MAX - NASTAWY.ZYCIE_MIN),
+                wyporn: NASTAWY.WYPORNOSC * (0.75 + Math.random() * 0.5),
+                turb: NASTAWY.TURBULENCJA * (Math.random() < 0.5 ? -1 : 1),
                 skala: 0.7 + Math.random() * 0.6,
                 zar: false
             });
@@ -143,11 +152,11 @@ export class Ogien {
             this._dodaj({
                 x: przed.x + (teraz.x - przed.x) * t,
                 y: przed.y + (teraz.y - przed.y) * t,
-                vx: vx * ZAR_DZIEDZICZENIE + (Math.random() - 0.5) * ZAR_ROZRZUT,
-                vy: vy * ZAR_DZIEDZICZENIE + (Math.random() - 0.5) * ZAR_ROZRZUT,
-                zycie: ZAR_ZYCIE * (0.7 + Math.random() * 0.6),
-                wyporn: ZAR_WYPORNOSC * (0.6 + Math.random() * 0.8),
-                turb: TURBULENCJA * 0.4 * (Math.random() < 0.5 ? -1 : 1),
+                vx: vx * NASTAWY.ZAR_DZIEDZICZENIE + (Math.random() - 0.5) * NASTAWY.ZAR_ROZRZUT,
+                vy: vy * NASTAWY.ZAR_DZIEDZICZENIE + (Math.random() - 0.5) * NASTAWY.ZAR_ROZRZUT,
+                zycie: NASTAWY.ZAR_ZYCIE * (0.7 + Math.random() * 0.6),
+                wyporn: NASTAWY.ZAR_WYPORNOSC * (0.6 + Math.random() * 0.8),
+                turb: NASTAWY.TURBULENCJA * 0.4 * (Math.random() < 0.5 ? -1 : 1),
                 skala: 0.35 + Math.random() * 0.4,
                 zar: true
             });
@@ -155,7 +164,7 @@ export class Ogien {
     }
 
     _dodaj(cz) {
-        if (this.czastki.length >= MAX_CZASTECZEK) return;
+        if (this.czastki.length >= NASTAWY.MAX_CZASTECZEK) { this.odrzucone++; return; }
         cz.wiek = 0;
         cz.faza = Math.random() * Math.PI * 2;
         this.czastki.push(cz);
@@ -175,7 +184,7 @@ export class Ogien {
             c.vx += c.turb * Math.sin(c.faza + c.wiek * 9) * p * dt;
             c.vy -= c.wyporn * dt;
 
-            const opor = 1 - OPOR * dt;
+            const opor = 1 - NASTAWY.OPOR * dt;
             c.vx *= opor; c.vy *= opor;
             c.x += c.vx * dt; c.y += c.vy * dt;
 
@@ -194,14 +203,14 @@ export class Ogien {
             const p = c.wiek / c.zycie;
 
             // Żar startuje niżej na rampie - już ostygł, gdy się oderwał.
-            const poz = c.zar ? 0.45 + p * 0.55 : Math.pow(p, KRZYWA_BARWY);
-            const sprite = this._sprites[Math.min(RAMPA.length - 1,
-                                        Math.floor(poz * RAMPA.length))];
+            const poz = c.zar ? 0.45 + p * 0.55 : Math.pow(p, NASTAWY.KRZYWA_BARWY);
+            const sprite = this._sprites[Math.min(NASTAWY.RAMPA.length - 1,
+                                        Math.floor(poz * NASTAWY.RAMPA.length))];
 
             // Szybki narost, powolne wygaszanie - bez tego cząsteczki
             // pojawiają się skokowo i widać emisję.
             const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
-            const r = SPRITE_PX * c.skala * (ROZMIAR_OD + (ROZMIAR_DO - ROZMIAR_OD) * p);
+            const r = NASTAWY.SPRITE_PX * c.skala * (NASTAWY.ROZMIAR_OD + (NASTAWY.ROZMIAR_DO - NASTAWY.ROZMIAR_OD) * p);
 
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * (c.zar ? 0.55 : 0.9)));
             ctx.drawImage(sprite, c.x - r / 2, c.y - r / 2, r, r);
@@ -220,17 +229,17 @@ export class Ogien {
  * błąd co liczenie gradientu w pętli rysowania kuli.
  */
 function zrobSprites() {
-    return RAMPA.map(([r, g, b]) => {
+    return NASTAWY.RAMPA.map(([r, g, b]) => {
         const c = document.createElement('canvas');
-        c.width = c.height = SPRITE_PX;
+        c.width = c.height = NASTAWY.SPRITE_PX;
         const x = c.getContext('2d');
-        const grd = x.createRadialGradient(SPRITE_PX / 2, SPRITE_PX / 2, 0,
-                                           SPRITE_PX / 2, SPRITE_PX / 2, SPRITE_PX / 2);
+        const grd = x.createRadialGradient(NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2, 0,
+                                           NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2, NASTAWY.SPRITE_PX / 2);
         grd.addColorStop(0.0, `rgba(${r},${g},${b},1)`);
         grd.addColorStop(0.35, `rgba(${r},${g},${b},0.55)`);
         grd.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
         x.fillStyle = grd;
-        x.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
+        x.fillRect(0, 0, NASTAWY.SPRITE_PX, NASTAWY.SPRITE_PX);
         return c;
     });
 }
