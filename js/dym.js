@@ -48,6 +48,7 @@
  */
 import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 import smokemachine from './vendor/smoke.js';
+import { krokTlumienia } from './czastki.js';
 
 // --- Emisja (jednostki biblioteki: px na MILISEKUNDĘ) ---
 // ZGADNIĘTE - do strojenia na kamerze. Tempo jest duże, bo alfa cząstki to
@@ -414,7 +415,15 @@ export class Dym {
         const hRef = this._H / NASTAWY.DZIELNIK_PLOTNA;
         const k = 2 * Math.PI / (wRef * NASTAWY.POLE_DLUGOSC_FALI_W);
         const A = NASTAWY.POLE_AMPLITUDA_W_S2 * wRef / 1e6;  // px/ms² (jednostki biblioteki)
-        const opor = Math.max(0, 1 - NASTAWY.OPOR * dt);
+        // Pozycję cząstki całkuje BIBLIOTEKA (smoke.js updateParticle),
+        // nie ten plik - dym.js dokłada tylko przyspieszenia/tłumienie
+        // do prędkości (setPreDrawCallback, patrz nagłówek klasy). Dlatego
+        // tu wystarczy sam mnożnik zaniku `e` z krokTlumienia (P2b) -
+        // całka pozycji `s` byłaby martwym kodem, bo nic jej tu nie użyje.
+        // Dym zostaje więc CELOWO pierwszego rzędu (Euler w przód na
+        // pozycji, jak reszta biblioteki), tylko zanik prędkości jest
+        // teraz dokładny zamiast przybliżony.
+        const opor = krokTlumienia(NASTAWY.OPOR, dt).e;
         const promienDloni = wRef * ROZGARNIJ_PROMIEN_W;
         const skalaDloni = 1 / NASTAWY.DZIELNIK_PLOTNA;
 
