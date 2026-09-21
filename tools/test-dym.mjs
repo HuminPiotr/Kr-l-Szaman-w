@@ -32,7 +32,7 @@ globalThis.document = {
 
 const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki,
         NAROST_S, ZANIK_S, KOLUMNA_S, SKALA_KOLUMNY, TAU_ROZROSTU_S,
-        CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK,
+        CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK, WYLOT_W_S,
         WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
         OPOZNIENIE_FRONTU_S, CZAS_WYBUCHU_S,
         SUFIT_Y_H, SPADEK_OD_Y_H, NASTAWY } = await import('../js/dym.js');
@@ -219,6 +219,42 @@ spr('odporna na NaN', Number.isFinite(skalaCzastki(NaN, NaN)));
         poRozejsciu > 4 * wPoprzek);
     const maxR2 = Math.max(...wszystkie(d).map(c => promienCzastki(c) / POL));
     spr(`...i kłęby urosły (${(maxR / W).toFixed(3)} -> ${(maxR2 / W).toFixed(3)} W)`, maxR2 > 2 * maxR);
+}
+
+// --- 5d. Pole przepływu (P2c, curl noise) - zerowy średni dryf ---
+console.log('\nPOLE PRZEPŁYWU (curl noise, patrz js/czastki.js/szum.js):');
+{
+    // Izolujemy TYLKO pole przepływu: wyporność/rozpychanie/rozlew wyłączone
+    // (mnożniki na 0), OPOR na 0 (nie tłumi tego, co pole właśnie dodało w
+    // TEJ SAMEJ klatce - liczymy przyrost, nie stan po tłumieniu), 500
+    // cząstek daleko za KOLUMNA_S (rozejscie≈1) w różnych miejscach/fazach.
+    // Bezdywergencyjność (curl2) powinna dać średni dryf bliski zeru -
+    // "wieje we wszystkie strony po równo", nie w jedną stronę.
+    const dPole = new Dym();
+    const domyslne = { WZNOSZENIE_W_S: 0, ROZPYCHANIE_W_S2: 0, ROZLEW_POD_SUFITEM_W_S: 0, OPOR: 0 };
+    const zapisane = {};
+    for (const k in domyslne) { zapisane[k] = NASTAWY[k]; NASTAWY[k] = domyslne[k]; }
+
+    for (let i = 0; i < 500; i++) {
+        dPole.emituj({ x: (i * 37) % W, y: (i * 53) % H }, W_PRAWO, 1, 1, 0.001, W, H);
+    }
+    // Zestarzyć cząstki daleko za KOLUMNA_S bez ruszania fizyki oporu (OPOR=0
+    // już to gwarantuje) - kilka sekund updateAndDraw.
+    przepusc(dPole, 3);
+    const cz = wszystkie(dPole).filter(c => c.wiekGry > KOLUMNA_S + 0.5);
+    let sumaVx = 0, sumaVy = 0;
+    for (const c of cz) { sumaVx += c.vxGry; sumaVy += c.vyGry; }
+    const sredniaVx = cz.length ? sumaVx / cz.length : 0;
+    const sredniaVy = cz.length ? sumaVy / cz.length : 0;
+    // Skala odniesienia: typowa prędkość WYLOT_W_S w px biblioteki/s, żeby
+    // "bliski zeru" miał sensowną jednostkę zamiast gołej liczby.
+    const skalaOdniesienia = WYLOT_W_S * W * POL;
+    spr(`${cz.length} cząstek po fazie kolumny, średni dryf x bliski zeru (${sredniaVx.toFixed(1)} vs skala ${skalaOdniesienia.toFixed(0)})`,
+        Math.abs(sredniaVx) < 0.15 * skalaOdniesienia);
+    spr(`średni dryf y bliski zeru (${sredniaVy.toFixed(1)} vs skala ${skalaOdniesienia.toFixed(0)})`,
+        Math.abs(sredniaVy) < 0.15 * skalaOdniesienia);
+
+    for (const k in zapisane) NASTAWY[k] = zapisane[k];
 }
 
 // --- 6. Reakcja na ręce i taniec ---

@@ -49,6 +49,7 @@
 import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 import smokemachine from './vendor/smoke.js';
 import { krokTlumienia } from './czastki.js';
+import { curl2 } from './szum.js';
 
 // --- Emisja (jednostki biblioteki: px na MILISEKUNDĘ) ---
 // ZGADNIĘTE - do strojenia na kamerze. Tempo jest duże, bo alfa cząstki to
@@ -479,8 +480,20 @@ export class Dym {
                 ? 0
                 : 1 - Math.exp(-(c.wiekGry - KOLUMNA_S) / NASTAWY.TAU_ROZEJSCIA_S);
             const faza = Number.isFinite(c.faza) ? c.faza : 0;
-            c.vxGry += A * Math.sin(c.y * k + this._t * NASTAWY.POLE_OMEGA_1 + faza) * dt * 1000 * rozejscie;
-            c.vyGry += A * Math.cos(c.x * k * 0.8 + this._t * NASTAWY.POLE_OMEGA_2 + faza * 0.5) * dt * 1000 * rozejscie;
+            // Pole przepływu jako CURL NOISE (P2c, 2026-09-21) zamiast dwóch
+            // NIEZALEŻNYCH sin/cos - curl2() liczy rotację JEDNEGO pola szumu
+            // (bezdywergencyjne: cząstki płyną WOKÓŁ zagęszczeń, nie tryskają
+            // z nich ani nie wsysają się w nie), więc wiry kłębów są spójne
+            // przestrzennie, nie tylko oscylują niezależnie na każdej osi.
+            // Semantyka NASTAWY zachowana: POLE_AMPLITUDA_W_S2 = amplituda (A),
+            // POLE_DLUGOSC_FALI_W = długość fali (przez k), POLE_OMEGA_1/2 =
+            // dwa niezależne tempa dryfu pola w czasie (jedno na współrzędną
+            // próbkowania) - `faza` dalej dekoreluje cząstki wyemitowane
+            // w tym samym miejscu i czasie.
+            const pole = curl2(c.x * k + this._t * NASTAWY.POLE_OMEGA_2 + faza * 0.5,
+                                c.y * k + this._t * NASTAWY.POLE_OMEGA_1 + faza);
+            c.vxGry += A * pole.x * dt * 1000 * rozejscie;
+            c.vyGry += A * pole.y * dt * 1000 * rozejscie;
 
             // Rozpychanie W POPRZEK kierunku wylotu - to jest "kłębi się na boki".
             const rozp = (c.rozpychanie ?? 0) * NASTAWY.ROZPYCHANIE_W_S2 * wRef / 1e6 * dt * 1000 * rozejscie;

@@ -35,6 +35,7 @@
  * wyczyscCache() (sprite'y są wypalone raz przy starcie).
  */
 import { krokTlumienia, obwiedniaCzastki } from './czastki.js';
+import { simplex2 } from './szum.js';
 
 export const NASTAWY = {
     // Rampa barw od rdzenia do wygaśnięcia. Ostatnia jest ciemnoczerwona, nie
@@ -182,10 +183,20 @@ export class Ogien {
             const p = c.wiek / c.zycie;
 
             // Turbulencja rośnie z wiekiem - u dołu płomień jest wąski,
-            // wyżej rozchodzi się i chwieje. Siła wymuszona NAJPIERW
-            // (Euler w przód - przybliżenie, patrz nagłówek czastki.js),
-            // potem dokładna całka pozycji + zanik prędkości (krokTlumienia).
-            c.vx += c.turb * Math.sin(c.faza + c.wiek * 9) * p * dt;
+            // wyżej rozchodzi się i chwieje. simplex2 zamiast sin (P2c,
+            // 2026-09-21): sin daje jedną globalną, WIDOCZNIE OKRESOWĄ falę
+            // (wszystkie cząstki chwieją się w tym samym rytmie, przesunięte
+            // tylko fazą startu); simplex2(c.faza, c.wiek*9) próbkuje
+            // NIEOKRESOWY szum wzdłuż osi czasu (wiek*9), z c.faza jako
+            // "ziarnem" per cząstka (różne cząstki próbkują różne krzywe
+            // szumu zamiast tej samej sinusoidy przesuniętej w fazie) -
+            // organiczne chwianie, nie miarowe wahadło. Zakres ~2x szerszy
+            // niż sin ([-1,1] vs ~[-1.6,1.6] empirycznie) - amplituda do
+            // dostrojenia na stanowisku (tools/scena.html).
+            // Siła wymuszona NAJPIERW (Euler w przód - przybliżenie, patrz
+            // nagłówek czastki.js), potem dokładna całka pozycji + zanik
+            // prędkości (krokTlumienia).
+            c.vx += c.turb * simplex2(c.faza, c.wiek * 9) * p * dt;
             c.vy -= c.wyporn * dt;
 
             const t = krokTlumienia(NASTAWY.OPOR, dt);
