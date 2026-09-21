@@ -130,3 +130,12 @@ export function wypalTintowany(img, barwa, px) {
     _tintCache.set(klucz, c);
     return c;
 }
+
+/**
+ * Czyści cache tintowanych sprite'ów. Zmiana barwy (np. suwak NASTAWY.BARWA_*
+ * na tools/scena.html) i tak trafia pod NOWY klucz cache'a (barwa jest
+ * częścią klucza), więc to NIE jest wymagane do poprawności - jest tu,
+ * żeby stanowisko VFX mogło zwolnić pamięć po serii eksperymentów z barwą,
+ * zamiast bez końca dopisywać do Mapy.
+ */
+export function wyczyscCache() { _tintCache.clear(); }
