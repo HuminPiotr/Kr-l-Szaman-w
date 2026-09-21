@@ -295,4 +295,39 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     spr('OGNISKO (eksport snapshot) nadal równy domyślnej wartości NASTAWY', OGNISKO === 900);
 }
 
+// --- DOKŁADNOŚĆ TŁUMIENIA (P2b) - jedna cząstka vs forma zamknięta ---
+console.log('\nDOKŁADNOŚĆ TŁUMIENIA (krokTlumienia w _ruszaj, patrz js/czastki.js):');
+{
+    // wystrzel() miesza ROZRZUT_PREDKOSCI=0 z INNYMI losowymi mnożnikami
+    // wpisanymi wprost w kod (0.8+random()*0.4 itd.), więc nie da się z
+    // niego dostać deterministycznej pojedynczej cząstki - budujemy ją
+    // ręcznie przez _dodaj(), tym samym wzorcem co test-iskry.mjs.
+    // Składowa WZDŁUŻ na osi x (vx), składowa PROMIENIOWA na osi y (vpy) -
+    // niezależne tłumienia (OPOR_WZDLUZ vs OPOR_PROMIEN), więc obie dają
+    // się porównać osobno z polozenieCzola().wzdluz/.promien.
+    const f9 = new Fala();
+    const V_WZDLUZ = 900, V_PROM = 720;
+    f9._dodaj({ x: 0, y: 0, z: 0, zx0: 0, zy0: 0,
+                vx: V_WZDLUZ, vy: 0, vz: 0, vpx: 0, vpy: V_PROM, vpz: 0,
+                zycie: 10, skala: 1, wiek: 0, rdzen: false, barwa: [255, 255, 255] });
+    const N = 30;
+    const T = N * DT;
+    for (let i = 0; i < N; i++) f9._ruszaj(DT);
+
+    const wzdluzOczekiwany = V_WZDLUZ * (1 - Math.exp(-NASTAWY.OPOR_WZDLUZ * T)) / NASTAWY.OPOR_WZDLUZ;
+    const promOczekiwany = V_PROM * (1 - Math.exp(-NASTAWY.OPOR_PROMIEN * T)) / NASTAWY.OPOR_PROMIEN;
+    const c = f9.czastki[0];
+    spr(`wzdłuż (x) zgadza się z formą zamkniętą co do 1e-6 (${c.x.toFixed(6)} vs ${wzdluzOczekiwany.toFixed(6)})`,
+        Math.abs(c.x - wzdluzOczekiwany) < 1e-6);
+    spr(`promieniowo (y) zgadza się z formą zamkniętą co do 1e-6 (${c.y.toFixed(6)} vs ${promOczekiwany.toFixed(6)})`,
+        Math.abs(c.y - promOczekiwany) < 1e-6);
+
+    // Ten sam wynik, teraz przez samą polozenieCzola() - potwierdza, że
+    // cząstki i forma zamknięta liczą TERAZ dokładnie tę samą fizykę
+    // (przed P2b był to tylko przybliżony wzorzec Eulera obok formy zamkniętej).
+    const zPolozenia = polozenieCzola(1, T);
+    spr(`polozenieCzola(1,T).wzdluz == ta sama forma zamknięta (${zPolozenia.wzdluz.toFixed(6)})`,
+        Math.abs(zPolozenia.wzdluz - wzdluzOczekiwany) < 1e-9);
+}
+
 process.exit(ok ? 0 : 1);

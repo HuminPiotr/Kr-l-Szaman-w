@@ -71,6 +71,7 @@
  * kształt daje kreska i smugi.
  */
 import { MANIFEST, obraz, losowyWariant, wypalTintowany } from './assety.js';
+import { krokTlumienia, obwiedniaCzastki } from './czastki.js';
 
 /**
  * Nastawy strojeniowe - eksportowane i MUTOWALNE, żeby tools/scena.html
@@ -475,14 +476,17 @@ export class Fala {
 
             // DWA RÓŻNE TŁUMIENIA - to one dają kształt fali uderzeniowej:
             // czoło wytraca pęd do przodu, ale nie przestaje się rozchodzić.
-            const oporWzdluz = 1 - NASTAWY.OPOR_WZDLUZ * krok;
-            const oporProm = 1 - NASTAWY.OPOR_PROMIEN * krok;
-            c.vx *= oporWzdluz; c.vy *= oporWzdluz; c.vz *= oporWzdluz;
-            c.vpx *= oporProm; c.vpy *= oporProm; c.vpz *= oporProm;
-
-            c.x += (c.vx + c.vpx) * krok;
-            c.y += (c.vy + c.vpy) * krok;
-            c.z += (c.vz + c.vpz) * krok;
+            // Tłumienie DOKŁADNE (krokTlumienia, patrz js/czastki.js) -
+            // ta sama forma zamknięta, której już używała polozenieCzola()
+            // (czoło i cząstki teraz liczą TĘ SAMĄ fizykę, nie przybliżenie
+            // obok formy zamkniętej).
+            const wz = krokTlumienia(NASTAWY.OPOR_WZDLUZ, krok);
+            const pr = krokTlumienia(NASTAWY.OPOR_PROMIEN, krok);
+            c.x += c.vx * wz.s + c.vpx * pr.s;
+            c.y += c.vy * wz.s + c.vpy * pr.s;
+            c.z += c.vz * wz.s + c.vpz * pr.s;
+            c.vx *= wz.e; c.vy *= wz.e; c.vz *= wz.e;
+            c.vpx *= pr.e; c.vpy *= pr.e; c.vpz *= pr.e;
 
             if (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.z)) zywe.push(c);
         }
@@ -614,7 +618,7 @@ export class Fala {
             const s = rzutPerspektywiczny(c.z);
             // Szybki narost, powolne wygaszanie - ten sam kształt obwiedni
             // co w ogien.js, żeby cząstki nie pojawiały się skokowo.
-            const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
+            const alfa = obwiedniaCzastki(p);
             // Cząstki czoła PUCHNĄ z wiekiem (fala się rozrzedza); rdzeń nie -
             // ma być ostrym błyskiem, nie rozmywającą się chmurą.
             const rosniecie = c.rdzen ? 1 : (0.6 + 0.8 * p);
