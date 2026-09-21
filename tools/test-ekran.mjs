@@ -9,7 +9,7 @@
  * czas PRZED guardem, więc zegar da się napędzić bez document, którego
  * nie ma w Node. Ten sam wzorzec co tools/test-zaplon.mjs / test-aura-impuls.mjs.
  */
-import { Ekran, obwiedniaUderzenia, obwiedniaFali } from '../js/ekran.js';
+import { Ekran, obwiedniaUderzenia, obwiedniaFali, NASTAWY } from '../js/ekran.js';
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
@@ -127,5 +127,20 @@ e8c.falaPowietrza({ x: 500, y: 400 }, { x: 1, y: 0, z: 0 }, 1);
 e8c.dokoncz(null, 1920, 1080, DT);
 e8c.dokoncz({}, NaN, 1080, DT);
 spr('dokoncz() z aktywną falą i ctx=null / NaN W nie wywala wyjątku', true);
+
+// --- NASTAWY - eksportowane i mutowalne (dla suwaków tools/scena.html) ---
+console.log('\nNASTAWY (mutowalność dla stanowiska):');
+{
+    const domyslnyCzas = NASTAWY.CZAS_TRWANIA;
+    NASTAWY.CZAS_TRWANIA = 10;   // wstrząs trwający 10 s zamiast 0.45 s
+    const e9 = new Ekran();
+    e9.uderz(1);
+    e9.dokoncz(null, 1920, 1080, 0.3);
+    spr(`zmiana NASTAWY.CZAS_TRWANIA widoczna w sile po 0.3 s (${e9.sila.toFixed(2)} - wciąż wysoka, nie opadła jak przy 0.45 s)`,
+        e9.sila > 0.5);
+    NASTAWY.CZAS_TRWANIA = domyslnyCzas;
+
+    spr('wyczyscCache() istnieje i nie rzuca (no-op)', (e9.wyczyscCache(), true));
+}
 
 process.exit(ok ? 0 : 1);

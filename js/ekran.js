@@ -56,29 +56,37 @@
 
 import { punktyCzola } from './fala.js';
 
-// ZGADNIĘTE - wymaga potwierdzenia na żywym ciele (klawisz D), jak inne
-// stałe wizualne w tym repo (OGNISKO w fala.js, CZAS_TRWANIA w zaplon.js).
-const CZAS_TRWANIA = 0.45;      // s
-const AMPLITUDA_PRZESUNIECIA = 0.015;  // ułamek szerokości płótna
-const SKALA_ZAPASOWA = 1.03;    // >1, żeby przesunięcie nie odsłoniło krawędzi pod wideo
-const ALFA_WINIETY = 0.55;
-const PROMIEN_BLUR_BLOOM = 6;   // px, na pomniejszonej kopii (1/4 rozmiaru)
-const DZIELNIK_BLOOM = 4;       // pomniejszenie płótna pomocniczego bloomu
-const ALFA_BLOOM = 0.35;
+/**
+ * Nastawy strojeniowe - eksportowane i MUTOWALNE dla tools/scena.html.
+ * ZGADNIĘTE - wymagają potwierdzenia na żywym ciele (klawisz D), jak inne
+ * stałe wizualne w tym repo (OGNISKO w fala.js, CZAS_TRWANIA w zaplon.js).
+ * Płótna pomocnicze (bloom/fala) zmieniają rozmiar dynamicznie co klatkę,
+ * więc DZIELNIK_BLOOM nie potrzebuje wyczyscCache() - następna klatka po
+ * zmianie po prostu przebudowuje bufor do nowego rozmiaru.
+ */
+export const NASTAWY = {
+    CZAS_TRWANIA: 0.45,      // s
+    AMPLITUDA_PRZESUNIECIA: 0.015,  // ułamek szerokości płótna
+    SKALA_ZAPASOWA: 1.03,    // >1, żeby przesunięcie nie odsłoniło krawędzi pod wideo
+    ALFA_WINIETY: 0.55,
+    PROMIEN_BLUR_BLOOM: 6,   // px, na pomniejszonej kopii (1/4 rozmiaru)
+    DZIELNIK_BLOOM: 4,       // pomniejszenie płótna pomocniczego bloomu
+    ALFA_BLOOM: 0.35,
 
-// --- fala powietrza (refrakcja Aarda) ---
-const CZAS_FALI = 0.6;          // s - dłużej niż wstrząs: czoło musi dolecieć do brzegu
-const WYBRZUSZENIE = 0.07;      // maks. mnożnik skali kopii sceny - 1 (7 % "rozepchnięcia")
-const GRUBOSC_OD = 0.45, GRUBOSC_DO = 0.18;  // ułamek promienia czoła: soczewka cienieje w locie
-const PUNKTOW_CZOLA = 48;
-const MARGINES_PX = 8;          // zapas wokół prostokąta kopii - skala rozpycha piksele poza obrys
+    // --- fala powietrza (refrakcja Aarda) ---
+    CZAS_FALI: 0.6,          // s - dłużej niż wstrząs: czoło musi dolecieć do brzegu
+    WYBRZUSZENIE: 0.07,      // maks. mnożnik skali kopii sceny - 1 (7 % "rozepchnięcia")
+    GRUBOSC_OD: 0.45, GRUBOSC_DO: 0.18,  // ułamek promienia czoła: soczewka cienieje w locie
+    PUNKTOW_CZOLA: 48,
+    MARGINES_PX: 8,          // zapas wokół prostokąta kopii - skala rozpycha piksele poza obrys
+};
 
 /**
  * Obwiednia jednego wstrząsu: szybki narost, szybkie tłumione wygaszanie -
  * czysta funkcja, testowalna bez document (ten sam wzorzec co obwiednia()
  * w zaplon.js).
  *
- * @param {number} p  0..1 (t / CZAS_TRWANIA)
+ * @param {number} p  0..1 (t / NASTAWY.CZAS_TRWANIA)
  * @returns {number} 0..1
  */
 export function obwiedniaUderzenia(p) {
@@ -94,7 +102,7 @@ export function obwiedniaUderzenia(p) {
  * najsilniejsze zagięcie było w pierwszej chwili (moment uderzenia), a
  * długi ogon czytał się jako "powietrze się uspokaja".
  *
- * @param {number} p  0..1 (t / CZAS_FALI)
+ * @param {number} p  0..1 (t / NASTAWY.CZAS_FALI)
  * @returns {number} 0..1
  */
 export function obwiedniaFali(p) {
@@ -123,8 +131,16 @@ export class Ekran {
         this._bloomCtx = null;
     }
 
+    /**
+     * No-op - płótna pomocnicze bloomu/fali resize'ują się same co klatkę
+     * (patrz komentarz przy NASTAWY). Metoda istnieje, żeby stanowisko
+     * (tools/scena.html) mogło wołać wyczyscCache() jednolicie na każdym
+     * module po zmianie suwaka, bez sprawdzania, czy dany moduł go potrzebuje.
+     */
+    wyczyscCache() {}
+
     /** Siła bieżącego wstrząsu 0..1 - bramka dla bloomu w dokoncz(). */
-    get sila() { return this._trwa ? this._sila * obwiedniaUderzenia(this._t / CZAS_TRWANIA) : 0; }
+    get sila() { return this._trwa ? this._sila * obwiedniaUderzenia(this._t / NASTAWY.CZAS_TRWANIA) : 0; }
 
     /**
      * Uderzenie. Ponowne wywołanie w trakcie trwania RESTARTUJE obwiednię -
@@ -187,13 +203,13 @@ export class Ekran {
     przesun(ctx, W, H) {
         const s = this.sila;
         if (!ctx || s <= 0.001 || !Number.isFinite(W) || !Number.isFinite(H)) return;
-        const p = this._t / CZAS_TRWANIA;
-        const amp = W * AMPLITUDA_PRZESUNIECIA * s;
+        const p = this._t / NASTAWY.CZAS_TRWANIA;
+        const amp = W * NASTAWY.AMPLITUDA_PRZESUNIECIA * s;
         const dx = Math.sin(p * Math.PI * 9 + this._fazaX) * amp;
         const dy = Math.sin(p * Math.PI * 11 + this._fazaY) * amp * 0.6;
         // Skala > 1 wokół środka, żeby przesunięcie nie odsłoniło krawędzi
         // pod wideo (płótno jest wypełnione cover-fit, nie ma zapasu poza brzegiem).
-        const skala = 1 + (SKALA_ZAPASOWA - 1) * s;
+        const skala = 1 + (NASTAWY.SKALA_ZAPASOWA - 1) * s;
         ctx.translate(W / 2, H / 2);
         ctx.scale(skala, skala);
         ctx.translate(-W / 2 + dx, -H / 2 + dy);
@@ -219,11 +235,11 @@ export class Ekran {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         if (this._trwa) {
             this._t += krok;
-            if (this._t >= CZAS_TRWANIA) this._trwa = false;
+            if (this._t >= NASTAWY.CZAS_TRWANIA) this._trwa = false;
         }
         if (this._fala) {
             this._fala.t += krok;
-            if (this._fala.t >= CZAS_FALI) this._fala = null;
+            if (this._fala.t >= NASTAWY.CZAS_FALI) this._fala = null;
         }
 
         const wymiaryOk = Number.isFinite(W) && Number.isFinite(H) && W > 0 && H > 0;
@@ -242,7 +258,7 @@ export class Ekran {
             W / 2, H / 2, Math.max(W, H) * 0.75
         );
         g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, `rgba(0,0,0,${(ALFA_WINIETY * s).toFixed(3)})`);
+        g.addColorStop(1, `rgba(0,0,0,${(NASTAWY.ALFA_WINIETY * s).toFixed(3)})`);
         ctx.save();
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
@@ -254,16 +270,16 @@ export class Ekran {
 
     _falaPowietrza(ctx, W, H) {
         const f = this._fala;
-        const p = f.t / CZAS_FALI;
+        const p = f.t / NASTAWY.CZAS_FALI;
         const obw = obwiedniaFali(p);
-        const wybrzuszenie = WYBRZUSZENIE * f.sila * obw;
+        const wybrzuszenie = NASTAWY.WYBRZUSZENIE * f.sila * obw;
         if (wybrzuszenie < 0.002) return;   // niewidoczne - nie płać za kopię płótna
 
         // Zewnętrzna i wewnętrzna krawędź czoła - z fala.js, żeby soczewka
         // leżała dokładnie na cząstkach (nagłówek). Grubość maleje w locie.
-        const grubosc = GRUBOSC_OD + (GRUBOSC_DO - GRUBOSC_OD) * p;
-        const zewn = punktyCzola(f.zaczep, f.kierunek, f.sila, f.t, PUNKTOW_CZOLA, 1);
-        const wewn = punktyCzola(f.zaczep, f.kierunek, f.sila, f.t, PUNKTOW_CZOLA, 1 - grubosc);
+        const grubosc = NASTAWY.GRUBOSC_OD + (NASTAWY.GRUBOSC_DO - NASTAWY.GRUBOSC_OD) * p;
+        const zewn = punktyCzola(f.zaczep, f.kierunek, f.sila, f.t, NASTAWY.PUNKTOW_CZOLA, 1);
+        const wewn = punktyCzola(f.zaczep, f.kierunek, f.sila, f.t, NASTAWY.PUNKTOW_CZOLA, 1 - grubosc);
         if (zewn.punkty.length < 3 || wewn.punkty.length < 3) return;
 
         // Prostokąt kopii: obrys zewnętrznej krawędzi, przycięty do płótna.
@@ -272,8 +288,8 @@ export class Ekran {
             if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x;
             if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y;
         }
-        x0 = Math.max(0, Math.floor(x0 - MARGINES_PX)); y0 = Math.max(0, Math.floor(y0 - MARGINES_PX));
-        x1 = Math.min(W, Math.ceil(x1 + MARGINES_PX));  y1 = Math.min(H, Math.ceil(y1 + MARGINES_PX));
+        x0 = Math.max(0, Math.floor(x0 - NASTAWY.MARGINES_PX)); y0 = Math.max(0, Math.floor(y0 - NASTAWY.MARGINES_PX));
+        x1 = Math.min(W, Math.ceil(x1 + NASTAWY.MARGINES_PX));  y1 = Math.min(H, Math.ceil(y1 + NASTAWY.MARGINES_PX));
         const bw = x1 - x0, bh = y1 - y0;
         if (bw < 2 || bh < 2) return;   // czoło całe poza kadrem
 
@@ -313,8 +329,8 @@ export class Ekran {
     }
 
     _bloom(ctx, W, H, s) {
-        const bw = Math.max(1, Math.round(W / DZIELNIK_BLOOM));
-        const bh = Math.max(1, Math.round(H / DZIELNIK_BLOOM));
+        const bw = Math.max(1, Math.round(W / NASTAWY.DZIELNIK_BLOOM));
+        const bh = Math.max(1, Math.round(H / NASTAWY.DZIELNIK_BLOOM));
         if (!this._bloomPlotno) {
             this._bloomPlotno = document.createElement('canvas');
             this._bloomCtx = this._bloomPlotno.getContext('2d');
@@ -329,8 +345,8 @@ export class Ekran {
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_BLOOM * s));
-        ctx.filter = `blur(${PROMIEN_BLUR_BLOOM}px)`;
+        ctx.globalAlpha = Math.max(0, Math.min(1, NASTAWY.ALFA_BLOOM * s));
+        ctx.filter = `blur(${NASTAWY.PROMIEN_BLUR_BLOOM}px)`;
         ctx.drawImage(this._bloomPlotno, 0, 0, bw, bh, 0, 0, W, H);
         ctx.filter = 'none';
         ctx.globalAlpha = 1;
