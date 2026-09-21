@@ -403,7 +403,16 @@ body.ready-pulse #energy-percentage {
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 20px rgba(239, 227, 200, 0.85);
 }
 
-/* Efekty stanów gry na cały ekran */
+/* Efekty stanów gry na cały ekran.
+   STAGING (P4, 2026-09-21): przy pełnej mocy dawniej pulsowały NARAZ
+   cztery rzeczy - floatingHUD, pulseIcon, barPulse, fullscreenPulse -
+   "single focal point" (userinterface-wiki staging-one-focal-point):
+   jeden punkt uwagi. Pasek mocy (.charged-glow / barPulse) ZOSTAJE
+   pulsujący - to jest miernik, na niego gracz patrzy. Poświata pełnego
+   ekranu jest teraz STATYCZNA (bez fullscreenPulse) - tło, nie drugi
+   rywalizujący ruch. Ikona podpowiedzi i kołysanie #instruction-hud
+   (floatingHUD) są WYCISZONE pod ready-pulse, nie usunięte - przy
+   niższej mocy dalej subtelnie żyją. */
 body.ready-pulse::after {
     content: '';
     position: absolute;
@@ -414,28 +423,39 @@ body.ready-pulse::after {
     box-shadow: inset 0 0 100px rgba(217, 164, 65, 0.35);
     pointer-events: none;
     z-index: 5;
-    animation: fullscreenPulse 1.5s infinite alternate;
+    opacity: 0.6;   /* środek dawnego zakresu 0.3-0.9 fullscreenPulse - statyczne */
 }
 
-@keyframes fullscreenPulse {
-    0% { opacity: 0.3; }
-    100% { opacity: 0.9; }
+body.ready-pulse .instruction-icon {
+    animation: none;
 }
 
-body.cooldown-state::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    box-shadow: inset 0 0 100px rgba(122, 31, 15, 0.3);
-    pointer-events: none;
-    z-index: 5;
-    animation: cooldownPulse 0.5s infinite alternate;
+body.ready-pulse #instruction-hud {
+    animation: none;
 }
 
-@keyframes cooldownPulse {
-    0% { opacity: 0.4; }
-    100% { opacity: 0.8; }
+/* body.cooldown-state (P4, 2026-09-21): USUNIĘTE - sierota, żaden kod JS
+   nigdy nie przełączał tej klasy (main.js zna tylko .charged-glow i
+   .ready-pulse). Martwe CSS z martwym @keyframes cooldownPulse. */
+
+/* --- PREFERS-REDUCED-MOTION (P4, 2026-09-21) ---
+   Gasi WYŁĄCZNIE dekoracyjne, NIESKOŃCZONE animacje chromu HUD/UI
+   (kołowrót run na ekranie startowym, kołysanie/pulsowanie podpowiedzi,
+   pulsowanie paska mocy, poświata pełnej mocy). NIE dotyka VFX na
+   płótnie (iskry/dym/fala/kołowrót itd.) - to jest TREŚĆ gry, ruch
+   taneczny reagujący na gracza, nie ozdobnik interfejsu wokół niej.
+   Crossfade komunikatów zostaje funkcjonalnie (tekst nadal się zmienia),
+   ale bez animowanego przejścia - 1ms zamiast 150/220ms. body.ready-pulse::after
+   nie ma tu wpisu - P4.4 (wyżej) już zamieniło jej fullscreenPulse na
+   stałą opacity, nie ma animacji do wygaszenia. */
+@media (prefers-reduced-motion: reduce) {
+    .krag-run,
+    #instruction-hud,
+    .instruction-icon,
+    .charged-glow {
+        animation: none;
+    }
+    .komunikat {
+        transition-duration: 1ms;
+    }
 }
