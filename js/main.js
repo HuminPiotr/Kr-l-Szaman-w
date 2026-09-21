@@ -14,7 +14,7 @@ import { mokosz } from './znaki/mokosz.js';
 import { aktualizujSkale } from './znaki/postawa.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
-import { Efekty, TABELA as EFEKTY_TABELA, srodekDloni } from './efekty.js';
+import { Efekty } from './efekty.js';
 import { zaladujFont } from './glify.js';
 import { Runy } from './runa.js';
 import { PasekSekwencji } from './sekwencja.js';
@@ -25,11 +25,12 @@ import { Dym } from './dym.js';
 import { Podmuch, PROG_PREDKOSCI, PROG_OTWARCIA, OGNISKO_KAMERY } from './podmuch.js';
 import { Fala, pchniecieCzola } from './fala.js';
 import { Tecza } from './tecza.js';
-import { Iskry, pekniecieZiemi } from './iskry.js';
+import { Iskry } from './iskry.js';
 import { Zaplon } from './zaplon.js';
 import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
-import { Kolowrot, BARWA_MGLA as BARWA_KOLOWROTU, kregSylwetki } from './kolowrot.js';
+import { Kolowrot } from './kolowrot.js';
+import { odpalPieczec, odpalTechnike, BARWA_ZAPLONU } from './techniki.js';
 import { zaladuj as zaladujAssety } from './assety.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
@@ -68,34 +69,12 @@ const IKONA = {
     czlowiek: 'ᛗ'      // "pokaż się kamerze" - sylwetka człowieka
 };
 
-// Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
-// PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
-// fala.js rysuje przez 'lighter': muszony fiolet, który dobrze czyta się
-// jako pieczęć, gaśnie do bladego różu pod addytywnym blendowaniem, jeśli
-// nie jest wystarczająco nasycony na starcie.
-const BARWA_GROMU = [190, 100, 255];
-
-// Barwy zapłonu sylwetki (js/zaplon.js) per TECHNIKA (pole `uzbraja`
-// z js/kombosy.js) - jeden wpis na każdą z czterech technik, nie na
-// pojedynczą pieczęć: zapłon jest nagrodą za COMBO, tak samo jak
-// fala/iskry przy Gromie w Ziemię. Barwy dobrane z tego samego rejestru
-// co efekty.js TABELA (przybliżone RGB odpowiedniej barwy HSL, podbite do
-// pełnego nasycenia z tego samego powodu co BARWA_GROMU wyżej).
-const BARWA_ZAPLONU = {
-    ogien: [255, 140, 40],        // pomarańcz Swaroga (efekty.js swarog: 25°)
-    aard: [140, 235, 195],        // mięta Striboga (efekty.js stribog: 160°)
-    // Tęcza nie ma JEDNEJ barwy z definicji - biel czyta się jako "cała
-    // paleta naraz", zamiast fałszywie wybierać jeden odcień z siedmiu.
-    tecza: [255, 255, 255],
-    gromWZiemie: BARWA_GROMU,
-    // Turkus mgły Kołowrotu (js/kolowrot.js) - JEDNO ŹRÓDŁO PRAWDY (import,
-    // nie powielona wartość), żeby zapłon sylwetki i sam efekt zawsze grały
-    // tą samą barwą.
-    kolowrot: BARWA_KOLOWROTU,
-    // Jasna, chłodna szarość - dym jeszcze nie płonie w chwili uzbrojenia
-    // combo (patrz efekty.js TABELA.dym - ten sam powód, ta sama barwa).
-    dym: [210, 210, 220]
-};
+// BARWA_GROMU i BARWA_ZAPLONU przeniesione do js/techniki.js (P1.2,
+// 2026-09-21) razem z dispatchem pieczęci/technik, który ich używa - tak
+// samo importuje je tools/scena.html (stanowisko VFX), żeby odpalać
+// DOKŁADNIE te same efekty co main.js. main.js importuje z powrotem tylko
+// BARWA_ZAPLONU (BARWA_GROMU nie jest tu już potrzebne) - używane przy
+// właściwym STRZALE Aarda (niżej, poza dispatchem uzbrojenia).
 
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
@@ -490,99 +469,22 @@ function klatka(now) {
     const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik);
 
     // --- 6a. Pieczęć się złożyła ---
+    // Dispatch efektów pieczęci/technik przeniesiony do js/techniki.js
+    // (P1.2, 2026-09-21) - jedno źródło prawdy dzielone z tools/scena.html
+    // (stanowisko VFX), żeby to, co odpala bench, było DOKŁADNIE tym, co
+    // odpala prawdziwa gra, nie równoległą reimplementacją.
     if (skl.zlozona) {
         motionMeter.zuzyj(skl.zlozona.koszt);
-        efekty.odpal(skl.zlozona.id);
-        // Wielka runa (js/runa.js) - zastępuje dawny pierścień. Zaczep
-        // TEN SAM, którego używa efekty.js dla wszystkich efektów pieczęci
-        // (środek dłoni), barwa z TEJ SAMEJ tabeli - jedno źródło prawdy.
-        runy.odpal(skl.zlozona.id, srodekDloni(frame, canvas.width, canvas.height),
-                   EFEKTY_TABELA[skl.zlozona.id]?.barwa);
-        aura.rozblysk(1);
-        // playFireSFX, NIE update('FIRING'): 'FIRING' tylko WYCISZA hum
-        // (audioEngine.js:100-103), a klatkę później update('CHARGING') na
-        // dole pętli i tak go przywraca - pieczęć wyszłaby bezgłośna.
-        // Argument steruje wysokością startową, więc pieczęć brzmi lżej
-        // niż technika.
-        audioEngine.playFireSFX(0.3);
+        odpalPieczec(skl.zlozona.id, frame, canvas.width, canvas.height,
+                     { efekty, runy, aura, audio: audioEngine });
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
-            efekty.odpal(technika.id);
-            // Pasek sekwencji "wiąże" ogon bufora, który właśnie trafił -
-            // po t (znacznik czasu), NIE po pozycji, więc kolejne pieczęcie
-            // dodane PO tym combo nie dziedziczą więzi (js/sekwencja.js
-            // nagłówek). Bufor sam NIE jest czyszczony - kombosy.js
-            // nagłówek, łańcuchy są celowe.
-            sekwencja.oznaczCombo(kombosy.bufor.slice(-technika.sekwencja.length), technika.nazwa, now);
-            aura.rozblysk(1);
-            // Zapłon sylwetki (js/zaplon.js) i wstrząs ekranu (js/ekran.js) -
-            // WARSTWA WSPÓLNA dla WSZYSTKICH czterech technik, nie tylko
-            // Gromu w Ziemię (ten dostaje DODATKOWO falę+iskry+grzmot
-            // w gałęzi niżej). Siła stała (1.0) z tego samego powodu co
-            // przy Gromie w Ziemię - technika jest gratis, efekt nie może
-            // być karą za niski pasek mocy.
-            zaplon.zapal(BARWA_ZAPLONU[technika.uzbraja] ?? [255, 255, 255], 1.0);
-            ekran.uderz(1.0);
-            // Kombos uzbraja technikę WSKAZANĄ POLEM `uzbraja` - dopóki
-            // technika była jedna, bezwarunkowe uzbrajanie ognia było
-            // w porządku; przy dwóch trzeba routować.
-            // Bez licznika ważności - licznik byłby presją ("szybciej!"),
-            // a to ma być relaks.
-            if (technika.uzbraja === 'ogien') {
-                plonacyPalec.uzbrój();
-            } else if (technika.uzbraja === 'aard') {
-                podmuch.uzbrój();
-            } else if (technika.uzbraja === 'tecza') {
-                // Nagroda odpala się NATYCHMIAST, bez drugiego gestu -
-                // inaczej niż 'ogien'/'aard', które tylko UZBRAJAJĄ technikę
-                // czekającą na osobny gest gracza. aktywuj() (re)startuje
-                // licznik do pełnych 30 s bezwarunkowo.
-                tecza.aktywuj();
-            } else if (technika.uzbraja === 'gromWZiemie') {
-                // Aktywacja NATYCHMIASTOWA jak Tęcza. Siła STAŁA (1.0), NIE
-                // pochodna motionMeter.moc - combo jest gratis, efekt nie
-                // może być karą za niski pasek mocy. Bez motionMeter.zuzyj()
-                // z tego samego powodu - w przeciwieństwie do gałęzi
-                // podmuchu niżej, tu nic nie jest "kupowane" z paska mocy.
-                const zaczepPx = pekniecieZiemi(frame, canvas.width, canvas.height);
-                // Piorun UDERZA PIERWSZY (js/piorun.js) - dopiero w niego
-                // pęka ziemia i tryskają iskry. To jedyny efekt w grze
-                // z prawdziwą, twardą krawędzią zamiast kolejnej miękkiej
-                // plamy - patrz nagłówek piorun.js. Ta sama barwa co fala,
-                // żeby cała sekwencja czytała się jako JEDNO zdarzenie.
-                piorun.uderz(zaczepPx, BARWA_GROMU, 1.0);
-                // Kierunek {0,-1,0} daje w fala.js pierścień w płaszczyźnie
-                // POZIOMEJ (prostopadłej do "w górę") - "pęknięcie ziemi,
-                // energia wybucha na boki i w głąb", nie fontanna.
-                //
-                // BARWA_GROMU: fiolet Welesa, jasny wariant jego pieczęci
-                // (efekty.js weles: 280°) - fala.js domyślnie jest blada
-                // niebieska (barwa Aarda), a ta sama fala niosła oba combosy
-                // nie do odróżnienia dopóki wystrzel() nie przyjął barwy.
-                fala.wystrzel(zaczepPx, { x: 0, y: -1, z: 0 }, 1.0, BARWA_GROMU);
-                iskry.wystrzel(zaczepPx, 1.0);
-                audioEngine.playGromSFX();
-            } else if (technika.uzbraja === 'kolowrot') {
-                // Aktywacja NATYCHMIASTOWA jak Tęcza i Grom w Ziemię. Siła
-                // STAŁA (1.0) z tego samego powodu - combo jest gratis.
-                // Zaczep na TUŁOWIU (kregSylwetki, nie pekniecieZiemi) -
-                // krąg rośnie WOKÓŁ tancerza (pas -> nad głowę), nie leży
-                // na niewidocznej podłodze. Patrz nagłówek kolowrot.js.
-                const kolko = kregSylwetki(frame, canvas.width, canvas.height);
-                kolowrot.zapal(kolko, kolko.skala, canvas.height, 1.0);
-                audioEngine.playKolowrotSFX();
-            } else if (technika.uzbraja === 'dym') {
-                // Trzecia technika KANAŁOWANA (jak 'ogien'/'aard') - uzbraja,
-                // nie odpala natychmiast. Gest aktywacji: js/dmuchanie.js.
-                dmuchanie.uzbrój(now);
-            }
-            // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
-            // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,
-            // NIE KONIEC". Bez tego nie byłoby drogi do podpalenia dymu:
-            // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
-            if (technika.uzbraja !== 'dym') dmuchanie.anuluj();
-            audioEngine.playFireSFX(1.0);
+            odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
+                efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie,
+                audio: audioEngine
+            });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
