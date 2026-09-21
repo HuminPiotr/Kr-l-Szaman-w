@@ -1,3 +1,5 @@
+import { krokTlumienia, obwiedniaCzastki } from './czastki.js';
+
 /**
  * Iskry Gromu w Ziemię - układ cząstek, TYLKO rysowanie.
  *
@@ -205,14 +207,17 @@ export class Iskry {
 
             // DWA RÓŻNE TŁUMIENIA - styczna (wir) gaśnie szybko, promieniowa
             // (wybuch) trwa dłużej. To one dają charakter zawirowania.
-            const oporT = 1 - NASTAWY.OPOR_STYCZNY * krok;
-            const oporR = 1 - NASTAWY.OPOR_PROMIENIOWY * krok;
-            c.vtx *= oporT; c.vty *= oporT;
-            c.vrx *= oporR; c.vry *= oporR;
+            // Siła wymuszona (wyporność) NAJPIERW, potem dokładna całka
+            // pozycji (krokTlumienia - patrz js/czastki.js), potem zanik
+            // prędkości - konwencja opisana w nagłówku czastki.js.
             c.vry -= NASTAWY.WYPORNOSC * krok;   // lekki unos w górę, jak żar w ogien.js
 
-            c.x += (c.vtx + c.vrx) * krok;
-            c.y += (c.vty + c.vry) * krok;
+            const t = krokTlumienia(NASTAWY.OPOR_STYCZNY, krok);
+            const r = krokTlumienia(NASTAWY.OPOR_PROMIENIOWY, krok);
+            c.x += c.vtx * t.s + c.vrx * r.s;
+            c.y += c.vty * t.s + c.vry * r.s;
+            c.vtx *= t.e; c.vty *= t.e;
+            c.vrx *= r.e; c.vry *= r.e;
 
             if (Number.isFinite(c.x) && Number.isFinite(c.y)) zywe.push(c);
         }
@@ -229,7 +234,7 @@ export class Iskry {
             const p = c.wiek / c.zycie;
             // Szybki narost, powolne wygaszanie - ten sam kształt obwiedni
             // co w ogien.js/fala.js.
-            const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
+            const alfa = obwiedniaCzastki(p);
             const r = NASTAWY.SPRITE_PX * c.skala * (0.6 + 0.8 * p);
 
             const idx = Math.min(NASTAWY.LICZBA_BARW_RAMPY - 1, Math.floor(c.barwaT * NASTAWY.LICZBA_BARW_RAMPY));

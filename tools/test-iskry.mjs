@@ -135,4 +135,36 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     NASTAWY.MAX_CZASTECZEK = domyslnyMax;
 }
 
+// --- 10. Dokładność tłumienia (P2b) - jedna cząstka vs forma zamknięta ---
+console.log('\nDOKŁADNOŚĆ TŁUMIENIA (krokTlumienia, patrz js/czastki.js):');
+{
+    // WYPORNOSC=0, ROZRZUT_PREDKOSCI=0 - izolujemy CZYSTY opór (bez siły
+    // wymuszonej), żeby porównanie z formą zamkniętą v0*(1-exp(-k*t))/k
+    // było DOKŁADNE, nie tylko przybliżone.
+    const domyslneWypornosc = NASTAWY.WYPORNOSC;
+    const domyslnyRozrzut = NASTAWY.ROZRZUT_PREDKOSCI;
+    NASTAWY.WYPORNOSC = 0;
+    NASTAWY.ROZRZUT_PREDKOSCI = 0;
+
+    const i9 = new Iskry();
+    i9._dodaj({ x: 0, y: 0, vrx: 300, vry: 0, vtx: 0, vty: 200, zycie: 10, skala: 1, wiek: 0, barwaT: 0 });
+    // Pętla LICZNIKOWA, nie "s += DT" - dryf zmiennoprzecinkowy akumulatora
+    // czasu potrafi dodać/ubrać krok (30 vs 31 wywołań _ruszaj), co psuje
+    // porównanie z formą zamkniętą niezależnie od poprawności fizyki.
+    const N = 30;
+    const T = N * DT;
+    for (let i = 0; i < N; i++) i9._ruszaj(DT);
+
+    const promienOczekiwany = 300 * (1 - Math.exp(-NASTAWY.OPOR_PROMIENIOWY * T)) / NASTAWY.OPOR_PROMIENIOWY;
+    const stycznaOczekiwana = 200 * (1 - Math.exp(-NASTAWY.OPOR_STYCZNY * T)) / NASTAWY.OPOR_STYCZNY;
+    const c = i9.czastki[0];
+    spr(`promieniowa (x) zgadza się z formą zamkniętą co do 1e-6 (${c.x.toFixed(6)} vs ${promienOczekiwany.toFixed(6)})`,
+        Math.abs(c.x - promienOczekiwany) < 1e-6);
+    spr(`styczna (y) zgadza się z formą zamkniętą co do 1e-6 (${c.y.toFixed(6)} vs ${stycznaOczekiwana.toFixed(6)})`,
+        Math.abs(c.y - stycznaOczekiwana) < 1e-6);
+
+    NASTAWY.WYPORNOSC = domyslneWypornosc;
+    NASTAWY.ROZRZUT_PREDKOSCI = domyslnyRozrzut;
+}
+
 process.exit(ok ? 0 : 1);
