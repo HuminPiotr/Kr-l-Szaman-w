@@ -36,10 +36,21 @@
             <p>Duchy się budzą — kamera i model ruchu…</p>
         </div>
 
-        <!-- Podpowiedź UI -->
+        <!-- Podpowiedź UI - DWIE warstwy nałożone na siebie (P4, 2026-09-21):
+             main.js pisze nowy komunikat do NIEAKTYWNEJ warstwy, potem
+             przełącza .aktywny - opacity się KRZYŻUJE zamiast twardo
+             podmieniać textContent (dawniej bez animacji przy zmianie
+             tekstu, mimo transition w CSS - triggerowała je tylko klasa
+             .hidden przy starcie gry). -->
         <div id="instruction-hud" class="hidden">
-            <span id="instruction-icon">ᛗ</span>
-            <span id="instruction-text">Złóż dłonie w miseczkę naprzeciw siebie</span>
+            <span class="komunikat aktywny" data-warstwa="a">
+                <span class="instruction-icon">ᛗ</span>
+                <span class="instruction-text">Złóż dłonie w miseczkę naprzeciw siebie</span>
+            </span>
+            <span class="komunikat" data-warstwa="b">
+                <span class="instruction-icon"></span>
+                <span class="instruction-text"></span>
+            </span>
         </div>
 
         <!-- Pasek sekwencji - ostatnio złożone pieczęcie i combosy -->

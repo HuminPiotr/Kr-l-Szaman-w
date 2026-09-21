@@ -199,9 +199,7 @@ button:active {
     position: absolute;
     top: 2rem;
     pointer-events: none;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
+    display: grid;   /* warstwy .komunikat nałożone na siebie w tej samej komórce */
     font-size: 1.15rem;
     font-weight: 600;
     color: var(--kosc);
@@ -211,12 +209,30 @@ button:active {
     z-index: 15;
 }
 
+/* Crossfade komunikatów (P4, 2026-09-21) - dwie warstwy w JEDNEJ komórce
+   grida, main.js pisze do nieaktywnej i przełącza .aktywny. Wyjście
+   SZYBSZE niż wejście (150ms vs 220ms, easing-exit-ease-in /
+   easing-entrance-ease-out) - stary komunikat ustępuje miejsca, nie
+   zwleka. Oba w paśmie 180-260ms dla "małej zmiany stanu". */
+.komunikat {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    opacity: 0;
+    transition: opacity 150ms ease-in;
+}
+.komunikat.aktywny {
+    opacity: 1;
+    transition: opacity 220ms ease-out;
+}
+
 @keyframes floatingHUD {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
 }
 
-#instruction-icon {
+.instruction-icon {
     font-family: 'Noto Sans Runic', serif;
     font-size: 1.5rem;
     color: var(--zloto);

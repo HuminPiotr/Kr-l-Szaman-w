@@ -31,6 +31,7 @@ import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { odpalPieczec, odpalTechnike, BARWA_ZAPLONU } from './techniki.js';
+import { Histereza } from './histereza.js';
 import { zaladuj as zaladujAssety } from './assety.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
 import { wzorPalcow, pelnaDlon, odlegloscNadgarstkow, zbieznoscOpuszek,
@@ -79,8 +80,24 @@ const IKONA = {
 const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
 const uiInstructionHud = document.getElementById('instruction-hud');
-const uiInstructionIcon = document.getElementById('instruction-icon');
-const uiInstructionText = document.getElementById('instruction-text');
+// Crossfade dwuwarstwowy (P4, 2026-09-21, patrz index.html) - dwie warstwy
+// .komunikat w tej samej komórce grida; ustawKomunikat() niżej pisze do
+// NIEAKTYWNEJ i przełącza .aktywny, więc opacity się krzyżuje zamiast
+// twardo podmieniać textContent.
+const uiKomunikatWarstwy = [...uiInstructionHud.querySelectorAll('.komunikat')];
+let uiKomunikatAktywnaTresc = null;   // ostatni ustawiony tekst - po nim wykrywamy "nic się nie zmieniło"
+
+/** Ustawia komunikat HUD z crossfade - no-op, gdy tekst jest identyczny z bieżącym. */
+function ustawKomunikat(tekst, ikona) {
+    if (tekst === uiKomunikatAktywnaTresc) return;
+    uiKomunikatAktywnaTresc = tekst;
+    const aktywna = uiKomunikatWarstwy.find(w => w.classList.contains('aktywny'));
+    const nieaktywna = uiKomunikatWarstwy.find(w => w !== aktywna) ?? uiKomunikatWarstwy[0];
+    nieaktywna.querySelector('.instruction-icon').textContent = ikona;
+    nieaktywna.querySelector('.instruction-text').textContent = tekst;
+    nieaktywna.classList.add('aktywny');
+    aktywna?.classList.remove('aktywny');
+}
 const uiEnergyHud = document.getElementById('energy-hud');
 const uiEnergyFill = document.getElementById('energy-fill');
 const uiEnergyPercentage = document.getElementById('energy-percentage');
@@ -150,6 +167,14 @@ let lastFrameTime = 0;
 let poprzNadgarstkiPx = null;
 let ostatniWybuchSFX = -Infinity;   // performance.now() ostatniego dźwięku detonacji dymu
 let poprzStanPalca = 'BEZCZYNNY';   // do wykrycia krawędzi PLONIE/BEZCZYNNY (P3, 2026-09-21 - dźwięk zapłonu/zgaszenia)
+
+// Histereza "moc pełna" (P4, 2026-09-21) - zastępuje gołe `moc >= 0.95`
+// przy .charged-glow/.ready-pulse/komunikacie HUD. Wejście przy 0.95,
+// wyjście przy 0.90 - GEMINI.md §2 "progi mają histerezę; nic nie miga
+// na granicy", którego ten jeden punkt w kodzie dotąd nie przestrzegał
+// (moc jest wygładzonym integratorem, więc w praktyce rzadko migało, ale
+// bez pasma nic tego nie gwarantowało).
+const pelnaMoc = new Histereza(0.95, 0.90);
 let wybuchyDoDzwieku = 0;           // wybuchy zebrane od ostatniego dźwięku
 const ODSTEP_WYBUCH_SFX_MS = 120;
 
@@ -728,11 +753,13 @@ function klatka(now) {
     const mocPct = Math.round(moc * 100);
     uiEnergyPercentage.textContent = `${mocPct}%`;
     uiEnergyFill.style.width = `${mocPct}%`;
-    uiEnergyFill.classList.toggle('charged-glow', moc >= 0.95);
+    // JEDNO wywołanie update() na klatkę - obie klasy CZYTAJĄ ten sam stan.
+    const jestPelna = pelnaMoc.update(moc);
+    uiEnergyFill.classList.toggle('charged-glow', jestPelna);
     // toggle(), NIE className = ... - przypisanie kasowało CAŁĄ listę klas
     // elementu co klatkę, więc każda inna klasa dołożona do <body> ginęłaby
     // najdalej za jedną klatkę.
-    document.body.classList.toggle('ready-pulse', moc >= 0.95);
+    document.body.classList.toggle('ready-pulse', jestPelna);
 
     // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
@@ -753,7 +780,7 @@ function klatka(now) {
     } else if (skl.skladana) {
         text = `Trzymaj — pieczęć się składa ${IKONA.plynie}`;
         icon = IKONA.plynie;
-    } else if (moc >= 0.95) {
+    } else if (jestPelna) {
         text = `Moc wypełniła cię po brzegi — układaj pieczęcie ${IKONA.swit}`;
         icon = IKONA.swit;
     } else if (plynnoscMiara.aktywnychStawow === 0) {
@@ -767,8 +794,7 @@ function klatka(now) {
         text = `Rozpuść ruch w łagodne łuki, a moc popłynie szybciej ${IKONA.plynie}`;
         icon = IKONA.plynie;
     }
-    uiInstructionText.textContent = text;
-    uiInstructionIcon.textContent = icon;
+    ustawKomunikat(text, icon);
 
     // Sygnatura straciła parametr `state` (P3, 2026-09-21) - był zawsze
     // 'CHARGING' (jedyne wywołanie w całej grze), gałąź READY/FIRING w
