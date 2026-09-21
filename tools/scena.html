@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stanowisko VFX - Król Szamanów</title>
+
+<!--
+  Baza dokumentu = KORZEŃ REPO (tools/scena.html + "../" = korzeń), nie
+  katalog tools/. Dzięki temu:
+    1. import './js/techniki.js' w skrypcie modułowym niżej rozwiązuje się
+       tak samo jak w index.html (import 'js/main.js'), bez '../' przed
+       każdą ścieżką.
+    2. assety.js robi `img.src = 'assets/czastki/...'` (ścieżka względna
+       WZGLĘDEM DOKUMENTU, nie względem modułu JS) - bez <base> te obrazki
+       szukałyby się w tools/assets/, którego nie ma.
+  Serwować z KORZENIA repo: `python3 -m http.server 8000`, otworzyć
+  http://localhost:8000/tools/scena.html - otwarcie przez file:// nie
+  załaduje modułów ES (CORS na file://).
+-->
+<base href="../">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bona+Nova:wght@400;700&family=Noto+Sans+Runic&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --tlo: #0e0b09; --panel: #17130f; --panel2: #1e1812; --linia: #332b22;
+    --tekst: #e8ddd0; --tekst-slaby: #a89a88; --akcent: #ff8c3c; --akcent2: #ffcf8c;
+    --ok: #6ee7a0; --zle: #ff6e6e;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--tlo); color: var(--tekst);
+    font: 14px/1.4 system-ui, -apple-system, sans-serif;
+    display: grid; grid-template-columns: 340px 1fr 340px; grid-template-rows: 100vh;
+}
+h1 { font: 700 15px "Bona Nova", serif; margin: 0 0 4px; color: var(--akcent2); letter-spacing: .02em; }
+h2 { font: 700 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em;
+     color: var(--tekst-slaby); margin: 16px 0 6px; border-bottom: 1px solid var(--linia); padding-bottom: 4px; }
+h2:first-child { margin-top: 0; }
+.kol { overflow-y: auto; padding: 14px; border-right: 1px solid var(--linia); }
+.kol:last-child { border-right: none; border-left: 1px solid var(--linia); }
+#srodek { display: flex; flex-direction: column; align-items: center; padding: 14px; overflow-y: auto; }
+#platno { background: #000; border: 1px solid var(--linia); border-radius: 4px; max-width: 100%; height: auto; }
+button {
+    background: var(--panel2); color: var(--tekst); border: 1px solid var(--linia); border-radius: 5px;
+    padding: 7px 10px; font: 12px system-ui, sans-serif; cursor: pointer; transition: background .1s;
+}
+button:hover { background: #2a221a; border-color: var(--akcent); }
+button.gorace { border-color: var(--akcent); color: var(--akcent2); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+.rzad-przyciskow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.rzad-przyciskow button { flex: 1 1 auto; min-width: 90px; }
+label.suwak { display: block; font-size: 11px; color: var(--tekst-slaby); margin: 8px 0 2px; }
+label.suwak span.wart { color: var(--akcent2); font-variant-numeric: tabular-nums; float: right; }
+input[type=range] { width: 100%; accent-color: var(--akcent); }
+input[type=color] { width: 100%; height: 24px; background: none; border: 1px solid var(--linia); border-radius: 4px; }
+input[type=number], input[type=text] {
+    background: var(--panel2); color: var(--tekst); border: 1px solid var(--linia); border-radius: 4px;
+    padding: 4px 6px; width: 100%; font: 12px monospace;
+}
+details { border: 1px solid var(--linia); border-radius: 5px; margin-bottom: 8px; background: var(--panel); }
+details > summary { cursor: pointer; padding: 6px 8px; font-size: 12px; font-weight: 600; color: var(--akcent2); }
+details[open] > summary { border-bottom: 1px solid var(--linia); }
+.wnetrze-modulu { padding: 6px 10px 10px; }
+#log { font: 11px/1.4 ui-monospace, monospace; white-space: pre-wrap; color: var(--tekst-slaby);
+       max-height: 140px; overflow-y: auto; background: var(--panel2); border-radius: 4px; padding: 6px; }
+#prompt { font: 11px/1.5 ui-monospace, monospace; background: var(--panel2); border-radius: 4px; padding: 8px;
+          white-space: pre-wrap; min-height: 40px; }
+.stan-wiersz { display: flex; justify-content: space-between; font: 11px monospace; padding: 2px 0; }
+.stan-wiersz .ok { color: var(--ok); } .stan-wiersz .zle { color: var(--zle); }
+#kopiuj { width: 100%; margin-top: 6px; }
+.malenki { font-size: 10px; color: var(--tekst-slaby); }
+.checkbox-wiersz { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div class="kol" id="lewa">
+    <h1>Stanowisko VFX</h1>
+    <p class="malenki">Król Szamanów - bez kamery. Odpala <code>js/techniki.js</code> (to samo, co gra) na syntetycznej klatce.</p>
+
+    <h2>Ziarno / determinizm</h2>
+    <label class="suwak">Ziarno (?seed=)
+        <input type="number" id="pole-ziarno" value="1" style="width:100%">
+    </label>
+    <div class="rzad-przyciskow">
+        <button id="btn-ziarno-losowe">Losowe ziarno</button>
+        <button id="btn-ziarno-zastosuj">Zastosuj (przeładuj)</button>
+    </div>
+    <p class="malenki">Zmiana ziarna przeładowuje stronę z <code>?seed=N</code> - to samo ziarno = te same klatki.</p>
+
+    <h2>Pieczęcie</h2>
+    <div class="rzad-przyciskow" id="przyciski-pieczecie"></div>
+
+    <h2>Techniki (uzbrojenie combo)</h2>
+    <div class="rzad-przyciskow" id="przyciski-techniki"></div>
+    <p class="malenki">"Uzbraja" tak samo jak dopełnienie combo w grze - dla Ognia/Aarda/Dymu drugi gest odpala właściwy efekt (patrz niżej).</p>
+
+    <h2>Gesty (drugi krok - poza rozpoznawaniem)</h2>
+    <p class="malenki">Rozpoznawacze gestów (dłoń przy ustach, rozsunięcie) POMIJANE - potrzebują prawdziwego sygnału z kamery. Tu odpalamy efekt bezpośrednio, tak jak main.js po rozpoznaniu gestu.</p>
+    <div class="checkbox-wiersz"><input type="checkbox" id="chk-palec"><label for="chk-palec">Płonący Palec płonie (ciągłe)</label></div>
+    <div class="checkbox-wiersz"><input type="checkbox" id="chk-dmucha"><label for="chk-dmucha">Okadzenie: dmucha (ciągłe)</label></div>
+    <div class="rzad-przyciskow"><button id="btn-aard-strzel">Aard: strzał</button></div>
+
+    <h2>Postawa syntetyczna</h2>
+    <label class="suwak">Kołysanie tańca <span class="wart" id="w-kolysanie">0.5</span>
+        <input type="range" id="s-kolysanie" min="0" max="1" step="0.01" value="0.5">
+    </label>
+    <div class="checkbox-wiersz"><input type="checkbox" id="chk-poza" checked><label for="chk-poza">Poza widoczna (frame.pose)</label></div>
+</div>
+
+<div id="srodek">
+    <canvas id="platno" width="1280" height="720"></canvas>
+    <div class="rzad-przyciskow" style="margin-top:10px; width:100%; max-width:1280px;">
+        <button id="btn-play-pauza">Pauza</button>
+        <button id="btn-audio">🔇 Dźwięk wyłączony (kliknij, by odblokować)</button>
+        <span class="malenki" id="fps-info" style="align-self:center; margin-left:auto;"></span>
+    </div>
+    <div id="log"></div>
+</div>
+
+<div class="kol" id="prawa">
+    <h2>Panel kontroli</h2>
+    <div id="panel-kontroli"></div>
+
+    <h2>Nastawy (suwaki)</h2>
+    <div id="suwaki-modulow"></div>
+
+    <h2>Prompt (diff od domyślnych)</h2>
+    <div id="prompt">(brak zmian)</div>
+    <button id="kopiuj">Kopiuj</button>
+</div>
+
+<script type="module">
+import { mulberry32, ustawZiarnoSzumu } from './js/szum.js';
+
+// ================== ZIARNO - MUSI być przed jakimkolwiek importem gry ==================
+// Dynamiczny import (nie statyczny) jest tu obowiązkowy: statyczne importy
+// hoistują się PRZED wykonaniem reszty modułu, więc Math.random zostałby
+// nadpisany PO tym, jak moduły gry już go przeczytały (żaden z nich nie
+// czyta Math.random przy imporcie, ale nie ma co na to liczyć).
+const params = new URLSearchParams(location.search);
+const ziarno = parseInt(params.get('seed') || '1', 10) || 1;
+const paramT = params.has('t') ? parseFloat(params.get('t')) : null;
+const paramScenariusz = params.get('scenariusz') || null;
+
+Math.random = mulberry32(ziarno);
+ustawZiarnoSzumu(ziarno);
+document.getElementById('pole-ziarno').value = ziarno;
+
+const [
+    { Efekty, TABELA: EFEKTY_TABELA },
+    { Aura },
+    { Zaplon },
+    { Dym },
+    { Runy },
+    { Ogien },
+    { PlonacyPalec },
+    { Dmuchanie },
+    { Podmuch },
+    { Fala, pchniecieCzola },
+    { Tecza },
+    { Iskry },
+    { Ekran },
+    { Piorun },
+    { Kolowrot },
+    { zaladuj: zaladujAssety },
+    { computeCoverFit, mapLandmarks },
+    { zaladujFont, fontGotowy },
+    { AudioEngine },
+    { KomboSilnik },
+    { PasekSekwencji },
+    { odpalPieczec, odpalTechnike, BARWA_ZAPLONU },
+    { dlon },
+] = await Promise.all([
+    import('./js/efekty.js'), import('./js/aura.js'), import('./js/zaplon.js'),
+    import('./js/dym.js'), import('./js/runa.js'), import('./js/ogien.js'),
+    import('./js/plonacyPalec.js'), import('./js/dmuchanie.js'), import('./js/podmuch.js'),
+    import('./js/fala.js'), import('./js/tecza.js'), import('./js/iskry.js'),
+    import('./js/ekran.js'), import('./js/piorun.js'), import('./js/kolowrot.js'),
+    import('./js/assety.js'), import('./js/frameMapper.js'), import('./js/glify.js'),
+    import('./js/audioEngine.js'), import('./js/kombosy.js'), import('./js/sekwencja.js'),
+    import('./js/techniki.js'), import('./tools/_dlon-syntetyczna.mjs'),
+]);
+
+zaladujFont();
+zaladujAssety().catch(() => {});
+
+// ================== INSTANCJE - te same klasy, których używa main.js ==================
+const canvas = document.getElementById('platno');
+const ctx = canvas.getContext('2d');
+
+const efekty = new Efekty();
+const aura = new Aura(canvas, ctx);
+const zaplon = new Zaplon();
+const dym = new Dym();
+const runy = new Runy();
+const ogien = new Ogien();
+const plonacyPalec = new PlonacyPalec();
+const dmuchanie = new Dmuchanie();
+const podmuch = new Podmuch();
+const fala = new Fala();
+const tecza = new Tecza();
+const iskry = new Iskry();
+const ekran = new Ekran();
+const piorun = new Piorun();
+const kolowrot = new Kolowrot();
+const kombosy = new KomboSilnik();
+const sekwencja = new PasekSekwencji(null, null);
+const audioEngine = new AudioEngine();
+
+// Lista modułów z eksportowanym NASTAWY - do panelu suwaków i do prompt-diff.
+// { etykieta, nastawy: obiekt eksportowany przez moduł, instancja: ma wyczyscCache() }
+const MODULY_NASTAWY = [
+    { etykieta: 'Iskry (Grom w Ziemię)', plik: 'js/iskry.js', nastawy: (await import('./js/iskry.js')).NASTAWY, instancja: iskry },
+    { etykieta: 'Ogień', plik: 'js/ogien.js', nastawy: (await import('./js/ogien.js')).NASTAWY, instancja: ogien },
+    { etykieta: 'Fala (Aard/Grom)', plik: 'js/fala.js', nastawy: (await import('./js/fala.js')).NASTAWY, instancja: fala },
+    { etykieta: 'Dym (Okadzenie)', plik: 'js/dym.js', nastawy: (await import('./js/dym.js')).NASTAWY, instancja: dym },
+    { etykieta: 'Kołowrót', plik: 'js/kolowrot.js', nastawy: (await import('./js/kolowrot.js')).NASTAWY, instancja: kolowrot },
+    { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
+    { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
+    { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
+];
+const DOMYSLNE_NASTAWY = MODULY_NASTAWY.map(m => JSON.parse(JSON.stringify(m.nastawy)));
+
+// ================== SYNTETYCZNA KLATKA ==================
+// Postać stojąca, indeksy MediaPipe Pose (33 punkty): 0 nos, 11/12 barki,
+// 13/14 łokcie, 15/16 nadgarstki, 23/24 biodra, 25/26 kolana, 27/28 kostki.
+// Współrzędne ZNORMALIZOWANE (0..1) w przestrzeni "wideo" - mapLandmarks()
+// przenosi je do przestrzeni płótna, tą samą drogą co main.js:buildFrame.
+const SIM_W = 1280, SIM_H = 720;   // udawane wymiary "wideo" (16:9, jak getUserMedia ideal)
+function pozaBazowa(t, kolysanie) {
+    const hu = 0.10;            // "jednostka wzrostu" ułamek wysokości klatki
+    const bx = 0.5, by = 0.42;  // środek barków
+    const kol = kolysanie;
+    const faza = t * 1.3;
+    const przechyl = Math.sin(faza) * 0.04 * kol;
+    const gojdanie = Math.sin(faza * 0.5) * 0.02 * kol;
+    const lm = new Array(33).fill(null).map(() => ({ x: bx, y: by, z: 0, visibility: 1 }));
+    lm[0] = { x: bx + przechyl * 0.5, y: by - hu * 1.7, z: 0, visibility: 1 };            // nos
+    lm[11] = { x: bx - hu * 0.9 + przechyl, y: by + gojdanie, z: 0, visibility: 1 };       // bark L
+    lm[12] = { x: bx + hu * 0.9 + przechyl, y: by + gojdanie, z: 0, visibility: 1 };       // bark P
+    lm[23] = { x: bx - hu * 0.7, y: by + hu * 2.6, z: 0, visibility: 1 };                  // biodro L
+    lm[24] = { x: bx + hu * 0.7, y: by + hu * 2.6, z: 0, visibility: 1 };                  // biodro P
+    // Ręce tańczą - łokcie/nadgarstki opisują łuki wokół barków, żeby
+    // dym.rozgarnij()/plonacyPalec dostały organiczny, żywy sygnał ruchu.
+    const ramieFaza = faza * 1.7;
+    for (const [strona, bark, znak] of [['L', 11, -1], ['P', 12, 1]]) {
+        const b = lm[bark];
+        const machniecie = Math.sin(ramieFaza + (strona === 'L' ? 0 : Math.PI * 0.6)) * kol;
+        const lokiecX = b.x + znak * hu * 0.7;
+        const lokiecY = b.y + hu * 1.1 + machniecie * hu * 0.3;
+        const idxLokiec = strona === 'L' ? 13 : 14;
+        const idxNadgarstek = strona === 'L' ? 15 : 16;
+        lm[idxLokiec] = { x: lokiecX, y: lokiecY, z: 0, visibility: 1 };
+        lm[idxNadgarstek] = {
+            x: lokiecX + znak * hu * 0.5 * Math.cos(machniecie),
+            y: lokiecY + hu * 1.1 - Math.abs(machniecie) * hu * 1.4,
+            z: 0, visibility: 1
+        };
+    }
+    lm[25] = { x: lm[23].x, y: by + hu * 4.2, z: 0, visibility: 1 };
+    lm[26] = { x: lm[24].x, y: by + hu * 4.2, z: 0, visibility: 1 };
+    lm[27] = { x: lm[25].x, y: by + hu * 5.3, z: 0, visibility: 1 };
+    lm[28] = { x: lm[26].x, y: by + hu * 5.3, z: 0, visibility: 1 };
+    return lm;
+}
+
+/** Rasteryzuje prostą sylwetkę (głowa+tułów+kończyny) na maskę alfa - stand-in za segmentację MediaPipe. */
+const MASKA_SZER = 480, MASKA_WYS = Math.round(480 * SIM_H / SIM_W);
+const maskaPlotno = document.createElement('canvas');
+maskaPlotno.width = MASKA_SZER; maskaPlotno.height = MASKA_WYS;
+const maskaCtx = maskaPlotno.getContext('2d');
+function zbudujMaske(lm) {
+    const mc = maskaCtx, W = MASKA_SZER, H = MASKA_WYS;
+    mc.clearRect(0, 0, W, H);
+    mc.fillStyle = '#fff';
+    const P = (i) => ({ x: lm[i].x * W, y: lm[i].y * H });
+    const kapsula = (a, b, promien) => {
+        mc.beginPath();
+        const dx = b.x - a.x, dy = b.y - a.y, dl = Math.hypot(dx, dy) || 1;
+        const nx = -dy / dl * promien, ny = dx / dl * promien;
+        mc.moveTo(a.x + nx, a.y + ny);
+        mc.lineTo(b.x + nx, b.y + ny);
+        mc.arc(b.x, b.y, promien, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
+        mc.lineTo(a.x - nx, a.y - ny);
+        mc.arc(a.x, a.y, promien, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
+        mc.closePath(); mc.fill();
+    };
+    const nos = P(0), bL = P(11), bP = P(12), hL = P(23), hP = P(24);
+    const promienGlowy = Math.hypot(bP.x - bL.x, bP.y - bL.y) * 0.35;
+    mc.beginPath();
+    mc.arc(nos.x, nos.y + promienGlowy * 0.3, promienGlowy, 0, Math.PI * 2);
+    mc.fill();
+    // Tułów jako czworokąt barki->biodra.
+    mc.beginPath();
+    mc.moveTo(bL.x, bL.y); mc.lineTo(bP.x, bP.y); mc.lineTo(hP.x, hP.y); mc.lineTo(hL.x, hL.y);
+    mc.closePath(); mc.fill();
+    const szerKonczyny = Math.hypot(bP.x - bL.x, bP.y - bL.y) * 0.16;
+    kapsula(bL, P(13), szerKonczyny); kapsula(P(13), P(15), szerKonczyny * 0.85);
+    kapsula(bP, P(14), szerKonczyny); kapsula(P(14), P(16), szerKonczyny * 0.85);
+    kapsula(hL, P(25), szerKonczyny * 1.1); kapsula(P(25), P(27), szerKonczyny);
+    kapsula(hP, P(26), szerKonczyny * 1.1); kapsula(P(26), P(28), szerKonczyny);
+
+    const dane = mc.getImageData(0, 0, W, H).data;
+    const out = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) out[i] = dane[i * 4 + 3];   // kanał alfa jako "pewność" maski
+    return out;
+}
+
+// ================== STAN SYMULACJI ==================
+const stan = {
+    t: 0,                    // zegar symulacji (s)
+    live: paramT === null,   // tryb ciągły (rAF) vs. zamrożona klatka
+    kolysanie: parseFloat(document.getElementById('s-kolysanie').value),
+    pozaWidoczna: document.getElementById('chk-poza').checked,
+    poprzNadgarstkiPx: null,
+    palecPlonie: false,
+    dmuchaOkadzenie: false,
+    dzwiekOdblokowany: false,
+};
+
+function zbudujFrame(t) {
+    const lm = pozaBazowa(t, stan.kolysanie);
+    const fit = computeCoverFit({ videoWidth: SIM_W, videoHeight: SIM_H }, canvas);
+    const poseLandmarks = stan.pozaWidoczna ? mapLandmarks(lm, fit) : null;
+    // Dłonie: dlon() z tools/_dlon-syntetyczna.mjs przy nadgarstkach (15/16),
+    // otwarta (zgiecia=0) - gesty precyzyjne palców i tak są pomijane (patrz
+    // panel "Gesty" w lewej kolumnie), więc kształt dłoni nie musi być realistyczny.
+    const hands = [];
+    if (stan.pozaWidoczna) {
+        for (const [idx, lustro] of [[15, false], [16, true]]) {
+            const w = lm[idx];
+            const lmDlon = dlon({ ox: w.x, oy: w.y, skala: 0.045, zgiecia: [0, 0, 0, 0, 0], lustro });
+            hands.push({ landmarks: mapLandmarks(lmDlon, fit), worldLandmarks: null, handedness: lustro ? 'Left' : 'Right' });
+        }
+    }
+    return { hands, pose: poseLandmarks ? { landmarks: poseLandmarks, worldLandmarks: null } : null,
+             width: canvas.width, height: canvas.height, dt: 0, now: t * 1000, fit,
+             maska: stan.pozaWidoczna ? zbudujMaske(lm) : null };
+}
+
+// ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
+const worekTechnik = {
+    efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, audio: audioEngine
+};
+const worekPieczeci = { efekty, runy, aura, audio: audioEngine };
+
+// ================== PĘTLA RYSOWANIA - ten sam porządek co main.js:klatka() ==================
+let zliczoneKlatki = 0, ostatniFpsCzas = performance.now(), fps = 0;
+function rysujKlatke(dt, frame) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ekran.przesun(ctx, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#0a0502';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(10, 5, 2, 0.55)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    tecza.update(0.5, dt);
+    aura.updateAndDraw(frame.maska, MASKA_SZER, MASKA_WYS, 0.6, 0.7, frame.fit, dt, tecza);
+    zaplon.updateAndDraw(ctx, frame.maska, MASKA_SZER, MASKA_WYS, frame.fit, dt);
+
+    // --- Okadzenie: emisja ciągła (checkbox), rozgarnięcie dłońmi, podpalenie od Płonącego Palca ---
+    if (stan.dmuchaOkadzenie && frame.pose) {
+        const usta = { x: frame.pose.landmarks[0].x * canvas.width, y: (frame.pose.landmarks[0].y + 0.02) * canvas.height };
+        dym.emituj(usta, { x: 0, y: -1, z: 0.3 }, 1, 1, dt, canvas.width, canvas.height);
+    }
+    if (frame.pose?.landmarks) {
+        const lm = frame.pose.landmarks;
+        const nadgarstkiPx = [];
+        const nowe = {};
+        for (const i of [15, 16, 13, 14]) {
+            const p = lm[i];
+            if (!p) continue;
+            const x = p.x * canvas.width, y = p.y * canvas.height;
+            const poprz = stan.poprzNadgarstkiPx?.[i];
+            nadgarstkiPx.push({ x, y, vx: poprz && dt > 0 ? (x - poprz.x) / dt : 0, vy: poprz && dt > 0 ? (y - poprz.y) / dt : 0 });
+            nowe[i] = { x, y };
+        }
+        stan.poprzNadgarstkiPx = nowe;
+        dym.rozgarnij(nadgarstkiPx);
+    }
+    const zarzewia = [];
+    if (stan.palecPlonie && frame.pose) {
+        const czubek = { x: frame.pose.landmarks[16].x * canvas.width, y: frame.pose.landmarks[16].y * canvas.height };
+        zarzewia.push({ x: czubek.x, y: czubek.y, r: 14 });
+        for (let i = 0; i < ogien.czastki.length; i += 8) zarzewia.push({ x: ogien.czastki[i].x, y: ogien.czastki[i].y, r: 6 });
+    }
+    if (zarzewia.length) dym.podpal(zarzewia);
+    if (dym.liczba > 0 && fala.czola.length) {
+        const podmuchy = [];
+        for (const c of fala.czola) podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
+        if (podmuchy.length) dym.pchnij(podmuchy);
+    }
+    const wybuchy = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
+    if (wybuchy > 0) audioEngine.playWybuchSFX(wybuchy);
+
+    efekty.updateAndDraw(ctx, frame, dt);
+    runy.updateAndDraw(ctx, canvas.width, canvas.height, dt);
+
+    const zaczepPalca = stan.palecPlonie && frame.pose
+        ? { x: frame.pose.landmarks[16].x * canvas.width, y: frame.pose.landmarks[16].y * canvas.height }
+        : null;
+    ogien.updateAndDraw(ctx, zaczepPalca, stan.palecPlonie ? 1 : 0, dt);
+
+    piorun.updateAndDraw(ctx, dt);
+    fala.updateAndDraw(ctx, dt);
+    iskry.updateAndDraw(ctx, dt);
+    kolowrot.updateAndDraw(ctx, dt);
+
+    ctx.restore();
+    ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
+
+    audioEngine.update('CHARGING', 0.6, 0.7);
+}
+
+function krok(dt) {
+    stan.t += dt;
+    const frame = zbudujFrame(stan.t);
+    rysujKlatke(dt, frame);
+    return frame;
+}
+
+let poprzedniCzas = null;
+function petla(now) {
+    if (!stan.live) return;
+    const dt = poprzedniCzas ? Math.min(0.1, Math.max(0, (now - poprzedniCzas) / 1000)) : 1 / 60;
+    poprzedniCzas = now;
+    krok(dt);
+    zliczoneKlatki++;
+    if (now - ostatniFpsCzas > 500) {
+        fps = Math.round(zliczoneKlatki / ((now - ostatniFpsCzas) / 1000));
+        zliczoneKlatki = 0; ostatniFpsCzas = now;
+        document.getElementById('fps-info').textContent = `${fps} fps`;
+    }
+    requestAnimationFrame(petla);
+}
+
+// ================== SCENARIUSZE (dla trybu zamrożonego ?t=N&scenariusz=...) ==================
+const SCENARIUSZE = {
+    grom: () => odpalTechnike({ id: 'x', nazwa: 'Grom w Ziemię', uzbraja: 'gromWZiemie', sekwencja: ['swarog', 'weles', 'perun'] },
+                               zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    kolowrot: () => odpalTechnike({ id: 'x', nazwa: 'Kołowrót', uzbraja: 'kolowrot', sekwencja: ['perun', 'weles', 'mokosz'] },
+                                   zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    tecza: () => odpalTechnike({ id: 'x', nazwa: 'Tęcza', uzbraja: 'tecza', sekwencja: ['swarog', 'mokosz', 'stribog'] },
+                                zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    aard: () => { odpalTechnike({ id: 'x', nazwa: 'Aard', uzbraja: 'aard', sekwencja: ['stribog', 'stribog'] },
+                                 zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); odpalAardStrzal(); },
+    okadzenie: () => { odpalTechnike({ id: 'x', nazwa: 'Okadzenie', uzbraja: 'dym', sekwencja: ['swarog', 'stribog', 'swarog'] },
+                                      zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.dmuchaOkadzenie = true; },
+    palec: () => { odpalTechnike({ id: 'x', nazwa: 'Grom w Ogniu', uzbraja: 'ogien', sekwencja: ['swarog', 'perun'] },
+                                  zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.palecPlonie = true; },
+    pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
+    wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
+                       SCENARIUSZE.okadzenie(); SCENARIUSZE.palec(); },
+};
+
+function odpalAardStrzal() {
+    const zaczepPx = { x: canvas.width * 0.75, y: canvas.height * 0.55 };
+    const kierunek = { x: 1, y: -0.15, z: -0.3 };
+    fala.wystrzel(zaczepPx, kierunek, 1, BARWA_ZAPLONU.aard);
+    fala.wir(zaczepPx, 1, BARWA_ZAPLONU.aard);
+    ekran.uderz(1);
+    ekran.falaPowietrza(zaczepPx, kierunek, 1);
+    audioEngine.playAardSFX(1);
+}
+
+// ================== TRYB ZAMROŻONY: ?t=N - kroki stałe 1/60 do t=N, jedno rysowanie, potem stop ==================
+async function trybZamrozony() {
+    stan.live = false;
+    document.getElementById('btn-play-pauza').disabled = true;
+    // Determinizm zrzutu wymaga, żeby assety/font były gotowe PRZED
+    // wystrzałem scenariusza - inaczej pierwsze N klatek renderu może
+    // różnić się zależnie od tego, jak szybko sieć/dysk oddały pliki
+    // (particle-system skill: "seed RNG + fixed timestep -> same N -> same pixels").
+    await Promise.all([zaladujAssety().catch(() => {}), zaladujFont()]);
+    if (paramScenariusz && SCENARIUSZE[paramScenariusz]) SCENARIUSZE[paramScenariusz]();
+    const KROK = 1 / 60;
+    let t = 0;
+    while (t < paramT) { krok(KROK); t += KROK; }
+    // Ostatnie rysowanie dokładnie w paramT (resztkowy krok).
+    const reszta = paramT - (t - KROK);
+    if (reszta > 0 && reszta < KROK) krok(reszta);
+
+    window.__stan = zbierzDiagnostyke();
+    window.__ready = true;
+    logUj(`Zamrożone t=${paramT}s, scenariusz=${paramScenariusz ?? '(brak)'}, ziarno=${ziarno}`);
+}
+
+function zbierzDiagnostyke() {
+    const wszystkiePozycje = [
+        ...iskry.czastki.map(c => [c.x, c.y]),
+        ...ogien.czastki.map(c => [c.x, c.y]),
+        ...fala.czastki.map(c => [c.x, c.y]),
+        ...kolowrot._mgla.map(c => [c.x + kolowrot._zaczep.x, c.y + kolowrot._zaczep.y]),
+        ...kolowrot._drobiny.map(c => [c.x + kolowrot._zaczep.x, c.y + kolowrot._zaczep.y]),
+    ];
+    let nan = false, uciekly = 0;
+    for (const [x, y] of wszystkiePozycje) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) { nan = true; continue; }
+        if (x < -canvas.width * 0.5 || x > canvas.width * 1.5 || y < -canvas.height * 0.5 || y > canvas.height * 1.5) uciekly++;
+    }
+    const dane = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let sumaAlfy = 0;
+    for (let i = 3; i < dane.length; i += 4 * 97) sumaAlfy += dane[i];   // próbkowanie co 97. piksel - szybki szacunek
+    return {
+        czastki: { iskry: iskry.liczba, ogien: ogien.liczba, fala: fala.liczba, dym: dym.liczba,
+                   mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
+        odrzucone: { iskry: iskry.odrzucone, ogien: ogien.odrzucone, fala: fala.odrzucone, dym: dym.odrzucone },
+        nan, uciekly, pustePlotno: sumaAlfy === 0,
+    };
+}
+
+function logUj(tekst) {
+    const el = document.getElementById('log');
+    el.textContent += tekst + '\n';
+    el.scrollTop = el.scrollHeight;
+}
+
+// ================== UI: przyciski pieczęci/technik ==================
+const PIECZECIE = ['swarog', 'weles', 'perun', 'stribog', 'mokosz'];
+const TECHNIKI = [
+    { uzbraja: 'gromWZiemie', nazwa: 'Grom w Ziemię', sekwencja: ['swarog', 'weles', 'perun'] },
+    { uzbraja: 'kolowrot', nazwa: 'Kołowrót', sekwencja: ['perun', 'weles', 'mokosz'] },
+    { uzbraja: 'tecza', nazwa: 'Tęcza', sekwencja: ['swarog', 'mokosz', 'stribog'] },
+    { uzbraja: 'ogien', nazwa: 'Grom w Ogniu (uzbrój)', sekwencja: ['swarog', 'perun'] },
+    { uzbraja: 'aard', nazwa: 'Podmuch (uzbrój)', sekwencja: ['stribog', 'stribog'] },
+    { uzbraja: 'dym', nazwa: 'Okadzenie (uzbrój)', sekwencja: ['swarog', 'stribog', 'swarog'] },
+];
+const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
+for (const id of PIECZECIE) {
+    const b = document.createElement('button');
+    b.textContent = EFEKTY_TABELA[id]?.nazwa ?? id;
+    b.onclick = () => { odpalPieczec(id, zbudujFrame(stan.t), canvas.width, canvas.height, worekPieczeci); logUj(`Pieczęć: ${id}`); };
+    kontenerPieczeci.appendChild(b);
+}
+const kontenerTechnik = document.getElementById('przyciski-techniki');
+for (const t of TECHNIKI) {
+    const b = document.createElement('button');
+    b.textContent = t.nazwa; b.className = 'gorace';
+    b.onclick = () => {
+        odpalTechnike({ id: t.uzbraja + 'Bench', nazwa: t.nazwa, uzbraja: t.uzbraja, sekwencja: t.sekwencja },
+                       zbudujFrame(stan.t), canvas.width, canvas.height, stan.t * 1000, worekTechnik);
+        logUj(`Technika uzbrojona: ${t.nazwa}`);
+    };
+    kontenerTechnik.appendChild(b);
+}
+
+document.getElementById('btn-aard-strzel').onclick = () => { odpalAardStrzal(); logUj('Aard: strzał'); };
+document.getElementById('chk-palec').onchange = (e) => { stan.palecPlonie = e.target.checked; };
+document.getElementById('chk-dmucha').onchange = (e) => { stan.dmuchaOkadzenie = e.target.checked; };
+document.getElementById('chk-poza').onchange = (e) => { stan.pozaWidoczna = e.target.checked; };
+document.getElementById('s-kolysanie').oninput = (e) => {
+    stan.kolysanie = parseFloat(e.target.value);
+    document.getElementById('w-kolysanie').textContent = stan.kolysanie.toFixed(2);
+};
+document.getElementById('btn-play-pauza').onclick = (e) => {
+    stan.live = !stan.live;
+    e.target.textContent = stan.live ? 'Pauza' : 'Wznów';
+    if (stan.live) { poprzedniCzas = null; requestAnimationFrame(petla); }
+};
+document.getElementById('btn-ziarno-losowe').onclick = () => {
+    document.getElementById('pole-ziarno').value = Math.floor(Math.random() * 1e9);
+};
+document.getElementById('btn-ziarno-zastosuj').onclick = () => {
+    const z = document.getElementById('pole-ziarno').value;
+    const u = new URL(location.href); u.searchParams.set('seed', z); location.href = u.toString();
+};
+document.getElementById('btn-audio').onclick = async (e) => {
+    if (!stan.dzwiekOdblokowany) {
+        audioEngine.init();
+        stan.dzwiekOdblokowany = true;
+        e.target.textContent = '🔊 Dźwięk odblokowany';
+        e.target.disabled = true;
+    }
+};
+
+// ================== PANEL KONTROLI (odświeżany co ~0.5s w trybie live) ==================
+function odswiezPanelKontroli() {
+    const d = zbierzDiagnostyke();
+    const wiersz = (etykieta, wartosc, dobrze) =>
+        `<div class="stan-wiersz"><span>${etykieta}</span><span class="${dobrze ? 'ok' : 'zle'}">${wartosc}</span></div>`;
+    document.getElementById('panel-kontroli').innerHTML =
+        wiersz('Cząstki (iskry/ogień/fala/dym)', `${d.czastki.iskry}/${d.czastki.ogien}/${d.czastki.fala}/${d.czastki.dym}`, true) +
+        wiersz('Mgła/drobiny (Kołowrót)', `${d.czastki.mgla}/${d.czastki.drobiny}`, true) +
+        wiersz('Odrzucone (sufit MAX_CZASTECZEK)', `${d.odrzucone.iskry}+${d.odrzucone.ogien}+${d.odrzucone.fala}+${d.odrzucone.dym}`,
+               d.odrzucone.iskry + d.odrzucone.ogien + d.odrzucone.fala + d.odrzucone.dym === 0) +
+        wiersz('NaN w pozycjach', d.nan ? 'TAK' : 'nie', !d.nan) +
+        wiersz('Cząstki poza kadrem (1.5x)', d.uciekly, d.uciekly === 0) +
+        wiersz('Płótno puste (suma alfy=0)', d.pustePlotno ? 'TAK' : 'nie', !d.pustePlotno) +
+        wiersz('Font run (glify pieczęci)', fontGotowy() ? 'gotowy' : 'ładuje się...', fontGotowy());
+}
+if (stan.live) setInterval(() => { if (stan.live) odswiezPanelKontroli(); }, 500);
+
+// ================== SUWAKI (introspekcja NASTAWY) + PROMPT DIFF ==================
+function formatWartosc(v) {
+    if (Array.isArray(v)) return `[${v.map(x => Math.round(x)).join(',')}]`;
+    return Number.isInteger(v) ? String(v) : v.toFixed(3);
+}
+function aktualizujPrompt() {
+    const linie = [];
+    MODULY_NASTAWY.forEach((m, mi) => {
+        const domyslne = DOMYSLNE_NASTAWY[mi];
+        for (const klucz of Object.keys(m.nastawy)) {
+            const teraz = m.nastawy[klucz], byl = domyslne[klucz];
+            if (JSON.stringify(teraz) !== JSON.stringify(byl)) {
+                linie.push(`ustaw w ${m.plik}: NASTAWY.${klucz} = ${formatWartosc(teraz)} (było ${formatWartosc(byl)})`);
+            }
+        }
+    });
+    document.getElementById('prompt').textContent = linie.length ? linie.join('\n') : '(brak zmian)';
+}
+document.getElementById('kopiuj').onclick = () => {
+    navigator.clipboard?.writeText(document.getElementById('prompt').textContent);
+    logUj('Prompt skopiowany.');
+};
+
+const kontenerSuwakow = document.getElementById('suwaki-modulow');
+for (const m of MODULY_NASTAWY) {
+    const det = document.createElement('details');
+    const sum = document.createElement('summary'); sum.textContent = m.etykieta;
+    det.appendChild(sum);
+    const wnetrze = document.createElement('div'); wnetrze.className = 'wnetrze-modulu';
+    for (const [klucz, wartosc] of Object.entries(m.nastawy)) {
+        if (Array.isArray(wartosc) && wartosc.length === 3 && wartosc.every(Number.isFinite)) {
+            // Barwa RGB - suwak koloru.
+            const lab = document.createElement('label'); lab.className = 'suwak'; lab.textContent = klucz;
+            const inp = document.createElement('input'); inp.type = 'color';
+            const hex = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+            inp.value = `#${hex(wartosc[0])}${hex(wartosc[1])}${hex(wartosc[2])}`;
+            inp.oninput = () => {
+                const h = inp.value;
+                m.nastawy[klucz] = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+                m.instancja.wyczyscCache?.();
+                aktualizujPrompt();
+            };
+            lab.appendChild(inp); wnetrze.appendChild(lab);
+        } else if (typeof wartosc === 'number' && Number.isFinite(wartosc)) {
+            const lab = document.createElement('label'); lab.className = 'suwak';
+            const spanWart = document.createElement('span'); spanWart.className = 'wart'; spanWart.textContent = formatWartosc(wartosc);
+            lab.textContent = klucz + ' '; lab.appendChild(spanWart);
+            const inp = document.createElement('input'); inp.type = 'range';
+            const gora = wartosc === 0 ? 1 : Math.abs(wartosc) * 4;
+            inp.min = wartosc < 0 ? -gora : (wartosc === 0 ? -1 : 0);
+            inp.max = gora; inp.step = gora / 200 || 0.01;
+            inp.value = wartosc;
+            inp.oninput = () => {
+                m.nastawy[klucz] = parseFloat(inp.value);
+                spanWart.textContent = formatWartosc(m.nastawy[klucz]);
+                m.instancja.wyczyscCache?.();
+                aktualizujPrompt();
+            };
+            lab.appendChild(inp); wnetrze.appendChild(lab);
+        }
+        // Zagnieżdżone obiekty (np. dym.js NASTAWY.BARWA_ZAPLONU_STOPNIE - tablica
+        // tablic) i tablice inne niż RGB celowo pominięte - edycja przez prompt/kod,
+        // nie przez suwak (nie ma dobrej reprezentacji UI dla nich tutaj).
+    }
+    det.appendChild(wnetrze);
+    kontenerSuwakow.appendChild(det);
+}
+
+// ================== START ==================
+if (paramT !== null) {
+    trybZamrozony();
+} else {
+    logUj(`Stanowisko gotowe. Ziarno=${ziarno}. Tryb: ciągły (rAF).`);
+    requestAnimationFrame(petla);
+    odswiezPanelKontroli();
+}
+</script>
+</body>
+</html>
