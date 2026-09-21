@@ -34,6 +34,8 @@
  * mogło podpiąć suwaki. Po zmianie RAMPA/KRZYWA_BARWY/SPRITE_PX wywołaj
  * wyczyscCache() (sprite'y są wypalone raz przy starcie).
  */
+import { krokTlumienia, obwiedniaCzastki } from './czastki.js';
+
 export const NASTAWY = {
     // Rampa barw od rdzenia do wygaśnięcia. Ostatnia jest ciemnoczerwona, nie
     // szara - patrz punkt 1 w nagłówku. Pierwsza barwa jest CIEPŁĄ bielą, nie
@@ -180,13 +182,15 @@ export class Ogien {
             const p = c.wiek / c.zycie;
 
             // Turbulencja rośnie z wiekiem - u dołu płomień jest wąski,
-            // wyżej rozchodzi się i chwieje.
+            // wyżej rozchodzi się i chwieje. Siła wymuszona NAJPIERW
+            // (Euler w przód - przybliżenie, patrz nagłówek czastki.js),
+            // potem dokładna całka pozycji + zanik prędkości (krokTlumienia).
             c.vx += c.turb * Math.sin(c.faza + c.wiek * 9) * p * dt;
             c.vy -= c.wyporn * dt;
 
-            const opor = 1 - NASTAWY.OPOR * dt;
-            c.vx *= opor; c.vy *= opor;
-            c.x += c.vx * dt; c.y += c.vy * dt;
+            const t = krokTlumienia(NASTAWY.OPOR, dt);
+            c.x += c.vx * t.s; c.y += c.vy * t.s;
+            c.vx *= t.e; c.vy *= t.e;
 
             if (Number.isFinite(c.x) && Number.isFinite(c.y)) zywe.push(c);
         }
@@ -209,7 +213,7 @@ export class Ogien {
 
             // Szybki narost, powolne wygaszanie - bez tego cząsteczki
             // pojawiają się skokowo i widać emisję.
-            const alfa = Math.sin(Math.min(1, p * 6) * Math.PI * 0.5) * (1 - p) * (1 - p);
+            const alfa = obwiedniaCzastki(p);
             const r = NASTAWY.SPRITE_PX * c.skala * (NASTAWY.ROZMIAR_OD + (NASTAWY.ROZMIAR_DO - NASTAWY.ROZMIAR_OD) * p);
 
             ctx.globalAlpha = Math.max(0, Math.min(1, alfa * (c.zar ? 0.55 : 0.9)));

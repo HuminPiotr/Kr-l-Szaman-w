@@ -78,5 +78,23 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     spr('wyczyscCache() istnieje i nie rzuca', (o7.wyczyscCache(), true));
 }
 
+// --- 6. Dokładność tłumienia (P2b) - jedna cząstka vs forma zamknięta ---
+console.log('\nDOKŁADNOŚĆ TŁUMIENIA (krokTlumienia, patrz js/czastki.js):');
+{
+    // turb=0 izoluje CZYSTY opór na osi x (bez turbulencji); wyporn=0 na osi
+    // x też nie działa (wyporn działa tylko na vy) - porównujemy x z formą
+    // zamkniętą V0*(1-exp(-OPOR*T))/OPOR, dokładnie tym samym wzorem co
+    // fala.js:polozenieCzola().
+    const o9 = new Ogien();
+    const V0 = 200;
+    o9._dodaj({ x: 0, y: 0, vx: V0, vy: 0, zycie: 10, wyporn: 0, turb: 0, skala: 1, zar: false });
+    const N = 30;
+    const T = N * DT;
+    for (let i = 0; i < N; i++) o9._ruszaj(DT);
+    const oczekiwane = V0 * (1 - Math.exp(-NASTAWY.OPOR * T)) / NASTAWY.OPOR;
+    spr(`x zgadza się z formą zamkniętą co do 1e-6 (${o9.czastki[0].x.toFixed(6)} vs ${oczekiwane.toFixed(6)})`,
+        Math.abs(o9.czastki[0].x - oczekiwane) < 1e-6);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);
