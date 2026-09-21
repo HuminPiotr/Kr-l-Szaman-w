@@ -66,12 +66,11 @@ export function odpalPieczec(id, frame, W, H, s) {
     s.efekty.odpal(id);
     s.runy.odpal(id, srodekDloni(frame, W, H), EFEKTY_TABELA[id]?.barwa);
     s.aura.rozblysk(1);
-    // playFireSFX, NIE update('FIRING'): 'FIRING' tylko WYCISZA hum
-    // (audioEngine.js:100-103), a klatkę później update('CHARGING') na
-    // dole pętli i tak go przywraca - pieczęć wyszłaby bezgłośna.
-    // Argument steruje wysokością startową, więc pieczęć brzmi lżej
-    // niż technika.
-    s.audio.playFireSFX(0.3);
+    // grajPieczecZlozona() (P3, 2026-09-21) - dzwonek dedykowany pieczęci,
+    // odrębny od grajTechnike() (whoosh + warstwa) - pieczęć jest krokiem
+    // pośrednim, ma brzmieć LŻEJ niż dopełnione combo, nie tym samym
+    // dźwiękiem o innym argumencie jak dawne playFireSFX(0.3) vs (1.0).
+    s.audio.grajPieczecZlozona();
 }
 
 /**
@@ -161,5 +160,8 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
     // NIE KONIEC". Bez tego nie byłoby drogi do podpalenia dymu:
     // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
     if (technika.uzbraja !== 'dym') s.dmuchanie.anuluj();
-    s.audio.playFireSFX(1.0);
+    // grajTechnike() (P3, 2026-09-21) - whoosh wspólny + warstwa per
+    // technika (dawniej WSZYSTKIE sześć technik dzieliło identyczny
+    // playFireSFX(1.0), nieodróżnialne bez patrzenia na ekran).
+    s.audio.grajTechnike(technika.uzbraja);
 }

@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kula Mocy - Vibe Coding</title>
+    <title>Król Szamanów</title>
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Google Fonts dla lepszego wyglądu -->
+
+    <!-- Google Fonts: Bona Nova (tytuły/tekst, polski krój z pełnymi
+         diakrytykami) + Noto Sans Runic (glify pieczęci i HUD) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Bona+Nova:wght@400;700&family=Bona+Nova+SC:wght@400;700&family=Noto+Sans+Runic&display=swap" rel="stylesheet">
+
     <!-- Import map dla najnowszego MediaPipe Tasks API -->
     <script type="importmap">
       {
@@ -23,35 +24,47 @@
 <body>
     <div id="ui-layer">
         <div id="start-screen">
-            <h1>Vibe Coding<br><span class="highlight">Kula Mocy</span></h1>
-            <p>Pokaż, jaką masz energię. Po kliknięciu zaakceptuj dostęp do kamery.</p>
-            <button id="start-btn">START</button>
+            <div class="krag-run" aria-hidden="true">
+                <span>ᚲ</span><span>ᚦ</span><span>ᚢ</span><span>ᚨ</span><span>ᛚ</span>
+            </div>
+            <p class="kicker">Warsztat vibe codingu</p>
+            <h1>Król<br><span class="highlight">Szamanów</span></h1>
+            <p>Tańcz. Składaj pieczęcie. Wołaj żywioły.<br>Po kliknięciu zaakceptuj dostęp do kamery.</p>
+            <button id="start-btn">Rozpal ogień</button>
         </div>
         <div id="loading-screen" class="hidden">
-            <p>Inicjalizacja sztucznej inteligencji i kamery...</p>
+            <p>Duchy się budzą — kamera i model ruchu…</p>
         </div>
 
         <!-- Podpowiedź UI -->
         <div id="instruction-hud" class="hidden">
-            <span id="instruction-icon">🙌</span>
+            <span id="instruction-icon">ᛗ</span>
             <span id="instruction-text">Złóż dłonie w miseczkę naprzeciw siebie</span>
         </div>
 
-        <!-- HUD poziomu energii -->
+        <!-- Pasek sekwencji - ostatnio złożone pieczęcie i combosy -->
+        <div id="sekwencja-run" class="hidden">
+            <div id="sekwencja-nazwa"></div>
+            <div id="sekwencja-sloty"></div>
+        </div>
+
+        <!-- Pasek mocy - cienka krawędź u dołu ekranu, nie karta. Moc karmi
+             wszystkie pięć żywiołów, stąd neutralne złoto/kość, nie ogień. -->
         <div id="energy-hud" class="hidden">
-            <div class="hud-header">
-                <span class="hud-label">MOC SKUMULOWANA</span>
-                <span id="energy-percentage">0%</span>
-            </div>
-            <div class="hud-bar-wrapper">
+            <div id="energy-track">
                 <div id="energy-fill"></div>
             </div>
+            <span id="energy-percentage">0%</span>
         </div>
+
+        <!-- Wskaźnik dźwięku (P3, 2026-09-21) - a11y-visual-equivalent: samo
+             wyciszenie (klawisz M) nie ma innego widocznego śladu w grze. -->
+        <button id="audio-wskaznik" class="hidden" aria-label="Przełącz dźwięk (M)" title="Przełącz dźwięk (M)">♪</button>
     </div>
 
     <!-- Ukryte wideo do pobierania klatek -->
     <video id="webcam" autoplay playsinline></video>
-    
+
     <!-- Płótno, na którym rysujemy lustrzany podgląd oraz samą kulę -->
     <canvas id="output-canvas"></canvas>
 

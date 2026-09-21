@@ -57,10 +57,9 @@ console.log('ODPAL PIECZEĆ:');
     spr('efekty.odpal wywołane', zawiera(log, 'efekty.odpal'));
     spr('runy.odpal wywołane', zawiera(log, 'runy.odpal'));
     spr('aura.rozblysk wywołane', zawiera(log, 'aura.rozblysk'));
-    spr('audio.playFireSFX wywołane', zawiera(log, 'audio.playFireSFX'));
-    const rozblysk = log.find(w => w.wolanie === 'audio.playFireSFX');
-    spr(`audio.playFireSFX(0.3) - pieczęć brzmi LŻEJ niż technika (arg=${rozblysk.args[0]})`,
-        rozblysk.args[0] === 0.3);
+    // grajPieczecZlozona() (P3) - dedykowany dzwonek, ODRĘBNY od grajTechnike()
+    // (technika); dawne playFireSFX(0.3) vs (1.0) było TĄ SAMĄ metodą.
+    spr('audio.grajPieczecZlozona wywołane, NIE grajTechnike', zawiera(log, 'audio.grajPieczecZlozona') && !zawiera(log, 'audio.grajTechnike'));
     spr('dokładnie 4 wywołania, nic więcej', log.length === 4);
 }
 
@@ -75,8 +74,10 @@ function testTechnika(uzbraja, sekwencja, oczekiwane, opis) {
     const w = wolania(log);
     // Warstwa WSPÓLNA dla wszystkich sześciu technik.
     const wspolne = ['efekty.odpal', 'sekwencja.oznaczCombo', 'aura.rozblysk',
-                      'zaplon.zapal', 'ekran.uderz', 'audio.playFireSFX'];
+                      'zaplon.zapal', 'ekran.uderz', 'audio.grajTechnike'];
     for (const m of wspolne) spr(`${opis}: warstwa wspólna zawiera ${m}`, w.includes(m));
+    const grajTechnike = log.find(x => x.wolanie === 'audio.grajTechnike');
+    spr(`${opis}: audio.grajTechnike dostaje właściwe uzbraja ('${uzbraja}')`, grajTechnike?.args[0] === uzbraja);
     for (const m of oczekiwane) spr(`${opis}: zawiera ${m}`, w.includes(m));
     // dmuchanie.anuluj wywoływane dla KAŻDEJ techniki OPRÓCZ 'dym'.
     if (uzbraja === 'dym') {

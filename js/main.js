@@ -87,6 +87,7 @@ const uiEnergyPercentage = document.getElementById('energy-percentage');
 const uiSekwencjaRun = document.getElementById('sekwencja-run');
 const uiSekwencjaSloty = document.getElementById('sekwencja-sloty');
 const uiSekwencjaNazwa = document.getElementById('sekwencja-nazwa');
+const uiAudioWskaznik = document.getElementById('audio-wskaznik');
 
 const startBtn = document.getElementById('start-btn');
 const video = document.getElementById('webcam');
@@ -148,6 +149,7 @@ let lastFrameTime = 0;
 // dymu (js/dym.js:rozgarnij()). { 15: {x,y}|undefined, 16: {x,y}|undefined }.
 let poprzNadgarstkiPx = null;
 let ostatniWybuchSFX = -Infinity;   // performance.now() ostatniego dźwięku detonacji dymu
+let poprzStanPalca = 'BEZCZYNNY';   // do wykrycia krawędzi PLONIE/BEZCZYNNY (P3, 2026-09-21 - dźwięk zapłonu/zgaszenia)
 let wybuchyDoDzwieku = 0;           // wybuchy zebrane od ostatniego dźwięku
 const ODSTEP_WYBUCH_SFX_MS = 120;
 
@@ -163,7 +165,35 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
+/** Wskaźnik dźwięku (P3, 2026-09-21) - odzwierciedla audioEngine.wyciszony w DOM. */
+function odswiezWskaznikAudio() {
+    const wyciszony = audioEngine.wyciszony;
+    uiAudioWskaznik.textContent = wyciszony ? '♪̸' : '♪';
+    uiAudioWskaznik.classList.toggle('wyciszony', wyciszony);
+    uiAudioWskaznik.setAttribute('aria-pressed', String(wyciszony));
+}
+function przelaczDzwiek() {
+    audioEngine.przelaczWyciszenie();
+    odswiezWskaznikAudio();
+}
+uiAudioWskaznik.addEventListener('click', przelaczDzwiek);
+// Klawisz M - własny listener, niezależny od debugHud.js (D/R/N/Z/1-8/Esc) -
+// ten sam wzorzec rozdzielenia co osobny AudioContext debugHud.js dla
+// dźwięków sesji nagrywania (nie chcemy jednego miejsca odpowiedzialnego
+// za wszystkie skróty klawiszowe w grze, patrz debugHud.js nagłówek).
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
+});
+
 startBtn.addEventListener('click', async () => {
+    // 0. Audio PIERWSZE, PRZED jakimkolwiek await (P3, 2026-09-21) - to jest
+    // jedyne miejsce w całej grze z prawdziwym gestem użytkownika (klik).
+    // init()+resume() wołane TU, zanim getUserMedia/MediaPipe zjedzą to okno
+    // - dawniej audioEngine.init() siedziało PO trzech await niżej, poza
+    // oknem aktywacji, więc przeglądarka mogła odmówić AudioContext.
+    audioEngine.init();
+    audioEngine.resume();
+
     // 1. Ukryj start i pokaż ładowanie
     uiStartScreen.classList.add('hidden');
     uiLoadingScreen.classList.remove('hidden');
@@ -204,14 +234,14 @@ startBtn.addEventListener('click', async () => {
 
         // 4. Aura tancerza
         aura = new Aura(canvas, ctx);
-
-        // 5. Inicjalizacja syntezatora audio
-        audioEngine.init();
+        // (Audio już zainicjalizowane na samym początku handlera - patrz krok 0.)
 
         uiLoadingScreen.classList.add('hidden');
         uiInstructionHud.classList.remove('hidden');
         uiEnergyHud.classList.remove('hidden');
         uiSekwencjaRun.classList.remove('hidden');
+        uiAudioWskaznik.classList.remove('hidden');
+        odswiezWskaznikAudio();
 
         isRunning = true;
         requestAnimationFrame(renderLoop);
@@ -636,6 +666,17 @@ function klatka(now) {
     const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
     if (pobor > 0) motionMeter.zuzyj(pobor);
 
+    // Dźwięk Płonącego Palca (P3, 2026-09-21): krawędzie stanu = one-shoty
+    // (zapłon/zgaszenie), stan PLONIE = ciągły trzask skalowany siłą.
+    if (poprzStanPalca !== 'PLONIE' && plonacyPalec.stan === 'PLONIE') {
+        audioEngine.grajZaplonPalca();
+    } else if (poprzStanPalca === 'PLONIE' && plonacyPalec.stan !== 'PLONIE') {
+        audioEngine.grajZgaszenie();
+    }
+    if (plonacyPalec.stan === 'PLONIE') audioEngine.ustawPalec(plonacyPalec.sila);
+    else audioEngine.ustawPalec(0);
+    poprzStanPalca = plonacyPalec.stan;
+
     ogien.updateAndDraw(
         ctx,
         plonacyPalec.zaczep
@@ -729,7 +770,12 @@ function klatka(now) {
     uiInstructionText.textContent = text;
     uiInstructionIcon.textContent = icon;
 
-    audioEngine.update('CHARGING', moc, plynnosc);
+    // Sygnatura straciła parametr `state` (P3, 2026-09-21) - był zawsze
+    // 'CHARGING' (jedyne wywołanie w całej grze), gałąź READY/FIRING w
+    // audioEngine.js była martwa i usunięta razem z nim.
+    audioEngine.update(moc, plynnosc);
+    audioEngine.ustawSkladanie(skl.postep, skl.skladana);
+    audioEngine.ustawTecze(tecza.silaSladu);
 
     // --- 7b. Szkielet dłoni ---
     rysujDlonie(frame);
