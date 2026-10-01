@@ -88,7 +88,7 @@ export class Przebieg {
     zapiszWynik(wynik, rozbicie, momenty) {
         if (this.stan !== 'RUNDA' || this.runda.stan !== 'KONIEC') return null;
         const w = Number.isFinite(wynik) && wynik > 0 ? wynik : 0;
-        const pods = { tryb: this.konfig.tryb, nick: this.nick, wynik: w, rozbicie, momenty,
+        const pods = { tryb: this.konfig.tryb, dlugoscS: this.konfig.dlugoscS, nick: this.nick, wynik: w, rozbicie, momenty,
                        kragKoniec: null, nastepny: null, podium: null };
         if (this.krag) {
             this.krag.zapiszWynik(w, rozbicie, momenty);

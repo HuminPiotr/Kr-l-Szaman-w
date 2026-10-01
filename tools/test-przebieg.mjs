@@ -41,6 +41,7 @@ console.log('PRZEBIEG POJEDYNCZEJ RUNDY:');
     spr('żadnych dodatkowych zdarzeń po KONIEC', z.typy() === 'trwa,wybrzmienie,koniecRundy');
     const pods = p.zapiszWynik(1234.7, { taniec: 100 }, { splecenia: 2 });
     spr('podsumowanie zawiera wynik', pods && pods.wynik === 1234.7 && pods.tryb === 'proba');
+    spr('podsumowanie niesie długość rundy (dla tytułu za punkty na minutę)', pods.dlugoscS === 60);
     spr('bez Kręgu: nick null, brak podium', pods.nick === null && pods.podium === null && pods.kragKoniec === null);
     spr('stan PODSUMOWANIE', p.stan === 'PODSUMOWANIE');
 }
