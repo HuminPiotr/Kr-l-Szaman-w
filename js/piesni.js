@@ -32,7 +32,10 @@ export function walidujManifest(dane) {
             plik,
             tytul: tekst(w.tytul, plik.replace(/\.[^.]+$/, '')),
             autor: tekst(w.autor),
-            licencja: tekst(w.licencja)
+            licencja: tekst(w.licencja),
+            // Długość z manifestu tylko do WYŚWIETLENIA w menu; prawdziwą, autorytatywną
+            // długość rundy daje audio.duration po załadowaniu (Piesn.zaladuj).
+            dlugoscS: typeof w.dlugoscS === 'number' && Number.isFinite(w.dlugoscS) && w.dlugoscS > 0 ? w.dlugoscS : 0
         });
     }
     return out;

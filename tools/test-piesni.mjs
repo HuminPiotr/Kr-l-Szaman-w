@@ -38,6 +38,8 @@ console.log('\nMANIFEST - WALIDACJA:');
     spr('brak tytułu -> tytuł z nazwy pliku', walidujManifest([{ plik: 'Piesn.m4a' }])[0].tytul === 'Piesn');
     spr('nie-tablica -> pusta lista', walidujManifest({}).length === 0 && walidujManifest(null).length === 0 && walidujManifest('x').length === 0);
     spr('wpis bez pliku odrzucony', walidujManifest([{ tytul: 'x' }, null, 5, { plik: '' }]).length === 0);
+    spr('dlugoscS z manifestu zachowana', walidujManifest([{ plik: 'a.m4a', dlugoscS: 216.4 }])[0].dlugoscS === 216.4);
+    spr('brak/zła dlugoscS = 0', [undefined, NaN, -5, 'x', 0, Infinity].every(d => walidujManifest([{ plik: 'a.m4a', dlugoscS: d }])[0].dlugoscS === 0));
     spr('ścieżka z ../ odrzucona (nie wychodzimy z katalogu)', walidujManifest([{ plik: '../../etc/passwd' }, { plik: 'a/b.m4a' }, { plik: 'a\\b.m4a' }]).length === 0);
     spr('pola nie-tekstowe nie rzucają', walidujManifest([{ plik: 'a.m4a', tytul: 5, autor: {}, licencja: null }]).length === 1);
 }
@@ -62,6 +64,7 @@ console.log('\nMANIFEST NA DYSKU:');
         try { readFileSync(new URL('../' + KATALOG_MUZYKI + u.plik, import.meta.url)); } catch { istnieje = false; }
         spr(`plik '${u.plik}' istnieje`, istnieje);
         spr(`'${u.plik}' ma autora i licencję do uzupełnienia/wyjaśnienia`, u.autor.length > 0 && u.licencja.length > 0);
+        spr(`'${u.plik}' ma dlugoscS z manifestu (menu pokazuje czas pieśni)`, u.dlugoscS > 0);
     }
 }
 
