@@ -36,6 +36,14 @@
             <p>Duchy się budzą — kamera i model ruchu…</p>
         </div>
 
+        <!-- Wynik (punktacja, 2026-10-01) - DOM, nie płótno (lustro). Licznik,
+             serie reakcji i warstwa unoszących się "+340 Okadzenie". -->
+        <div id="wynik-hud" class="hidden">
+            <div id="wynik-licznik">0</div>
+            <div id="wynik-serie"></div>
+        </div>
+        <div id="wynik-unoszace" aria-hidden="true"></div>
+
         <!-- Podpowiedź UI - DWIE warstwy nałożone na siebie (P4, 2026-09-21):
              main.js pisze nowy komunikat do NIEAKTYWNEJ warstwy, potem
              przełącza .aktywny - opacity się KRZYŻUJE zamiast twardo

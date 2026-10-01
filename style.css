@@ -448,7 +448,68 @@ body.ready-pulse #instruction-hud {
    ale bez animowanego przejścia - 1ms zamiast 150/220ms. body.ready-pulse::after
    nie ma tu wpisu - P4.4 (wyżej) już zamieniło jej fullscreenPulse na
    stałą opacity, nie ma animacji do wygaszenia. */
+/* --- WYNIK (punktacja, 2026-10-01) ---
+   Lewy górny róg: środek góry zajmuje #instruction-hud, prawy róg
+   wskaźnik dźwięku. */
+#wynik-hud {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    z-index: 15;
+    pointer-events: none;
+    font-family: 'Bona Nova SC', serif;
+    color: var(--zloto);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 18px rgba(255, 122, 26, 0.45);
+    transition: opacity 0.4s ease;
+}
+#wynik-hud.wylaczony { opacity: 0; }
+#wynik-licznik {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+#wynik-serie {
+    margin-top: 0.3rem;
+    font-size: 1rem;
+    color: var(--plomien);
+    min-height: 1.2em;
+}
+#wynik-unoszace {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 14;
+    overflow: hidden;
+}
+.unosi {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: 'Bona Nova SC', serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--kosc);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 14px rgba(255, 179, 71, 0.7);
+    white-space: nowrap;
+    animation: unies 1.4s ease-out forwards;
+}
+.unosi-technika { font-size: 1.9rem; color: var(--plomien); }
+.unosi-splecenie { font-size: 1.5rem; color: var(--zloto); }
+@keyframes unies {
+    0%   { opacity: 0; transform: translate(-50%, -30%) scale(0.85); }
+    15%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -160%) scale(1); }
+}
+@keyframes zanik {
+    0%, 60% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+    .unosi {
+        animation-name: zanik;   /* bez ruchu - tylko zanik */
+        transform: translate(-50%, -50%);
+    }
     .krag-run,
     #instruction-hud,
     .instruction-icon,
