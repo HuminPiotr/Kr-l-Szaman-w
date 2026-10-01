@@ -113,6 +113,8 @@ konflikt z końcowego przeglądu podprojektu 1 (swobodny pokazywał licznik).
 
 **Esc** w rundzie → `przerwij()`: bez zapisu, fabryka czyści moduły, wraca swobodny. Kamera działa dalej.
 
+*(Podprojekt 3: Esc wraca na Polanę, nie do trybu swobodnego - patrz `2026-10-01-polana-ksiega-design.md`.)*
+
 ## Poza zakresem
 
 Menu, wybór trybu myszą, nick, Księga rekordów, Kronika, koronacja i jajka z nickami (podprojekt 3);
