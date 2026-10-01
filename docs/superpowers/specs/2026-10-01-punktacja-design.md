@@ -1,0 +1,126 @@
+# Punktacja — system punktowy (podprojekt 1 z 3 „arcade")
+
+## Kontekst
+
+Gra była czystym tańcem: bez punktów, timera i porażki (GEMINI.md §2). Właściciel chce
+arcade'owości i rywalizacji między graczami. Podprojekty: **1. punkty (ten spec)**,
+2. tryby gry, 3. menu „Polana" + Księga rekordów. Punkty są fundamentem dla pozostałych dwóch.
+
+Decyzje z burzy mózgów (2026-10-01):
+- **§2 przepisane, nie usunięte.** Punkty tylko PRZYBYWAJĄ. Brak kar, combo nie resetuje się
+  za pomyłkę, nic nie mówi „źle". Znika wyłącznie „brak punktów/timera". Tryb swobodny zostaje
+  jak dziś (punkty nieaktywne i niewidoczne).
+- **Warstwy:** taniec + pieczęć + technika + reakcje. Bez globalnego mnożnika „żaru".
+- Premie za **reakcje między technikami** (to, o co prosił właściciel: podpalony dym punktuje
+  za każdy wybuchnięty kłąb).
+- **Rozszerzalność:** nowe techniki i reakcje mają się wpinać bez przepisywania punktacji.
+
+## Moduł `js/punkty.js`
+
+Czysta logika, bez DOM i canvasu (wzorzec `js/kombosy.js`), testowana w `node`.
+`main.js` zgłasza zdarzenia (PUSH), HUD odczytuje stan co klatkę (PULL, jak `sekwencja.js`).
+
+API klasy `Punktacja`:
+
+| Metoda / pole | Znaczenie |
+|---|---|
+| `taniec(plynnosc, responsywnosc, dt)` | strumień za ruch; zła wartość (NaN/∞/ujemna) → 0 |
+| `pieczec(id, now)` | stała nagroda; zapisuje pieczęć w WŁASNEJ historii |
+| `technika(kombo, now)` | wartość z tabeli, malejący przyrost, splecenie; zwraca przyznane punkty |
+| `reakcja(id, n, now)` | `n` jednostek reakcji z rejestru `REAKCJE` |
+| `wynik`, `rozbicie` | suma; `{ taniec, pieczecie, techniki, reakcje }` |
+| `zdarzenia` | kolejka do unoszących się napisów (PULL, czyszczona przez HUD) |
+| `momenty` | największe osiągnięcia rundy (np. największa Pożoga) — dla Kroniki |
+| `mnoznikZewu` | hak (funkcja `(idPieczeci\|kombo) → 1..2`) dla trybu Zew (podprojekt 2) |
+| `aktywna` | `false` w trybie swobodnym — wszystkie metody wtedy nic nie robią |
+| `reset()` | równy start rundy |
+
+**Niezmiennik:** żadna ścieżka API nie zmniejsza `wynik`. Test to sprawdza.
+
+## Wartości
+
+- **Taniec:** do ~4 pkt/s × `plynnosc` × `motionMeter.responsywnosc` (0..1, po odjęciu
+  podłogi szumu — samo stanie w miejscu nie punktuje). Ok. 500 pkt za 2 min tańca: ktoś, komu
+  nie wychodzą pieczęcie, nadal zdobywa punkty.
+- **Pieczęć:** 25.
+- **Technika:** `100 × Σ TRUDNOSC[pieczęć w sekwencji]`, gdzie
+  `TRUDNOSC = { mokosz: 1.0, weles: 1.0, perun: 1.2, stribog: 1.4, swarog: 1.6 }`.
+  Trudność pochodzi ze zmierzonej rozpoznawalności (`tools/test-rozdzielnosc.mjs`, komentarz
+  w `js/kombosy.js` przy Kołowrocie): woda/ziemia ≈ 1,0, błyskawica 0,70–1,00, powietrze
+  0,40–0,93, ogień 0,21–0,59. Im trudniej pieczęć złożyć, tym więcej wnosi.
+  Przykłady: Kołowrót (perun, weles, mokosz) = 320; Okadzenie (swarog, stribog, swarog) = 460;
+  Grom w Ogniu (swarog, perun) = 280; Aard (stribog ×2) = 280.
+- **Malejący przyrost:** ta sama technika pod rząd daje 100% → 75% → 50% (podłoga 50%);
+  inna technika przywraca 100%. Nie kara — nagradza różnorodność; punkty nigdy nie znikają.
+
+## Reakcje (rejestr)
+
+`REAKCJE = { id: { nazwa, punktyZaJednostke, ... } }`. Nowa reakcja to jeden wpis plus jedno
+wywołanie `punkty.reakcja(id, n, now)` tam, gdzie zachodzi.
+
+| id | Co | Punkty |
+|---|---|---|
+| `pozoga` | wybuchnięty kłąb podpalonego dymu | +8 za kłąb, malejąco po ~50 kłębach w jednym pożarze |
+| `rozwianie` | kłąb dymu PO RAZ PIERWSZY pchnięty daną falą (Aard, fala Gromu w Ziemię) | +3 za kłąb |
+| `splecenie` | technika odpalona ogonem, który dzieli pieczęć z ogonem poprzedniej techniki | +50% wartości drugiej techniki |
+
+**„Jeden pożar"** = seria wybuchów bez przerwy dłuższej niż ~1,5 s. Sufit malejącego
+przyrostu liczy się per pożar. Kolumna dymu to setki cząstek, więc bez sufitu jedna detonacja
+przebiłaby kilka technik.
+
+**Cel balansu (do POTWIERDZENIA pomiarem w `tools/scena.html` przed zamknięciem zadania):**
+pełna Pożoga ≈ 1,5–2× wartości Okadzenia (~700–900 pkt), nigdy więcej niż ~3 techniki.
+Liczby 8/kłąb i próg 50 są startowe; pomiar liczby kłębów w pełnej detonacji ustala je
+ostatecznie.
+
+**Splecenie po NAKŁADANIU OGONÓW, nie po czasie.** `Punktacja` ma własną historię pieczęci
+(wpisy `{id, t}` z `pieczec()`); technika zapamiętuje, których wpisów (po znaczniku `t`)
+użyła jako ogona. Nowa technika, której ogon dzieli wpis z ogonem poprzedniej, dostaje
+splecenie. Próg czasowy odpadł: w łańcuchu Okadzenie → Grom w Ogniu czwarta pieczęć składa
+się ≥ 0,9 s po trzeciej. Bufor kombosów nie jest czyszczony po trafieniu (zamierzone), więc
+nakładanie ogonów to naturalny sygnał „połączyłeś".
+
+## Rozwianie — zmiana w `js/dym.js`
+
+`dym.pchnij()` tylko zapisuje listę; `_fizyka` konsumuje ją później w `updateAndDraw`.
+`fala.czola` żyje ~0,7 s i jest pchane co klatkę, więc naiwne liczenie punktowałoby każdy
+kłąb ~40 razy na falę. Rozwiązanie: czoło fali niesie `idFali`; kłąb zapamiętuje id fal, które
+go już trafiły; liczy się tylko pierwsze trafienie. `updateAndDraw` zwraca
+`{ wybuchy, rozwiane }` (wzorzec `_nowychWybuchow`). Zmiana sygnatury zwrotu dotyka
+`main.js` i `tools/test-dym.mjs`.
+
+## HUD — `js/wynikHud.js`
+
+DOM, nie płótno (płótno jest lustrzane, GEMINI.md §4). Licznik u góry; unoszące się
+„+340 Okadzenie" / „Pożoga ×23" w miejscu zdarzenia (`srodekDloni` z `js/efekty.js`,
+przeliczone na lustro). `prefers-reduced-motion` jak w P4.3. Ukryty, gdy `aktywna === false`.
+
+## Wpięcie w `js/main.js`
+
+- blok 6a: `punkty.pieczec`, `punkty.technika`;
+- po `dym.updateAndDraw`: `reakcja('pozoga', wybuchy)`, `reakcja('rozwianie', rozwiane)`;
+- co klatkę: `punkty.taniec(plynnosc, motionMeter.responsywnosc, dt)`.
+
+## Testy — `tools/test-punkty.mjs` (do `tools/test-wszystko.sh`)
+
+- **Strażnik rozszerzalności:** każde combo z `KOMBOSY` ma skończoną dodatnią wartość,
+  każda pieczęć w jakiejkolwiek sekwencji ma wpis w `TRUDNOSC`, każda reakcja używana w kodzie
+  istnieje w `REAKCJE`. Nowa technika bez wartości wywala test.
+- Punkty nigdy nie maleją; NaN/Infinity na wejściu ignorowane (GEMINI.md §4, zatruta moc).
+- Malejący przyrost i jego reset po innej technice.
+- Sufit Pożogi na jeden pożar; nowy pożar po przerwie > 1,5 s.
+- Splecenie na łańcuchu swarog→stribog→swarog→perun (ten sam scenariusz co `test-kombosy.mjs`);
+  brak splecenia, gdy ogony się nie nakładają.
+- `aktywna = false` → zero punktów i zdarzeń.
+- `dym`: kłąb trafiony tą samą falą przez wiele klatek liczy się raz.
+
+## Poza zakresem
+
+Tryby i koniec rundy (podprojekt 2), zapis wyników i Księga (podprojekt 3), mnożnik Zewu
+(tylko hak `mnoznikZewu`).
+
+## Ryzyka
+
+Liczby punktów są ZGADNIĘTE jak progi w reszcie gry i wymagają strojenia na żywym ciele.
+Struktura (warstwy, trudność wyprowadzona z pomiarów, rejestr reakcji, strażnik w teście)
+jest tak zbudowana, żeby strojenie zmieniało stałe, nie kod.
