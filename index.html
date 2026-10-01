@@ -1,16 +1,19 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Król Szamanów</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 
     <!-- Google Fonts: Bona Nova (tytuły/tekst, polski krój z pełnymi
          diakrytykami) + Noto Sans Runic (glify pieczęci i HUD) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bona+Nova:wght@400;700&family=Bona+Nova+SC:wght@400;700&family=Noto+Sans+Runic&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bona+Nova:wght@400;700&family=Bona+Nova+SC:wght@400;700&family=Noto+Sans+Runic&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Import map dla najnowszego MediaPipe Tasks API -->
     <script type="importmap">
@@ -20,167 +23,255 @@
         }
       }
     </script>
-</head>
-<body>
+  </head>
+  <body>
     <div id="ui-layer">
-        <!-- MENU "Polana" (2026-10-01, podprojekt 3). Cztery ekrany w jednej warstwie;
+      <!-- MENU "Polana" (2026-10-01, podprojekt 3). Cztery ekrany w jednej warstwie;
              widoczny jest ten, który wskazuje model Menu (js/menu.js), render robi
              js/polanaUi.js. Teksty gracza WYŁĄCZNIE przez textContent. -->
-        <div id="menu">
-            <section id="polana" class="menu-ekran">
-                <div class="krag-run" aria-hidden="true">
-                    <span>ᚲ</span><span>ᚦ</span><span>ᚢ</span><span>ᚨ</span><span>ᛚ</span>
-                </div>
-                <p class="kicker">Warsztat vibe codingu</p>
-                <h1>Król<br><span class="highlight">Szamanów</span></h1>
-                <p class="podtytul">Tańcz. Składaj pieczęcie. Wołaj żywioły.</p>
-                <div id="kamienie" role="menu" aria-label="Wybierz obrzęd">
-                    <div class="ognisko" aria-hidden="true"><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i></div>
-                    <button type="button" class="kamien" data-kamien="obrzed" role="menuitem">
-                        <span class="kamien-runa" aria-hidden="true">ᛟ</span>
-                        <span class="kamien-nazwa">Obrzęd</span>
-                        <span class="kamien-opis">taniec do pieśni</span>
-                    </button>
-                    <button type="button" class="kamien" data-kamien="proba" role="menuitem">
-                        <span class="kamien-runa" aria-hidden="true">ᚦ</span>
-                        <span class="kamien-nazwa">Próba</span>
-                        <span class="kamien-opis">taniec na czas</span>
-                    </button>
-                    <button type="button" class="kamien" data-kamien="swobodny" role="menuitem">
-                        <span class="kamien-runa" aria-hidden="true">ᛗ</span>
-                        <span class="kamien-nazwa">Swobodny taniec</span>
-                        <span class="kamien-opis">bez punktów</span>
-                    </button>
-                    <button type="button" class="kamien" data-kamien="ksiega" role="menuitem">
-                        <span class="kamien-runa" aria-hidden="true">ᛉ</span>
-                        <span class="kamien-nazwa">Księga Plemienia</span>
-                        <span class="kamien-opis">najlepsze wyniki</span>
-                    </button>
-                </div>
-                <p id="polana-podpowiedz" aria-live="polite"></p>
-            </section>
+      <div id="menu">
+        <section id="polana" class="menu-ekran">
+          <div class="krag-run" aria-hidden="true">
+            <span>ᚲ</span><span>ᚦ</span><span>ᚢ</span><span>ᚨ</span
+            ><span>ᛚ</span>
+          </div>
+          <!-- <p class="kicker">Warsztat vibe codingu</p> -->
+          <h1>Król<br /><span class="highlight">Szamanów</span></h1>
+          <p class="podtytul">Tańcz. Składaj pieczęcie. Wołaj żywioły.</p>
+          <div id="kamienie" role="menu" aria-label="Wybierz obrzęd">
+            <div class="ognisko" aria-hidden="true">
+              <i class="iskra"></i><i class="iskra"></i><i class="iskra"></i
+              ><i class="iskra"></i><i class="iskra"></i><i class="iskra"></i
+              ><i class="iskra"></i>
+            </div>
+            <button
+              type="button"
+              class="kamien"
+              data-kamien="obrzed"
+              role="menuitem"
+            >
+              <span class="kamien-runa" aria-hidden="true">ᛟ</span>
+              <span class="kamien-nazwa">Obrzęd</span>
+              <span class="kamien-opis">taniec do pieśni</span>
+            </button>
+            <button
+              type="button"
+              class="kamien"
+              data-kamien="proba"
+              role="menuitem"
+            >
+              <span class="kamien-runa" aria-hidden="true">ᚦ</span>
+              <span class="kamien-nazwa">Próba</span>
+              <span class="kamien-opis">taniec na czas</span>
+            </button>
+            <button
+              type="button"
+              class="kamien"
+              data-kamien="swobodny"
+              role="menuitem"
+            >
+              <span class="kamien-runa" aria-hidden="true">ᛗ</span>
+              <span class="kamien-nazwa">Swobodny taniec</span>
+              <span class="kamien-opis">bez punktów</span>
+            </button>
+            <button
+              type="button"
+              class="kamien"
+              data-kamien="ksiega"
+              role="menuitem"
+            >
+              <span class="kamien-runa" aria-hidden="true">ᛉ</span>
+              <span class="kamien-nazwa">Księga Plemienia</span>
+              <span class="kamien-opis">najlepsze wyniki</span>
+            </button>
+          </div>
+          <p id="polana-podpowiedz" aria-live="polite"></p>
+        </section>
 
-            <section id="konfig" class="menu-ekran hidden">
-                <h2 id="konfig-tytul"></h2>
-                <div id="konfig-piesn" class="grupa hidden">
-                    <div class="etykieta">Pieśń</div>
-                    <div id="konfig-piesni" class="wybor" role="radiogroup" aria-label="Pieśń"></div>
-                </div>
-                <div id="konfig-czas" class="grupa hidden">
-                    <div class="etykieta">Czas próby</div>
-                    <div id="konfig-czasy" class="wybor" role="radiogroup" aria-label="Czas próby"></div>
-                </div>
-                <div id="konfig-opcje" class="grupa">
-                    <label class="opcja"><input type="checkbox" id="opt-zew"><span><b>Zew żywiołów</b><small>duchy proszą o żywioł, a on daje ×2</small></span></label>
-                    <label class="opcja"><input type="checkbox" id="opt-krag"><span><b>Krąg</b><small>kilku tancerzy po kolei</small></span></label>
-                </div>
-                <div id="konfig-nick-solo" class="grupa">
-                    <label class="etykieta" for="nick-solo">Imię tancerza</label>
-                    <div class="nick-wiersz">
-                        <input id="nick-solo" type="text" maxlength="16" autocomplete="off" spellcheck="false">
-                        <button type="button" id="nick-kosci" aria-label="Wylosuj szamańskie imię" title="Wylosuj szamańskie imię">🎲</button>
-                    </div>
-                </div>
-                <div id="konfig-krag-lista" class="grupa hidden">
-                    <div class="etykieta">Tancerze po kolei</div>
-                    <div id="krag-nicki"></div>
-                    <button type="button" id="krag-dodaj" class="drugi">+ dopisz tancerza</button>
-                </div>
-                <p id="konfig-info" aria-live="polite"></p>
-                <div class="przyciski">
-                    <button type="button" id="konfig-wstecz" class="drugi">Wróć</button>
-                    <button type="button" id="rozpal-btn">Rozpal ogień</button>
-                </div>
-            </section>
+        <section id="konfig" class="menu-ekran hidden">
+          <h2 id="konfig-tytul"></h2>
+          <div id="konfig-piesn" class="grupa hidden">
+            <div class="etykieta">Pieśń</div>
+            <div
+              id="konfig-piesni"
+              class="wybor"
+              role="radiogroup"
+              aria-label="Pieśń"
+            ></div>
+          </div>
+          <div id="konfig-czas" class="grupa hidden">
+            <div class="etykieta">Czas próby</div>
+            <div
+              id="konfig-czasy"
+              class="wybor"
+              role="radiogroup"
+              aria-label="Czas próby"
+            ></div>
+          </div>
+          <div id="konfig-opcje" class="grupa">
+            <label class="opcja"
+              ><input type="checkbox" id="opt-zew" /><span
+                ><b>Zew żywiołów</b
+                ><small>duchy proszą o żywioł, a on daje ×2</small></span
+              ></label
+            >
+            <label class="opcja"
+              ><input type="checkbox" id="opt-krag" /><span
+                ><b>Krąg</b><small>kilku tancerzy po kolei</small></span
+              ></label
+            >
+          </div>
+          <div id="konfig-nick-solo" class="grupa">
+            <label class="etykieta" for="nick-solo">Imię tancerza</label>
+            <div class="nick-wiersz">
+              <input
+                id="nick-solo"
+                type="text"
+                maxlength="16"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button
+                type="button"
+                id="nick-kosci"
+                aria-label="Wylosuj szamańskie imię"
+                title="Wylosuj szamańskie imię"
+              >
+                🎲
+              </button>
+            </div>
+          </div>
+          <div id="konfig-krag-lista" class="grupa hidden">
+            <div class="etykieta">Tancerze po kolei</div>
+            <div id="krag-nicki"></div>
+            <button type="button" id="krag-dodaj" class="drugi">
+              + dopisz tancerza
+            </button>
+          </div>
+          <p id="konfig-info" aria-live="polite"></p>
+          <div class="przyciski">
+            <button type="button" id="konfig-wstecz" class="drugi">Wróć</button>
+            <button type="button" id="rozpal-btn">Rozpal ogień</button>
+          </div>
+        </section>
 
-            <section id="ksiega-ekran" class="menu-ekran hidden">
-                <h2>Księga Plemienia</h2>
-                <div id="ksiega-zakladki" class="wybor" role="tablist" aria-label="Tablice wyników"></div>
-                <ol id="ksiega-lista"></ol>
-                <p id="ksiega-info" aria-live="polite"></p>
-                <div class="przyciski">
-                    <button type="button" id="ksiega-wstecz" class="drugi">Do Polany</button>
-                    <button type="button" id="ksiega-eksport" class="drugi">Zapisz do pliku</button>
-                    <label class="plik drugi">Wczytaj z pliku<input type="file" id="ksiega-import" accept=".json,application/json"></label>
-                </div>
-                <details id="ksiega-wiecej">
-                    <summary>Więcej…</summary>
-                    <button type="button" id="ksiega-wyczysc" class="drugi">Wyczyść Księgę…</button>
-                    <button type="button" id="ksiega-wyczysc-tak" class="drugi hidden">Na pewno? To usunie wszystkie wyniki</button>
-                </details>
-            </section>
+        <section id="ksiega-ekran" class="menu-ekran hidden">
+          <h2>Księga Plemienia</h2>
+          <div
+            id="ksiega-zakladki"
+            class="wybor"
+            role="tablist"
+            aria-label="Tablice wyników"
+          ></div>
+          <ol id="ksiega-lista"></ol>
+          <p id="ksiega-info" aria-live="polite"></p>
+          <div class="przyciski">
+            <button type="button" id="ksiega-wstecz" class="drugi">
+              Do Polany
+            </button>
+            <button type="button" id="ksiega-eksport" class="drugi">
+              Zapisz do pliku
+            </button>
+            <label class="plik drugi"
+              >Wczytaj z pliku<input
+                type="file"
+                id="ksiega-import"
+                accept=".json,application/json"
+            /></label>
+          </div>
+          <details id="ksiega-wiecej">
+            <summary>Więcej…</summary>
+            <button type="button" id="ksiega-wyczysc" class="drugi">
+              Wyczyść Księgę…
+            </button>
+            <button type="button" id="ksiega-wyczysc-tak" class="drugi hidden">
+              Na pewno? To usunie wszystkie wyniki
+            </button>
+          </details>
+        </section>
 
-            <section id="kronika" class="menu-ekran hidden">
-                <div id="kronika-tytul"></div>
-                <div id="kronika-wynik"></div>
-                <div id="kronika-szaman"></div>
-                <div id="kronika-zdanie"></div>
-                <div id="kronika-przydomki"></div>
-                <div id="kronika-miejsce"></div>
-                <div id="kronika-linie"></div>
-                <div id="kronika-podium"></div>
-                <div id="kronika-podpis"></div>
-                <div class="przyciski">
-                    <button type="button" id="kronika-jeszcze">Jeszcze raz</button>
-                    <button type="button" id="kronika-polana" class="drugi">Do Polany</button>
-                </div>
-            </section>
-        </div>
-        <div id="loading-screen" class="hidden">
-            <p>Duchy się budzą — kamera i model ruchu…</p>
-        </div>
+        <section id="kronika" class="menu-ekran hidden">
+          <div id="kronika-tytul"></div>
+          <div id="kronika-wynik"></div>
+          <div id="kronika-szaman"></div>
+          <div id="kronika-zdanie"></div>
+          <div id="kronika-przydomki"></div>
+          <div id="kronika-miejsce"></div>
+          <div id="kronika-linie"></div>
+          <div id="kronika-podium"></div>
+          <div id="kronika-podpis"></div>
+          <div class="przyciski">
+            <button type="button" id="kronika-jeszcze">Jeszcze raz</button>
+            <button type="button" id="kronika-polana" class="drugi">
+              Do Polany
+            </button>
+          </div>
+        </section>
+      </div>
+      <div id="loading-screen" class="hidden">
+        <p>Duchy się budzą — kamera i model ruchu…</p>
+      </div>
 
-        <!-- Wynik (punktacja, 2026-10-01) - DOM, nie płótno (lustro). Licznik,
+      <!-- Wynik (punktacja, 2026-10-01) - DOM, nie płótno (lustro). Licznik,
              serie reakcji i warstwa unoszących się "+340 Okadzenie". -->
-        <div id="wynik-hud" class="hidden">
-            <div id="wynik-licznik">0</div>
-            <div id="wynik-serie"></div>
-        </div>
-        <div id="wynik-unoszace" aria-hidden="true"></div>
+      <div id="wynik-hud" class="hidden">
+        <div id="wynik-licznik">0</div>
+        <div id="wynik-serie"></div>
+      </div>
+      <div id="wynik-unoszace" aria-hidden="true"></div>
 
-        <!-- Runda (tryby, 2026-10-01) - odliczanie, czas, Zew, baner końca. DOM, nie płótno. -->
-        <div id="runda-hud" class="hidden">
-            <div id="runda-zapowiedz"></div>
-            <div id="runda-odliczanie"></div>
-            <div id="runda-czas"></div>
-            <div id="runda-zew"></div>
-        </div>
+      <!-- Runda (tryby, 2026-10-01) - odliczanie, czas, Zew, baner końca. DOM, nie płótno. -->
+      <div id="runda-hud" class="hidden">
+        <div id="runda-zapowiedz"></div>
+        <div id="runda-odliczanie"></div>
+        <div id="runda-czas"></div>
+        <div id="runda-zew"></div>
+      </div>
 
-        <!-- Podpowiedź UI - DWIE warstwy nałożone na siebie (P4, 2026-09-21):
+      <!-- Podpowiedź UI - DWIE warstwy nałożone na siebie (P4, 2026-09-21):
              main.js pisze nowy komunikat do NIEAKTYWNEJ warstwy, potem
              przełącza .aktywny - opacity się KRZYŻUJE zamiast twardo
              podmieniać textContent (dawniej bez animacji przy zmianie
              tekstu, mimo transition w CSS - triggerowała je tylko klasa
              .hidden przy starcie gry). -->
-        <div id="instruction-hud" class="hidden">
-            <span class="komunikat aktywny" data-warstwa="a">
-                <span class="instruction-icon">ᛗ</span>
-                <span class="instruction-text">Złóż dłonie w miseczkę naprzeciw siebie</span>
-            </span>
-            <span class="komunikat" data-warstwa="b">
-                <span class="instruction-icon"></span>
-                <span class="instruction-text"></span>
-            </span>
-        </div>
+      <div id="instruction-hud" class="hidden">
+        <span class="komunikat aktywny" data-warstwa="a">
+          <span class="instruction-icon">ᛗ</span>
+          <span class="instruction-text"
+            >Złóż dłonie w miseczkę naprzeciw siebie</span
+          >
+        </span>
+        <span class="komunikat" data-warstwa="b">
+          <span class="instruction-icon"></span>
+          <span class="instruction-text"></span>
+        </span>
+      </div>
 
-        <!-- Pasek sekwencji - ostatnio złożone pieczęcie i combosy -->
-        <div id="sekwencja-run" class="hidden">
-            <div id="sekwencja-nazwa"></div>
-            <div id="sekwencja-sloty"></div>
-        </div>
+      <!-- Pasek sekwencji - ostatnio złożone pieczęcie i combosy -->
+      <div id="sekwencja-run" class="hidden">
+        <div id="sekwencja-nazwa"></div>
+        <div id="sekwencja-sloty"></div>
+      </div>
 
-        <!-- Pasek mocy - cienka krawędź u dołu ekranu, nie karta. Moc karmi
+      <!-- Pasek mocy - cienka krawędź u dołu ekranu, nie karta. Moc karmi
              wszystkie pięć żywiołów, stąd neutralne złoto/kość, nie ogień. -->
-        <div id="energy-hud" class="hidden">
-            <div id="energy-track">
-                <div id="energy-fill"></div>
-            </div>
-            <span id="energy-percentage">0%</span>
+      <div id="energy-hud" class="hidden">
+        <div id="energy-track">
+          <div id="energy-fill"></div>
         </div>
+        <span id="energy-percentage">0%</span>
+      </div>
 
-        <!-- Wskaźnik dźwięku (P3, 2026-09-21) - a11y-visual-equivalent: samo
+      <!-- Wskaźnik dźwięku (P3, 2026-09-21) - a11y-visual-equivalent: samo
              wyciszenie (klawisz M) nie ma innego widocznego śladu w grze. -->
-        <button id="audio-wskaznik" class="hidden" aria-label="Przełącz dźwięk (M)" title="Przełącz dźwięk (M)">♪</button>
+      <button
+        id="audio-wskaznik"
+        class="hidden"
+        aria-label="Przełącz dźwięk (M)"
+        title="Przełącz dźwięk (M)"
+      >
+        ♪
+      </button>
     </div>
 
     <!-- Ukryte wideo do pobierania klatek -->
@@ -191,5 +282,5 @@
 
     <!-- Inicjujemy aplikację -->
     <script type="module" src="js/main.js"></script>
-</body>
+  </body>
 </html>
