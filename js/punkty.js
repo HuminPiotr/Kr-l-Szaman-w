@@ -38,8 +38,33 @@ export const PREMIA_SPLECENIA = 0.5;      // +50% wartości drugiej techniki (Ta
 // nikt nie tańczył (i nikt nie widział).
 const MAX_DT_TANCA_S = 0.1;
 
-// Rejestr reakcji - uzupełniany w Task 3.
-export const REAKCJE = {};
+// REJESTR REAKCJI - premie za łączenie technik. Nowa reakcja to JEDEN
+// wpis tutaj plus jedno punkty.reakcja(id, n, now) tam, gdzie zachodzi
+// (tools/test-punkty.mjs sprawdza, że każde id wołane z main.js tu jest).
+//
+// SERIA: jednostki (kłęby) w odstępach < przerwaMs to jedno zdarzenie
+// ("jeden pożar"). Pełne punkty do `pelneDo` jednostek w serii, potem
+// punkty × pelneDo/k - suma rośnie logarytmicznie. Kolumna dymu to SETKI
+// cząstek; bez tego jedna detonacja przebijałaby kilka technik.
+// ZGADNIĘTE - cel balansu w specu (pełna Pożoga ≈ 1.5-2× Okadzenia),
+// potwierdzany pomiarem: node tools/pomiar-reakcji.mjs.
+export const REAKCJE = {
+    // Wybuchnięty kłąb podpalonego dymu (js/dym.js - updateAndDraw).
+    pozoga: { nazwa: 'Pożoga', punkty: 8, pelneDo: 50, przerwaMs: 1500 },
+    // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
+    rozwianie: { nazwa: 'Rozwianie', punkty: 3, pelneDo: 40, przerwaMs: 1500 }
+};
+
+// Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs
+// wyłapał zawieszenie: reakcja('pozoga', 1e9) liczyła pętlę miliard razy.
+// Jedna klatka nie może mieć więcej jednostek niż cała chmura - MAX_CZASTEK
+// w js/dym.js to 1100, z zapasem bierzemy 2000.
+export const MAX_JEDNOSTEK_NA_WYWOLANIE = 2000;
+
+/** Punkty za k-tą (od 1) jednostkę serii reakcji. */
+export function punktyJednostki(def, k) {
+    return def.punkty * Math.min(1, def.pelneDo / k);
+}
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
 
@@ -143,6 +168,43 @@ export class Punktacja {
         if (p > 0) this._zdarzenia.push({ rodzaj: 'technika', tekst: kombo.nazwa, punkty: p, t: now, miejsce });
         if (premia > 0) this._zdarzenia.push({ rodzaj: 'splecenie', tekst: 'Splecenie', punkty: premia, t: now, miejsce });
         return p + premia;
+    }
+
+    /**
+     * @param {string} id   klucz REAKCJE
+     * @param {number} n    jednostek w tej klatce (ułamek w dół, <= 0 nic)
+     * @param {number} now  ms
+     */
+    reakcja(id, n, now) {
+        const def = REAKCJE[id];
+        if (!this.aktywna || !def || !Number.isFinite(n) || !Number.isFinite(now)) return 0;
+        const ile = Math.min(MAX_JEDNOSTEK_NA_WYWOLANIE, Math.floor(n));
+        if (ile <= 0) return 0;
+
+        let s = this._serie[id];
+        if (!s || now - s.ostatnieT > def.przerwaMs) {
+            s = this._serie[id] = { n: 0, punkty: 0, ostatnieT: now };
+        }
+        let p = 0;
+        for (let i = 0; i < ile; i++) p += punktyJednostki(def, ++s.n);
+        s.ostatnieT = now;
+        p = this._dodaj('reakcje', p);
+        s.punkty += p;
+        this.momenty.serie[id] = Math.max(this.momenty.serie[id] ?? 0, s.n);
+        // CELOWO bez zdarzenia w kolejce - reakcje przychodzą co klatkę
+        // i zalałyby ekran napisami; HUD czyta serieAktywne().
+        return p;
+    }
+
+    /** Serie reakcji wciąż trwające - HUD pokazuje je jako "Pożoga ×23 +184". */
+    serieAktywne(now) {
+        const out = [];
+        for (const [id, s] of Object.entries(this._serie)) {
+            if (Number.isFinite(now) && now - s.ostatnieT <= REAKCJE[id].przerwaMs) {
+                out.push({ id, nazwa: REAKCJE[id].nazwa, n: s.n, punkty: s.punkty });
+            }
+        }
+        return out;
     }
 
     /** Kolejka do unoszących się napisów. PULL: HUD odbiera i kolejka pustoszeje. */

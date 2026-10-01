@@ -123,4 +123,75 @@ spam.pieczec('stribog', 2000);
 spam.technika(kombo('aard'), 2000);
 spr(`ta sama technika nie splata się sama ze sobą (${spam.rozbicie.reakcje})`, spam.rozbicie.reakcje === 0);
 
+console.log('\nREAKCJE:');
+const { REAKCJE, punktyJednostki } = await import('../js/punkty.js');
+spr('pozoga i rozwianie w rejestrze', !!REAKCJE.pozoga && !!REAKCJE.rozwianie);
+spr('jednostka pełna do progu', punktyJednostki(REAKCJE.pozoga, 50) === 8);
+spr('za progiem maleje', punktyJednostki(REAKCJE.pozoga, 100) === 4);
+
+const r = new Punktacja();
+spr(`10 kłębów = 80 (${r.reakcja('pozoga', 10, 0)})`, r.wynik === 80);
+r.reakcja('pozoga', 40, 500);   // ta sama seria (przerwa < 1.5 s)
+spr(`50 kłębów w jednym pożarze = 400 (${r.wynik})`, r.wynik === 400);
+const przed = r.wynik;
+r.reakcja('pozoga', 50, 1000);  // kłęby 51..100 - malejąco
+const dorzut = r.wynik - przed;
+spr(`kłęby 51-100 dają mniej niż pierwsze 50 (${dorzut.toFixed(0)})`, dorzut > 0 && dorzut < 400);
+spr('momenty.serie.pozoga = 100', r.momenty.serie.pozoga === 100);
+
+const nowy = new Punktacja();
+nowy.reakcja('pozoga', 60, 0);
+nowy.reakcja('pozoga', 10, 3000);   // przerwa 3 s > 1.5 s - NOWY pożar, pełne punkty
+spr('nowy pożar po przerwie zaczyna od pełnych punktów', Math.abs(nowy.rozbicie.reakcje - (punktyJednostkiSuma(60) + 80)) < 1e-6);
+function punktyJednostkiSuma(n) { let s = 0; for (let k = 1; k <= n; k++) s += punktyJednostki(REAKCJE.pozoga, k); return s; }
+
+// REVIEW FOCUS 3
+const zle = new Punktacja();
+zle.reakcja('pozoga', 0, 0); zle.reakcja('pozoga', -5, 0); zle.reakcja('pozoga', NaN, 0);
+zle.reakcja('pozoga', 3, NaN); zle.reakcja('nieznana', 5, 0);
+spr('n <= 0, NaN, zły czas i nieznana reakcja nic nie dają', zle.wynik === 0);
+zle.reakcja('pozoga', 2.9, 0);
+spr('ułamek zaokrąglany w dół (2 kłęby = 16)', zle.wynik === 16);
+
+// REVIEW FOCUS 5: reakcje NIE idą do kolejki unoszących się napisów (co
+// klatkę by zalały ekran) - HUD pokazuje je jako zagregowaną serię.
+spr('reakcja nie tworzy zdarzeń', zle.odbierzZdarzenia().length === 0);
+const aktywne = r.serieAktywne(1000);
+spr(`seria aktywna: Pożoga ×100 (${aktywne.map(s => s.nazwa + '×' + s.n).join()})`,
+    aktywne.length === 1 && aktywne[0].nazwa === 'Pożoga' && aktywne[0].n === 100);
+spr('seria wygasa po przerwie', r.serieAktywne(1000 + 1600).length === 0);
+
+console.log('\nSUFIT JEDNOSTEK NA WYWOŁANIE:');
+{
+    // Fuzz wyłapał: reakcja('pozoga', 1e9) kręciła pętlę miliard razy (zawieszenie
+    // gry). Jedna klatka nie może mieć więcej jednostek niż cała chmura dymu.
+    const { MAX_JEDNOSTEK_NA_WYWOLANIE } = await import('../js/punkty.js');
+    spr('sufit istnieje', Number.isFinite(MAX_JEDNOSTEK_NA_WYWOLANIE) && MAX_JEDNOSTEK_NA_WYWOLANIE > 0);
+    const duzo = new Punktacja(), sufit = new Punktacja();
+    const t0 = Date.now();
+    duzo.reakcja('pozoga', 1e9, 0);
+    sufit.reakcja('pozoga', MAX_JEDNOSTEK_NA_WYWOLANIE, 0);
+    spr(`1e9 jednostek kończy się szybko (${Date.now() - t0} ms)`, Date.now() - t0 < 200);
+    spr('1e9 liczone jak sufit', duzo.wynik === sufit.wynik && duzo.momenty.serie.pozoga === MAX_JEDNOSTEK_NA_WYWOLANIE);
+}
+
+console.log('\nNIGDY NIE MALEJE (losowe wywołania):');
+const los = new Punktacja();
+const smieci = [NaN, Infinity, -Infinity, -1, 0, 0.5, 1, 1e9, undefined, null];
+const wez = () => smieci[Math.floor(Math.random() * smieci.length)];
+let poprz = 0, monot = true;
+for (let i = 0; i < 2000; i++) {
+    const t = i * 37;
+    switch (i % 5) {
+        case 0: los.taniec(wez(), wez(), wez()); break;
+        case 1: los.pieczec(['swarog', 'perun', '', null][i % 4], wez() ?? t); break;
+        case 2: los.technika(KOMBOSY[i % KOMBOSY.length], t); break;
+        case 3: los.reakcja(['pozoga', 'rozwianie', 'x'][i % 3], wez(), t); break;
+        case 4: los.reakcja('pozoga', 5, t); break;
+    }
+    if (!(los.wynik >= poprz) || !Number.isFinite(los.wynik)) monot = false;
+    poprz = los.wynik;
+}
+spr(`wynik monotoniczny i skończony (${los.wynik.toFixed(0)})`, monot);
+
 process.exit(ok ? 0 : 1);
