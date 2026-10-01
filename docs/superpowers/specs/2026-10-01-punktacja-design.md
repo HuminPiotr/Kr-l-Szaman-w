@@ -85,9 +85,11 @@ nakładanie ogonów to naturalny sygnał „połączyłeś".
 `dym.pchnij()` tylko zapisuje listę; `_fizyka` konsumuje ją później w `updateAndDraw`.
 `fala.czola` żyje ~0,7 s i jest pchane co klatkę, więc naiwne liczenie punktowałoby każdy
 kłąb ~40 razy na falę. Rozwiązanie: czoło fali niesie `idFali`; kłąb zapamiętuje id fal, które
-go już trafiły; liczy się tylko pierwsze trafienie. `updateAndDraw` zwraca
-`{ wybuchy, rozwiane }` (wzorzec `_nowychWybuchow`). Zmiana sygnatury zwrotu dotyka
-`main.js` i `tools/test-dym.mjs`.
+go już trafiły; liczy się tylko pierwsze trafienie. `updateAndDraw` dalej zwraca liczbę
+wybuchów (kilkanaście miejsc w `tools/test-dym.mjs` ją sumuje); liczba rozwianych kłębów
+z ostatniej klatki trafia do nowego pola `dym.ostatnioRozwiane` (wzorzec `_nowychWybuchow`).
+Id czoła nadaje `Fala.wystrzel()` (`czolo.id`), a wołający dopisuje `idFali` do punktów
+z `pchniecieCzola()`.
 
 ## HUD — `js/wynikHud.js`
 
@@ -98,7 +100,7 @@ przeliczone na lustro). `prefers-reduced-motion` jak w P4.3. Ukryty, gdy `aktywn
 ## Wpięcie w `js/main.js`
 
 - blok 6a: `punkty.pieczec`, `punkty.technika`;
-- po `dym.updateAndDraw`: `reakcja('pozoga', wybuchy)`, `reakcja('rozwianie', rozwiane)`;
+- po `dym.updateAndDraw`: `reakcja('pozoga', wybuchy, now)`, `reakcja('rozwianie', dym.ostatnioRozwiane, now)`;
 - co klatkę: `punkty.taniec(plynnosc, motionMeter.responsywnosc, dt)`.
 
 ## Testy — `tools/test-punkty.mjs` (do `tools/test-wszystko.sh`)
