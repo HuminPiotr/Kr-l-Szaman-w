@@ -17,6 +17,7 @@
 import { TABELA as EFEKTY_TABELA, srodekDloni } from './efekty.js';
 import { pekniecieZiemi } from './iskry.js';
 import { kregSylwetki, BARWA_MGLA as BARWA_KOLOWROTU } from './kolowrot.js';
+import { BOGOWIE } from './jaja.js';
 
 // Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
 // PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
@@ -164,4 +165,41 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
     // technika (dawniej WSZYSTKIE sześć technik dzieliło identyczny
     // playFireSFX(1.0), nieodróżnialne bez patrzenia na ekran).
     s.audio.grajTechnike(technika.uzbraja);
+}
+
+/**
+ * Jajo z nickiem-bogiem (js/jaja.js): krótki, bezpieczny efekt na ekranie Kroniki.
+ * NIE uzbraja technik, NIE pobiera mocy, NIE dotyka kombosów - to tylko widowisko,
+ * dlatego worek `s` jest węższy niż w odpalTechnike (test używa Proxy, które rzuca
+ * na każdą zależność spoza listy).
+ *
+ * @param {string|null} bog  z bogZNicku()
+ * @param {object} frame  kontrakt klatki
+ * @param {number} W
+ * @param {number} H
+ * @param {{piorun, ekran, zaplon, fala, tecza, iskry, efekty, audio}} s
+ */
+export function odpalJajo(bog, frame, W, H, s) {
+    if (!BOGOWIE.includes(bog)) return;   // nieznany bóg/null: nic - i bez efekty.odpal(nieznane id)
+    const ziemia = pekniecieZiemi(frame, W, H);
+    if (bog === 'perun') {
+        s.piorun.uderz(ziemia, BARWA_GROMU, 1.0);
+        s.ekran.uderz(1.0);
+        s.audio?.playGromSFX?.();
+        return;
+    }
+    s.efekty?.odpal(bog);   // ta sama animacja co przy złożeniu pieczęci tego żywiołu
+    if (bog === 'swarog') {
+        s.zaplon.zapal(BARWA_ZAPLONU.ogien, 1.0);
+        s.audio?.playWybuchSFX?.(1);
+    } else if (bog === 'stribog') {
+        s.fala.wystrzel(ziemia, { x: 0, y: -1, z: 0 }, 1.0, BARWA_ZAPLONU.aard);
+        s.audio?.playAardSFX?.(1);
+    } else if (bog === 'mokosz') {
+        s.tecza.aktywuj();
+    } else if (bog === 'weles') {
+        s.iskry.wystrzel(ziemia, 1.0);
+        s.fala.wystrzel(ziemia, { x: 0, y: -1, z: 0 }, 1.0, BARWA_GROMU);
+        s.audio?.playGromSFX?.();
+    }
 }
