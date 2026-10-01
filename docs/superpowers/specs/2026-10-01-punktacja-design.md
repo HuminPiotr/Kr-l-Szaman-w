@@ -60,8 +60,8 @@ wywołanie `punkty.reakcja(id, n, now)` tam, gdzie zachodzi.
 
 | id | Co | Punkty |
 |---|---|---|
-| `pozoga` | wybuchnięty kłąb podpalonego dymu | +8 za kłąb, malejąco po ~50 kłębach w jednym pożarze |
-| `rozwianie` | kłąb dymu pchnięty falą (Aard, fala Gromu w Ziemię) PO RAZ PIERWSZY W ŻYCIU | +3 za kłąb |
+| `pozoga` | wybuchnięty kłąb podpalonego dymu | +5 za kłąb, malejąco po 40 kłębach w jednym pożarze (przerwa 1,5 s) |
+| `rozwianie` | kłąb dymu pchnięty falą (Aard, fala Gromu w Ziemię) PO RAZ PIERWSZY W ŻYCIU | +2 za kłąb, malejąco po 30 w serii (przerwa 10 s) |
 | `splecenie` | technika odpalona ogonem, który dzieli pieczęć z ogonem poprzedniej techniki | +50% wartości drugiej techniki |
 
 **„Jeden pożar"** = seria wybuchów bez przerwy dłuższej niż ~1,5 s. Sufit malejącego
@@ -73,7 +73,24 @@ jest deterministyczna, nie trzeba kamery; mierzymy przy MAKSYMALNEJ chmurze):**
 - pełna Pożoga ≈ 1,5–2× wartości Okadzenia (~700–900 pkt), nigdy więcej niż ~3 techniki;
 - pełne Rozwianie maksymalnej chmury ≤ ~300 pkt (≈ jeden Aard);
 - Okadzenie dokarmiane + Aard co 3 s przez 60 s: Rozwianie łącznie ≤ ~1000 pkt.
-Liczby 8/50 i 3/40 są startowe; pomiar ustala je ostatecznie.
+Liczby 8/50 i 3/40 były startowe; pomiar ustalił je ostatecznie.
+
+**Pomiar (2026-10-01, `node tools/pomiar-reakcji.mjs`):**
+
+| | startowe 8/50, 3/40, przerwa 1,5 s | ostateczne 5/40, 2/30, Rozwianie przerwa 10 s |
+|---|---|---|
+| Pożoga, chmura 140 kłębów | 809 | 449 |
+| Pożoga, chmura 350 | 1175 | 632 |
+| Pożoga, chmura maks. (1100) | **1633** | **860** ✓ |
+| Rozwianie, chmura maks. | **516** | **275** ✓ |
+| Farma: chmura dokarmiana + fala co 3 s przez 60 s | **6500** | **362** ✓ |
+
+Farma pokazała, że „raz w życiu kłębu" nie wystarcza: dokarmiana chmura dostarcza świeżych
+kłębów, a fala co 3 s otwierała nową serię z pełnymi punktami. Przerwa serii Rozwiania 10 s
+zlewa regularne fale w jedną serię z logarytmicznym przyrostem.
+
+Dodatkowo (z fuzzu w teście): `MAX_JEDNOSTEK_NA_WYWOLANIE = 2000` — `reakcja('pozoga', 1e9)`
+zawieszała pętlę; jedna klatka nie może mieć więcej jednostek niż cała chmura (`MAX_CZASTEK` 1100).
 
 **Splecenie po NAKŁADANIU OGONÓW, nie po czasie.** `Punktacja` ma własną historię pieczęci
 (wpisy `{id, t}` z `pieczec()`); technika zapamiętuje, których wpisów (po znaczniku `t`)

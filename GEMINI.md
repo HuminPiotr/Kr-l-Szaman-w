@@ -19,7 +19,7 @@ Cel emocjonalny: gracz ma **całkowicie rozluźnić ciało** i czerpać przyjemn
 Obowiązuje w całym kodzie i wygrywa ze wszystkimi innymi względami.
 
 - Każdy pomiar zwraca **ciągłą wartość 0..1**, nigdy boolean. Płynność steruje TEMPEM ładowania, nigdy go nie zeruje: ruch szarpany ładuje ok. 4x wolniej, ale **ładuje** (`PODLOGA_PLYNNOSCI`).
-- **Brak punktów, timera, stanu porażki.** Nagrodą jest sam efekt.
+- **Punkty tylko przybywają** (od 2026-10-01, arcade - spec `docs/superpowers/specs/2026-10-01-punktacja-design.md`): nic ich nie odejmuje, combo nie resetuje się za pomyłkę, koniec rundy to podsumowanie, nie porażka. Malejący przyrost za powtarzanie daje MNIEJ, nigdy nie zabiera. Tryb swobodny - bez punktów i czasu, jak dawniej. **Brak stanu porażki.**
 - Komunikaty mówią, co jest dostępne **dalej**, nie co gracz robi **źle**.
 - Bezruch i wyjście z kadru **nie karzą** — płynność wraca wtedy do pełnej, bo brak danych to nie jest szarpanie.
 - Progi mają histerezę; nic nie migocze na granicy.
@@ -88,6 +88,8 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/glify.js` | Król Szamanów (2026-09-14): mapa pięciu pieczęci na runy Elder Futharku (`Noto Sans Runic`), ładowanie fontu (`document.fonts`, nigdy nie odrzuca - brak fontu nie jest błędem), lista glifów ZAKAZANYCH (symbole zawłaszczone politycznie, patrz §7) |
 | `js/runa.js` | Wielka runa przy dłoniach - zastępuje dawną animację pierścienia przy KAŻDEJ złożonej pieczęci (jedyny ślad okręgu: bardzo słaby pierścień, wyłącznie w fazie narodzin). Trzy fazy (narodziny/żar/rozsypanie), iskry rozsypania startują z PIKSELI SAMEGO GLIFU (rasteryzacja na offscreen canvas, cache per znak) |
 | `js/sekwencja.js` | Pasek sekwencji u dołu ekranu (DOM, nie płótno - lustro i webfont-na-canvasie to oba powody). Czyta `KomboSilnik.aktywne(now)` co klatkę (PULL, bufor NIGDY nie jest czyszczony), sloty gasną z wiekiem (`alfaSlotu`), combo "wiąże" ogon bufora złotą poświatą po znaczniku czasu, nie po pozycji |
+| `js/punkty.js` | Punktacja (2026-10-01): cztery warstwy (taniec / pieczęć / technika / reakcje), wartość techniki = 100 × suma `TRUDNOSC` pieczęci (z ZMIERZONEJ rozpoznawalności), malejący przyrost za powtarzanie, rejestr `REAKCJE` (Pożoga, Rozwianie - serie z logarytmicznym przyrostem), splecenie po NAKŁADANIU OGONÓW (nie po czasie). Czysta logika; `tools/test-punkty.mjs` jest strażnikiem: nowe combo bez wpisu w `TRUDNOSC` albo reakcja wołana z main.js bez wpisu w `REAKCJE` = czerwony test |
+| `js/wynikHud.js` | HUD wyniku (DOM): licznik w lewym górnym rogu, linijka serii reakcji, unoszące się „+340 Okadzenie" w miejscu zdarzenia (lustro przeliczone w `pozycjaWLustrze`) |
 
 **Odpięte, nie usunięte** (wracają, gdyby kamera zewnętrzna albo lepszy tracker to uzasadniły): `powerBall.js`, `wiatr.js`, `znaki/perun.js`, `znaki/mokosz.js`, `znaki/weles.js`, `znaki/postawa.js` (postawy CAŁEGO CIAŁA - wymagają kadru z barkami i biodrami), `znaki/welesDlon.js`, `znaki/perunDlon.js`, `znaki/szczurDlon.js`, `znaki/mokoszSplot.js` (pieczęcie/znaki PALCOWE lub z pozy zastąpione runami 2026-09-01 - patrz §4).
 
@@ -148,6 +150,7 @@ Stąd `SZEROKOSC_DETEKCJI = 480` w `poseTracker.js`. Aura jest rozmyta, więc ni
 ```
 sh tools/test-wszystko.sh    # cała logika bez kamery
 node tools/tune-motion.mjs   # strojenie MotionMeter
+node tools/pomiar-reakcji.mjs # balans punktów za reakcje dymu (Pożoga/Rozwianie, ~15 s)
 ```
 
 Testy **nie zastępują** sprawdzenia na żywym ciele — wejściem gry jest strumień z kamery. Do tego służy nakładka debug (`D`).

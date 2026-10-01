@@ -126,23 +126,26 @@ spr(`ta sama technika nie splata się sama ze sobą (${spam.rozbicie.reakcje})`,
 console.log('\nREAKCJE:');
 const { REAKCJE, punktyJednostki } = await import('../js/punkty.js');
 spr('pozoga i rozwianie w rejestrze', !!REAKCJE.pozoga && !!REAKCJE.rozwianie);
-spr('jednostka pełna do progu', punktyJednostki(REAKCJE.pozoga, 50) === 8);
-spr('za progiem maleje', punktyJednostki(REAKCJE.pozoga, 100) === 4);
+// Oczekiwania liczone ZE STAŁYCH rejestru - strojenie (tools/pomiar-reakcji.mjs)
+// zmienia liczby, nie ten test.
+const PZ = REAKCJE.pozoga;
+spr('jednostka pełna do progu', punktyJednostki(PZ, PZ.pelneDo) === PZ.punkty);
+spr('za progiem maleje (2× próg = połowa)', punktyJednostki(PZ, 2 * PZ.pelneDo) === PZ.punkty / 2);
 
 const r = new Punktacja();
-spr(`10 kłębów = 80 (${r.reakcja('pozoga', 10, 0)})`, r.wynik === 80);
-r.reakcja('pozoga', 40, 500);   // ta sama seria (przerwa < 1.5 s)
-spr(`50 kłębów w jednym pożarze = 400 (${r.wynik})`, r.wynik === 400);
+spr(`10 kłębów = 10 × punkty (${r.reakcja('pozoga', 10, 0)})`, r.wynik === 10 * PZ.punkty);
+r.reakcja('pozoga', PZ.pelneDo - 10, 500);   // ta sama seria (przerwa < przerwaMs)
+spr(`pełny próg w jednym pożarze = próg × punkty (${r.wynik})`, r.wynik === PZ.pelneDo * PZ.punkty);
 const przed = r.wynik;
-r.reakcja('pozoga', 50, 1000);  // kłęby 51..100 - malejąco
+r.reakcja('pozoga', 100 - PZ.pelneDo, 1000);  // kłęby za progiem - malejąco
 const dorzut = r.wynik - przed;
-spr(`kłęby 51-100 dają mniej niż pierwsze 50 (${dorzut.toFixed(0)})`, dorzut > 0 && dorzut < 400);
+spr(`kłęby za progiem dają mniej za sztukę (${dorzut.toFixed(0)})`, dorzut > 0 && dorzut < (100 - PZ.pelneDo) * PZ.punkty);
 spr('momenty.serie.pozoga = 100', r.momenty.serie.pozoga === 100);
 
 const nowy = new Punktacja();
 nowy.reakcja('pozoga', 60, 0);
-nowy.reakcja('pozoga', 10, 3000);   // przerwa 3 s > 1.5 s - NOWY pożar, pełne punkty
-spr('nowy pożar po przerwie zaczyna od pełnych punktów', Math.abs(nowy.rozbicie.reakcje - (punktyJednostkiSuma(60) + 80)) < 1e-6);
+nowy.reakcja('pozoga', 10, 60 + PZ.przerwaMs + 1);   // przerwa > przerwaMs - NOWY pożar, pełne punkty
+spr('nowy pożar po przerwie zaczyna od pełnych punktów', Math.abs(nowy.rozbicie.reakcje - (punktyJednostkiSuma(60) + 10 * PZ.punkty)) < 1e-6);
 function punktyJednostkiSuma(n) { let s = 0; for (let k = 1; k <= n; k++) s += punktyJednostki(REAKCJE.pozoga, k); return s; }
 
 // REVIEW FOCUS 3
@@ -151,7 +154,7 @@ zle.reakcja('pozoga', 0, 0); zle.reakcja('pozoga', -5, 0); zle.reakcja('pozoga',
 zle.reakcja('pozoga', 3, NaN); zle.reakcja('nieznana', 5, 0);
 spr('n <= 0, NaN, zły czas i nieznana reakcja nic nie dają', zle.wynik === 0);
 zle.reakcja('pozoga', 2.9, 0);
-spr('ułamek zaokrąglany w dół (2 kłęby = 16)', zle.wynik === 16);
+spr('ułamek zaokrąglany w dół (2.9 -> 2 kłęby)', zle.wynik === 2 * PZ.punkty);
 
 // REVIEW FOCUS 5: reakcje NIE idą do kolejki unoszących się napisów (co
 // klatkę by zalały ekran) - HUD pokazuje je jako zagregowaną serię.
@@ -159,7 +162,7 @@ spr('reakcja nie tworzy zdarzeń', zle.odbierzZdarzenia().length === 0);
 const aktywne = r.serieAktywne(1000);
 spr(`seria aktywna: Pożoga ×100 (${aktywne.map(s => s.nazwa + '×' + s.n).join()})`,
     aktywne.length === 1 && aktywne[0].nazwa === 'Pożoga' && aktywne[0].n === 100);
-spr('seria wygasa po przerwie', r.serieAktywne(1000 + 1600).length === 0);
+spr('seria wygasa po przerwie', r.serieAktywne(1000 + PZ.przerwaMs + 1).length === 0);
 
 console.log('\nSUFIT JEDNOSTEK NA WYWOŁANIE:');
 {

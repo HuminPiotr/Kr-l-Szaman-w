@@ -46,13 +46,21 @@ const MAX_DT_TANCA_S = 0.1;
 // ("jeden pożar"). Pełne punkty do `pelneDo` jednostek w serii, potem
 // punkty × pelneDo/k - suma rośnie logarytmicznie. Kolumna dymu to SETKI
 // cząstek; bez tego jedna detonacja przebijałaby kilka technik.
-// ZGADNIĘTE - cel balansu w specu (pełna Pożoga ≈ 1.5-2× Okadzenia),
-// potwierdzany pomiarem: node tools/pomiar-reakcji.mjs.
+// ZMIERZONE 2026-10-01 (node tools/pomiar-reakcji.mjs, fizyka dymu jest
+// deterministyczna): pełna chmura (1100 kłębów) -> Pożoga ~860 pkt
+// (cel 1.5-2× Okadzenia = 690-920), Rozwianie ~275 (cel <= ~1 Aard).
+// Startowe 8/50 i 3/40 dawały 1633 i 516 - za dużo.
+//
+// ROZWIANIE ma przerwę serii 10 s, nie 1.5 s: chmurę Okadzenia da się
+// dokarmiać, więc "raz w życiu kłębu" nie wystarcza - fala co 3 s trafia
+// świeże kłęby i przy krótkiej przerwie każda otwierała NOWĄ serię
+// z pełnymi punktami (farma 60 s: 6500 pkt). Z przerwą 10 s regularne
+// fale zlewają się w JEDNĄ serię z logarytmicznym przyrostem (farma: ~360).
 export const REAKCJE = {
     // Wybuchnięty kłąb podpalonego dymu (js/dym.js - updateAndDraw).
-    pozoga: { nazwa: 'Pożoga', punkty: 8, pelneDo: 50, przerwaMs: 1500 },
+    pozoga: { nazwa: 'Pożoga', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
-    rozwianie: { nazwa: 'Rozwianie', punkty: 3, pelneDo: 40, przerwaMs: 1500 }
+    rozwianie: { nazwa: 'Rozwianie', punkty: 2, pelneDo: 30, przerwaMs: 10000 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs
