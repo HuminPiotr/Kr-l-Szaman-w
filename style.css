@@ -505,7 +505,83 @@ body.ready-pulse #instruction-hud {
     100% { opacity: 0; }
 }
 
+/* --- RUNDA (tryby, 2026-10-01) ---
+   Czas w prawym górnym rogu, na lewo od wskaźnika dźwięku (#audio-wskaznik
+   right:14px, 34px). Odliczanie i baner końca na środku. */
+#runda-hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 16;
+    font-family: 'Bona Nova SC', serif;
+    color: var(--kosc);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 18px rgba(255, 122, 26, 0.45);
+}
+#runda-zapowiedz {
+    position: absolute;
+    top: 38%;
+    width: 100%;
+    text-align: center;
+    font-size: 2.6rem;
+    color: var(--plomien);
+}
+#runda-odliczanie {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 9rem;
+    font-weight: 700;
+    color: var(--zloto);
+}
+#runda-czas {
+    position: absolute;
+    top: 14px;
+    right: 64px;
+    font-size: 1.8rem;
+    font-variant-numeric: tabular-nums;
+}
+/* Ostatnie 10 s: łuna rośnie, kolor się rozgrzewa - zachęta, nie zagrożenie (§2). */
+#runda-hud.ostatnie #runda-czas {
+    color: var(--zar);
+    text-shadow: 0 0 22px rgba(255, 122, 26, 0.9), 0 0 44px rgba(255, 122, 26, 0.5);
+    animation: lunaCzasu 1s ease-in-out infinite;
+}
+#runda-zew {
+    position: absolute;
+    top: 5.2rem;
+    width: 100%;
+    text-align: center;
+    font-size: 1.25rem;
+    color: var(--plomien);
+    min-height: 1.4em;
+}
+#runda-koniec {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 18rem;
+    max-width: 90%;
+    padding: 1.6rem 2.2rem;
+    text-align: center;
+    background: var(--mrok);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 12px;
+}
+#runda-koniec-tytul { font-size: 1.5rem; color: var(--plomien); }
+#runda-koniec-wynik { font-size: 4.4rem; font-weight: 700; color: var(--zloto); line-height: 1.1; }
+#runda-koniec-linie { margin: 0.8rem 0; font-size: 1.1rem; line-height: 1.6; }
+#runda-koniec-podpis { font-size: 0.95rem; opacity: 0.8; }
+@keyframes lunaCzasu {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.75; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+    #runda-hud.ostatnie #runda-czas {
+        animation: none;   /* sam kolor i łuna, bez pulsowania */
+    }
     .unosi {
         animation-name: zanik;   /* bez ruchu - tylko zanik */
         transform: translate(-50%, -50%);

@@ -44,6 +44,20 @@
         </div>
         <div id="wynik-unoszace" aria-hidden="true"></div>
 
+        <!-- Runda (tryby, 2026-10-01) - odliczanie, czas, Zew, baner końca. DOM, nie płótno. -->
+        <div id="runda-hud" class="hidden">
+            <div id="runda-zapowiedz"></div>
+            <div id="runda-odliczanie"></div>
+            <div id="runda-czas"></div>
+            <div id="runda-zew"></div>
+            <div id="runda-koniec" class="hidden">
+                <div id="runda-koniec-tytul"></div>
+                <div id="runda-koniec-wynik"></div>
+                <div id="runda-koniec-linie"></div>
+                <div id="runda-koniec-podpis"></div>
+            </div>
+        </div>
+
         <!-- Podpowiedź UI - DWIE warstwy nałożone na siebie (P4, 2026-09-21):
              main.js pisze nowy komunikat do NIEAKTYWNEJ warstwy, potem
              przełącza .aktywny - opacity się KRZYŻUJE zamiast twardo
