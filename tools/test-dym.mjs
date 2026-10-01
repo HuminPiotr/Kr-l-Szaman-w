@@ -453,4 +453,25 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     spr('wyczyscCache() istnieje i nie rzuca (resetuje leniwą maszynę)', (d10.wyczyscCache(), true));
 }
 
+console.log('\nROZWIANIE - kłąb liczy się RAZ W ŻYCIU:');
+{
+    const d = new Dym();
+    for (let i = 0; i < 30; i++) { d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d.updateAndDraw(null, W, H, DT); }
+    spr('świeży Dym ma ostatnioRozwiane = 0', new Dym().ostatnioRozwiane === 0);
+    // Ogromne koło pchnięcia nad całym ekranem - trafia wszystko.
+    const fala = () => [{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1 }];
+    d.pchnij(fala()); d.updateAndDraw(null, W, H, DT);
+    const pierwsze = d.ostatnioRozwiane;
+    spr(`pierwsza klatka fali liczy kłęby (${pierwsze})`, pierwsze > 0 && pierwsze <= d._czastki.length);
+    let kolejne = 0;
+    for (let i = 0; i < 40; i++) { d.pchnij(fala()); d.updateAndDraw(null, W, H, DT); kolejne += d.ostatnioRozwiane; }
+    spr(`te same kłęby nie liczą się ponownie - ani tą, ani następną falą (${kolejne})`, kolejne === 0);
+    d.updateAndDraw(null, W, H, DT);
+    spr('bez podmuchów ostatnioRozwiane = 0', d.ostatnioRozwiane === 0);
+    // Nowo wydmuchane kłęby (świeże _przygotuj) liczą się normalnie.
+    for (let i = 0; i < 10; i++) { d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d.updateAndDraw(null, W, H, DT); }
+    d.pchnij(fala()); d.updateAndDraw(null, W, H, DT);
+    spr(`świeże kłęby liczą się (${d.ostatnioRozwiane})`, d.ostatnioRozwiane > 0);
+}
+
 process.exit(ok ? 0 : 1);

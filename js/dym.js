@@ -170,6 +170,7 @@ export class Dym {
         this._dlonie = [];           // nadgarstki i łokcie z prędkościami (rozgarnij)
         this._podmuchy = [];         // punkty czoła fali Aarda z prędkościami (pchnij)
         this._nowychWybuchow = 0;    // liczone w callbacku, zwracane z updateAndDraw
+        this.ostatnioRozwiane = 0;   // kłęby pchnięte falą PO RAZ PIERWSZY W ŻYCIU w tej klatce (punkty: reakcja 'rozwianie')
         this._wybuchajacych = 0;
         this.odrzucone = 0;          // licznik cząstek wymuszenie usuniętych przez sufit MAX_CZASTEK (_pilnujSufitu) - panel kontroli tools/scena.html
     }
@@ -282,6 +283,7 @@ export class Dym {
         c.tZaplonu = 0;
         c.tWybuch = 0;
         c.rozprzestrzenil = false;
+        c.rozwiany = false;
         c.faza = Math.random() * Math.PI * 2;
         Object.assign(c, warianty());
     }
@@ -344,6 +346,7 @@ export class Dym {
      * @returns {number} liczba cząstek, które w tej klatce weszły w WYBUCH
      */
     updateAndDraw(ctx, W, H, dt) {
+        this.ostatnioRozwiane = 0;   // PRZED guardem - pusta klatka też zeruje
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.05, dt)) : 0;
         const maszyna = this._maszynaDla(W, H);
         if (!maszyna || krok <= 0) return 0;
@@ -530,6 +533,13 @@ export class Dym {
                 const sila = Number.isFinite(p.sila) ? Math.max(0, Math.min(1, p.sila)) : 0;
                 const wplyw = (1 - dist / promien) * sila;
                 if (wplyw <= 0) continue;
+                // Punkty: kłąb liczy się RAZ W ŻYCIU. Chmura Okadzenia żyje
+                // minutami - liczenie na każdą falę zrobiłoby z "chmura + Aard
+                // co 3 s" najlepszą strategię gry (spec punktacji, Rozwianie).
+                if (!c.rozwiany) {
+                    c.rozwiany = true;
+                    this.ostatnioRozwiane++;
+                }
                 const vx = ograniczPodmuch(p.vx) * skalaDloni / 1000;
                 const vy = ograniczPodmuch(p.vy) * skalaDloni / 1000;
                 c.vxGry += vx * wplyw * NASTAWY.PODMUCH_SILA;
