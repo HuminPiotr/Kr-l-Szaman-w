@@ -27,7 +27,13 @@
 // żadnego sygnału dlaczego. Szersze okno dotyczy WSZYSTKICH kombosów w tej
 // tabeli, nie tylko Tęczy - świadoma decyzja, żeby nie różnicować progów
 // wybaczania między technikami.
-const OKNO_MS = 6500;
+//
+// Eksportowane: js/sekwencja.js (pasek run u dołu ekranu) liczy z NIEGO
+// zanik pojedynczego slotu, żeby slot gasł DOKŁADNIE wtedy, gdy wpis
+// wypada z bufora kombosów - kopia lokalna rozjechałaby się po cichu przy
+// każdej przyszłej zmianie tutaj, ten sam powód co eksport PROG_POSTAWY
+// z pieczecie.js.
+export const OKNO_MS = 6500;
 
 // Pole `uzbraja` mówi, KTÓRĄ technikę kombos przygotowuje - main.js routuje
 // po nim zamiast bezwarunkowo uzbrajać płonący palec.
@@ -123,6 +129,20 @@ export class KomboSilnik {
         }
 
         return this._dopasuj();
+    }
+
+    /**
+     * Kopia bufora wciąż w oknie, NAJSTARSZE Z PRZODU - do odczytu przez
+     * pasek sekwencji (js/sekwencja.js). NIE MUTUJE bufora (w przeciwieństwie
+     * do dodaj(), który przycina go przy okazji): odczyt HUD/UI nie może
+     * mieć efektów ubocznych na silniku kombosów.
+     *
+     * @param {number} now  performance.now() w ms
+     * @returns {{id: string, t: number}[]}
+     */
+    aktywne(now) {
+        if (!Number.isFinite(now)) return [];
+        return this.bufor.filter(w => now - w.t <= this.okno);
     }
 
     /** Dopasowanie do KOŃCÓWKI bufora - patrz komentarz o łańcuchach. */

@@ -1,4 +1,7 @@
-# Projekt: Kula Mocy
+# Projekt: Król Szamanów
+
+*(d. "Kula Mocy" - nazwa zmieniona 2026-09-14 przy oprawie szamańskiej,
+§7 pkt 3; katalog repo i `powerBall.js` [odpięty] zostają bez zmian.)*
 
 ## 1. Cel
 
@@ -82,6 +85,9 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/dmuchanie.js` | Okadzenie (swaróg→stribog→swaróg) - gest "dłoń przy ustach"; DRUGA technika kanałowana, celowo INNA niż Płonący Palec (odsunięcie dłoni WSTRZYMUJE, nie kończy; wyczerpana moc nigdy nie kończy potencjału; jeden zegar 4 min od combo). Kierunek wydechu w CZTERY STRONY z blendu głowy (nos względem oczu 2/5: skręt→X, pochylenie→Y) i dłoni; długość tego blendu to `wyrazistosc` - początkowa siła wypchnięcia z ustawienia gracza |
 | `js/dym.js` | Dym Okadzenia na silniku **smoke.js** (`js/vendor/`, MIT, kopia 1:1 z 4 oznaczonymi zmianami pod ESM): biblioteka daje sprite, cykl życia cząstki i rysowanie, ten plik całą GRĘ - kierunkowy wydech z początkową siłą (`addsmoke` z min/maxVx/Vy), opór, wyporność słabnącą pod sufitem, pole przepływu, REAKCJĘ NA RĘCE I TANIEC (pchnięcie + wir za dłonią), stany ognia, front na siatce kubełkowej i detonację na teksturach Kenney. Wpięcie przez `setPreDrawCallback`; obwiednia ALFY sterowana podawanym bibliotece wiekiem (`wiekBiblioteki`), a ROZMIAR osobno (`skalaCzastki`) - wąska kolumna przy ustach przez ~1 s, potem rozrost i rozpychanie na boki, aż dym rozejdzie się po ekranie. Własne płótno w 1/2 rozdzielczości (biblioteka czyści swój kontekst) |
 | `js/vendor/` | Biblioteki zewnętrzne wpięte do repo (bez npm i bundlera - wszystko ładuje się jako ESM). Dziś: `smoke.js` (MIT, Guillermo Webster) z licencją w `LICENSE-smoke.txt`; zmiany wobec oryginału są ponumerowane w nagłówku pliku |
+| `js/glify.js` | Król Szamanów (2026-09-14): mapa pięciu pieczęci na runy Elder Futharku (`Noto Sans Runic`), ładowanie fontu (`document.fonts`, nigdy nie odrzuca - brak fontu nie jest błędem), lista glifów ZAKAZANYCH (symbole zawłaszczone politycznie, patrz §7) |
+| `js/runa.js` | Wielka runa przy dłoniach - zastępuje dawną animację pierścienia przy KAŻDEJ złożonej pieczęci (jedyny ślad okręgu: bardzo słaby pierścień, wyłącznie w fazie narodzin). Trzy fazy (narodziny/żar/rozsypanie), iskry rozsypania startują z PIKSELI SAMEGO GLIFU (rasteryzacja na offscreen canvas, cache per znak) |
+| `js/sekwencja.js` | Pasek sekwencji u dołu ekranu (DOM, nie płótno - lustro i webfont-na-canvasie to oba powody). Czyta `KomboSilnik.aktywne(now)` co klatkę (PULL, bufor NIGDY nie jest czyszczony), sloty gasną z wiekiem (`alfaSlotu`), combo "wiąże" ogon bufora złotą poświatą po znaczniku czasu, nie po pozycji |
 
 **Odpięte, nie usunięte** (wracają, gdyby kamera zewnętrzna albo lepszy tracker to uzasadniły): `powerBall.js`, `wiatr.js`, `znaki/perun.js`, `znaki/mokosz.js`, `znaki/weles.js`, `znaki/postawa.js` (postawy CAŁEGO CIAŁA - wymagają kadru z barkami i biodrami), `znaki/welesDlon.js`, `znaki/perunDlon.js`, `znaki/szczurDlon.js`, `znaki/mokoszSplot.js` (pieczęcie/znaki PALCOWE lub z pozy zastąpione runami 2026-09-01 - patrz §4).
 
@@ -154,7 +160,7 @@ Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · koły
 
 1. **Nagrać prawdziwe szablony run** — zastąpić syntetyczne koło/zygzak/falę w `runy/szablony.js` nagraniami z żywego ciała (klawisz `N`). Najwyższy priorytet: to jedyna rzecz, przez którą cała przebudowa na runy może jeszcze zawieść w praktyce.
 2. **Potwierdzić na żywym ciele** — progi `ksztalt.js` (`BLAD_ZERO`/`BLAD_PELNY`), okno śladu (`MAX_DLUGOSC_M`), margines i czas przejęcia lepkiego argmaxu, oraz ograniczenie tempa kombosa x3 (§4).
-3. **Oprawa szamańska** — paleta ognia/węgla, ognisko u dołu kadru
+3. **Oprawa szamańska** — ~~paleta ognia/węgla~~ zrobione 2026-09-14 (style.css, main.js, js/runa.js, js/sekwencja.js, js/glify.js - nazwa "Król Szamanów", runy zamiast pierścienia, pasek sekwencji). Łuna ogniska jest DZIŚ tylko na ekranie startowym (`#start-screen::after`, gradient CSS) - ognisko WIDOCZNE PRZEZ CAŁĄ GRĘ (cząstki na płótnie, nie tylko start) zostaje w kolejce
 4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
 5. **Czwarty żywioł/piąty kształt** (np. spirala) — dopiero po potwierdzeniu obecnej czwórki (koło/zygzak/fala/piramidka) na żywo
 

@@ -17,7 +17,10 @@
 // pozycje zastępcze i gracz zgłosił, że "efekt nie powala". Dłonie są zawsze
 // w kadrze, zawsze w centrum uwagi i to z nich składa się pieczęć - efekt
 // wychodzący z palców czyta się nieporównanie lepiej niż elipsa u stóp.
-function srodekDloni(frame, W, H) {
+// Eksportowana: js/runa.js zaczepia dużą runę pieczęci w TYM SAMYM miejscu
+// co dotychczasowy (znikający) pierścień - "efekt wychodzący z palców czyta
+// się nieporównanie lepiej", patrz komentarz przy definicji niżej.
+export function srodekDloni(frame, W, H) {
     const h = (frame.hands ?? []).filter(d => d.landmarks?.[0] && Number.isFinite(d.landmarks[0].x));
     if (!h.length) return { x: W * 0.5, y: H * 0.45 };
     let x = 0, y = 0, n = 0;
@@ -39,11 +42,19 @@ export const TABELA = {
     // -piec-pieczeci-styku-design.md) - jedna barwa na ŻYWIOŁ, wiersz na
     // id znaku ze znaki/*.js (weles/perun/stribog/mokosz czytają teraz
     // POZĘ, nie mają już wariantu otwarta/pięść).
-    swarog:  { barwa: '25, 100%, 62%',  ksztalt: 'pierscien',   czas: 0.9 },  // ogień
-    weles:   { barwa: '280, 70%, 58%',  ksztalt: 'sciagniecie', czas: 0.9 },  // ziemia
-    perun:   { barwa: '50, 100%, 92%',  ksztalt: 'pierscien',   czas: 0.7 },  // błyskawica
-    stribog: { barwa: '160, 55%, 75%',  ksztalt: 'pierscien',   czas: 0.8 },  // powietrze
-    mokosz:  { barwa: '200, 70%, 70%',  ksztalt: 'pierscien',   czas: 0.9 },  // woda
+    //
+    // KSZTAŁT 'tchnienie' (Król Szamanów, 2026-09-14): zastąpił pierścień/
+    // ściągnięcie. Pieczęć ma dziś WŁASNĄ, dużą animację - runę Futharku
+    // rodzącą się przy dłoniach i rozsypującą się w żar (js/runa.js,
+    // wpięta osobno w main.js) - więc płomień w TABELI ma być tylko
+    // BARDZO SUBTELNYM tłem pod runą, nie konkurować z nią o uwagę. Stąd
+    // ta sama definicja "lekkości" co przy dawnym pierścieniu (nagłówek
+    // pliku: "Pieczęcie - LEKKIE"), tylko przeniesiona na nowy kształt.
+    swarog:  { barwa: '25, 100%, 62%',  ksztalt: 'tchnienie', czas: 0.9 },  // ogień
+    weles:   { barwa: '280, 70%, 58%',  ksztalt: 'tchnienie', czas: 0.9 },  // ziemia
+    perun:   { barwa: '50, 100%, 92%',  ksztalt: 'tchnienie', czas: 0.7 },  // błyskawica
+    stribog: { barwa: '160, 55%, 75%',  ksztalt: 'tchnienie', czas: 0.8 },  // powietrze
+    mokosz:  { barwa: '200, 70%, 70%',  ksztalt: 'tchnienie', czas: 0.9 },  // woda
     // szczur, splot celowo NIEOBECNE - znaki odpięte (js/main.js), pliki
     // zostają na dysku i mogłyby dostać te wpisy z powrotem, gdyby wróciły.
     //
@@ -199,6 +210,22 @@ function rysuj(ctx, def, p, alfa, lm, W, H, zaczep) {
             ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
             ctx.stroke();
             ctx.filter = 'none';
+            break;
+        }
+        case 'tchnienie': {
+            // BARDZO SUBTELNE tło pod runą (js/runa.js robi teraz ciężką
+            // pracę wizualną przy złożeniu pieczęci). Miękka, mała poświata
+            // przy dłoni, szybki narost i wygasanie - nie okrąg, nie ma
+            // promienia rosnącego z czasem, tylko oddech w miejscu.
+            const s = zaczep;
+            const r = W * (0.05 + 0.02 * Math.sin(p * Math.PI));
+            const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+            g.addColorStop(0, kolor(alfa * 0.16));
+            g.addColorStop(1, kolor(0));
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+            ctx.fill();
             break;
         }
         case 'blyskIFala': {

@@ -16,7 +16,7 @@
  * Struktura testów (łańcuchy, brak podwójnego odpalenia, wygasanie) jest
  * niezależna od konkretnych id - sprawdza WYŁĄCZNIE silnik.
  */
-import { KomboSilnik, KOMBOSY } from '../js/kombosy.js';
+import { KomboSilnik, KOMBOSY, OKNO_MS } from '../js/kombosy.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -211,5 +211,30 @@ spr(`swarog -> stribog -> swarog odpala Okadzenie (${dym2?.id})`, dym2?.id === '
 const zapalka = k13.dodaj('perun', 1400);
 spr(`...i zaraz potem, bez czyszczenia bufora, perun odpala Grom w Ogniu (${zapalka?.id})`,
     zapalka?.id === 'gromWOgniu');
+
+// --- aktywne(now): odczyt dla paska sekwencji (js/sekwencja.js), NIE MUTUJE ---
+console.log('\nAKTYWNE(now) - odczyt paska sekwencji:');
+const k14 = new KomboSilnik();
+k14.dodaj('swarog', 0);
+k14.dodaj('weles', 1000);
+const przedOdczytem = k14.bufor.length;
+const akt = k14.aktywne(2000);
+spr(`aktywne() zwraca oba wpisy wewnątrz okna (${akt.length})`, akt.length === 2);
+spr('aktywne() NIE mutuje bufora', k14.bufor.length === przedOdczytem);
+
+const poOknie = k14.aktywne(2000 + OKNO_MS + 1);
+spr('aktywne() poza OKNO_MS zwraca pustą listę mimo że bufor jeszcze nieprzycięty',
+    poOknie.length === 0 && k14.bufor.length === przedOdczytem);
+
+spr('aktywne(NaN) nie rzuca, zwraca pustą listę', k14.aktywne(NaN).length === 0);
+
+console.log('\nAKTYWNE(now) NIE CZYŚCI SIĘ PO TRAFIENIU KOMBO (łańcuch dalej widoczny):');
+const k15 = new KomboSilnik();
+k15.dodaj('perun', 0);
+k15.dodaj('weles', 500);
+const kolowrotTrafil = k15.dodaj('mokosz', 1000);
+spr(`perun -> weles -> mokosz odpala Kołowrót (${kolowrotTrafil?.id})`, kolowrotTrafil?.id === 'kolowrot');
+spr('pasek po trafieniu combo dalej pokazuje wszystkie trzy sloty',
+    k15.aktywne(1200).length === 3);
 
 process.exit(ok ? 0 : 1);
