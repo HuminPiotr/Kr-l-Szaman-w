@@ -21,6 +21,12 @@ import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js'
 import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn } from './piesni.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
+import { Menu } from './menu.js';
+import { PolanaUi } from './polanaUi.js';
+import { Ksiega, kluczKsiegi } from './ksiega.js';
+import { zbudujKronike } from './kronika.js';
+import { bogZNicku } from './jaja.js';
+import { losoweImie } from './imiona.js';
 import { Efekty, srodekDloni } from './efekty.js';
 import { zaladujFont } from './glify.js';
 import { Runy } from './runa.js';
@@ -37,7 +43,7 @@ import { Zaplon } from './zaplon.js';
 import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
-import { odpalPieczec, odpalTechnike, BARWA_ZAPLONU } from './techniki.js';
+import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
 import { zaladuj as zaladujAssety } from './assety.js';
 import { computeCoverFit, drawVideoCover, mapLandmarks } from './frameMapper.js';
@@ -84,7 +90,6 @@ const IKONA = {
 // BARWA_ZAPLONU (BARWA_GROMU nie jest tu już potrzebne) - używane przy
 // właściwym STRZALE Aarda (niżej, poza dispatchem uzbrojenia).
 
-const uiStartScreen = document.getElementById('start-screen');
 const uiLoadingScreen = document.getElementById('loading-screen');
 const uiInstructionHud = document.getElementById('instruction-hud');
 // Crossfade dwuwarstwowy (P4, 2026-09-21, patrz index.html) - dwie warstwy
@@ -113,7 +118,6 @@ const uiSekwencjaSloty = document.getElementById('sekwencja-sloty');
 const uiSekwencjaNazwa = document.getElementById('sekwencja-nazwa');
 const uiAudioWskaznik = document.getElementById('audio-wskaznik');
 
-const startBtn = document.getElementById('start-btn');
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('output-canvas');
 const ctx = canvas.getContext('2d');
@@ -153,6 +157,26 @@ let utworRundy = null;            // wpis z manifestu wybrany do Obrzędu
 const rundaHud = new RundaHud(document.getElementById('runda-hud'));
 punkty.aktywna = false;           // do pierwszej rundy
 punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
+// MENU "Polana" (2026-10-01, podprojekt 3, spec 2026-10-01-polana-ksiega-design.md).
+// Model Menu trzyma ekran i konfigurację, PolanaUi renderuje, main.js spina z grą.
+// Księga na localStorage (try/catch w Ksiega - brak pamięci nie jest błędem).
+const ksiega = new Ksiega((() => { try { return window.localStorage; } catch { return null; } })());
+const menu = new Menu({ ostatniNick: ksiega.ostatniNick() });
+let efektKroniki = null;   // {bog, korona} - odpalany w klatce, gdy istnieje `frame`
+const polanaUi = new PolanaUi(document, {
+    menu, ksiega, losoweImie,
+    onStart: (konf) => rozpalOgien(konf),
+    onJeszczeRaz: () => dalejZKroniki(),
+    onDoPolany: () => doPolany()
+});
+// Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
+wczytajManifest().then((lista) => {
+    menu.ustawPiesni(lista);
+    // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
+    menu.zUrl(parsujKonfiguracje(window.location.search));
+    polanaUi.render();
+});
+polanaUi.render();
 let efekty = new Efekty();
 // Wielka runa przy dłoniach (js/runa.js) zastępuje dawny pierścień składania
 // pieczęci; pasek sekwencji (js/sekwencja.js) czyta TEN SAM bufor kombosów
@@ -231,65 +255,32 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
 });
 
-// Strażnik przed podwójnym startem: przycisk zostaje w DOM pod .hidden (tylko
-// opacity:0), więc kliknięty myszą trzyma fokus, a Enter (klawisz rund) albo
-// spacja aktywowałyby go ponownie - druga kamera, drugi model, druga pętla klatek.
+// Strażnik przed podwójnym startem kamery: "Rozpal ogień" można kliknąć dwa razy
+// podczas ładowania modeli - druga kamera, drugi model, druga pętla klatek.
+// Menu dodatkowo blokuje przycisk (menu.zajety), a tu jest ostatnia linia obrony.
 let startowano = false;
 
-startBtn.addEventListener('click', async () => {
-    if (startowano) return;
+/** Kamera + modele + pętla klatek - RAZ na życie strony. @returns {Promise<boolean>} czy gra działa */
+async function uruchomGre() {
+    if (isRunning) return true;
+    if (startowano) return false;
     startowano = true;
-    startBtn.disabled = true;
-    // 0. Audio PIERWSZE, PRZED jakimkolwiek await (P3, 2026-09-21) - to jest
-    // jedyne miejsce w całej grze z prawdziwym gestem użytkownika (klik).
-    // init()+resume() wołane TU, zanim getUserMedia/MediaPipe zjedzą to okno
-    // - dawniej audioEngine.init() siedziało PO trzech await niżej, poza
-    // oknem aktywacji, więc przeglądarka mogła odmówić AudioContext.
-    audioEngine.init();
-    audioEngine.resume();
-
-    // 1. Ukryj start i pokaż ładowanie
-    uiStartScreen.classList.add('hidden');
     uiLoadingScreen.classList.remove('hidden');
-
     try {
         // 2. Inicjalizacja kamery (WebRTC)
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user'
-            }
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
         });
         video.srcObject = stream;
-
         // Czekamy na załadowanie metadanych, żeby znać oryginalne wymiary wideo
-        await new Promise(resolve => {
-            video.onloadedmetadata = () => resolve();
-        });
+        await new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
         video.play();
-
-        // 3. Inicjalizacja AI (MediaPipe) + font run (js/glify.js: 3 s
-        // limit, NIGDY nie odrzuca - brak fontu nie blokuje startu gry,
-        // js/runa.js po prostu pominie glif, dopóki się nie doczeka).
-        await Promise.all([
-            poseTracker.initialize(),
-            handTracker.initialize(),
-            zaladujFont()
-        ]);
-
-        // 3a. Assety Kołowrotu (js/assety.js) - CELOWO NIE await. Pobieranie
-        // 10 obrazków nie ma blokować startu gry - to jest cały sens
-        // asynchronicznego ładowania (patrz nagłówek assety.js). Kołowrót
-        // po prostu nie narysuje którejś warstwy przez pierwsze kilka
-        // sekund gry, jeśli gracz złoży combo zanim pobieranie się skończy -
-        // GEMINI.md §2, brak assetu nigdy nie jest błędem.
-        zaladujAssety().catch(() => {});   // per-obraz błędy już łapie assety.js; catch tu to tylko siatka bezpieczeństwa
-
+        // 3. Inicjalizacja AI (MediaPipe) + font run (js/glify.js: 3 s limit, NIGDY nie odrzuca).
+        await Promise.all([poseTracker.initialize(), handTracker.initialize(), zaladujFont()]);
+        // 3a. Assety Kołowrotu - CELOWO NIE await (brak assetu nigdy nie jest błędem, §2).
+        zaladujAssety().catch(() => {});
         // 4. Aura tancerza
         aura = new Aura(canvas, ctx);
-        // (Audio już zainicjalizowane na samym początku handlera - patrz krok 0.)
-
         uiLoadingScreen.classList.add('hidden');
         uiInstructionHud.classList.remove('hidden');
         uiEnergyHud.classList.remove('hidden');
@@ -297,22 +288,31 @@ startBtn.addEventListener('click', async () => {
         document.getElementById('wynik-hud').classList.remove('hidden');
         uiAudioWskaznik.classList.remove('hidden');
         odswiezWskaznikAudio();
-
         isRunning = true;
         requestAnimationFrame(renderLoop);
-
-        // Tryb z adresu (menu w podprojekcie 3 wywoła tę samą funkcję). Bez parametrów - swobodny.
-        uruchomZKonfiguracji(parsujKonfiguracje(window.location.search)).catch((e) => console.error('Tryb:', e));
-
+        return true;
     } catch (e) {
         startowano = false;           // błąd kamery/modelu: wolno spróbować ponownie
-        startBtn.disabled = false;
         alert("Błąd dostępu do kamery lub inicjalizacji AI: " + e.message);
         console.error(e);
-        uiStartScreen.classList.remove('hidden');
         uiLoadingScreen.classList.add('hidden');
+        return false;
     }
-});
+}
+
+/** "Rozpal ogień" z menu - to jedyny gest użytkownika, więc audio startuje TU, przed jakimkolwiek await. */
+async function rozpalOgien(konfig) {
+    if (menu.zajety) return;
+    audioEngine.init();
+    audioEngine.resume();
+    menu.zajety = true; polanaUi.render();
+    const dziala = await uruchomGre();
+    menu.zajety = false;
+    if (!dziala) { polanaUi.render(); return; }
+    menu.naGre(); polanaUi.render();
+    // Obrzęd: długość z metadanych i pieśń; swobodny: nic (przebieg === null, punkty wyłączone).
+    uruchomZKonfiguracji({ ...konfig }).catch((e) => console.error('Tryb:', e));
+}
 
 /**
  * Przepisuje maskę segmentacji z GPU do zwykłej tablicy i ZWALNIA obiekt maski.
@@ -504,6 +504,37 @@ function zakonczPrzebieg() {
     resetujModuly();
 }
 
+/** Esc w grze / "Do Polany" z Kroniki: bez zapisu, czysty start, menu na żywym obrazie. */
+function doPolany() {
+    zakonczPrzebieg();      // pieśń stop, moduły i punkty czyste
+    efektKroniki = null;
+    menu.doPolany();
+    polanaUi.render();
+}
+
+/** Enter / "Jeszcze raz" na Kronice: następny gracz Kręgu albo ta sama runda od nowa. */
+function dalejZKroniki() {
+    if (!przebieg || !przebieg.dalej(performance.now())) return;
+    resetujModuly();
+    punkty.reset();
+    przygotujPiesn();
+    efektKroniki = null;
+    menu.naGre();
+    polanaUi.render();
+}
+
+/** Koniec rundy: zapis do Księgi, Kronika, jaja. Wołane raz, z obsluzZdarzeniaRundy('koniecRundy'). */
+function pokazKronike(pods) {
+    const klucz = kluczKsiegi(przebieg.konfig, utworRundy);
+    const nick = pods.nick ?? menu.nick.trim();
+    const wk = klucz && nick ? ksiega.dodaj(klucz, nick, pods.wynik, Date.now()) : null;
+    if (!pods.nick && nick) ksiega.zapamietajNick(nick);
+    if (wk?.wpisano) polanaUi.pokazSwiezy(klucz, nick.slice(0, 16), Math.floor(pods.wynik));
+    menu.naKronike(zbudujKronike(pods, { wynikKsiegi: wk }));
+    polanaUi.render();
+    efektKroniki = { bog: bogZNicku(nick), korona: !!wk?.nowyRekord };
+}
+
 /** Zdarzenia rundy z tej klatki (Przebieg.update) -> reakcje gry. */
 function obsluzZdarzeniaRundy(zdarzenia, now) {
     for (const z of zdarzenia) {
@@ -523,7 +554,8 @@ function obsluzZdarzeniaRundy(zdarzenia, now) {
             piesn?.zatrzymaj();
             piesn = null;
             // Zapis RAZ - Przebieg odrzuca drugie wywołanie. Kopie, bo punkty.reset() je wyczyści.
-            przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie }, JSON.parse(JSON.stringify(punkty.momenty)));
+            const pods = przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie }, JSON.parse(JSON.stringify(punkty.momenty)));
+            if (pods) pokazKronike(pods);
         }
     }
 }
@@ -565,16 +597,13 @@ async function uruchomZKonfiguracji(konfig) {
 // preventDefault: Enter na podsumowaniu inaczej aktywowałby sfokusowany
 // przycisk startu (kliknięty myszą zachowuje fokus) i uruchomił grę od nowa.
 window.addEventListener('keydown', (e) => {
-    const decyzja = decyzjaKlawisza(e.key, { stan: przebieg?.stan ?? null, sesjaAktywna: debugHud.sesja.aktywna });
+    const decyzja = decyzjaKlawisza(e.key, {
+        stan: przebieg?.stan ?? null, sesjaAktywna: debugHud.sesja.aktywna, ekran: menu.ekran
+    });
     if (!decyzja) return;
     e.preventDefault();
-    if (decyzja === 'zakoncz') {
-        zakonczPrzebieg();   // bez zapisu - Esc to wyjście, nie wynik
-    } else if (przebieg.dalej(performance.now())) {
-        resetujModuly();
-        punkty.reset();
-        przygotujPiesn();
-    }
+    if (decyzja === 'polana') doPolany();
+    else dalejZKroniki();
 }, true);
 
 function klatka(now) {
@@ -681,6 +710,14 @@ function klatka(now) {
 
     // --- 6. Ciągłość ruchu razy płynność -> moc ---
     const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik);
+
+    // Jajo z nickiem-bogiem i koronacja za nowy rekord (Kronika): odpalane tu, bo dopiero
+    // w tym miejscu klatki istnieje `frame` (zaczep efektów). Koronacja ostatnia - złoto wygrywa z zapłonem jaja.
+    if (efektKroniki) {
+        const e = efektKroniki; efektKroniki = null;
+        odpalJajo(e.bog, frame, canvas.width, canvas.height, { piorun, ekran, zaplon, fala, tecza, iskry, efekty, audio: audioEngine });
+        if (e.korona) { zaplon.zapal([255, 200, 80], 1.0); ekran.uderz(0.6); }
+    }
 
     // --- 6a. Pieczęć się złożyła ---
     // Dispatch efektów pieczęci/technik przeniesiony do js/techniki.js

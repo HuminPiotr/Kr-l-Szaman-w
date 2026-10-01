@@ -117,21 +117,24 @@ export class Przebieg {
 }
 
 /**
- * Co robi klawisz w trakcie trybów - CZYSTA decyzja, żeby dało się ją testować
- * bez przeglądarki (main.js wykonuje wynik).
+ * Co robi klawisz poza menu - CZYSTA decyzja (main.js wykonuje wynik). Klawiszami
+ * samego menu (Polana/konfiguracja/Księga) rządzi js/polanaUi.js - tu `null`.
  *
- * Esc przy aktywnej sesji nagraniowej debugHud NIE należy do rundy: ten Esc
- * przerywa nagrywanie. main.js czyta stan sesji w fazie CAPTURE, PRZED
- * listenerem debugHud (ten zerowałby stan sesji, zanim zdążymy go sprawdzić).
- * Enter działa tylko na podsumowaniu - w trakcie rundy nic nie robi.
+ * Esc przy aktywnej sesji nagraniowej debugHud NIE należy do gry: ten Esc przerywa
+ * nagrywanie. main.js czyta stan sesji w fazie CAPTURE, PRZED listenerem debugHud
+ * (ten zerowałby stan sesji, zanim zdążymy go sprawdzić).
+ * Esc w rundzie, na Kronice i w swobodnym tańcu wraca na Polanę.
+ * Enter działa tylko na Kronice - w trakcie rundy nic nie robi.
  *
  * @param {string} key
- * @param {{stan:string|null, sesjaAktywna:boolean}} kontekst  stan = przebieg.stan albo null (swobodny)
- * @returns {'zakoncz'|'dalej'|null}
+ * @param {{stan:string|null, sesjaAktywna:boolean, ekran:string}} kontekst
+ *        stan = przebieg.stan albo null; ekran = menu.ekran ('gra' = poza menu)
+ * @returns {'polana'|'dalej'|null}
  */
-export function decyzjaKlawisza(key, { stan, sesjaAktywna }) {
-    if (!stan) return null;
-    if (key === 'Escape') return sesjaAktywna ? null : 'zakoncz';
+export function decyzjaKlawisza(key, { stan, sesjaAktywna, ekran }) {
+    const wGrze = ekran === 'gra' || ekran === 'kronika';
+    if (!wGrze) return null;
+    if (key === 'Escape') return sesjaAktywna ? null : 'polana';
     if (key === 'Enter') return stan === 'PODSUMOWANIE' ? 'dalej' : null;
     return null;
 }

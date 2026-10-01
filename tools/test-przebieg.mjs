@@ -160,23 +160,36 @@ console.log('\nSTRAŻNIK WPIĘCIA W main.js:');
         ['punkty.aktywna =', 'punkty włączane/wyłączane stanem rundy (swobodny = wyłączone)'],
         ['parsujKonfiguracje(', 'konfiguracja z adresu'],
         ['.zakonczPiesn()', "koniec pieśni (ended) kończy rundę"],
-        ["decyzja === 'zakoncz'", 'Esc przerywa rundę (decyzja z decyzjaKlawisza, bez zapisu)'],
-        ['przebieg.dalej(', 'Enter na podsumowaniu startuje następną rundę'],
+        ["decyzja === 'polana'", 'Esc prowadzi na Polanę (bez zapisu)'],
+        ['przebieg.dalej(', 'Enter na Kronice startuje następną rundę'],
+        ['new Menu(', 'model menu'],
+        ['new PolanaUi(', 'warstwa DOM menu'],
+        ['new Ksiega(', 'Księga Plemienia'],
+        ['menu.zUrl(', 'skrót ?tryb= wypełnia konfigurację menu'],
+        ['kluczKsiegi(', 'zapis wyniku do tablicy właściwej dla trybu'],
+        ['ksiega.dodaj(', 'wynik rundy trafia do Księgi'],
+        ['zbudujKronike(', 'Kronika po rundzie'],
+        ['odpalJajo(', 'jajo z nickiem-bogiem'],
+        ['bogZNicku(', 'rozpoznanie nicku-boga'],
+        ['menu.zajety = true', 'menu blokuje przycisk podczas ładowania kamery (REVIEW FOCUS 3)'],
+        ['onStart: (konf) => rozpalOgien(konf)', 'start rundy z konfiguracji menu (PolanaUi.onStart -> rozpalOgien)'],
         ['rundaHud.update(', 'HUD rundy aktualizowany co klatkę']
     ];
     for (const [fragment, opis] of MUSI) spr(opis, main.includes(fragment));
     spr('Esc nie koliduje z sesją nagraniową debugHud', main.includes('debugHud.sesja.aktywna'));
 }
 
-console.log('\nDECYZJA KLAWISZA (final review: Enter odpalał ponownie przycisk startu, Esc ścigał się z debugHud):');
+console.log('\nDECYZJA KLAWISZA (Esc -> Polana; Enter tylko na Kronice; Esc nie ściga się z debugHud):');
 {
-    spr('bez przebiegu (swobodny) żaden klawisz nic nie robi', decyzjaKlawisza('Escape', { stan: null, sesjaAktywna: false }) === null && decyzjaKlawisza('Enter', { stan: null, sesjaAktywna: false }) === null);
-    spr('Esc w RUNDZIE -> zakoncz', decyzjaKlawisza('Escape', { stan: 'RUNDA', sesjaAktywna: false }) === 'zakoncz');
-    spr('Esc w PODSUMOWANIU -> zakoncz (powrót do swobodnego)', decyzjaKlawisza('Escape', { stan: 'PODSUMOWANIE', sesjaAktywna: false }) === 'zakoncz');
-    spr('Esc przy aktywnej sesji nagraniowej debugHud NIE przerywa rundy', decyzjaKlawisza('Escape', { stan: 'RUNDA', sesjaAktywna: true }) === null);
-    spr('Enter w PODSUMOWANIU -> dalej', decyzjaKlawisza('Enter', { stan: 'PODSUMOWANIE', sesjaAktywna: false }) === 'dalej');
-    spr('Enter w RUNDZIE nic nie robi (REVIEW FOCUS 4)', decyzjaKlawisza('Enter', { stan: 'RUNDA', sesjaAktywna: false }) === null);
-    spr('inne klawisze nic nie robią', ['m', 'M', 'd', ' ', 'z', '1'].every(k => decyzjaKlawisza(k, { stan: 'RUNDA', sesjaAktywna: false }) === null));
+    const d = (key, kontekst) => decyzjaKlawisza(key, { stan: null, sesjaAktywna: false, ekran: 'polana', ...kontekst });
+    spr('na Polanie/konfiguracji/Księdze main nic nie robi (klawiszami menu rządzi polanaUi)', ['polana', 'konfig', 'ksiega'].every(e => d('Escape', { ekran: e }) === null && d('Enter', { ekran: e }) === null));
+    spr('Esc w RUNDZIE -> polana', d('Escape', { stan: 'RUNDA', ekran: 'gra' }) === 'polana');
+    spr('Esc w PODSUMOWANIU (Kronika) -> polana', d('Escape', { stan: 'PODSUMOWANIE', ekran: 'kronika' }) === 'polana');
+    spr('Esc w swobodnym tańcu (gra bez przebiegu) -> polana', d('Escape', { stan: null, ekran: 'gra' }) === 'polana');
+    spr('Esc przy aktywnej sesji nagraniowej debugHud NIE rusza gry', d('Escape', { stan: 'RUNDA', ekran: 'gra', sesjaAktywna: true }) === null && d('Escape', { stan: null, ekran: 'gra', sesjaAktywna: true }) === null);
+    spr('Enter w PODSUMOWANIU -> dalej', d('Enter', { stan: 'PODSUMOWANIE', ekran: 'kronika' }) === 'dalej');
+    spr('Enter w RUNDZIE i w swobodnym nic nie robi (REVIEW FOCUS 5)', d('Enter', { stan: 'RUNDA', ekran: 'gra' }) === null && d('Enter', { stan: null, ekran: 'gra' }) === null);
+    spr('inne klawisze nic nie robią', ['m', 'M', 'd', ' ', 'z', '1'].every(k => d(k, { stan: 'RUNDA', ekran: 'gra' }) === null));
 }
 
 console.log('\nSTRAŻNIK: przycisk startu i kolejność klawiatury w main.js (final review, Critical):');
@@ -184,12 +197,14 @@ console.log('\nSTRAŻNIK: przycisk startu i kolejność klawiatury w main.js (fi
     const { readFileSync } = await import('node:fs');
     const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
     // Tekstowe, bo main.js nie importuje się w node - sprawdzają WPIĘCIA, nie zachowanie.
-    spr('handler startu ma strażnika przed podwójnym uruchomieniem', /startBtn\.addEventListener\('click', async \(\) => \{\s*(\/\/[^\n]*\n\s*)*if \(startowano\) return;/.test(main));
-    spr('przycisk startu wyłączany po starcie (nie fokusowalny, Enter go nie odpali)', main.includes('startBtn.disabled = true'));
     spr('błąd kamery zwalnia strażnika (można spróbować ponownie)', /startowano = false;[\s\S]{0,200}Błąd dostępu do kamery/.test(main));
     spr('handler klawiatury rundy woła decyzjaKlawisza', main.includes('decyzjaKlawisza('));
     spr('handler klawiatury rundy w fazie CAPTURE (przed listenerem debugHud)', /decyzjaKlawisza\([\s\S]{0,900}\}, true\);/.test(main));
     spr('Enter/Esc obsłużone przez preventDefault', main.includes('e.preventDefault()'));
+    spr('stary baner końca rundy usunięty z main/HUD (zastąpiony Kroniką)', !main.includes('tekstPodsumowania') && !main.includes('runda-koniec'));
+    spr('handler startu rozbity: uruchomGre() raz + start z menu', main.includes('async function uruchomGre(') && main.includes('async function rozpalOgien('));
+    spr('stary przycisk start-btn usunięty', !main.includes("getElementById('start-btn')"));
+    spr('uruchomGre ma strażnika przed podwójnym startem kamery', /async function uruchomGre\(\) \{\s*if \(isRunning\) return true;\s*if \(startowano\) return false;\s*startowano = true;/.test(main));
 }
 
 process.exit(ok ? 0 : 1);

@@ -2,7 +2,7 @@
  * HUD rundy - czyste funkcje (DOM sprawdzany w przeglądarce).
  *   node tools/test-runda-hud.mjs
  */
-import { formatCzasu, tekstZewu, tekstPodsumowania, widokRundy, RundaHud } from '../js/rundaHud.js';
+import { formatCzasu, tekstZewu, widokRundy, RundaHud } from '../js/rundaHud.js';
 import { Przebieg } from '../js/przebieg.js';
 import { parsujKonfiguracje, ODLICZANIE_S, ZAPOWIEDZ_S, ZEW_START_S } from '../js/tryby.js';
 
@@ -22,25 +22,6 @@ console.log('\nZEW:');
 spr('baner z nazwą żywiołu', tekstZewu('swarog') === 'Duchy proszą: ogień ×2');
 spr('brak żywiołu = pusty tekst', tekstZewu(null) === '');
 spr('nieznany żywioł = pusty tekst (bez "undefined")', tekstZewu('xyz') === '');
-
-console.log('\nPODSUMOWANIE:');
-{
-    const t = tekstPodsumowania({ tryb: 'proba', nick: null, wynik: 1234.7, rozbicie: { taniec: 100.4, pieczecie: 75, techniki: 800, reakcje: 259.3 },
-                                  momenty: { splecenia: 2, serie: { pozoga: 47 } }, kragKoniec: null, nastepny: null, podium: null });
-    spr('wynik zaokrąglony w dół', t.wynik === '1234');
-    spr('rozbicie w liniach (4 warstwy)', t.linie.filter(l => /taniec|pieczęcie|techniki|reakcje/.test(l)).length === 4);
-    spr('największa Pożoga w liniach', t.linie.some(l => l.includes('47')));
-    spr('podpis zachęca (Enter/Esc), nie ocenia', /Enter/.test(t.podpis) && /Esc/.test(t.podpis));
-    spr('ciepły ton: bez słów porażki', !/przegra|niestety|słab|zły|źle/i.test(JSON.stringify(t)));
-    const kr = tekstPodsumowania({ tryb: 'proba', nick: 'Ola', wynik: 500, rozbicie: {}, momenty: {}, kragKoniec: false, nastepny: 'Bartek', podium: null });
-    spr('Krąg w toku: tytuł z nickiem, następny w podpisie', kr.tytul.includes('Ola') && kr.podpis.includes('Bartek'));
-    const pod = tekstPodsumowania({ tryb: 'proba', nick: 'Bartek', wynik: 900, rozbicie: {}, momenty: {}, kragKoniec: true, nastepny: null,
-                                    podium: [{ nick: 'Bartek', wynik: 900 }, { nick: 'Ola', wynik: 500 }] });
-    spr('koniec Kręgu: podium w liniach z miejscami', pod.linie[0].includes('1') && pod.linie[0].includes('Bartek') && pod.linie[1].includes('Ola'));
-    const puste = tekstPodsumowania({ tryb: 'proba', nick: null, wynik: 0, rozbicie: null, momenty: null, kragKoniec: null, nastepny: null, podium: null });
-    spr('rozbicie/momenty null nie rzucają', puste.wynik === '0');
-    spr('wynik NaN = 0', tekstPodsumowania({ wynik: NaN, rozbicie: {}, momenty: {} }).wynik === '0');
-}
 
 console.log('\nWIDOK RUNDY:');
 {
@@ -63,12 +44,12 @@ console.log('\nWIDOK RUNDY:');
     krok(60);
     krok(3);
     w = widokRundy(p);
-    spr('KONIEC (przed zapisem): brak podsumowania, brak czasu', w.koniec === null && w.czas === '');
+    spr('KONIEC (przed zapisem): brak czasu', w.czas === '');
     p.zapiszWynik(321, { taniec: 1 }, {});
     w = widokRundy(p);
-    spr('PODSUMOWANIE: baner końca', w.koniec !== null && w.koniec.wynik === '321');
+    spr('PODSUMOWANIE (Kronika w menu): HUD rundy pusty, bez banera', widokRundy(p).czas === '' && !('koniec' in widokRundy(p)));
     const bezPrzebiegu = widokRundy(null);
-    spr('brak przebiegu (swobodny): wszystko puste', bezPrzebiegu.zapowiedz === '' && bezPrzebiegu.odliczanie === 0 && bezPrzebiegu.czas === '' && bezPrzebiegu.zew === '' && bezPrzebiegu.koniec === null);
+    spr('brak przebiegu (swobodny): wszystko puste', bezPrzebiegu.zapowiedz === '' && bezPrzebiegu.odliczanie === 0 && bezPrzebiegu.czas === '' && bezPrzebiegu.zew === '');
 }
 
 console.log('\nOSTATNIE SEKUNDY:');
