@@ -91,4 +91,36 @@ console.log('\nRESET:');
 m.reset();
 spr('reset zeruje wynik, rozbicie i momenty', m.wynik === 0 && m.rozbicie.techniki === 0 && !m.momenty.techniki.kolowrot);
 
+console.log('\nSPLECENIE (nakładanie ogonów, nie czas):');
+// Ten sam łańcuch co w test-kombosy.mjs: swarog->stribog->swarog daje
+// Okadzenie, a ZARAZ potem (bez czyszczenia bufora) perun domyka Grom
+// w Ogniu ogonem [swarog, perun] - swarog jest WSPÓLNY. Czwarta pieczęć
+// składa się >= 0.9 s po trzeciej, więc próg czasowy by tu nie zadziałał.
+const s = new Punktacja();
+s.pieczec('swarog', 0); s.pieczec('stribog', 1000); s.pieczec('swarog', 2000);
+const okadzenie = s.technika(kombo('dym'), 2000);
+s.pieczec('perun', 3500);   // 1.5 s później
+const grom = s.technika(kombo('gromWOgniu'), 3500);
+spr(`Okadzenie bez premii (${okadzenie})`, okadzenie === 460);
+spr(`Grom w Ogniu z premią +50% (${grom})`, grom === 280 + 140);
+spr('rozbicie: premia w reakcjach', s.rozbicie.reakcje === 140 && s.rozbicie.techniki === 740);
+spr('momenty.splecenia = 1', s.momenty.splecenia === 1);
+spr('zdarzenie Splecenie w kolejce', s.odbierzZdarzenia().some(z => z.rodzaj === 'splecenie' && z.punkty === 140));
+
+const bez = new Punktacja();
+bez.pieczec('perun', 0); bez.pieczec('weles', 1000); bez.pieczec('mokosz', 2000);
+bez.technika(kombo('kolowrot'), 2000);
+bez.pieczec('swarog', 3000); bez.pieczec('perun', 4000);
+bez.technika(kombo('gromWOgniu'), 4000);
+spr(`ogony bez wspólnej pieczęci - brak premii (${bez.rozbicie.reakcje})`, bez.rozbicie.reakcje === 0);
+
+// REVIEW FOCUS 1: stribog x3 odpala Aarda dwa razy z nakładającymi się
+// ogonami. Splecenie TEJ SAMEJ techniki ze sobą nagradzałoby spam.
+const spam = new Punktacja();
+spam.pieczec('stribog', 0); spam.pieczec('stribog', 1000);
+spam.technika(kombo('aard'), 1000);
+spam.pieczec('stribog', 2000);
+spam.technika(kombo('aard'), 2000);
+spr(`ta sama technika nie splata się sama ze sobą (${spam.rozbicie.reakcje})`, spam.rozbicie.reakcje === 0);
+
 process.exit(ok ? 0 : 1);

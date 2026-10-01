@@ -77,7 +77,7 @@ export class Punktacja {
         this.momenty = { serie: {}, techniki: {}, splecenia: 0 };
         this._zdarzenia = [];
         this._historia = [];          // [{id, t}] złożonych pieczęci - do splecenia (Task 2)
-        this._poprzedniOgon = null;   // Set znaczników t ogona poprzedniej techniki
+        this._poprzedniOgon = null;   // {id, t:Set} ogona poprzedniej techniki
         this._ostatniaTechnika = null;
         this._powtorzen = 0;
         this._serie = {};             // reakcje (Task 3)
@@ -122,9 +122,27 @@ export class Punktacja {
         const czynnik = Math.max(PODLOGA_POWTORZENIA, 1 - SPADEK_POWTORZENIA * this._powtorzen);
         const p = this._dodaj('techniki', baza * czynnik * this._zew('technika', kombo));
 
+        // SPLECENIE - po NAKŁADANIU OGONÓW, nie po czasie. Bufor kombosów nie
+        // jest czyszczony po trafieniu (kombosy.js, "łańcuchy są celowe"), więc
+        // pieczęć dzieląca ogony dwóch technik to naturalny sygnał "połączyłeś".
+        // Ogon = ostatnie N pieczęci z WŁASNEJ historii (main.js woła pieczec()
+        // przed technika()), identyfikowane znacznikiem czasu, nie pozycją.
+        // Ta sama technika ze sobą NIE splata się - inaczej stribog x N
+        // (każdy kolejny odpala Aarda) byłby najlepszą strategią.
+        const n = kombo.sekwencja.length;
+        const ogon = new Set(this._historia.slice(-n).map(w => w.t));
+        let premia = 0;
+        if (this._poprzedniOgon && this._poprzedniOgon.id !== kombo.id
+            && [...ogon].some(t => this._poprzedniOgon.t.has(t))) {
+            premia = this._dodaj('reakcje', p * PREMIA_SPLECENIA);
+            if (premia > 0) this.momenty.splecenia++;
+        }
+        this._poprzedniOgon = { id: kombo.id, t: ogon };
+
         this.momenty.techniki[kombo.id] = (this.momenty.techniki[kombo.id] ?? 0) + 1;
         if (p > 0) this._zdarzenia.push({ rodzaj: 'technika', tekst: kombo.nazwa, punkty: p, t: now, miejsce });
-        return p;
+        if (premia > 0) this._zdarzenia.push({ rodzaj: 'splecenie', tekst: 'Splecenie', punkty: premia, t: now, miejsce });
+        return p + premia;
     }
 
     /** Kolejka do unoszących się napisów. PULL: HUD odbiera i kolejka pustoszeje. */
