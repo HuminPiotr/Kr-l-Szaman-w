@@ -256,5 +256,39 @@ console.log('\nSYGNATURA update() (P3 - bez martwej gałęzi READY/FIRING):');
     spr('readyOsc nie istnieje (martwa gałąź usunięta)', e.readyOsc === undefined);
 }
 
+// --- Pieśń przez magistralę (tryby, 2026-10-01) ---
+console.log('\nPIEŚŃ PRZEZ MAGISTRALĘ:');
+{
+    const PROTO = AtrapaAudioContext.prototype;
+    PROTO.createMediaElementSource = function (el) {
+        const w = bazowyWezel('mediaElementSource', []);
+        w._element = el;
+        return w;
+    };
+    const e = new AudioEngine();
+    spr('podlaczPiesn przed init() = null, bez wyjątku', e.podlaczPiesn({}) === null);
+    const e2 = nowyEngine();
+    const audio = {};
+    const przed = WEZLY.length;
+    const uchwyt = e2.podlaczPiesn(audio);
+    spr('podlaczPiesn po init() zwraca uchwyt', uchwyt && typeof uchwyt.glosnosc === 'function' && typeof uchwyt.odlacz === 'function');
+    const zrodlo = WEZLY.slice(przed).find(w => w._typ === 'mediaElementSource');
+    const gain = WEZLY.slice(przed).find(w => w._typ === 'gain');
+    spr('źródło pieśni -> gain pieśni', zrodlo && gain && zrodlo._polaczoneDo.includes(gain));
+    spr('gain pieśni -> masterGain (NIE destination: M wycisza także pieśń)', gain._polaczoneDo.includes(e2.masterGain) && !gain._polaczoneDo.includes('destination-sentinel'));
+    uchwyt.glosnosc(0, 2);
+    const ev = gain.gain._zdarzenia;
+    const idxSet = ev.findIndex(x => x.metoda === 'setValueAtTime');
+    const idxRamp = ev.findIndex(x => x.metoda === 'linearRampToValueAtTime');
+    spr('zanik: setValueAtTime PRZED rampą (ta sama zasada co reszta engine)', idxSet >= 0 && idxRamp > idxSet);
+    spr('zanik schodzi do 0 w zadanym czasie', ev[idxRamp].wartosc === 0 && ev[idxRamp].czas >= 2);
+    uchwyt.glosnosc(NaN, NaN);
+    spr('głośność NaN nie psuje obwiedni', ev.every(x => Number.isFinite(x.wartosc)));
+    uchwyt.odlacz();
+    spr('odlacz rozłącza graf pieśni', zrodlo._rozlaczony === true && gain._rozlaczony === true);
+    uchwyt.odlacz();
+    spr('odlacz jest idempotentne', true);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

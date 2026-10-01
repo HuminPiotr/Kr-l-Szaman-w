@@ -142,6 +142,48 @@ export class AudioEngine {
     }
 
     /**
+     * Pieśń rundy (js/piesni.js) przez TĘ SAMĄ magistralę co efekty:
+     * źródło -> gain pieśni -> masterGain -> compressor -> destination.
+     * Dzięki temu klawisz M wycisza także pieśń, a kompresor nie pozwala
+     * jej zagłuszyć efektów. createMediaElementSource wolno wywołać RAZ na
+     * element - Piesn tworzy nowy <audio> na każdą rundę.
+     *
+     * @param {HTMLAudioElement} audioEl
+     * @returns {{glosnosc:(v:number, czasS?:number)=>void, odlacz:()=>void}|null}
+     *          null przed init() (brak kontekstu) - Piesn schodzi wtedy na audio.volume
+     */
+    podlaczPiesn(audioEl) {
+        if (!this.initialized || !this.audioCtx || !this.masterGain) return null;
+        let zrodlo, gain;
+        try {
+            zrodlo = this.audioCtx.createMediaElementSource(audioEl);
+            gain = this.audioCtx.createGain();
+            gain.gain.setValueAtTime(1, this.audioCtx.currentTime);
+            zrodlo.connect(gain);
+            gain.connect(this.masterGain);
+        } catch (err) {
+            console.error('Pieśń nie podłączona do magistrali:', err);
+            return null;
+        }
+        let odlaczona = false;
+        return {
+            // setValueAtTime PRZED rampą - ta sama zasada co reszta obwiedni w tym pliku.
+            glosnosc: (v, czasS = 0.05) => {
+                if (odlaczona || !Number.isFinite(v)) return;
+                const t = this.audioCtx.currentTime;
+                const dl = Number.isFinite(czasS) && czasS > 0 ? czasS : 0.05;
+                gain.gain.setValueAtTime(gain.gain.value, t);
+                gain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, v)), t + dl);
+            },
+            odlacz: () => {
+                if (odlaczona) return;
+                odlaczona = true;
+                try { zrodlo.disconnect(); gain.disconnect(); } catch { /* już rozłączone */ }
+            }
+        };
+    }
+
+    /**
      * Odcina graf audio jednego głosu, gdy `zrodlo` (oscylator/BufferSource)
      * kończy grać - GC i tak by je zebrał po straceniu referencji, ale to
      * jawnie zwalnia węzły z grafu Web Audio od razu (patrz nagłówek pliku,
