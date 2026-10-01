@@ -194,4 +194,13 @@ for (let i = 0; i < 2000; i++) {
 }
 spr(`wynik monotoniczny i skończony (${los.wynik.toFixed(0)})`, monot);
 
+console.log('\nSTRAŻNIK: reakcje wołane z main.js istnieją w REAKCJE:');
+{
+    const { readFileSync } = await import('node:fs');
+    const zrodlo = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+    const wolane = [...zrodlo.matchAll(/punkty\.reakcja\(\s*'(\w+)'/g)].map(m => m[1]);
+    spr(`main.js woła reakcje (${wolane.join(', ')})`, wolane.length >= 2);
+    for (const id of wolane) spr(`'${id}' jest w REAKCJE`, !!REAKCJE[id]);
+}
+
 process.exit(ok ? 0 : 1);

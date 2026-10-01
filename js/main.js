@@ -14,7 +14,9 @@ import { mokosz } from './znaki/mokosz.js';
 import { aktualizujSkale } from './znaki/postawa.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
-import { Efekty } from './efekty.js';
+import { Punktacja } from './punkty.js';
+import { WynikHud } from './wynikHud.js';
+import { Efekty, srodekDloni } from './efekty.js';
 import { zaladujFont } from './glify.js';
 import { Runy } from './runa.js';
 import { PasekSekwencji } from './sekwencja.js';
@@ -132,6 +134,10 @@ znaki.zarejestruj(stribog);      // powietrze
 znaki.zarejestruj(mokosz);       // woda
 let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
+// Punktacja (2026-10-01, spec docs/superpowers/specs/2026-10-01-punktacja-design.md).
+// PUSH zdarzeń w istniejących miejscach pętli, HUD czyta PULL co klatkę.
+let punkty = new Punktacja();
+const wynikHud = new WynikHud(document.getElementById('wynik-hud'));
 let efekty = new Efekty();
 // Wielka runa przy dłoniach (js/runa.js) zastępuje dawny pierścień składania
 // pieczęci; pasek sekwencji (js/sekwencja.js) czyta TEN SAM bufor kombosów
@@ -265,6 +271,7 @@ startBtn.addEventListener('click', async () => {
         uiInstructionHud.classList.remove('hidden');
         uiEnergyHud.classList.remove('hidden');
         uiSekwencjaRun.classList.remove('hidden');
+        document.getElementById('wynik-hud').classList.remove('hidden');
         uiAudioWskaznik.classList.remove('hidden');
         odswiezWskaznikAudio();
 
@@ -539,11 +546,16 @@ function klatka(now) {
     // odpala prawdziwa gra, nie równoległą reimplementacją.
     if (skl.zlozona) {
         motionMeter.zuzyj(skl.zlozona.koszt);
+        // Punkty: pieczec() PRZED technika() - splecenie czyta ogon z własnej
+        // historii pieczęci (js/punkty.js), więc ta pieczęć musi już w niej być.
+        const miejscePunktow = srodekDloni(frame, canvas.width, canvas.height);
+        punkty.pieczec(skl.zlozona.id, now, miejscePunktow);
         odpalPieczec(skl.zlozona.id, frame, canvas.width, canvas.height,
                      { efekty, runy, aura, audio: audioEngine });
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
+            punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
                 podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie,
@@ -663,6 +675,9 @@ function klatka(now) {
     }
 
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
+    // Reakcje - premie za łączenie technik (rejestr REAKCJE w js/punkty.js).
+    punkty.reakcja('pozoga', wybuchyDymu, now);
+    punkty.reakcja('rozwianie', dym.ostatnioRozwiane, now);
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
         // Dźwięk NIE co klatkę: przy zapłonie świeżej kolumny (v3: setki
@@ -764,6 +779,8 @@ function klatka(now) {
     // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
+    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
+    wynikHud.update(punkty, now, canvas.width, canvas.height);
 
     // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
     let text, icon;
