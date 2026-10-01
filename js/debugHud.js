@@ -145,9 +145,11 @@ export class DebugHud {
     /**
      * Sygnał dźwiękowy przez własny, jednorazowy oscylator.
      *
-     * NIE przez audioEngine.js: tamten prowadzi ciągłą warstwę muzyczną gry
-     * i jego stan zależy od mocy i płynności. Sygnały sesji muszą być słyszalne
-     * niezależnie od tego, co robi ścieżka dźwiękowa, i nie mogą jej zaburzać.
+     * NIE przez audioEngine.js: tamten to magistrala pieśni rund (gra nie ma
+     * efektów dźwiękowych) i niesie wyciszenie M. Sygnały sesji nagraniowej muszą
+     * być słyszalne niezależnie od niego i nie mogą zaburzać pieśni. To jedyny
+     * oscylator w js/ - narzędzie dewelopera, nie dźwięk gry (wyjątek w
+     * tools/test-brak-efektow-dzwiekowych.mjs).
      *
      * Dźwięk jest tu ważniejszy niż ekran: przy błyskawicy gracz stoi bokiem
      * do kamery i monitora może w ogóle nie widzieć.

@@ -116,7 +116,6 @@ details[open] > summary { border-bottom: 1px solid var(--linia); }
     <canvas id="platno" width="1280" height="720"></canvas>
     <div class="rzad-przyciskow" style="margin-top:10px; width:100%; max-width:1280px;">
         <button id="btn-play-pauza">Pauza</button>
-        <button id="btn-audio">🔇 Dźwięk wyłączony (kliknij, by odblokować)</button>
         <span class="malenki" id="fps-info" style="align-self:center; margin-left:auto;"></span>
     </div>
     <div id="log"></div>
@@ -170,7 +169,6 @@ const [
     { zaladuj: zaladujAssety },
     { computeCoverFit, mapLandmarks },
     { zaladujFont, fontGotowy },
-    { AudioEngine },
     { KomboSilnik },
     { PasekSekwencji },
     { odpalPieczec, odpalTechnike, BARWA_ZAPLONU },
@@ -182,7 +180,7 @@ const [
     import('./js/fala.js'), import('./js/tecza.js'), import('./js/iskry.js'),
     import('./js/ekran.js'), import('./js/piorun.js'), import('./js/kolowrot.js'),
     import('./js/assety.js'), import('./js/frameMapper.js'), import('./js/glify.js'),
-    import('./js/audioEngine.js'), import('./js/kombosy.js'), import('./js/sekwencja.js'),
+    import('./js/kombosy.js'), import('./js/sekwencja.js'),
     import('./js/techniki.js'), import('./tools/_dlon-syntetyczna.mjs'),
 ]);
 
@@ -210,7 +208,6 @@ const piorun = new Piorun();
 const kolowrot = new Kolowrot();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
-const audioEngine = new AudioEngine();
 
 // Lista modułów z eksportowanym NASTAWY - do panelu suwaków i do prompt-diff.
 // { etykieta, nastawy: obiekt eksportowany przez moduł, instancja: ma wyczyscCache() }
@@ -320,7 +317,6 @@ const stan = {
     poprzNadgarstkiPx: null,
     palecPlonie: false,
     dmuchaOkadzenie: false,
-    dzwiekOdblokowany: false,
 };
 
 function zbudujFrame(t) {
@@ -346,9 +342,9 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie, audio: audioEngine
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie
 };
-const worekPieczeci = { efekty, runy, aura, audio: audioEngine };
+const worekPieczeci = { efekty, runy, aura };
 
 // ================== PĘTLA RYSOWANIA - ten sam porządek co main.js:klatka() ==================
 let zliczoneKlatki = 0, ostatniFpsCzas = performance.now(), fps = 0;
@@ -398,8 +394,7 @@ function rysujKlatke(dt, frame) {
         for (const c of fala.czola) podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
-    const wybuchy = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
-    if (wybuchy > 0) audioEngine.playWybuchSFX(wybuchy);
+    dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
 
     efekty.updateAndDraw(ctx, frame, dt);
     runy.updateAndDraw(ctx, canvas.width, canvas.height, dt);
@@ -416,8 +411,6 @@ function rysujKlatke(dt, frame) {
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
-
-    audioEngine.update('CHARGING', 0.6, 0.7);
 }
 
 function krok(dt) {
@@ -468,7 +461,6 @@ function odpalAardStrzal() {
     fala.wir(zaczepPx, 1, BARWA_ZAPLONU.aard);
     ekran.uderz(1);
     ekran.falaPowietrza(zaczepPx, kierunek, 1);
-    audioEngine.playAardSFX(1);
 }
 
 // ================== TRYB ZAMROŻONY: ?t=N - kroki stałe 1/60 do t=N, jedno rysowanie, potem stop ==================
@@ -572,15 +564,6 @@ document.getElementById('btn-ziarno-zastosuj').onclick = () => {
     const z = document.getElementById('pole-ziarno').value;
     const u = new URL(location.href); u.searchParams.set('seed', z); location.href = u.toString();
 };
-document.getElementById('btn-audio').onclick = async (e) => {
-    if (!stan.dzwiekOdblokowany) {
-        audioEngine.init();
-        stan.dzwiekOdblokowany = true;
-        e.target.textContent = '🔊 Dźwięk odblokowany';
-        e.target.disabled = true;
-    }
-};
-
 // ================== PANEL KONTROLI (odświeżany co ~0.5s w trybie live) ==================
 function odswiezPanelKontroli() {
     const d = zbierzDiagnostyke();

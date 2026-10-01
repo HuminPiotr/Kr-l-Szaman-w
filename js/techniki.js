@@ -61,17 +61,13 @@ export const BARWA_ZAPLONU = {
  * @param {object} frame  kontrakt klatki
  * @param {number} W  szerokość płótna w px
  * @param {number} H  wysokość płótna w px
- * @param {{efekty, runy, aura, audio}} s
+ * @param {{efekty, runy, aura}} s
  */
 export function odpalPieczec(id, frame, W, H, s) {
     s.efekty.odpal(id);
     s.runy.odpal(id, srodekDloni(frame, W, H), EFEKTY_TABELA[id]?.barwa);
     s.aura.rozblysk(1);
-    // grajPieczecZlozona() (P3, 2026-09-21) - dzwonek dedykowany pieczęci,
-    // odrębny od grajTechnike() (whoosh + warstwa) - pieczęć jest krokiem
-    // pośrednim, ma brzmieć LŻEJ niż dopełnione combo, nie tym samym
-    // dźwiękiem o innym argumencie jak dawne playFireSFX(0.3) vs (1.0).
-    s.audio.grajPieczecZlozona();
+    // Bez dźwięku: gra nie ma efektów dźwiękowych (decyzja 2026-10-01), tylko pieśni rund.
 }
 
 /**
@@ -84,7 +80,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, audio}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -141,7 +137,6 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // nie do odróżnienia dopóki wystrzel() nie przyjął barwy.
         s.fala.wystrzel(zaczepPx, { x: 0, y: -1, z: 0 }, 1.0, BARWA_GROMU);
         s.iskry.wystrzel(zaczepPx, 1.0);
-        s.audio.playGromSFX();
     } else if (technika.uzbraja === 'kolowrot') {
         // Aktywacja NATYCHMIASTOWA jak Tęcza i Grom w Ziemię. Siła
         // STAŁA (1.0) z tego samego powodu - combo jest gratis.
@@ -150,7 +145,6 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // na niewidocznej podłodze. Patrz nagłówek kolowrot.js.
         const kolko = kregSylwetki(frame, W, H);
         s.kolowrot.zapal(kolko, kolko.skala, H, 1.0);
-        s.audio.playKolowrotSFX();
     } else if (technika.uzbraja === 'dym') {
         // Trzecia technika KANAŁOWANA (jak 'ogien'/'aard') - uzbraja,
         // nie odpala natychmiast. Gest aktywacji: js/dmuchanie.js.
@@ -161,10 +155,6 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
     // NIE KONIEC". Bez tego nie byłoby drogi do podpalenia dymu:
     // podpalenie wymaga Gromu w Ogniu, czyli WŁAŚNIE "innego combo".
     if (technika.uzbraja !== 'dym') s.dmuchanie.anuluj();
-    // grajTechnike() (P3, 2026-09-21) - whoosh wspólny + warstwa per
-    // technika (dawniej WSZYSTKIE sześć technik dzieliło identyczny
-    // playFireSFX(1.0), nieodróżnialne bez patrzenia na ekran).
-    s.audio.grajTechnike(technika.uzbraja);
 }
 
 /**
@@ -177,7 +167,7 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
  * @param {object} frame  kontrakt klatki
  * @param {number} W
  * @param {number} H
- * @param {{piorun, ekran, zaplon, fala, tecza, iskry, efekty, audio}} s
+ * @param {{piorun, ekran, zaplon, fala, tecza, iskry, efekty}} s
  */
 export function odpalJajo(bog, frame, W, H, s) {
     if (!BOGOWIE.includes(bog)) return;   // nieznany bóg/null: nic - i bez efekty.odpal(nieznane id)
@@ -185,21 +175,17 @@ export function odpalJajo(bog, frame, W, H, s) {
     if (bog === 'perun') {
         s.piorun.uderz(ziemia, BARWA_GROMU, 1.0);
         s.ekran.uderz(1.0);
-        s.audio?.playGromSFX?.();
         return;
     }
     s.efekty?.odpal(bog);   // ta sama animacja co przy złożeniu pieczęci tego żywiołu
     if (bog === 'swarog') {
         s.zaplon.zapal(BARWA_ZAPLONU.ogien, 1.0);
-        s.audio?.playWybuchSFX?.(1);
     } else if (bog === 'stribog') {
         s.fala.wystrzel(ziemia, { x: 0, y: -1, z: 0 }, 1.0, BARWA_ZAPLONU.aard);
-        s.audio?.playAardSFX?.(1);
     } else if (bog === 'mokosz') {
         s.tecza.aktywuj();
     } else if (bog === 'weles') {
         s.iskry.wystrzel(ziemia, 1.0);
         s.fala.wystrzel(ziemia, { x: 0, y: -1, z: 0 }, 1.0, BARWA_GROMU);
-        s.audio?.playGromSFX?.();
     }
 }

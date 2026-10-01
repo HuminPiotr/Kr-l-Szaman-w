@@ -27,7 +27,8 @@ function zrobWorek(log) {
         efekty: szpieg('efekty'),
         runy: szpieg('runy'),
         aura: szpieg('aura'),
-        audio: szpieg('audio'),
+        // BRAK `audio` w worku: gra nie ma efektów dźwiękowych (2026-10-01). Szpieg tu NIE istnieje,
+        // więc każda próba `s.audio.coś()` w kodzie rzuci TypeError i test padnie.
         sekwencja: szpieg('sekwencja'),
         kombosy: { bufor: [{ id: 'swarog', t: 0 }, { id: 'weles', t: 1 }, { id: 'perun', t: 2 }] },
         zaplon: szpieg('zaplon'),
@@ -57,10 +58,8 @@ console.log('ODPAL PIECZEĆ:');
     spr('efekty.odpal wywołane', zawiera(log, 'efekty.odpal'));
     spr('runy.odpal wywołane', zawiera(log, 'runy.odpal'));
     spr('aura.rozblysk wywołane', zawiera(log, 'aura.rozblysk'));
-    // grajPieczecZlozona() (P3) - dedykowany dzwonek, ODRĘBNY od grajTechnike()
-    // (technika); dawne playFireSFX(0.3) vs (1.0) było TĄ SAMĄ metodą.
-    spr('audio.grajPieczecZlozona wywołane, NIE grajTechnike', zawiera(log, 'audio.grajPieczecZlozona') && !zawiera(log, 'audio.grajTechnike'));
-    spr('dokładnie 4 wywołania, nic więcej', log.length === 4);
+    spr('żadnych wywołań audio (gra nie ma efektów dźwiękowych)', !wolania(log).some(w => w.startsWith('audio.')));
+    spr('dokładnie 3 wywołania, nic więcej', log.length === 3);
 }
 
 // --- 2. odpalTechnike() per gałąź uzbraja ---
@@ -74,10 +73,9 @@ function testTechnika(uzbraja, sekwencja, oczekiwane, opis) {
     const w = wolania(log);
     // Warstwa WSPÓLNA dla wszystkich sześciu technik.
     const wspolne = ['efekty.odpal', 'sekwencja.oznaczCombo', 'aura.rozblysk',
-                      'zaplon.zapal', 'ekran.uderz', 'audio.grajTechnike'];
+                      'zaplon.zapal', 'ekran.uderz'];
     for (const m of wspolne) spr(`${opis}: warstwa wspólna zawiera ${m}`, w.includes(m));
-    const grajTechnike = log.find(x => x.wolanie === 'audio.grajTechnike');
-    spr(`${opis}: audio.grajTechnike dostaje właściwe uzbraja ('${uzbraja}')`, grajTechnike?.args[0] === uzbraja);
+    spr(`${opis}: bez żadnych wywołań audio`, !w.some(m => m.startsWith('audio.')));
     for (const m of oczekiwane) spr(`${opis}: zawiera ${m}`, w.includes(m));
     // dmuchanie.anuluj wywoływane dla KAŻDEJ techniki OPRÓCZ 'dym'.
     if (uzbraja === 'dym') {
@@ -90,10 +88,10 @@ function testTechnika(uzbraja, sekwencja, oczekiwane, opis) {
 }
 
 testTechnika('gromWZiemie', ['swarog', 'weles', 'perun'],
-    ['piorun.uderz', 'fala.wystrzel', 'iskry.wystrzel', 'audio.playGromSFX'], 'Grom w Ziemię');
+    ['piorun.uderz', 'fala.wystrzel', 'iskry.wystrzel'], 'Grom w Ziemię');
 
 testTechnika('kolowrot', ['perun', 'weles', 'mokosz'],
-    ['kolowrot.zapal', 'audio.playKolowrotSFX'], 'Kołowrót');
+    ['kolowrot.zapal'], 'Kołowrót');
 
 testTechnika('tecza', ['swarog', 'mokosz', 'stribog'], ['tecza.aktywuj'], 'Tęcza');
 

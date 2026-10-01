@@ -213,8 +213,6 @@ let lastFrameTime = 0;
 // Poprzednie pozycje nadgarstków (px) - do prędkości dłoni przy rozgarnianiu
 // dymu (js/dym.js:rozgarnij()). { 15: {x,y}|undefined, 16: {x,y}|undefined }.
 let poprzNadgarstkiPx = null;
-let ostatniWybuchSFX = -Infinity;   // performance.now() ostatniego dźwięku detonacji dymu
-let poprzStanPalca = 'BEZCZYNNY';   // do wykrycia krawędzi PLONIE/BEZCZYNNY (P3, 2026-09-21 - dźwięk zapłonu/zgaszenia)
 
 // Histereza "moc pełna" (P4, 2026-09-21) - zastępuje gołe `moc >= 0.95`
 // przy .charged-glow/.ready-pulse/komunikacie HUD. Wejście przy 0.95,
@@ -223,8 +221,6 @@ let poprzStanPalca = 'BEZCZYNNY';   // do wykrycia krawędzi PLONIE/BEZCZYNNY (P
 // (moc jest wygładzonym integratorem, więc w praktyce rzadko migało, ale
 // bez pasma nic tego nie gwarantowało).
 const pelnaMoc = new Histereza(0.95, 0.90);
-let wybuchyDoDzwieku = 0;           // wybuchy zebrane od ostatniego dźwięku
-const ODSTEP_WYBUCH_SFX_MS = 120;
 
 // Maska sylwetki, przepisana na CPU. Trzymamy poza wynikiem detekcji, bo
 // obiekt maski trzeba zwolnić od razu po odczycie (patrz pobierzMaske).
@@ -483,11 +479,8 @@ function resetujModuly() {
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
-    poprzStanPalca = 'BEZCZYNNY';
-    wybuchyDoDzwieku = 0;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
-    audioEngine.ustawPalec(0);
 }
 
 /** Nowa pieśń na rundę (Obrzęd): nowy <audio> na gracza, ładuje się podczas zapowiedzi/odliczania. */
@@ -732,7 +725,7 @@ function klatka(now) {
     // w tym miejscu klatki istnieje `frame` (zaczep efektów). Koronacja ostatnia - złoto wygrywa z zapłonem jaja.
     if (efektKroniki) {
         const e = efektKroniki; efektKroniki = null;
-        odpalJajo(e.bog, frame, canvas.width, canvas.height, { piorun, ekran, zaplon, fala, tecza, iskry, efekty, audio: audioEngine });
+        odpalJajo(e.bog, frame, canvas.width, canvas.height, { piorun, ekran, zaplon, fala, tecza, iskry, efekty });
         if (e.korona) { zaplon.zapal([255, 200, 80], 1.0); ekran.uderz(0.6); }
     }
 
@@ -750,15 +743,14 @@ function klatka(now) {
         const miejscePunktow = srodekDloni(frame, canvas.width, canvas.height);
         punkty.pieczec(skl.zlozona.id, now, miejscePunktow);
         odpalPieczec(skl.zlozona.id, frame, canvas.width, canvas.height,
-                     { efekty, runy, aura, audio: audioEngine });
+                     { efekty, runy, aura });
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie,
-                audio: audioEngine
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -879,15 +871,6 @@ function klatka(now) {
     punkty.reakcja('rozwianie', dym.ostatnioRozwiane, now);
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
-        // Dźwięk NIE co klatkę: przy zapłonie świeżej kolumny (v3: setki
-        // cząstek wstęgi) front detonuje przez kilkanaście klatek z rzędu -
-        // szum 0.35 s nakładany 60x/s to ściana hałasu, nie seria wybuchów.
-        wybuchyDoDzwieku += wybuchyDymu;
-        if (now - ostatniWybuchSFX >= ODSTEP_WYBUCH_SFX_MS) {
-            audioEngine.playWybuchSFX(wybuchyDoDzwieku);
-            wybuchyDoDzwieku = 0;
-            ostatniWybuchSFX = now;
-        }
     }
 
     // --- 7a. Efekty pieczęci i technik ---
@@ -904,17 +887,6 @@ function klatka(now) {
     // this.moc sama.
     const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
     if (pobor > 0) motionMeter.zuzyj(pobor);
-
-    // Dźwięk Płonącego Palca (P3, 2026-09-21): krawędzie stanu = one-shoty
-    // (zapłon/zgaszenie), stan PLONIE = ciągły trzask skalowany siłą.
-    if (poprzStanPalca !== 'PLONIE' && plonacyPalec.stan === 'PLONIE') {
-        audioEngine.grajZaplonPalca();
-    } else if (poprzStanPalca === 'PLONIE' && plonacyPalec.stan !== 'PLONIE') {
-        audioEngine.grajZgaszenie();
-    }
-    if (plonacyPalec.stan === 'PLONIE') audioEngine.ustawPalec(plonacyPalec.sila);
-    else audioEngine.ustawPalec(0);
-    poprzStanPalca = plonacyPalec.stan;
 
     ogien.updateAndDraw(
         ctx,
@@ -948,7 +920,6 @@ function klatka(now) {
         // słabiej trzęsie, ale ZAWSZE coś się dzieje (GEMINI.md §2).
         ekran.uderz(wystrzal.sila);
         ekran.falaPowietrza(zaczepPx, wystrzal.kierunek, wystrzal.sila);
-        audioEngine.playAardSFX(wystrzal.sila);
     }
     // Piorun PRZED falą/iskrami - uderza z góry, dopiero potem pęka ziemia.
     piorun.updateAndDraw(ctx, dt);
@@ -1012,13 +983,6 @@ function klatka(now) {
         icon = IKONA.plynie;
     }
     ustawKomunikat(text, icon);
-
-    // Sygnatura straciła parametr `state` (P3, 2026-09-21) - był zawsze
-    // 'CHARGING' (jedyne wywołanie w całej grze), gałąź READY/FIRING w
-    // audioEngine.js była martwa i usunięta razem z nim.
-    audioEngine.update(moc, plynnosc);
-    audioEngine.ustawSkladanie(skl.postep, skl.skladana);
-    audioEngine.ustawTecze(tecza.silaSladu);
 
     // --- 7b. Szkielet dłoni ---
     rysujDlonie(frame);

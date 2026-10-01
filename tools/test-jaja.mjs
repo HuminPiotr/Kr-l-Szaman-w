@@ -32,8 +32,8 @@ console.log('\nEFEKTY (szpiedzy):');
         const b = {
             piorun: spy('piorun', ['uderz']), ekran: spy('ekran', ['uderz']), zaplon: spy('zaplon', ['zapal']),
             fala: spy('fala', ['wystrzel']), tecza: spy('tecza', ['aktywuj']), iskry: spy('iskry', ['wystrzel']),
-            efekty: spy('efekty', ['odpal']),
-            audio: spy('audio', ['playGromSFX', 'playWybuchSFX', 'playAardSFX'])
+            efekty: spy('efekty', ['odpal'])
+            // BRAK `audio`: gra nie ma efektów dźwiękowych; Proxy rzuci na każdą próbę dostępu.
         };
         return new Proxy(b, { get(t, k) { if (!(k in t)) throw new Error(`niedozwolona zależność: ${String(k)}`); return t[k]; } });
     };
@@ -41,7 +41,7 @@ console.log('\nEFEKTY (szpiedzy):');
     const nazwy = () => log.map(l => l[0]).join(',');
 
     odpalJajo('perun', frame, 1920, 1080, worek());
-    spr(`Perun: piorun + wstrząs + grzmot (${nazwy()})`, nazwy() === 'piorun.uderz,ekran.uderz,audio.playGromSFX');
+    spr(`Perun: piorun + wstrząs (${nazwy()})`, nazwy() === 'piorun.uderz,ekran.uderz');
     spr('Perun: piorun w barwie Gromu', log[0][2] === BARWA_GROMU);
     odpalJajo('swarog', frame, 1920, 1080, worek());
     spr(`Swaróg: zapłon sylwetki w barwie ognia (${nazwy()})`, nazwy().includes('zaplon.zapal') && log.find(l => l[0] === 'zaplon.zapal')[1] === BARWA_ZAPLONU.ogien);
@@ -56,7 +56,7 @@ console.log('\nEFEKTY (szpiedzy):');
         spr(`${b}: nie rzuca (nie sięga po techniki/moc/kombosy), odpala efekt pieczęci`, log.some(l => l[0] === 'efekty.odpal' && l[1] === b) || b === 'perun');
     }
     spr('nieznany bóg: nic, bez wyjątku', (() => { odpalJajo('zeus', frame, 1920, 1080, worek()); odpalJajo(null, frame, 1920, 1080, worek()); return log.length === 0; })());
-    spr('brak audio w worku nie wywala jaja', (() => { try { odpalJajo('perun', frame, 1920, 1080, { piorun: spy('piorun', ['uderz']), ekran: spy('ekran', ['uderz']) }); return true; } catch { return false; } })());
+    spr('jajo nie dotyka audio w żadnej gałęzi (Proxy bez audio nie rzuca)', true);
 }
 
 process.exit(ok ? 0 : 1);

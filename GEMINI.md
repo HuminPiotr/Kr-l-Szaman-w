@@ -63,7 +63,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
 | `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
 | `js/aura.js` | maska sylwetki → poświata |
-| `js/audioEngine.js` | syntezator |
+| `js/audioEngine.js` | CIENKA magistrala audio, bez syntezy: `masterGain` → kompresor → `destination`, wyciszenie (klawisz M, trwałe w `localStorage`) i `podlaczPiesn`. **Gra nie ma efektów dźwiękowych (decyzja 2026-10-01) - jedyny dźwięk to pieśni rund** (`js/piesni.js`). `tools/test-brak-efektow-dzwiekowych.mjs` pilnuje, żeby synteza i stary interfejs (`graj*`/`play*SFX`/`ustaw*`) nie wróciły; wyjątek: osobny AudioContext w `debugHud.js` (sygnały sesji nagraniowej dewelopera) |
 | `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu, `N` = zrzuć ślad runy do konsoli) |
 | `js/znaki/registry.js` | rejestr znaków; `score(frame)` → 0..1, nigdy boolean |
 | `js/znaki/dlon.js` | wspólne narzędzia geometrii dłoni (skala, wyprostowanie, zwinięcie w pięść) |
@@ -174,7 +174,7 @@ Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · koły
 1. **Nagrać prawdziwe szablony run** — zastąpić syntetyczne koło/zygzak/falę w `runy/szablony.js` nagraniami z żywego ciała (klawisz `N`). Najwyższy priorytet: to jedyna rzecz, przez którą cała przebudowa na runy może jeszcze zawieść w praktyce.
 2. **Potwierdzić na żywym ciele** — progi `ksztalt.js` (`BLAD_ZERO`/`BLAD_PELNY`), okno śladu (`MAX_DLUGOSC_M`), margines i czas przejęcia lepkiego argmaxu, oraz ograniczenie tempa kombosa x3 (§4).
 3. **Oprawa szamańska** — ~~paleta ognia/węgla~~ zrobione 2026-09-14 (style.css, main.js, js/runa.js, js/sekwencja.js, js/glify.js - nazwa "Król Szamanów", runy zamiast pierścienia, pasek sekwencji). Łuna ogniska jest DZIŚ tylko na ekranie startowym (`#start-screen::after`, gradient CSS) - ognisko WIDOCZNE PRZEZ CAŁĄ GRĘ (cząstki na płótnie, nie tylko start) zostaje w kolejce
-4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
+4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem (uwaga: gra nie ma dziś efektów dźwiękowych, więc rytm to dodatek do pieśni, nie do syntezatora)
 5. **Czwarty żywioł/piąty kształt** (np. spirala) — dopiero po potwierdzeniu obecnej czwórki (koło/zygzak/fala/piramidka) na żywo
 6. ~~Menu i Księga rekordów~~ zrobione 2026-10-01 (podprojekt 3): menu „Polana", Kronika, Księga Plemienia (lokalna), jaja z nickami-bogami. Zostaje: **strojenie tytułów Kroniki** (`PROGI_TYTULOW`, pkt/min) na żywym ciele oraz **test całego przepływu z kamerą** (start z menu, runda, Kronika, zapis, Esc). Wspólna tablica online wymaga backendu (łamie §3) - świadomie poza zakresem. Pieśni właściciela w `assets/muzyka/` (2 utwory Suno) - LICENCJĘ sprawdzić przed publikacją gry.
 

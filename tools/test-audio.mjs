@@ -5,12 +5,12 @@
  *
  *   node tools/test-audio.mjs
  *
- * Pilnuje CZTERECH luk z audytu P3 (patrz nagłówek js/audioEngine.js):
- * magistrala (żaden głos nie łączy się z destination z pominięciem
- * masterGain->compressor), bezpieczeństwo obwiedni (setValueAtTime PRZED
- * jakąkolwiek rampą, exponentialRamp nigdy do zera), sprzątanie węzłów
- * (onended odłącza cały graf głosu), cache bufora szumu (createBuffer
- * wołane RAZ, nie przy każdym playWybuchSFX/playAardSFX).
+ * OD 2026-10-01 gra NIE MA efektów dźwiękowych - tylko pieśni rund. Silnik zostaje
+ * jako CIENKA MAGISTRALA: masterGain -> compressor -> destination, wyciszenie (M)
+ * i podłączenie pieśni (podlaczPiesn). Ten test pilnuje, że:
+ *   - silnik niczego nie syntezuje (zero oscylatorów, zero źródeł buforowych),
+ *   - stary interfejs efektów (metody graj..., play...SFX, ustaw..., update) nie wrócił,
+ *   - magistrala, wyciszenie i pieśń działają.
  */
 
 // --- Atrapa Web Audio API ---
@@ -105,117 +105,47 @@ function nowyEngine() {
     return e;
 }
 
-// --- 1. Wywołania przed init() są no-opami, bez wyjątku ---
-console.log('PRZED init():');
+// --- 1. Brak syntezy: gra nie ma efektów dźwiękowych (tylko pieśni) ---
+console.log('BRAK EFEKTÓW DŹWIĘKOWYCH:');
+{
+    const e = nowyEngine();
+    const typy = new Set(WEZLY.map(w => w._typ));
+    spr(`init() tworzy WYŁĄCZNIE magistralę (węzły: ${[...typy].join(', ')})`, [...typy].every(x => x === 'compressor' || x === 'gain'));
+    spr('zero oscylatorów (bez szumu bazowego "hum")', !WEZLY.some(w => w._typ === 'oscillator'));
+    spr('zero źródeł buforowych (bez wybuchów/szumów)', !WEZLY.some(w => w._typ === 'bufferSource'));
+    spr('bufor szumu nie jest tworzony', LICZNIK_CREATE_BUFFER === 0);
+    spr('zero filtrów (bez barwienia efektów)', !WEZLY.some(w => w._typ === 'biquad'));
+    const STARE = ['update', 'ustawSkladanie', 'ustawTecze', 'ustawPalec', 'grajZaplonPalca', 'grajZgaszenie',
+                   'grajPieczecZlozona', 'grajTechnike', 'playGromSFX', 'playKolowrotSFX', 'playWybuchSFX', 'playAardSFX'];
+    for (const m of STARE) spr(`interfejs efektu '${m}' nie istnieje`, typeof e[m] === 'undefined');
+    spr('brak głosów hum w stanie silnika', e.humGain === undefined && e.humOsc === undefined && e.hum2Osc === undefined && e._buforSzumu === undefined);
+}
+
+// --- 2. Przed init() metody magistrali są no-opami ---
+console.log('\nPRZED init():');
 {
     const e = new AudioEngine();
     let rzucil = false;
-    try {
-        e.update(0.5, 0.5); e.playGromSFX(); e.playKolowrotSFX();
-        e.playWybuchSFX(1); e.playAardSFX(1); e.ustawSkladanie(0.5, 'swarog');
-        e.ustawTecze(0.5); e.ustawPalec(0.5); e.grajZaplonPalca(); e.grajZgaszenie();
-        e.grajPieczecZlozona(); e.grajTechnike('ogien');
-    } catch { rzucil = true; }
+    // Wyciszenie jest TRWAŁE (localStorage), więc przełączamy dwa razy - żeby nie skazić kolejnych sekcji.
+    try { e.resume(); e.przelaczWyciszenie(); e.przelaczWyciszenie(); e.podlaczPiesn({}); } catch { rzucil = true; }
     spr('żadna metoda nie rzuca przed init()', !rzucil);
     spr('audioCtx wciąż null (init() nigdy nie wywołane)', e.audioCtx === null);
+    spr('podlaczPiesn przed init() = null', e.podlaczPiesn({}) === null);
 }
 
-// --- 2. Magistrala: WSZYSTKO przez masterGain -> compressor -> destination ---
-console.log('\nMAGISTRALA (żaden głos nie omija masterGain/compressor):');
+// --- 3. Magistrala: masterGain -> compressor -> destination ---
+console.log('\nMAGISTRALA:');
 {
     const e = nowyEngine();
-    e.update(0.7, 0.8);
-    e.grajPieczecZlozona();
-    e.grajTechnike('gromWZiemie');
-    e.playGromSFX();
-    e.playKolowrotSFX();
-    e.playWybuchSFX(2);
-    e.playAardSFX(0.6);
-    e.ustawSkladanie(0.5, 'swarog');
-    e.ustawTecze(0.7);
-    e.ustawPalec(0.5);
-    e.grajZaplonPalca();
-
     const doDestination = POLACZENIA.filter(p => p.do === 'destination');
-    spr(`TYLKO compressor łączy się bezpośrednio z destination (${doDestination.length} połączeń, wszystkie od compressor)`,
+    spr(`TYLKO compressor łączy się bezpośrednio z destination (${doDestination.length} połączeń)`,
         doDestination.length >= 1 && doDestination.every(p => p.od === e.compressor));
-    spr('compressor łączy się z destination', POLACZENIA.some(p => p.od === e.compressor && p.do === 'destination'));
     spr('masterGain łączy się z compressor (nie z destination wprost)',
         POLACZENIA.some(p => p.od === e.masterGain && p.do === e.compressor));
+    spr('init() jest idempotentne (drugi init nie dubluje węzłów)', (() => { const n = WEZLY.length; e.init(); return WEZLY.length === n; })());
 }
 
-// --- 3. Bezpieczeństwo obwiedni: setValueAtTime PRZED rampą, brak rampy do zera ---
-console.log('\nBEZPIECZEŃSTWO OBWIEDNI (audio-rules skilla ui-sound-design):');
-{
-    const e = nowyEngine();
-    e.update(0.7, 0.8);
-    e.grajPieczecZlozona();
-    e.grajTechnike('gromWZiemie');
-    e.playGromSFX();
-    e.playKolowrotSFX();
-    e.playWybuchSFX(2);
-    e.playAardSFX(0.6);
-    e.ustawSkladanie(0.5, 'swarog');
-    e.ustawTecze(0.7);
-    e.ustawPalec(0.5);
-    e.grajZaplonPalca();
-    e.grajZgaszenie();
-
-    let zeroTarget = 0, brakSetPrzedRampa = 0, sprawdzoneParamy = 0;
-    for (const w of WEZLY) {
-        for (const klucz of Object.keys(w)) {
-            const p = w[klucz];
-            if (!p || !Array.isArray(p._zdarzenia) || p._zdarzenia.length === 0) continue;
-            sprawdzoneParamy++;
-            const rampy = p._zdarzenia.filter(z => z.metoda === 'exponentialRampToValueAtTime');
-            for (const r of rampy) if (r.wartosc <= 0) zeroTarget++;
-            if (rampy.length > 0) {
-                const pierwsza = p._zdarzenia[0];
-                if (pierwsza.metoda !== 'setValueAtTime') brakSetPrzedRampa++;
-            }
-        }
-    }
-    spr(`sprawdzono ${sprawdzoneParamy} parametrów z automatyzacją`, sprawdzoneParamy > 10);
-    spr('żadna exponentialRampToValueAtTime nie celuje w <= 0', zeroTarget === 0);
-    spr('każdy param z rampą ma setValueAtTime JAKO PIERWSZE zdarzenie', brakSetPrzedRampa === 0);
-}
-
-// --- 4. Sprzątanie: onended odłącza wszystkie węzły głosu ---
-console.log('\nSPRZĄTANIE (onended -> disconnect):');
-{
-    const e = nowyEngine();
-    // init() już stworzył węzły TRWAŁE (masterGain/humGain/hum2Gain -
-    // nigdy nie są disconnect()owane, żyją przez całą grę) - zapamiętujemy
-    // granicę PRZED graniem dzwonka, żeby sprawdzić TYLKO nowe węzły głosu.
-    const przedDzwonkiem = WEZLY.length;
-    e.grajPieczecZlozona();
-    const noweWezly = WEZLY.slice(przedDzwonkiem);
-    const zrodla = noweWezly.filter(w => (w._typ === 'oscillator' || w._typ === 'bufferSource') && typeof w.onended === 'function');
-    spr(`grajPieczecZlozona() ma ${zrodla.length} źródło/a z onended`, zrodla.length >= 1);
-    // Symulujemy asynchroniczne zakończenie odtwarzania (patrz komentarz
-    // w AtrapaAudioContext.createOscillator) - dopiero TERAZ, po tym jak
-    // grajPieczecZlozona() zdążyła wywołać _sprzatnij() i ustawić onended.
-    for (const z of zrodla) { if (z.onended) z.onended(); }
-    // Każdy węzeł głosu (tu: gainy dzwonka, _sprzatnij dostaje [gain]) -
-    // NOWE, nie węzły trwałe silnika - ma być disconnect()owany po zakończeniu.
-    const gainyPoDzwonku = noweWezly.filter(w => w._typ === 'gain');
-    spr(`${gainyPoDzwonku.length} nowe gainy dzwonka są disconnect() po onended`,
-        gainyPoDzwonku.length >= 1 && gainyPoDzwonku.every(g => g._rozlaczony === true));
-}
-
-// --- 5. Cache bufora szumu: createBuffer RAZ, nie przy każdym wywołaniu ---
-console.log('\nCACHE BUFORA SZUMU:');
-{
-    const e = nowyEngine();
-    spr('createBuffer wołane RAZ w init()', LICZNIK_CREATE_BUFFER === 1);
-    for (let i = 0; i < 5; i++) e.playWybuchSFX(1);
-    for (let i = 0; i < 5; i++) e.playAardSFX(1);
-    for (let i = 0; i < 3; i++) e.grajZaplonPalca();
-    spr('5x playWybuchSFX + 5x playAardSFX + 3x grajZaplonPalca -> createBuffer WCIĄŻ RAZ (bufor dzielony)',
-        LICZNIK_CREATE_BUFFER === 1);
-}
-
-// --- 6. Wyciszenie ---
+// --- 4. Wyciszenie (klawisz M wycisza pieśń, bo ta idzie przez masterGain) ---
 console.log('\nWYCISZENIE:');
 {
     const e = nowyEngine();
@@ -227,33 +157,6 @@ console.log('\nWYCISZENIE:');
     e.przelaczWyciszenie();
     spr('drugie przełączenie wraca do odciszonego', e.wyciszony === false);
     spr('masterGain.gain wraca do 0.8', e.masterGain.gain.value === 0.8);
-}
-
-// --- 7. Odporność na NaN ---
-console.log('\nODPORNOŚĆ:');
-{
-    const e = nowyEngine();
-    let rzucil = false;
-    try {
-        e.update(NaN, NaN);
-        e.ustawSkladanie(NaN, 'swarog');
-        e.ustawTecze(NaN);
-        e.ustawPalec(NaN);
-        e.playWybuchSFX(NaN);
-        e.playAardSFX(NaN);
-    } catch { rzucil = true; }
-    spr('NaN we wszystkich wejściach nie rzuca wyjątku', !rzucil);
-    spr('hum gain skończony po update(NaN,NaN)', Number.isFinite(e.humGain.gain.value));
-    spr('skladanieGain skończony po ustawSkladanie(NaN,...)', Number.isFinite(e.skladanieGain.gain.value));
-}
-
-// --- 8. update() straciło parametr state (sygnatura P3) ---
-console.log('\nSYGNATURA update() (P3 - bez martwej gałęzi READY/FIRING):');
-{
-    const e = nowyEngine();
-    e.update(1, 1);   // (moc, plynnosc) - NIE (state, moc, plynnosc)
-    spr('update(moc, plynnosc) ustawia hum na pełną moc', e.humGain.gain.value > 0.1);
-    spr('readyOsc nie istnieje (martwa gałąź usunięta)', e.readyOsc === undefined);
 }
 
 // --- Pieśń przez magistralę (tryby, 2026-10-01) ---
