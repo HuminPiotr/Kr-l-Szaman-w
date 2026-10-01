@@ -149,8 +149,8 @@ nowe złożenie i płaci w pełni.
 
 ## Poza zakresem
 
-Tryby i koniec rundy (podprojekt 2), zapis wyników i Księga (podprojekt 3), mnożnik Zewu
-(tylko hak `mnoznikZewu`).
+Zapis wyników i Księga (podprojekt 3). Tryby, koniec rundy i mnożnik Zewu wdrożono w podprojekcie 2
+(`2026-10-01-tryby-design.md`); tryb swobodny bez punktów = `punkty.aktywna` sterowane stanem rundy.
 
 ## Ryzyka
 

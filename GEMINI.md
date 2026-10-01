@@ -19,7 +19,7 @@ Cel emocjonalny: gracz ma **całkowicie rozluźnić ciało** i czerpać przyjemn
 Obowiązuje w całym kodzie i wygrywa ze wszystkimi innymi względami.
 
 - Każdy pomiar zwraca **ciągłą wartość 0..1**, nigdy boolean. Płynność steruje TEMPEM ładowania, nigdy go nie zeruje: ruch szarpany ładuje ok. 4x wolniej, ale **ładuje** (`PODLOGA_PLYNNOSCI`).
-- **Punkty tylko przybywają** (od 2026-10-01, arcade - spec `docs/superpowers/specs/2026-10-01-punktacja-design.md`): nic ich nie odejmuje, combo nie resetuje się za pomyłkę, koniec rundy to podsumowanie, nie porażka. Malejący przyrost za powtarzanie daje MNIEJ, nigdy nie zabiera. Tryb swobodny - bez punktów i czasu, jak dawniej. **Brak stanu porażki.**
+- **Punkty tylko przybywają** (od 2026-10-01, arcade - spec `docs/superpowers/specs/2026-10-01-punktacja-design.md`): nic ich nie odejmuje, combo nie resetuje się za pomyłkę, koniec rundy to podsumowanie, nie porażka. Malejący przyrost za powtarzanie daje MNIEJ, nigdy nie zabiera. Tryb swobodny - bez punktów i czasu, jak dawniej. **Brak stanu porażki.** Rundy (Obrzęd = pieśń, Próba = na czas) kończą się czasem albo końcem pieśni - koniec to podsumowanie, nie porażka. Zew żywiołów niczego nie zabiera, tylko podwaja nagrodę.
 - Komunikaty mówią, co jest dostępne **dalej**, nie co gracz robi **źle**.
 - Bezruch i wyjście z kadru **nie karzą** — płynność wraca wtedy do pełnej, bo brak danych to nie jest szarpanie.
 - Progi mają histerezę; nic nie migocze na granicy.
@@ -90,6 +90,11 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/sekwencja.js` | Pasek sekwencji u dołu ekranu (DOM, nie płótno - lustro i webfont-na-canvasie to oba powody). Czyta `KomboSilnik.aktywne(now)` co klatkę (PULL, bufor NIGDY nie jest czyszczony), sloty gasną z wiekiem (`alfaSlotu`), combo "wiąże" ogon bufora złotą poświatą po znaczniku czasu, nie po pozycji |
 | `js/punkty.js` | Punktacja (2026-10-01): cztery warstwy (taniec / pieczęć / technika / reakcje), wartość techniki = 100 × suma `TRUDNOSC` pieczęci (z ZMIERZONEJ rozpoznawalności), malejący przyrost za powtarzanie, rejestr `REAKCJE` (Pożoga, Rozwianie - serie z logarytmicznym przyrostem), splecenie po NAKŁADANIU OGONÓW (nie po czasie). Czysta logika; `tools/test-punkty.mjs` jest strażnikiem: nowe combo bez wpisu w `TRUDNOSC` albo reakcja wołana z main.js bez wpisu w `REAKCJE` = czerwony test |
 | `js/wynikHud.js` | HUD wyniku (DOM): licznik w lewym górnym rogu, linijka serii reakcji, unoszące się „+340 Okadzenie" w miejscu zdarzenia (lustro przeliczone w `pozycjaWLustrze`) |
+| `js/tryby.js` | Silnik rundy (ZAPOWIEDZ→ODLICZANIE→TRWA→WYBRZMIENIE→KONIEC; czas ze SKUMULOWANYCH przyciętych `dt` - zawieszona karta nie przeskakuje rundy; wybrzmienie dopuszcza dopalenie dymu), `Zew` (×2 dla żywiołu: pieczęć i technika, NIE reakcje i taniec - inaczej psuje zmierzony balans), `Krag` (2-6 graczy, dubel dostaje sufiks, podium), `parsujKonfiguracje` (`?tryb=proba&czas=60&zew=1&krag=Ola,Bartek`, `?tryb=obrzed&piesn=0`) |
+| `js/przebieg.js` | Orkiestrator rundy: zdarzenia klatki (`trwa`/`wybrzmienie`/`koniecRundy`), zapis wyniku RAZ, Krąg, Zew. Tryb swobodny nie ma przebiegu (`przebieg === null` w main.js, `punkty.aktywna = false`) |
+| `js/swiezeModuly.js` | Równy start rundy: NOWE instancje wszystkich modułów ze stanem rundy (większość nie ma `reset()`; ukryty stan łatwo pominąć). Nowy `let x = new Klasa()` w main.js bez wpisu tutaj = dziedziczenie stanu między graczami (uzbrojone Okadzenie ma zegar 4 min!); `tools/test-swieze-moduly.mjs` to pilnuje |
+| `js/piesni.js` | Manifest `assets/muzyka/utwory.json` (nazwy plików mają spacje i polskie znaki - `encodeURIComponent`), `Piesn` NIGDY nie jest błędem (`{ok:false}` → „Duchy zgubiły pieśń", runda gra dalej jak próba), pieśń przez `AudioEngine.podlaczPiesn` - ta sama magistrala co efekty, więc M ją wycisza |
+| `js/rundaHud.js` | HUD rundy (DOM): odliczanie, czas, Zew, „Teraz tańczy", baner końca (TYMCZASOWY - zastąpi go Kronika z podprojektu 3) |
 
 **Odpięte, nie usunięte** (wracają, gdyby kamera zewnętrzna albo lepszy tracker to uzasadniły): `powerBall.js`, `wiatr.js`, `znaki/perun.js`, `znaki/mokosz.js`, `znaki/weles.js`, `znaki/postawa.js` (postawy CAŁEGO CIAŁA - wymagają kadru z barkami i biodrami), `znaki/welesDlon.js`, `znaki/perunDlon.js`, `znaki/szczurDlon.js`, `znaki/mokoszSplot.js` (pieczęcie/znaki PALCOWE lub z pozy zastąpione runami 2026-09-01 - patrz §4).
 
@@ -166,5 +171,6 @@ Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · koły
 3. **Oprawa szamańska** — ~~paleta ognia/węgla~~ zrobione 2026-09-14 (style.css, main.js, js/runa.js, js/sekwencja.js, js/glify.js - nazwa "Król Szamanów", runy zamiast pierścienia, pasek sekwencji). Łuna ogniska jest DZIŚ tylko na ekranie startowym (`#start-screen::after`, gradient CSS) - ognisko WIDOCZNE PRZEZ CAŁĄ GRĘ (cząstki na płótnie, nie tylko start) zostaje w kolejce
 4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem
 5. **Czwarty żywioł/piąty kształt** (np. spirala) — dopiero po potwierdzeniu obecnej czwórki (koło/zygzak/fala/piramidka) na żywo
+6. **Menu i Księga rekordów** — podprojekt 3 (arcade). Wejście do rund to dziś `?tryb=` z adresu (`js/tryby.js:parsujKonfiguracje`); menu wywoła tę samą funkcję `uruchomZKonfiguracji` z `main.js`. Pieśni właściciela w `assets/muzyka/` (2 utwory Suno - LICENCJĘ sprawdzić przed publikacją gry).
 
 *Przy symbolice omijać kołowrót/swarzycę — zostały zawłaszczone przez skrajną prawicę. Celem są i tak autorskie runy.*
