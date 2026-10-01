@@ -16,6 +16,11 @@ import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Punktacja } from './punkty.js';
 import { WynikHud } from './wynikHud.js';
+import { Przebieg } from './przebieg.js';
+import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js';
+import { swiezeModuly } from './swiezeModuly.js';
+import { wczytajManifest, Piesn } from './piesni.js';
+import { RundaHud, widokRundy } from './rundaHud.js';
 import { Efekty, srodekDloni } from './efekty.js';
 import { zaladujFont } from './glify.js';
 import { Runy } from './runa.js';
@@ -136,12 +141,18 @@ let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 // Punktacja (2026-10-01, spec docs/superpowers/specs/2026-10-01-punktacja-design.md).
 // PUSH zdarzeń w istniejących miejscach pętli, HUD czyta PULL co klatkę.
-// TYMCZASOWO (do podprojektu 2, tryby): punkty są włączone zawsze, bo gra ma
-// dziś jeden tryb. Spec i GEMINI.md §2 mówią, że TRYB SWOBODNY jest bez punktów
-// i bez HUD - gdy tryby powstaną, swobodny ustawia `punkty.aktywna = false`
-// (HUD wtedy sam znika, patrz wynikHud.js). NIE scalać do main przed tym.
 let punkty = new Punktacja();
 const wynikHud = new WynikHud(document.getElementById('wynik-hud'));
+// TRYBY (2026-10-01, spec docs/superpowers/specs/2026-10-01-tryby-design.md).
+// `przebieg === null` = tryb SWOBODNY: bez punktów, bez końca, jak dawna gra.
+// Brak parametrów w adresie = swobodny, więc licznik punktów już się nie pokazuje
+// w jedynym trybie (konflikt z końcowego przeglądu podprojektu 1 zamknięty).
+let przebieg = null;
+let piesn = null;                 // Piesn bieżącej rundy (Obrzęd) albo null
+let utworRundy = null;            // wpis z manifestu wybrany do Obrzędu
+const rundaHud = new RundaHud(document.getElementById('runda-hud'));
+punkty.aktywna = false;           // do pierwszej rundy
+punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
 let efekty = new Efekty();
 // Wielka runa przy dłoniach (js/runa.js) zastępuje dawny pierścień składania
 // pieczęci; pasek sekwencji (js/sekwencja.js) czyta TEN SAM bufor kombosów
@@ -281,6 +292,9 @@ startBtn.addEventListener('click', async () => {
 
         isRunning = true;
         requestAnimationFrame(renderLoop);
+
+        // Tryb z adresu (menu w podprojekcie 3 wywoła tę samą funkcję). Bez parametrów - swobodny.
+        uruchomZKonfiguracji(parsujKonfiguracje(window.location.search)).catch((e) => console.error('Tryb:', e));
 
     } catch (e) {
         alert("Błąd dostępu do kamery lub inicjalizacji AI: " + e.message);
@@ -444,6 +458,110 @@ function renderLoop(now) {
     }
 }
 
+/**
+ * Równy start: NOWE instancje wszystkich modułów ze stanem rundy (js/swiezeModuly.js)
+ * + zerowanie stanu pętli, który żyje w main.js. W Kręgu następny gracz nie może
+ * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
+ */
+function resetujModuly() {
+    ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+       plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
+       kolowrot } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+    poprzNadgarstkiPx = null;
+    poprzStanPalca = 'BEZCZYNNY';
+    wybuchyDoDzwieku = 0;
+    ostatniKomunikat = null;
+    ostatniKomunikatDo = 0;
+    audioEngine.ustawPalec(0);
+}
+
+/** Nowa pieśń na rundę (Obrzęd): nowy <audio> na gracza, ładuje się podczas zapowiedzi/odliczania. */
+function przygotujPiesn() {
+    piesn?.zatrzymaj();
+    piesn = null;
+    if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
+    piesn = new Piesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el) });
+    piesn.naKoniec(() => przebieg?.zakonczPiesn());
+    piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
+}
+
+function zakonczPrzebieg() {
+    piesn?.zatrzymaj();
+    piesn = null;
+    przebieg = null;
+    punkty.reset();
+    punkty.aktywna = false;
+    resetujModuly();
+}
+
+/** Zdarzenia rundy z tej klatki (Przebieg.update) -> reakcje gry. */
+function obsluzZdarzeniaRundy(zdarzenia, now) {
+    for (const z of zdarzenia) {
+        if (z.typ === 'trwa') {
+            // Równy start: pasek mocy, dym i uzbrojone techniki z odliczania nie liczą się.
+            resetujModuly();
+            punkty.reset();
+            piesn?.graj().then((gra) => {
+                if (!gra && piesn) {
+                    ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
+                    ostatniKomunikatDo = performance.now() + 5000;
+                }
+            });
+        } else if (z.typ === 'wybrzmienie') {
+            piesn?.zanik(WYBRZMIENIE_S);
+        } else if (z.typ === 'koniecRundy') {
+            piesn?.zatrzymaj();
+            piesn = null;
+            // Zapis RAZ - Przebieg odrzuca drugie wywołanie. Kopie, bo punkty.reset() je wyczyści.
+            przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie }, JSON.parse(JSON.stringify(punkty.momenty)));
+        }
+    }
+}
+
+/** Uruchamia tryb z konfiguracji (adres teraz, menu w podprojekcie 3 - ta sama funkcja). */
+async function uruchomZKonfiguracji(konfig) {
+    if (konfig.tryb === 'swobodny') return;
+    let konf = konfig;
+    if (konf.tryb === 'obrzed') {
+        const manifest = await wczytajManifest();
+        utworRundy = manifest[konf.piesn] ?? null;
+        if (!utworRundy) {
+            // Brak pieśni nie jest błędem (§2) - Obrzęd zamienia się w próbę.
+            konf = { ...konf, tryb: 'proba', dlugoscS: 90 };
+            ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
+            ostatniKomunikatDo = performance.now() + 5000;
+        } else {
+            const probny = new Piesn(utworRundy);
+            const { ok, dlugoscS } = await probny.zaladuj();
+            probny.zatrzymaj();
+            // Długość z metadanych; niepoprawna -> awaryjna (tryb nadal obrzed, gra jak próba).
+            konf = { ...konf, dlugoscS: ok ? dlugoscS : PIESN_AWARYJNA_S };
+            if (!ok) {
+                ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
+                ostatniKomunikatDo = performance.now() + 5000;
+                utworRundy = null;
+            }
+        }
+    }
+    przebieg = new Przebieg(konf);
+    przygotujPiesn();
+    przebieg.start(performance.now());
+}
+
+window.addEventListener('keydown', (e) => {
+    if (!przebieg) return;
+    // Esc należy też do sesji nagraniowej debugHud (przerywa nagrywanie) - nie kradniemy go.
+    if (e.key === 'Escape' && !debugHud.sesja.aktywna) {
+        zakonczPrzebieg();   // bez zapisu - Esc to wyjście, nie wynik
+    } else if (e.key === 'Enter' && przebieg.stan === 'PODSUMOWANIE') {
+        if (przebieg.dalej(performance.now())) {
+            resetujModuly();
+            punkty.reset();
+            przygotujPiesn();
+        }
+    }
+});
+
 function klatka(now) {
 
     // Bez wymiarów wideo computeCoverFit dzieli przez zero, ratio robi się
@@ -462,6 +580,12 @@ function klatka(now) {
     const dt = lastFrameTime ? Math.min(0.1, Math.max(0, (now - lastFrameTime) / 1000)) : 0;
     lastFrameTime = now;
     debugHud.tick(now);
+
+    // --- Rundy (tryby) ---
+    // Przebieg liczy czas ze SKUMULOWANYCH przyciętych dt, więc zawieszona karta nie
+    // przeskoczy rundy do końca. Punkty płyną tylko w TRWA i WYBRZMIENIU.
+    if (przebieg) obsluzZdarzeniaRundy(przebieg.update(now), now);
+    punkty.aktywna = !!przebieg && przebieg.stan === 'RUNDA' && przebieg.runda.punktuje;
 
     // --- 1. Podgląd z kamery ---
     const fit = computeCoverFit(video, canvas);
@@ -785,6 +909,7 @@ function klatka(now) {
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
     punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
+    rundaHud.update(widokRundy(przebieg));
 
     // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
     let text, icon;

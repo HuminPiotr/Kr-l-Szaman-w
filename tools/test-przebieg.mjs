@@ -142,4 +142,29 @@ console.log('\nSWOBODNY NIE MA PRZEBIEGU:');
     spr('Przebieg dla trybu swobodnego jest odrzucony (main.js trzyma null)', rzucil);
 }
 
+console.log('\nSTRAŻNIK WPIĘCIA W main.js:');
+{
+    const { readFileSync } = await import('node:fs');
+    const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+    // main.js nie da się zaimportować w node (DOM, kamera) - sprawdzamy WPIĘCIA tekstem,
+    // żeby refaktor nie odpiął po cichu któregoś z kontraktów rundy.
+    const MUSI = [
+        ['przebieg.update(', 'pętla woła przebieg.update(now) co klatkę'],
+        ["typ === 'trwa'", "reaguje na zdarzenie 'trwa' (reset modułów + start pieśni)"],
+        ["typ === 'wybrzmienie'", "reaguje na zdarzenie 'wybrzmienie' (zanik pieśni)"],
+        ["typ === 'koniecRundy'", "reaguje na zdarzenie 'koniecRundy' (zapis wyniku)"],
+        ['przebieg.zapiszWynik(', 'zapisuje wynik przez Przebieg (zapis raz)'],
+        ['swiezeModuly(', 'równy start przez fabrykę modułów'],
+        ['punkty.mnoznikZewu', 'Zew wpięty w punktację'],
+        ['punkty.aktywna =', 'punkty włączane/wyłączane stanem rundy (swobodny = wyłączone)'],
+        ['parsujKonfiguracje(', 'konfiguracja z adresu'],
+        ['.zakonczPiesn()', "koniec pieśni (ended) kończy rundę"],
+        ["'Escape'", 'Esc przerywa rundę'],
+        ["'Enter'", 'Enter na podsumowaniu'],
+        ['rundaHud.update(', 'HUD rundy aktualizowany co klatkę']
+    ];
+    for (const [fragment, opis] of MUSI) spr(opis, main.includes(fragment));
+    spr('Esc nie koliduje z sesją nagraniową debugHud', main.includes('debugHud.sesja.aktywna'));
+}
+
 process.exit(ok ? 0 : 1);
