@@ -39,6 +39,13 @@ export class Menu {
         this.kronika = null;
     }
 
+    /**
+     * Czy gra reaguje na ruch gracza (pieczęcie, techniki, ich dźwięki). Pod menu - nie:
+     * gracz stoi przed kamerą, pisze nick, a hałas Gromów za półprzezroczystym panelem
+     * byłby zaskoczeniem. Kronika to nadal gra (efekty po rundzie są jej częścią).
+     */
+    get graAktywna() { return this.ekran === 'gra' || this.ekran === 'kronika'; }
+
     /** Manifest pieśni wczytuje się asynchronicznie - Obrzęd odblokowuje się po fakcie. */
     ustawPiesni(lista) {
         this.piesni = Array.isArray(lista) ? lista : [];

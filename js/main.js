@@ -27,6 +27,8 @@ import { Ksiega, kluczKsiegi } from './ksiega.js';
 import { zbudujKronike } from './kronika.js';
 import { bogZNicku } from './jaja.js';
 import { losoweImie } from './imiona.js';
+import { czyPoleTekstowe } from './klawisze.js';
+import { ZetonStartu } from './zeton.js';
 import { Efekty, srodekDloni } from './efekty.js';
 import { zaladujFont } from './glify.js';
 import { Runy } from './runa.js';
@@ -163,6 +165,7 @@ punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, ar
 const ksiega = new Ksiega((() => { try { return window.localStorage; } catch { return null; } })());
 const menu = new Menu({ ostatniNick: ksiega.ostatniNick() });
 let efektKroniki = null;   // {bog, korona} - odpalany w klatce, gdy istnieje `frame`
+const zetonStartu = new ZetonStartu();
 const polanaUi = new PolanaUi(document, {
     menu, ksiega, losoweImie,
     onStart: (konf) => rozpalOgien(konf),
@@ -252,6 +255,8 @@ uiAudioWskaznik.addEventListener('click', przelaczDzwiek);
 // dźwięków sesji nagrywania (nie chcemy jednego miejsca odpowiedzialnego
 // za wszystkie skróty klawiszowe w grze, patrz debugHud.js nagłówek).
 window.addEventListener('keydown', (e) => {
+    // Nick w menu: litera 'm' to część imienia, nie wyciszenie (js/klawisze.js).
+    if (czyPoleTekstowe(e.target)) return;
     if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
 });
 
@@ -506,6 +511,7 @@ function zakonczPrzebieg() {
 
 /** Esc w grze / "Do Polany" z Kroniki: bez zapisu, czysty start, menu na żywym obrazie. */
 function doPolany() {
+    zetonStartu.uniewaznij();   // oczekujący asynchroniczny start nie ma już prawa dokończyć
     zakonczPrzebieg();      // pieśń stop, moduły i punkty czyste
     efektKroniki = null;
     menu.doPolany();
@@ -526,7 +532,7 @@ function dalejZKroniki() {
 /** Koniec rundy: zapis do Księgi, Kronika, jaja. Wołane raz, z obsluzZdarzeniaRundy('koniecRundy'). */
 function pokazKronike(pods) {
     const klucz = kluczKsiegi(przebieg.konfig, utworRundy);
-    const nick = pods.nick ?? menu.nick.trim();
+    const nick = pods.nick ?? String(przebieg.konfig.nick ?? '').trim();
     const wk = klucz && nick ? ksiega.dodaj(klucz, nick, pods.wynik, Date.now()) : null;
     if (!pods.nick && nick) ksiega.zapamietajNick(nick);
     if (wk?.wpisano) polanaUi.pokazSwiezy(klucz, nick.slice(0, 16), Math.floor(pods.wynik));
@@ -563,28 +569,38 @@ function obsluzZdarzeniaRundy(zdarzenia, now) {
 /** Uruchamia tryb z konfiguracji (adres teraz, menu w podprojekcie 3 - ta sama funkcja). */
 async function uruchomZKonfiguracji(konfig) {
     if (konfig.tryb === 'swobodny') return;
+    // Żeton: ten start trwa do kilku sekund (manifest z sieci, metadane audio). Esc na Polanę albo
+    // wybór innego trybu w tym czasie unieważnia go - po każdym await sprawdzamy, czy jeszcze mamy prawo
+    // dokończyć (inaczej spóźniona runda startuje pod menu i zapisuje wynik do Księgi).
+    const zeton = zetonStartu.nowy();
     let konf = konfig;
+    let utwor = null;
     if (konf.tryb === 'obrzed') {
         const manifest = await wczytajManifest();
-        utworRundy = manifest[konf.piesn] ?? null;
-        if (!utworRundy) {
+        if (!zetonStartu.aktualny(zeton)) return;
+        utwor = manifest[konf.piesn] ?? null;
+        if (!utwor) {
             // Brak pieśni nie jest błędem (§2) - Obrzęd zamienia się w próbę.
             konf = { ...konf, tryb: 'proba', dlugoscS: 90 };
             ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
             ostatniKomunikatDo = performance.now() + 5000;
         } else {
-            const probny = new Piesn(utworRundy);
+            const probny = new Piesn(utwor);
             const { ok, dlugoscS } = await probny.zaladuj();
             probny.zatrzymaj();
+            if (!zetonStartu.aktualny(zeton)) return;
             // Długość z metadanych; niepoprawna -> awaryjna (tryb nadal obrzed, gra jak próba).
             konf = { ...konf, dlugoscS: ok ? dlugoscS : PIESN_AWARYJNA_S };
             if (!ok) {
                 ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
                 ostatniKomunikatDo = performance.now() + 5000;
-                utworRundy = null;
+                utwor = null;
             }
         }
     }
+    // utworRundy ustawiamy DOPIERO tu, po sprawdzeniach żetonu: moduł-wide zmienna nie może zdradzić
+    // pieśni z przerwanego startu A rundzie B.
+    utworRundy = utwor;
     przebieg = new Przebieg(konf);
     przygotujPiesn();
     przebieg.start(performance.now());
@@ -598,7 +614,8 @@ async function uruchomZKonfiguracji(konfig) {
 // przycisk startu (kliknięty myszą zachowuje fokus) i uruchomił grę od nowa.
 window.addEventListener('keydown', (e) => {
     const decyzja = decyzjaKlawisza(e.key, {
-        stan: przebieg?.stan ?? null, sesjaAktywna: debugHud.sesja.aktywna, ekran: menu.ekran
+        stan: przebieg?.stan ?? null, sesjaAktywna: debugHud.sesja.aktywna, ekran: menu.ekran,
+        fokusNaPrzycisku: document.activeElement?.tagName === 'BUTTON'
     });
     if (!decyzja) return;
     e.preventDefault();
@@ -724,7 +741,9 @@ function klatka(now) {
     // (P1.2, 2026-09-21) - jedno źródło prawdy dzielone z tools/scena.html
     // (stanowisko VFX), żeby to, co odpala bench, było DOKŁADNIE tym, co
     // odpala prawdziwa gra, nie równoległą reimplementacją.
-    if (skl.zlozona) {
+    // Pod menu (Polana/konfiguracja/Księga) pieczęcie i techniki są wyłączone: gracz stoi przed kamerą i
+    // pisze nick, a Gromy z dźwiękiem za półprzezroczystym panelem byłyby zaskoczeniem (menu.graAktywna).
+    if (skl.zlozona && menu.graAktywna) {
         motionMeter.zuzyj(skl.zlozona.koszt);
         // Punkty: pieczec() PRZED technika() - splecenie czyta ogon z własnej
         // historii pieczęci (js/punkty.js), więc ta pieczęć musi już w niej być.

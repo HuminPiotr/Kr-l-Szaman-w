@@ -127,14 +127,16 @@ export class Przebieg {
  * Enter działa tylko na Kronice - w trakcie rundy nic nie robi.
  *
  * @param {string} key
- * @param {{stan:string|null, sesjaAktywna:boolean, ekran:string}} kontekst
+ * @param {{stan:string|null, sesjaAktywna:boolean, ekran:string, fokusNaPrzycisku?:boolean}} kontekst
  *        stan = przebieg.stan albo null; ekran = menu.ekran ('gra' = poza menu)
  * @returns {'polana'|'dalej'|null}
  */
-export function decyzjaKlawisza(key, { stan, sesjaAktywna, ekran }) {
+export function decyzjaKlawisza(key, { stan, sesjaAktywna, ekran, fokusNaPrzycisku = false }) {
     const wGrze = ekran === 'gra' || ekran === 'kronika';
     if (!wGrze) return null;
     if (key === 'Escape') return sesjaAktywna ? null : 'polana';
-    if (key === 'Enter') return stan === 'PODSUMOWANIE' ? 'dalej' : null;
+    // Enter na SFOKUSOWANYM przycisku robi to, co przycisk (natywny click) - np. "Do Polany" na
+    // Kronice; inaczej skrót "dalej" podmieniłby jego działanie na "Jeszcze raz".
+    if (key === 'Enter') return stan === 'PODSUMOWANIE' && !fokusNaPrzycisku ? 'dalej' : null;
     return null;
 }

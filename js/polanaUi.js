@@ -68,8 +68,8 @@ export class PolanaUi {
             this.ksiega.wyczysc(); this.potwierdzaWyczysc = false; this.swiezy = null;
             this.infoKsiegi = 'Księga jest czysta — zaczynacie od nowa.'; odswiez();
         });
-        $('kronika-jeszcze').addEventListener('click', () => this.onJeszczeRaz());
-        $('kronika-polana').addEventListener('click', () => this.onDoPolany());
+        $('kronika-jeszcze').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onJeszczeRaz(); });
+        $('kronika-polana').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onDoPolany(); });
 
         // Klawiatura: strzałki chodzą po kamieniach, Esc cofa o krok (Polana i Kronika/gra - w main.js).
         this.doc.addEventListener('keydown', (e) => {
@@ -100,6 +100,9 @@ export class PolanaUi {
     }
 
     _start() {
+        // Tylko z ekranu konfiguracji: w trakcie rundy menu.tryb nadal jest ustawiony, więc bez tego
+        // Enter/Spacja na ukrytym (display:none), ale wciąż sfokusowanym przycisku restartowałaby rundę.
+        if (this.menu.ekran !== 'konfig') return;
         const konf = this.menu.konfiguracja();
         if (konf && !this.menu.zajety) this.onStart(konf);
     }
@@ -147,6 +150,9 @@ export class PolanaUi {
     render() {
         if (!this.root) return;
         const { menu, doc } = this;
+        // Wchodzimy do gry: sfokusowany przycisk menu nie może zostać pod ręką (Enter/Spacja w trakcie rundy).
+        if (menu.ekran === 'gra' && this._ostatniEkran !== 'gra') doc.activeElement?.blur?.();
+        this._ostatniEkran = menu.ekran;
         const widoczne = menu.ekran in EKRAN_ID;
         this.root.classList.toggle('hidden', !widoczne);
         for (const [ekran, id] of Object.entries(EKRAN_ID)) doc.getElementById(id).classList.toggle('hidden', menu.ekran !== ekran);

@@ -149,6 +149,22 @@ console.log('\nZAJĘTY (REVIEW FOCUS 3 - podwójne kliknięcie podczas ładowani
     spr('zajęty: wstecz/wybierz nie ruszają ekranu', (() => { const e = m.ekran; m.wstecz(); m.wybierz('ksiega'); return m.ekran === e; })());
 }
 
+console.log('\nGRA AKTYWNA (final review: pieczęcie i techniki wyłączone pod menu):');
+{
+    const m = new Menu({ piesni });
+    spr('Polana: gra nieaktywna', m.graAktywna === false);
+    m.wybierz('proba');
+    spr('konfiguracja: gra nieaktywna', m.graAktywna === false);
+    m.doPolany(); m.wybierz('ksiega');
+    spr('Księga: gra nieaktywna', m.graAktywna === false);
+    m.doPolany(); m.naGre();
+    spr('gra: aktywna', m.graAktywna === true);
+    m.naKronike({ tytul: 'x' });
+    spr('Kronika: aktywna (gracz może tańczyć i patrzeć na efekty)', m.graAktywna === true);
+    m.doPolany();
+    spr('po powrocie na Polanę znów nieaktywna', m.graAktywna === false);
+}
+
 console.log('\nZ ADRESU (skrót dewelopera):');
 {
     const m = new Menu({ piesni, ostatniNick: 'Ola' });

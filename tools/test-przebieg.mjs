@@ -190,6 +190,11 @@ console.log('\nDECYZJA KLAWISZA (Esc -> Polana; Enter tylko na Kronice; Esc nie 
     spr('Enter w PODSUMOWANIU -> dalej', d('Enter', { stan: 'PODSUMOWANIE', ekran: 'kronika' }) === 'dalej');
     spr('Enter w RUNDZIE i w swobodnym nic nie robi (REVIEW FOCUS 5)', d('Enter', { stan: 'RUNDA', ekran: 'gra' }) === null && d('Enter', { stan: null, ekran: 'gra' }) === null);
     spr('inne klawisze nic nie robią', ['m', 'M', 'd', ' ', 'z', '1'].every(k => d(k, { stan: 'RUNDA', ekran: 'gra' }) === null));
+    // Final review (Important): Enter na sfokusowanym przycisku Kroniki ("Do Polany") ma zrobić to, co
+    // przycisk (natywny click), a nie być przejęty jako skrót "dalej".
+    spr('Enter z fokusem na przycisku NIE jest skrótem dalej', d('Enter', { stan: 'PODSUMOWANIE', ekran: 'kronika', fokusNaPrzycisku: true }) === null);
+    spr('Enter bez fokusu na przycisku nadal = dalej', d('Enter', { stan: 'PODSUMOWANIE', ekran: 'kronika', fokusNaPrzycisku: false }) === 'dalej');
+    spr('Esc z fokusem na przycisku nadal -> polana', d('Escape', { stan: 'PODSUMOWANIE', ekran: 'kronika', fokusNaPrzycisku: true }) === 'polana');
 }
 
 console.log('\nSTRAŻNIK: przycisk startu i kolejność klawiatury w main.js (final review, Critical):');
@@ -204,6 +209,10 @@ console.log('\nSTRAŻNIK: przycisk startu i kolejność klawiatury w main.js (fi
     spr('stary baner końca rundy usunięty z main/HUD (zastąpiony Kroniką)', !main.includes('tekstPodsumowania') && !main.includes('runda-koniec'));
     spr('handler startu rozbity: uruchomGre() raz + start z menu', main.includes('async function uruchomGre(') && main.includes('async function rozpalOgien('));
     spr('stary przycisk start-btn usunięty', !main.includes("getElementById('start-btn')"));
+    spr('skróty M i debug ignorują wpisywanie w polach (czyPoleTekstowe w main i debugHud)', main.includes("czyPoleTekstowe(e.target)") && readFileSync(new URL('../js/debugHud.js', import.meta.url), 'utf8').includes('czyPoleTekstowe(e.target)'));
+    spr('asynchroniczny start rundy ma żeton (Esc na Polanę go unieważnia)', main.includes('zetonStartu.nowy()') && main.includes('zetonStartu.uniewaznij()') && (main.match(/zetonStartu\.aktualny\(/g) ?? []).length >= 2);
+    spr('pieczęcie i techniki wyłączone w menu (graAktywna)', main.includes('menu.graAktywna'));
+    spr('nick Kroniki z konfiguracji rundy, nie z żywego pola menu', main.includes('przebieg.konfig.nick') && !main.includes('menu.nick.trim()'));
     spr('uruchomGre ma strażnika przed podwójnym startem kamery', /async function uruchomGre\(\) \{\s*if \(isRunning\) return true;\s*if \(startowano\) return false;\s*startowano = true;/.test(main));
 }
 

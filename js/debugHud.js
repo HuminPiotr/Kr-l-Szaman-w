@@ -14,6 +14,7 @@ import { znormalizujSlad } from './runy/ksztalt.js';
 import { SesjaNagraniowa, SCENARIUSZ } from './nagrywanie/sesja.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
+import { czyPoleTekstowe } from './klawisze.js';
 const PANEL_ID = 'debug-hud';
 const UPDATE_HZ = 10; // DOM aktualizowany 10x/s, nie 60x/s - zapis do DOM w pętli klatek to marnotrawstwo
 
@@ -42,6 +43,8 @@ export class DebugHud {
         this._lastEkranSesjiUpdate = 0;
 
         window.addEventListener('keydown', (e) => {
+            // Pisanie nicku w menu nie może odpalać skrótów debug (D/R/N/Z/1-8) - patrz js/klawisze.js.
+            if (czyPoleTekstowe(e.target)) return;
             if (e.key === 'd' || e.key === 'D') this.toggle();
             if (e.key === 'r' || e.key === 'R') this.resetujZakres();
             // Zrzut na klawisz, nie natychmiast tutaj - w handlerze klawiatury
