@@ -123,6 +123,36 @@ spam.pieczec('stribog', 2000);
 spam.technika(kombo('aard'), 2000);
 spr(`ta sama technika nie splata się sama ze sobą (${spam.rozbicie.reakcje})`, spam.rozbicie.reakcje === 0);
 
+console.log('\nTRZYMANIE JEDNEJ PIECZĘCI (final review, Important #1):');
+{
+    // Bufor kombosów nie jest czyszczony, więc przy trzymanej pozie każdy kolejny
+    // stribog odpala Aarda OGONEM, który dzieli pieczęć z poprzednim Aardem.
+    // Przed poprawką: 25 + 280×0.5 = 165 pkt na pieczęć w nieskończoność.
+    // Technika odpalona ogonem nakładającym się na WŁASNY poprzedni ogon
+    // płaci tylko pieczęć (25) - to samo wejście, nie nowe złożenie.
+    const h = new Punktacja();
+    h.pieczec('stribog', 0); h.pieczec('stribog', 1000);
+    const pierwszy = h.technika(kombo('aard'), 1000);
+    let reszta = 0;
+    for (let i = 2; i < 12; i++) {
+        h.pieczec('stribog', i * 1000);
+        reszta += h.technika(kombo('aard'), i * 1000);
+    }
+    spr(`pierwszy Aard płaci (${pierwszy})`, pierwszy === 280);
+    spr(`10 kolejnych odpaleń z nakładającym się ogonem = 0 pkt techniki (${reszta})`, reszta === 0);
+    spr(`10 pieczęci po 25 + pierwszy Aard (${h.wynik})`, h.wynik === 12 * 25 + 280);
+    spr('momenty liczą tylko płacące odpalenia', h.momenty.techniki.aard === 1);
+    // Przerwa: ogon który NIE dzieli pieczęci z poprzednim to nowe złożenie - płaci.
+    h.pieczec('stribog', 20000); h.pieczec('stribog', 21000);
+    spr('świeża para po przerwie płaci znowu', h.technika(kombo('aard'), 21000) > 0);
+    // Splecenie z INNĄ techniką działa po serii samopowtórzeń.
+    const m = new Punktacja();
+    m.pieczec('stribog', 0); m.pieczec('stribog', 1000); m.technika(kombo('aard'), 1000);
+    m.pieczec('stribog', 2000); m.technika(kombo('aard'), 2000);   // samopowtórzenie = 0
+    m.pieczec('swarog', 3000); m.pieczec('stribog', 4000); m.pieczec('swarog', 5000);
+    spr('inna technika po serii dalej płaci', m.technika(kombo('dym'), 5000) === 460);
+}
+
 console.log('\nREAKCJE:');
 const { REAKCJE, punktyJednostki } = await import('../js/punkty.js');
 spr('pozoga i rozwianie w rejestrze', !!REAKCJE.pozoga && !!REAKCJE.rozwianie);

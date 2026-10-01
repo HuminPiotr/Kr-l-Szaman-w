@@ -137,6 +137,16 @@ przeliczone na lustro). `prefers-reduced-motion` jak w P4.3. Ukryty, gdy `aktywn
 - `aktywna = false` → zero punktów i zdarzeń.
 - `dym`: kłąb liczy się raz w życiu — ani ta sama fala przez wiele klatek, ani kolejna fala nie liczy go ponownie.
 
+## Trzymanie jednej pieczęci (poprawka z końcowego przeglądu)
+
+Bufor kombosów nie jest czyszczony, więc przy trzymanej pozie (rozpoznawacz emituje
+`stribog → stribog → stribog…`) każdy kolejny stribog odpala Aarda ogonem dzielącym pieczęć
+z POPRZEDNIM Aardem. Zmierzone przed poprawką: ~168 pkt na pieczęć, ~40× strumień tańca.
+Reguła: technika odpalona ogonem nakładającym się na WŁASNY poprzedni ogon płaci tylko
+pieczęć (25), technika 0 — to samo wejście, nie nowe złożenie. Efekt w grze odpala się
+normalnie. Nic nie jest odejmowane (§2). Ogon, który nie dzieli pieczęci z poprzednim, to
+nowe złożenie i płaci w pełni.
+
 ## Poza zakresem
 
 Tryby i koniec rundy (podprojekt 2), zapis wyników i Księga (podprojekt 3), mnożnik Zewu

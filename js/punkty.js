@@ -149,24 +149,34 @@ export class Punktacja {
         const baza = wartoscTechniki(kombo);
         if (baza <= 0) return 0;
 
+        // OGON = ostatnie N pieczęci z WŁASNEJ historii (main.js woła pieczec()
+        // przed technika()), identyfikowane znacznikiem czasu, nie pozycją.
+        const n = kombo.sekwencja.length;
+        const ogon = new Set(this._historia.slice(-n).map(w => w.t));
+        const nakladaSie = !!this._poprzedniOgon && [...ogon].some(t => this._poprzedniOgon.t.has(t));
+
+        // TRZYMANIE JEDNEJ POZY (final review, Important #1). Bufor kombosów nie
+        // jest czyszczony, więc przy trzymanej pozie każdy kolejny stribog odpala
+        // Aarda ogonem dzielącym pieczęć z POPRZEDNIM Aardem - to samo wejście,
+        // nie nowe złożenie. Płaci wtedy tylko pieczęć (25), technika 0; efekt
+        // w grze odpala się normalnie. Bez tego 165 pkt na pieczęć w nieskończoność
+        // (~40x strumień tańca) biło każdą różnorodną grę bez łańcuchów.
+        if (nakladaSie && this._poprzedniOgon.id === kombo.id) {
+            this._poprzedniOgon = { id: kombo.id, t: ogon };
+            return 0;
+        }
+
         // Malejący przyrost: nagradza różnorodność, nie karze - punkty nie znikają.
         this._powtorzen = kombo.id === this._ostatniaTechnika ? this._powtorzen + 1 : 0;
         this._ostatniaTechnika = kombo.id;
         const czynnik = Math.max(PODLOGA_POWTORZENIA, 1 - SPADEK_POWTORZENIA * this._powtorzen);
         const p = this._dodaj('techniki', baza * czynnik * this._zew('technika', kombo));
 
-        // SPLECENIE - po NAKŁADANIU OGONÓW, nie po czasie. Bufor kombosów nie
-        // jest czyszczony po trafieniu (kombosy.js, "łańcuchy są celowe"), więc
-        // pieczęć dzieląca ogony dwóch technik to naturalny sygnał "połączyłeś".
-        // Ogon = ostatnie N pieczęci z WŁASNEJ historii (main.js woła pieczec()
-        // przed technika()), identyfikowane znacznikiem czasu, nie pozycją.
-        // Ta sama technika ze sobą NIE splata się - inaczej stribog x N
-        // (każdy kolejny odpala Aarda) byłby najlepszą strategią.
-        const n = kombo.sekwencja.length;
-        const ogon = new Set(this._historia.slice(-n).map(w => w.t));
+        // SPLECENIE - po NAKŁADANIU OGONÓW, nie po czasie. Pieczęć dzieląca ogony
+        // dwóch RÓŻNYCH technik to naturalny sygnał "połączyłeś" (kombosy.js,
+        // "łańcuchy są celowe"). Ta sama technika ze sobą już odpadła wyżej.
         let premia = 0;
-        if (this._poprzedniOgon && this._poprzedniOgon.id !== kombo.id
-            && [...ogon].some(t => this._poprzedniOgon.t.has(t))) {
+        if (nakladaSie) {
             premia = this._dodaj('reakcje', p * PREMIA_SPLECENIA);
             if (premia > 0) this.momenty.splecenia++;
         }

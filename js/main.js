@@ -136,6 +136,10 @@ let skladanie = new SkladaniePieczeci();
 let kombosy = new KomboSilnik();
 // Punktacja (2026-10-01, spec docs/superpowers/specs/2026-10-01-punktacja-design.md).
 // PUSH zdarzeń w istniejących miejscach pętli, HUD czyta PULL co klatkę.
+// TYMCZASOWO (do podprojektu 2, tryby): punkty są włączone zawsze, bo gra ma
+// dziś jeden tryb. Spec i GEMINI.md §2 mówią, że TRYB SWOBODNY jest bez punktów
+// i bez HUD - gdy tryby powstaną, swobodny ustawia `punkty.aktywna = false`
+// (HUD wtedy sam znika, patrz wynikHud.js). NIE scalać do main przed tym.
 let punkty = new Punktacja();
 const wynikHud = new WynikHud(document.getElementById('wynik-hud'));
 let efekty = new Efekty();
