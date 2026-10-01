@@ -4,7 +4,7 @@
 
 **Goal:** Gracz zdobywa punkty za taniec, pieczęcie, techniki i reakcje między technikami; wynik widać w HUD.
 
-**Architecture:** Czysta logika w `js/punkty.js` (bez DOM, testy w node, wzorzec `js/kombosy.js`). `main.js` zgłasza zdarzenia (PUSH) w istniejących miejscach pętli, HUD `js/wynikHud.js` (DOM) odczytuje stan co klatkę (PULL, wzorzec `js/sekwencja.js`). Rozwianie dymu liczone w `js/dym.js` po pierwszym trafieniu kłębu daną falą.
+**Architecture:** Czysta logika w `js/punkty.js` (bez DOM, testy w node, wzorzec `js/kombosy.js`). `main.js` zgłasza zdarzenia (PUSH) w istniejących miejscach pętli, HUD `js/wynikHud.js` (DOM) odczytuje stan co klatkę (PULL, wzorzec `js/sekwencja.js`). Rozwianie dymu liczone w `js/dym.js` raz w życiu kłębu.
 
 **Tech Stack:** Vanilla JS, moduły ES bez bundlera, testy jako skrypty `node tools/test-*.mjs` (helper `spr(opis, warunek)`, `process.exit(ok ? 0 : 1)`), zbiorczo `sh tools/test-wszystko.sh` (sam podchwytuje nowe pliki `test-*.mjs`).
 
@@ -500,11 +500,11 @@ W `js/punkty.js` zastąpić `export const REAKCJE = {};` i dopisać funkcję:
 // punkty × pelneDo/k - suma rośnie logarytmicznie. Kolumna dymu to SETKI
 // cząstek; bez tego jedna detonacja przebijałaby kilka technik.
 // ZGADNIĘTE - cel balansu w specu (pełna Pożoga ≈ 1.5-2× Okadzenia),
-// potwierdzany pomiarem w tools/scena.html.
+// potwierdzany pomiarem: node tools/pomiar-reakcji.mjs.
 export const REAKCJE = {
     // Wybuchnięty kłąb podpalonego dymu (js/dym.js - updateAndDraw).
     pozoga: { nazwa: 'Pożoga', punkty: 8, pelneDo: 50, przerwaMs: 1500 },
-    // Kłąb dymu pchnięty PO RAZ PIERWSZY daną falą Aarda/Gromu (dym.ostatnioRozwiane).
+    // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
     rozwianie: { nazwa: 'Rozwianie', punkty: 3, pelneDo: 40, przerwaMs: 1500 }
 };
 
@@ -569,136 +569,92 @@ git commit -m "Punktacja: rejestr reakcji, serie z malejacym przyrostem"
 
 ---
 
-### Task 4: Dym liczy rozwiane kłęby (pierwsze trafienie daną falą)
+### Task 4: Dym liczy rozwiane kłęby (raz w życiu kłębu)
 
 **Files:**
-- Modify: `js/fala.js:393` (`wystrzel` — id czoła), `js/dym.js` (konstruktor ~l. 172, `_fizyka` pętla podmuchów ~l. 526, `updateAndDraw` ~l. 351), `js/main.js:657-662`, `tools/scena.html:396-399`
-- Test: `tools/test-dym.mjs`, `tools/test-fala.mjs`
+- Modify: `js/dym.js` (konstruktor ~l. 172, `_przygotuj` ~l. 281, `_fizyka` pętla podmuchów ~l. 526, `updateAndDraw` ~l. 349)
+- Test: `tools/test-dym.mjs`
 
 **Interfaces:**
-- Consumes: istniejące `dym.pchnij(punkty)`, `pchniecieCzola()`, `fala.czola`.
-- Produces: `czolo.id:number` (unikalne, rosnące) w `fala.czola`; punkty pchnięcia mogą nieść `idFali:number`; `dym.ostatnioRozwiane:number` — kłęby trafione w ostatniej klatce PO RAZ PIERWSZY przez daną falę. Punkty bez `idFali` pchają, ale nie liczą się.
+- Consumes: istniejące `dym.pchnij(punkty)` (jedyne źródło `_podmuchy` to czoła fali Aarda/Gromu - dłonie idą osobno przez `rozgarnij`).
+- Produces: `dym.ostatnioRozwiane:number` — kłęby, które w ostatniej klatce zostały pchnięte falą PO RAZ PIERWSZY W SWOIM ŻYCIU.
 
-- [ ] **Step 1: Write the failing tests**
+**Dlaczego raz w życiu, nie raz na falę:** chmura Okadzenia żyje ~200–260 s i można ją dokarmiać minutami. Gdyby każda nowa fala liczyła kłęby od nowa, „jedna wielka chmura + Aard co 3 s" (~420 pkt na falę przy ~500 kłębach) biłoby każdą technikę. Raz w życiu = chmura jest zasobem, który się zużywa, jak przy Pożodze.
 
-W `tools/test-fala.mjs` przed `process.exit` (helper `spr` i import `Fala` już są w pliku):
-
-```js
-console.log('\nID CZOŁA (rozwianie dymu liczone raz na falę):');
-{
-    const f = new Fala();
-    f.wystrzel({ x: 500, y: 500 }, { x: 1, y: 0, z: 0 }, 1);
-    f.wystrzel({ x: 500, y: 500 }, { x: 1, y: 0, z: 0 }, 1);
-    const ids = f.czola.map(c => c.id);
-    spr(`każde czoło ma unikalne id (${ids.join(', ')})`, ids.length === 2 && Number.isFinite(ids[0]) && ids[0] !== ids[1]);
-}
-```
+- [ ] **Step 1: Write the failing test**
 
 W `tools/test-dym.mjs` przed `process.exit`:
 
 ```js
-console.log('\nROZWIANIE - kłąb liczy się RAZ na falę:');
+console.log('\nROZWIANIE - kłąb liczy się RAZ W ŻYCIU:');
 {
     const d = new Dym();
     for (let i = 0; i < 30; i++) { d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d.updateAndDraw(null, W, H, DT); }
-    const cel = d._czastki[0];
+    spr('świeży Dym ma ostatnioRozwiane = 0', new Dym().ostatnioRozwiane === 0);
     // Ogromne koło pchnięcia nad całym ekranem - trafia wszystko.
-    const fala = (idFali) => [{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1, idFali }];
-    d.pchnij(fala(1)); d.updateAndDraw(null, W, H, DT);
+    const fala = () => [{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1 }];
+    d.pchnij(fala()); d.updateAndDraw(null, W, H, DT);
     const pierwsze = d.ostatnioRozwiane;
     spr(`pierwsza klatka fali liczy kłęby (${pierwsze})`, pierwsze > 0 && pierwsze <= d._czastki.length);
     let kolejne = 0;
-    for (let i = 0; i < 40; i++) { d.pchnij(fala(1)); d.updateAndDraw(null, W, H, DT); kolejne += d.ostatnioRozwiane; }
-    spr(`ta sama fala przez 40 klatek nie liczy ich ponownie (${kolejne})`, kolejne === 0);
-    d.pchnij(fala(2)); d.updateAndDraw(null, W, H, DT);
-    spr(`NOWA fala liczy je znowu (${d.ostatnioRozwiane})`, d.ostatnioRozwiane > 0);
-    d.pchnij([{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1 }]); d.updateAndDraw(null, W, H, DT);
-    spr('punkt bez idFali pcha, ale się nie liczy', d.ostatnioRozwiane === 0);
+    for (let i = 0; i < 40; i++) { d.pchnij(fala()); d.updateAndDraw(null, W, H, DT); kolejne += d.ostatnioRozwiane; }
+    spr(`te same kłęby nie liczą się ponownie - ani tą, ani następną falą (${kolejne})`, kolejne === 0);
     d.updateAndDraw(null, W, H, DT);
     spr('bez podmuchów ostatnioRozwiane = 0', d.ostatnioRozwiane === 0);
-    spr('świeży Dym ma ostatnioRozwiane = 0', new Dym().ostatnioRozwiane === 0);
-    void cel;
+    // Nowo wydmuchane kłęby (świeże _przygotuj) liczą się normalnie.
+    for (let i = 0; i < 10; i++) { d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d.updateAndDraw(null, W, H, DT); }
+    d.pchnij(fala()); d.updateAndDraw(null, W, H, DT);
+    spr(`świeże kłęby liczą się (${d.ostatnioRozwiane})`, d.ostatnioRozwiane > 0);
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 2: Run test to verify it fails**
 
-Run: `node tools/test-fala.mjs; node tools/test-dym.mjs`
-Expected: FAIL — `każde czoło ma unikalne id (undefined, undefined)` i `pierwsza klatka fali liczy kłęby (undefined)`.
+Run: `node tools/test-dym.mjs`
+Expected: FAIL — `świeży Dym ma ostatnioRozwiane = 0` (undefined).
 
 - [ ] **Step 3: Implement**
-
-`js/fala.js` — nad `export class Fala`:
-
-```js
-// Id czoła - rosnący licznik modułu, nie losowy. Dym (js/dym.js) zapamiętuje
-// id fal, które trafiły kłąb, i liczy do punktów (reakcja "rozwianie")
-// tylko PIERWSZE trafienie - czoło żyje ~0.7 s i pcha dym co klatkę.
-let nastepneIdCzola = 1;
-```
-
-w `wystrzel()` zmienić push (l. 393) na:
-
-```js
-        this.czola.push({ id: nastepneIdCzola++, zaczep: { x: zaczep.x, y: zaczep.y }, kierunek: os, sila: s, barwa: b, wiek: 0, smugi });
-```
 
 `js/dym.js` — w konstruktorze obok `this._nowychWybuchow = 0;`:
 
 ```js
-        this.ostatnioRozwiane = 0;   // kłęby trafione w tej klatce PO RAZ PIERWSZY daną falą (punkty: reakcja 'rozwianie')
+        this.ostatnioRozwiane = 0;   // kłęby pchnięte falą PO RAZ PIERWSZY W ŻYCIU w tej klatce (punkty: reakcja 'rozwianie')
 ```
 
-w `updateAndDraw` obok `this._nowychWybuchow = 0;` (l. 351, PRZED guardem `return 0` też — patrz niżej):
+w `_przygotuj(c, ...)` obok `c.rozprzestrzenil = false;` (inicjalizacja TU, przy innych polach per cząstka - gdyby biblioteka kiedyś zaczęła recyklować obiekty cząstek, świeży kłąb nie odziedziczy flagi):
+
+```js
+        c.rozwiany = false;
+```
+
+w `updateAndDraw` — PIERWSZA linia ciała metody (przed guardem `if (!maszyna || krok <= 0) return 0;`, żeby pusta klatka też zerowała):
 
 ```js
         this.ostatnioRozwiane = 0;
 ```
 
-Uwaga: guard `if (!maszyna || krok <= 0) return 0;` stoi przed zerowaniem — przenieść `this.ostatnioRozwiane = 0;` NAD guard, żeby pusta klatka też zerowała.
-
 w `_fizyka`, w pętli `for (const p of this._podmuchy)` zaraz po `if (wplyw <= 0) continue;`:
 
 ```js
-                // Punkty: kłąb liczy się RAZ na falę (czoło pcha go co klatkę
-                // przez ~0.7 s - bez tego jeden Aard punktowałby kłąb ~40 razy).
-                if (Number.isFinite(p.idFali)) {
-                    c.trafioneFale ??= [];
-                    if (!c.trafioneFale.includes(p.idFali)) {
-                        c.trafioneFale.push(p.idFali);
-                        if (c.trafioneFale.length > 8) c.trafioneFale.shift();
-                        this.ostatnioRozwiane++;
-                    }
+                // Punkty: kłąb liczy się RAZ W ŻYCIU. Chmura Okadzenia żyje
+                // minutami - liczenie na każdą falę zrobiłoby z "chmura + Aard
+                // co 3 s" najlepszą strategię gry (spec punktacji, Rozwianie).
+                if (!c.rozwiany) {
+                    c.rozwiany = true;
+                    this.ostatnioRozwiane++;
                 }
-```
-
-`js/main.js:659-661` — pętla czół:
-
-```js
-        for (const c of fala.czola) {
-            for (const p of pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24)) {
-                p.idFali = c.id;
-                podmuchy.push(p);
-            }
-        }
-```
-
-`tools/scena.html:398` — ta sama zmiana:
-
-```js
-        for (const c of fala.czola) for (const p of pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24)) { p.idFali = c.id; podmuchy.push(p); }
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `sh tools/test-wszystko.sh`
-Expected: wszystkie `✓` (w tym stare testy dym/fala — nic nie zależy od braku pola `id`).
+Expected: wszystkie `✓`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add js/fala.js js/dym.js js/main.js tools/scena.html tools/test-dym.mjs tools/test-fala.mjs
-git commit -m "Dym liczy rozwiane klęby raz na fale (pod punktacje)"
+git add js/dym.js tools/test-dym.mjs
+git commit -m "Dym liczy rozwiane kleby raz w zyciu (pod punktacje)"
 ```
 
 ---
@@ -1055,42 +1011,102 @@ git commit -m "Punktacja wpieta w petle gry"
 
 ---
 
-### Task 7: Pomiar Pożogi, strojenie, dokumentacja
+### Task 7: Pomiar Pożogi i Rozwiania, strojenie, dokumentacja
 
 **Files:**
-- Modify: `tools/scena.html` (licznik punktów pożaru), `js/punkty.js` (stałe po pomiarze), `docs/superpowers/specs/2026-10-01-punktacja-design.md` (zmierzone liczby), `GEMINI.md` (§2, §3 tabela plików, §6), pamięć `kula-mocy-regula-nic-nie-mowi-zle.md` + `MEMORY.md`
+- Create: `tools/pomiar-reakcji.mjs` (NIE `test-*` - to raport, nie test; `test-wszystko.sh` go nie podchwyci)
+- Modify: `js/punkty.js` (stałe po pomiarze), `tools/test-punkty.mjs` (jeśli stałe się zmienią), `docs/superpowers/specs/2026-10-01-punktacja-design.md`, `GEMINI.md` (§2, §3, §6), pamięć `kula-mocy-regula-nic-nie-mowi-zle.md` + `MEMORY.md`
 
 **Interfaces:**
-- Consumes: wszystko powyżej.
-- Produces: zmierzony zakres punktów pełnej Pożogi zapisany w specu; stałe `REAKCJE.pozoga` dostrojone do celu (≈ 700–900 pkt za pełną detonację, ≤ ~3 techniki).
+- Consumes: `Dym` (`emituj`, `podpal`, `pchnij`, `updateAndDraw`, `ostatnioRozwiane`, `_czastki`), `Punktacja`, `wartoscTechniki`, `KOMBOSY`.
+- Produces: zmierzone N/punkty dla Pożogi i Rozwiania przy krótkim/średnim/MAKSYMALNYM dmuchaniu; stałe `REAKCJE` dostrojone do celów z specu.
 
-- [ ] **Step 1: Dodaj pomiar do scena.html**
+**Cele (z specu):** pełna Pożoga przy maksymalnej chmurze ≈ 700–900 pkt (1,5–2× Okadzenia = 460); jedno pełne Rozwianie maksymalnej chmury ≤ ~300 pkt (≈ jeden Aard); Okadzenie + Aard co 3 s przez 60 s: suma reakcji ≤ ~3 techniki (~1000 pkt).
 
-W `tools/scena.html` zaimportuj `Punktacja` i po `const wybuchy = dym.updateAndDraw(...)` dopisz:
+- [ ] **Step 1: Napisz skrypt pomiaru**
+
+`tools/pomiar-reakcji.mjs` — deterministyczny pomiar w node (fizyka dymu nie potrzebuje kamery ani przeglądarki; helpery jak w `tools/test-dym.mjs`):
 
 ```js
-    punktyPomiar.reakcja('pozoga', wybuchy, performance.now());
-    punktyPomiar.reakcja('rozwianie', dym.ostatnioRozwiane, performance.now());
-    for (const s of punktyPomiar.serieAktywne(performance.now())) {
-        console.log(`[pomiar] ${s.nazwa} ×${s.n} = ${Math.round(s.punkty)} pkt`);
+/**
+ * Pomiar reakcji dymu pod balans punktacji. Raport, nie test.
+ *   node tools/pomiar-reakcji.mjs
+ */
+import { Dym } from '../js/dym.js';
+import { Punktacja, wartoscTechniki } from '../js/punkty.js';
+import { KOMBOSY } from '../js/kombosy.js';
+
+const W = 1920, H = 1080, DT = 1 / 60, POL = 0.5;
+const USTA = { x: 960, y: 600 }, W_PRAWO = { x: 1, y: 0 };
+const okadzenie = wartoscTechniki(KOMBOSY.find(k => k.id === 'dym'));
+
+function chmura(sekundyDmuchania) {
+    const d = new Dym();
+    for (let i = 0; i < Math.round(sekundyDmuchania / DT); i++) {
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+        d.updateAndDraw(null, W, H, DT);
     }
+    return d;
+}
+
+function pozoga(sekundy) {
+    const d = chmura(sekundy), p = new Punktacja();
+    const n0 = d._czastki.length;
+    const c = d._czastki[0];
+    d.podpal([{ x: c.x / POL, y: c.y / POL, r: 10 }]);
+    let t = 0;
+    for (let i = 0; i < 60 * 30; i++, t += DT * 1000) {   // do 30 s - front musi przejść całą chmurę
+        p.reakcja('pozoga', d.updateAndDraw(null, W, H, DT), t);
+    }
+    return { kleby: n0, wybuchy: p.momenty.serie.pozoga ?? 0, punkty: Math.round(p.rozbicie.reakcje) };
+}
+
+function rozwianie(sekundy) {
+    const d = chmura(sekundy), p = new Punktacja();
+    const n0 = d._czastki.length;
+    d.pchnij([{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1 }]);
+    d.updateAndDraw(null, W, H, DT);
+    p.reakcja('rozwianie', d.ostatnioRozwiane, 0);
+    return { kleby: n0, punkty: Math.round(p.rozbicie.reakcje) };
+}
+
+// Najgorszy przypadek farmienia: chmura dokarmiana CAŁY CZAS, fala co 3 s przez 60 s.
+function farma() {
+    const d = chmura(10), p = new Punktacja();
+    let t = 0;
+    for (let i = 0; i < 60 * 60; i++, t += DT * 1000) {
+        d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H);
+        if (i % 180 === 0) d.pchnij([{ x: USTA.x, y: USTA.y, r: 5000, vx: 100, vy: 0, sila: 1 }]);
+        d.updateAndDraw(null, W, H, DT);
+        p.reakcja('rozwianie', d.ostatnioRozwiane, t);
+    }
+    return Math.round(p.rozbicie.reakcje);
+}
+
+console.log(`Okadzenie = ${okadzenie} pkt; cel pełnej Pożogi ${Math.round(1.5 * okadzenie)}-${2 * okadzenie}`);
+for (const s of [2, 5, 15, 60]) {
+    const a = pozoga(s), b = rozwianie(s);
+    console.log(`dmuchanie ${String(s).padStart(2)} s: kłębów ${a.kleby} | Pożoga ×${a.wybuchy} = ${a.punkty} | Rozwianie = ${b.punkty}`);
+}
+console.log(`farma (chmura dokarmiana + fala co 3 s, 60 s): Rozwianie = ${farma()} pkt (cel ≤ ~1000)`);
 ```
 
-z `const punktyPomiar = new Punktacja();` przy innych instancjach.
+Jeśli `emituj` ma wewnętrzny sufit cząstek, wiersz `60 s` pokaże MAKSYMALNĄ chmurę — to jest wartość, pod którą stroimy.
 
 - [ ] **Step 2: Zmierz**
 
-W scena.html: Okadzenie, dmuchanie ~5 s (pełna kolumna), potem Płonący Palec w dym. Odczytaj ostatni wpis `[pomiar] Pożoga ×N = P pkt` (`read_console_messages`, wzorzec `\[pomiar\]`). Powtórz 3× (krótkie / średnie / długie dmuchanie). Zapisz N i P.
+Run: `node tools/pomiar-reakcji.mjs`
+Zapisz wyjście.
 
 - [ ] **Step 3: Dostrój**
 
-Jeśli P dla długiego dmuchania > ~900 lub < ~600: zmień `pelneDo` (i ewentualnie `punkty`) w `REAKCJE.pozoga` tak, żeby trafić w 700–900, korzystając ze wzoru: `P ≈ punkty × pelneDo × (1 + ln(N / pelneDo))` dla N > pelneDo. Uruchom `node tools/test-punkty.mjs` — testy sekcji REAKCJE używają wartości 8/50; jeśli je zmieniasz, zaktualizuj oczekiwane liczby w teście (400, 80, `punktyJednostki(…, 100) === 4`) zgodnie z nowymi stałymi.
+Dla wiersza o największej chmurze: jeśli Pożoga poza 700–900 albo Rozwianie > ~300 albo farma > ~1000 — zmień `punkty`/`pelneDo` odpowiedniej reakcji w `REAKCJE` (`js/punkty.js`). Wzór sumy serii dla N > pelneDo: `P ≈ punkty × pelneDo × (1 + ln(N / pelneDo))`. Powtórz Step 2 aż do trafienia w cele. Jeśli zmieniłeś stałe pożogi, zaktualizuj oczekiwane liczby w sekcji REAKCJE `tools/test-punkty.mjs` (testy używają 8/50: wartości 80, 400, `punktyJednostki(…, 50) === 8`, `punktyJednostki(…, 100) === 4`, `zle.wynik === 16`) i uruchom `node tools/test-punkty.mjs`.
 
 - [ ] **Step 4: Dokumentacja**
 
-- Spec, sekcja „Cel balansu": dopisz tabelkę zmierzonych N/P i ostateczne stałe.
+- Spec, sekcja „Cel balansu": wklej tabelę z wyjścia pomiaru i ostateczne stałe.
 - `GEMINI.md` §2: zastąp punkt „**Brak punktów, timera, stanu porażki.** Nagrodą jest sam efekt." tekstem: „**Punkty tylko przybywają** (od 2026-10-01, tryby arcade): nic ich nie odejmuje, combo nie resetuje się za pomyłkę, koniec rundy to podsumowanie, nie porażka. Tryb swobodny — bez punktów i czasu, jak dawniej. Brak stanu porażki."
-- `GEMINI.md` §3 tabela plików: wiersze `js/punkty.js` (punktacja: warstwy, trudność z pomiaru, rejestr REAKCJE, splecenie po ogonach) i `js/wynikHud.js` (HUD wyniku, DOM).
+- `GEMINI.md` §3 tabela plików: wiersze `js/punkty.js` (punktacja: warstwy, trudność z pomiaru, rejestr REAKCJE, splecenie po ogonach) i `js/wynikHud.js` (HUD wyniku, DOM). §6: `node tools/pomiar-reakcji.mjs # balans reakcji dymu`.
 - Pamięć: w `/Users/whomean/.claude/projects/-Users-whomean-Documents-antigravity-powerball-app/memory/kula-mocy-regula-nic-nie-mowi-zle.md` dopisz, że 2026-10-01 reguła została przepisana (punkty tylko dodają, tryb swobodny zostaje), nie zniesiona; zaktualizuj hook w `MEMORY.md`.
 
 - [ ] **Step 5: Final run + commit**
@@ -1099,6 +1115,6 @@ Run: `sh tools/test-wszystko.sh`
 Expected: wszystkie `✓`.
 
 ```bash
-git add tools/scena.html js/punkty.js tools/test-punkty.mjs docs/superpowers/specs/2026-10-01-punktacja-design.md GEMINI.md
-git commit -m "Punktacja: pomiar Pozogi, strojenie, dokumentacja"
+git add tools/pomiar-reakcji.mjs js/punkty.js tools/test-punkty.mjs docs/superpowers/specs/2026-10-01-punktacja-design.md GEMINI.md
+git commit -m "Punktacja: pomiar reakcji dymu, strojenie, dokumentacja"
 ```

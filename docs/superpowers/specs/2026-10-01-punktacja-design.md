@@ -61,17 +61,19 @@ wywołanie `punkty.reakcja(id, n, now)` tam, gdzie zachodzi.
 | id | Co | Punkty |
 |---|---|---|
 | `pozoga` | wybuchnięty kłąb podpalonego dymu | +8 za kłąb, malejąco po ~50 kłębach w jednym pożarze |
-| `rozwianie` | kłąb dymu PO RAZ PIERWSZY pchnięty daną falą (Aard, fala Gromu w Ziemię) | +3 za kłąb |
+| `rozwianie` | kłąb dymu pchnięty falą (Aard, fala Gromu w Ziemię) PO RAZ PIERWSZY W ŻYCIU | +3 za kłąb |
 | `splecenie` | technika odpalona ogonem, który dzieli pieczęć z ogonem poprzedniej techniki | +50% wartości drugiej techniki |
 
 **„Jeden pożar"** = seria wybuchów bez przerwy dłuższej niż ~1,5 s. Sufit malejącego
 przyrostu liczy się per pożar. Kolumna dymu to setki cząstek, więc bez sufitu jedna detonacja
 przebiłaby kilka technik.
 
-**Cel balansu (do POTWIERDZENIA pomiarem w `tools/scena.html` przed zamknięciem zadania):**
-pełna Pożoga ≈ 1,5–2× wartości Okadzenia (~700–900 pkt), nigdy więcej niż ~3 techniki.
-Liczby 8/kłąb i próg 50 są startowe; pomiar liczby kłębów w pełnej detonacji ustala je
-ostatecznie.
+**Cel balansu (do POTWIERDZENIA pomiarem `node tools/pomiar-reakcji.mjs` — fizyka dymu
+jest deterministyczna, nie trzeba kamery; mierzymy przy MAKSYMALNEJ chmurze):**
+- pełna Pożoga ≈ 1,5–2× wartości Okadzenia (~700–900 pkt), nigdy więcej niż ~3 techniki;
+- pełne Rozwianie maksymalnej chmury ≤ ~300 pkt (≈ jeden Aard);
+- Okadzenie dokarmiane + Aard co 3 s przez 60 s: Rozwianie łącznie ≤ ~1000 pkt.
+Liczby 8/50 i 3/40 są startowe; pomiar ustala je ostatecznie.
 
 **Splecenie po NAKŁADANIU OGONÓW, nie po czasie.** `Punktacja` ma własną historię pieczęci
 (wpisy `{id, t}` z `pieczec()`); technika zapamiętuje, których wpisów (po znaczniku `t`)
@@ -82,14 +84,16 @@ nakładanie ogonów to naturalny sygnał „połączyłeś".
 
 ## Rozwianie — zmiana w `js/dym.js`
 
-`dym.pchnij()` tylko zapisuje listę; `_fizyka` konsumuje ją później w `updateAndDraw`.
-`fala.czola` żyje ~0,7 s i jest pchane co klatkę, więc naiwne liczenie punktowałoby każdy
-kłąb ~40 razy na falę. Rozwiązanie: czoło fali niesie `idFali`; kłąb zapamiętuje id fal, które
-go już trafiły; liczy się tylko pierwsze trafienie. `updateAndDraw` dalej zwraca liczbę
-wybuchów (kilkanaście miejsc w `tools/test-dym.mjs` ją sumuje); liczba rozwianych kłębów
-z ostatniej klatki trafia do nowego pola `dym.ostatnioRozwiane` (wzorzec `_nowychWybuchow`).
-Id czoła nadaje `Fala.wystrzel()` (`czolo.id`), a wołający dopisuje `idFali` do punktów
-z `pchniecieCzola()`.
+Kłąb płaci Rozwianie **raz w życiu**, nie raz na falę. Chmura Okadzenia żyje ~200–260 s
+i można ją dokarmiać minutami; liczenie na każdą falę zrobiłoby z „chmura + Aard co 3 s"
+(~420 pkt na falę przy ~500 kłębach) najlepszą strategię gry. Raz w życiu = chmura jest
+zasobem, który się zużywa, jak przy Pożodze. Przy okazji odpada naiwne liczenie per klatka
+(czoło fali żyje ~0,7 s i pcha dym co klatkę).
+
+Implementacja: flaga `c.rozwiany` ustawiana w `_przygotuj` (obok innych pól cząstki),
+przestawiana przy pierwszym pchnięciu w pętli podmuchów `_fizyka`. `updateAndDraw` dalej
+zwraca liczbę wybuchów; liczba nowo rozwianych z ostatniej klatki trafia do pola
+`dym.ostatnioRozwiane`. `fala.js` i wywołania `pchniecieCzola` bez zmian.
 
 ## HUD — `js/wynikHud.js`
 
@@ -114,7 +118,7 @@ przeliczone na lustro). `prefers-reduced-motion` jak w P4.3. Ukryty, gdy `aktywn
 - Splecenie na łańcuchu swarog→stribog→swarog→perun (ten sam scenariusz co `test-kombosy.mjs`);
   brak splecenia, gdy ogony się nie nakładają.
 - `aktywna = false` → zero punktów i zdarzeń.
-- `dym`: kłąb trafiony tą samą falą przez wiele klatek liczy się raz.
+- `dym`: kłąb liczy się raz w życiu — ani ta sama fala przez wiele klatek, ani kolejna fala nie liczy go ponownie.
 
 ## Poza zakresem
 
