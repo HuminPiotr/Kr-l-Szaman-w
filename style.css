@@ -61,7 +61,7 @@ body {
     pointer-events: none;
 }
 
-#start-screen, #loading-screen {
+#loading-screen {
     pointer-events: auto;
     position: relative;
     overflow: hidden;
@@ -97,19 +97,7 @@ body {
     to   { transform: rotate(360deg); }
 }
 
-/* Łuna ogniska u dołu panelu - "ognisko u dołu kadru" (GEMINI.md §7.3)
-   w najtańszej postaci: gradient, nie cząstki. */
-#start-screen::after {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; bottom: -25%;
-    height: 65%;
-    background: radial-gradient(ellipse at 50% 100%, rgba(255, 122, 26, 0.35), transparent 72%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.kicker, h1, #start-screen > p, #start-btn {
+.kicker, h1 {
     position: relative;
     z-index: 2;
 }
@@ -578,7 +566,291 @@ body.ready-pulse #instruction-hud {
     50% { opacity: 0.75; }
 }
 
+/* --- MENU "Polana" (2026-10-01, podprojekt 3) ---
+   Jedna warstwa na całym ekranie; ekrany leżą w niej wyśrodkowane (Kronika po prawej,
+   żeby nie zasłaniać tancerza i efektów na żywym obrazie). `.hidden` globalnie daje
+   tylko opacity:0 - tu dodatkowo display:none, żeby ukryte ekrany nie zajmowały miejsca. */
+#menu {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    overflow-y: auto;
+    padding: 1.5rem 1rem;
+}
+#menu.hidden, .menu-ekran.hidden, .menu-ekran .hidden { display: none; }
+
+.menu-ekran {
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    width: min(46rem, 100%);
+    padding: 2.6rem 2.4rem 2.2rem;
+    background: var(--mrok);
+    border-radius: 12px;
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.55), inset 0 0 30px rgba(255, 122, 26, 0.06);
+    backdrop-filter: blur(10px);
+}
+.menu-ekran > *:not(.krag-run) { position: relative; z-index: 2; }
+
+/* Łuna ogniska u dołu panelu Polany - gradient, nie cząstki (GEMINI.md §7.3). */
+#polana.menu-ekran { background: none; border: 0; box-shadow: none; backdrop-filter: none; overflow: visible; }
+#polana::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -25%;
+    height: 70%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255, 122, 26, 0.38), transparent 72%);
+    pointer-events: none;
+    z-index: 0;
+}
+/* Globalne `p` ma max-width: 420px bez auto-marginesów - w menu akapity mają być wycentrowane. */
+.menu-ekran p { margin-left: auto; margin-right: auto; max-width: 34rem; }
+.podtytul { color: var(--kosc); opacity: 0.85; margin-bottom: 1.6rem; }
+.menu-ekran h2 {
+    font-family: 'Bona Nova SC', serif;
+    font-size: 2rem;
+    letter-spacing: 0.04em;
+    color: var(--plomien);
+    margin-bottom: 1.2rem;
+}
+
+/* Kamienie trybów: nieregularne, ciężkie, z wyrytą runą, która rozżarza się przy najechaniu. */
+#kamienie {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7rem, 10rem) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    justify-items: center;
+    width: min(46rem, 100%);
+    margin: 0.6rem auto 0;
+}
+.kamien[data-kamien="obrzed"]   { grid-area: 1 / 2; }
+.kamien[data-kamien="proba"]    { grid-area: 2 / 1; }
+.kamien[data-kamien="swobodny"] { grid-area: 2 / 3; }
+.kamien[data-kamien="ksiega"]   { grid-area: 3 / 2; }
+
+/* Ognisko pośrodku kręgu: jedyny "odważny" element ekranu (reszta jest cicha).
+   Płomień to warstwy gradientu, iskry - kilka punktów wznoszących się po łuku. */
+.ognisko { grid-area: 2 / 2; position: relative; width: 7.5rem; height: 9rem; pointer-events: none; }
+.ognisko::before {
+    content: ''; position: absolute; left: 50%; bottom: 0;
+    width: 130%; height: 30%; transform: translateX(-50%);
+    background: radial-gradient(ellipse at 50% 55%, rgba(255, 150, 50, 0.85), rgba(122, 31, 15, 0.5) 52%, transparent 76%);
+    filter: blur(2px);
+}
+.ognisko::after {
+    content: ''; position: absolute; left: 50%; bottom: 11%;
+    width: 60%; height: 86%; transform: translateX(-50%); transform-origin: 50% 100%;
+    border-radius: 50% 50% 46% 46% / 74% 74% 26% 26%;
+    background: radial-gradient(ellipse at 50% 88%, #fff2c4 0 10%, var(--plomien) 30%, var(--zar) 58%, rgba(122, 31, 15, 0) 84%);
+    filter: blur(1.5px);
+    animation: plomienie 1.6s ease-in-out infinite alternate;
+}
+@keyframes plomienie {
+    0%   { transform: translateX(-50%) scale(1, 0.93) skewX(-2deg); opacity: 0.9; }
+    55%  { transform: translateX(-50%) scale(0.97, 1.02) skewX(1.5deg); opacity: 1; }
+    100% { transform: translateX(-50%) scale(0.94, 1.05) skewX(3deg); opacity: 0.95; }
+}
+.iskra {
+    position: absolute; bottom: 38%; left: 50%; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--plomien); box-shadow: 0 0 6px var(--zar); opacity: 0;
+    animation: iskrzy 3.6s ease-out infinite;
+}
+.iskra:nth-child(1) { --dx: -2.2rem; margin-left: -10px; animation-delay: 0s; }
+.iskra:nth-child(2) { --dx: 1.6rem;  margin-left: 6px;   animation-delay: 0.7s; }
+.iskra:nth-child(3) { --dx: -0.8rem; margin-left: 0;     animation-delay: 1.4s; }
+.iskra:nth-child(4) { --dx: 2.6rem;  margin-left: 12px;  animation-delay: 2.0s; }
+.iskra:nth-child(5) { --dx: -1.6rem; margin-left: -4px;  animation-delay: 2.7s; }
+.iskra:nth-child(6) { --dx: 0.6rem;  margin-left: 2px;   animation-delay: 3.1s; }
+.iskra:nth-child(7) { --dx: -3rem;   margin-left: -14px; animation-delay: 1.0s; }
+@keyframes iskrzy {
+    0%   { opacity: 0; transform: translate(0, 0); }
+    12%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx), -7.5rem); }
+}
+
+.kamien {
+    --zar-kamienia: 0;
+    position: relative;
+    display: grid;
+    gap: 0.25rem;
+    justify-items: center;
+    width: min(15rem, 100%);
+    padding: 1rem 0.8rem 0.9rem;
+    font: inherit;
+    text-transform: none; letter-spacing: normal;
+    color: var(--kosc);
+    cursor: pointer;
+    background:
+        radial-gradient(ellipse at 50% 120%, rgba(255, 122, 26, calc(0.10 + var(--zar-kamienia) * 0.35)), transparent 70%),
+        linear-gradient(160deg, #2a2118 0%, #17110b 55%, #231a12 100%);
+    border: 1px solid rgba(217, 164, 65, 0.28);
+    border-radius: 46% 54% 50% 50% / 38% 40% 60% 62%;
+    box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.05), inset 0 -8px 18px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, --zar-kamienia 0.25s ease;
+}
+.kamien:nth-child(2) { border-radius: 52% 48% 44% 56% / 44% 36% 64% 56%; }
+.kamien:nth-child(3) { border-radius: 48% 52% 56% 44% / 40% 46% 54% 60%; }
+.kamien:nth-child(4) { border-radius: 54% 46% 48% 52% / 36% 44% 56% 64%; }
+.kamien-runa {
+    font-family: 'Noto Sans Runic', serif;
+    font-size: 2.6rem;
+    line-height: 1;
+    color: rgba(217, 164, 65, 0.55);
+    text-shadow: 0 0 0 rgba(255, 122, 26, 0);
+    transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+.kamien-nazwa { font-family: 'Bona Nova SC', serif; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.04em; }
+.kamien-opis { font-size: 0.85rem; opacity: 0.7; }
+.kamien:hover:not(:disabled), .kamien:focus-visible {
+    --zar-kamienia: 1;
+    transform: translateY(-3px) scale(1.02);
+    border-color: var(--zar);
+    box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.06), inset 0 -8px 18px rgba(0, 0, 0, 0.45), 0 8px 26px rgba(255, 122, 26, 0.28);
+    outline: none;
+}
+.kamien:hover:not(:disabled) .kamien-runa, .kamien:focus-visible .kamien-runa {
+    color: var(--plomien);
+    text-shadow: 0 0 14px rgba(255, 179, 71, 0.9), 0 0 30px rgba(255, 122, 26, 0.6);
+}
+.kamien:disabled { cursor: not-allowed; opacity: 0.4; filter: grayscale(0.6); }
+#polana-podpowiedz { min-height: 1.4em; margin-top: 1rem; font-size: 0.95rem; color: var(--plomien); }
+
+/* Globalny `button` (style.css wyżej) ma gradient, wersaliki, letter-spacing, poświatę i skalowanie
+   przy hover. :where() daje zerową specyficzność: reset działa, a klasy (.kamien, .wybor button,
+   .przyciski button ...) i tak wygrywają. */
+:where(.menu-ekran) button {
+    text-transform: none; letter-spacing: normal; font-size: 1rem;
+    transform: none; box-shadow: none; background: none; padding: 0;
+}
+:where(.menu-ekran) button:hover, :where(.menu-ekran) button:active { transform: none; box-shadow: none; }
+
+/* Formularze: konfiguracja i Księga. */
+.grupa { margin: 1.1rem 0; text-align: left; }
+.etykieta { display: block; font-family: 'Bona Nova SC', serif; font-size: 1.05rem; color: var(--zloto); margin-bottom: 0.45rem; }
+.wybor { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.wybor button {
+    font: inherit; color: var(--kosc); cursor: pointer;
+    padding: 0.5rem 0.95rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(217, 164, 65, 0.3);
+    border-radius: 999px;
+}
+.wybor button[aria-pressed="true"], .wybor button[aria-selected="true"] {
+    background: rgba(255, 122, 26, 0.22);
+    border-color: var(--zar);
+    color: var(--plomien);
+}
+.opcja { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.4rem 0; cursor: pointer; }
+.opcja input { margin-top: 0.3rem; accent-color: var(--zar); }
+.opcja small { display: block; font-size: 0.9rem; opacity: 0.75; }
+.nick-wiersz, .krag-wiersz { display: flex; gap: 0.5rem; margin-bottom: 0.45rem; }
+.menu-ekran input[type="text"] {
+    flex: 1; min-width: 0;
+    font: inherit; color: var(--kosc);
+    padding: 0.6rem 0.8rem;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    border-radius: 8px;
+}
+.menu-ekran input[type="text"]:focus-visible { outline: 2px solid var(--zar); outline-offset: 1px; }
+#nick-kosci, .krag-usun {
+    font-size: 1.3rem; cursor: pointer; padding: 0 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(217, 164, 65, 0.3);
+    border-radius: 8px; color: var(--kosc);
+}
+#konfig-info, #ksiega-info { min-height: 1.4em; font-size: 0.95rem; color: var(--plomien); margin: 0.6rem 0; }
+.przyciski { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; margin-top: 1.2rem; }
+/* Przycisk główny: tylko w .przyciski (klasy, bez id - inaczej przebija style pigułek i drugorzędnych). */
+.przyciski button:not(.drugi), .przyciski .plik:not(.drugi) {
+    font: inherit; font-weight: 700; cursor: pointer;
+    padding: 0.7rem 1.5rem; border-radius: 8px;
+    color: #1a0f06;
+    background: linear-gradient(180deg, var(--plomien), var(--zar));
+    border: 1px solid rgba(255, 220, 160, 0.5);
+    box-shadow: 0 0 22px rgba(255, 122, 26, 0.35);
+}
+/* Przycisk drugorzędny (po głównym w pliku - przy równej specyficzności wygrywa). */
+.menu-ekran button.drugi, .menu-ekran .plik.drugi {
+    font: inherit; cursor: pointer;
+    padding: 0.7rem 1.5rem; border-radius: 8px;
+    color: var(--kosc); background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(217, 164, 65, 0.35); box-shadow: none; font-weight: 400;
+}
+.menu-ekran button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.menu-ekran button:focus-visible, .plik:focus-within { outline: 2px solid var(--kosc); outline-offset: 2px; }
+.plik { position: relative; display: inline-block; }
+.plik input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* Księga: kora brzozowa - jasne paski na ciemnym tle, wpisy jak wyryte. */
+#ksiega-ekran {
+    background:
+        repeating-linear-gradient(92deg, rgba(239, 227, 200, 0.05) 0 2px, transparent 2px 9px),
+        var(--mrok);
+}
+#ksiega-zakladki { margin-bottom: 1rem; justify-content: center; }
+#ksiega-lista { list-style: none; margin: 0; padding: 0; text-align: left; counter-reset: miejsce; min-height: 4rem; }
+#ksiega-lista li {
+    counter-increment: miejsce;
+    display: grid; grid-template-columns: 2.4rem 1fr auto; gap: 0.6rem; align-items: baseline;
+    padding: 0.4rem 0.2rem; border-bottom: 1px dashed rgba(217, 164, 65, 0.22);
+}
+#ksiega-lista li::before { content: counter(miejsce) "."; font-family: 'Bona Nova SC', serif; color: var(--zloto); }
+#ksiega-lista li.swiezy { animation: zarWpisu 2.4s ease-out 1; background: rgba(255, 122, 26, 0.12); }
+.wpis-wynik { font-variant-numeric: tabular-nums; color: var(--plomien); font-weight: 700; }
+#ksiega-wiecej { margin-top: 1rem; text-align: left; font-size: 0.9rem; opacity: 0.85; }
+#ksiega-wiecej summary { cursor: pointer; margin-bottom: 0.5rem; }
+@keyframes zarWpisu { 0% { box-shadow: 0 0 22px rgba(255, 179, 71, 0.8); } 100% { box-shadow: none; } }
+
+/* Kronika: po prawej stronie, półprzezroczysta - tancerz i efekty zostają widoczne. */
+#kronika {
+    justify-self: end;
+    width: min(26rem, 100%);
+    margin-right: 2rem;
+    background: rgba(8, 4, 2, 0.58);
+    padding: 1.6rem 1.8rem;
+}
+#kronika-tytul { font-size: 1.1rem; color: var(--zloto); letter-spacing: 0.06em; }
+#kronika-wynik { font-family: 'Bona Nova SC', serif; font-size: 4.2rem; font-weight: 700; color: var(--plomien); line-height: 1.1; text-shadow: 0 0 24px rgba(255, 122, 26, 0.5); }
+#kronika-szaman { font-family: 'Bona Nova SC', serif; font-size: 1.6rem; }
+#kronika-zdanie { font-size: 0.95rem; opacity: 0.8; margin-bottom: 0.7rem; font-style: italic; }
+#kronika-przydomki { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-bottom: 0.7rem; }
+.przydomek { padding: 0.2rem 0.7rem; font-size: 0.85rem; border: 1px solid var(--zloto); border-radius: 999px; color: var(--zloto); }
+#kronika-miejsce { min-height: 1.4em; margin-bottom: 0.6rem; color: var(--plomien); font-weight: 700; }
+#kronika-miejsce.rekord { color: #ffd36a; text-shadow: 0 0 16px rgba(255, 200, 80, 0.9); letter-spacing: 0.05em; }
+#kronika-linie, #kronika-podium { font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.7rem; }
+#kronika-podpis { font-size: 0.85rem; opacity: 0.75; }
+
+/* Menu na żywym obrazie z kamery: przyciemniamy płótno i chowamy HUD gry. */
+body.w-menu #output-canvas { filter: brightness(0.42) saturate(0.85); transition: filter 0.4s ease; }
+body.w-menu #instruction-hud, body.w-menu #energy-hud, body.w-menu #sekwencja-run,
+body.w-menu #wynik-hud, body.w-menu #runda-hud { opacity: 0 !important; }
+
+@media (max-width: 40rem) {
+    #kamienie { grid-template-columns: 1fr 1fr; }
+    .ognisko { grid-area: 1 / 1 / 2 / 3; justify-self: center; height: 6.5rem; }
+    .kamien[data-kamien="obrzed"]   { grid-area: 2 / 1; }
+    .kamien[data-kamien="proba"]    { grid-area: 2 / 2; }
+    .kamien[data-kamien="swobodny"] { grid-area: 3 / 1; }
+    .kamien[data-kamien="ksiega"]   { grid-area: 3 / 2; }
+    h1 { font-size: 2.6rem; }
+    #kronika { justify-self: center; margin-right: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+    .kamien, .kamien-runa, body.w-menu #output-canvas { transition: none; }
+    .kamien:hover:not(:disabled), .kamien:focus-visible { transform: none; }
+    #ksiega-lista li.swiezy { animation: none; }
+    .ognisko::after, .iskra { animation: none; }
+    .iskra { display: none; }
     #runda-hud.ostatnie #runda-czas {
         animation: none;   /* sam kolor i łuna, bez pulsowania */
     }

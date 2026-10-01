@@ -83,12 +83,12 @@ export function zbudujKronike(pods, opcje) {
     const splecenia = liczba(pods?.momenty?.splecenia);
     if (splecenia > 0) linie.push(`spleceń technik: ${Math.floor(splecenia)}`);
 
-    let podpis = 'Enter — jeszcze raz · Esc — Polana';
-    if (pods?.kragKoniec === false && pods.nastepny) podpis = `Enter — teraz tańczy: ${pods.nastepny} · Esc — Polana`;
-    if (pods?.kragKoniec === true) podpis = 'Enter — nowy Krąg · Esc — Polana';
+    let podpis = 'Enter: jeszcze raz. Esc: wróć na Polanę.';
+    if (pods?.kragKoniec === false && pods.nastepny) podpis = `Enter: teraz tańczy ${pods.nastepny}. Esc: wróć na Polanę.`;
+    if (pods?.kragKoniec === true) podpis = 'Enter: nowy Krąg. Esc: wróć na Polanę.';
 
     return {
-        tytul: pods?.nick ? `${pods.nick} — obrzęd skończony` : 'Obrzęd skończony',
+        tytul: pods?.nick ? `${pods.nick}: obrzęd skończony` : 'Obrzęd skończony',
         wynik: String(wynik),
         szaman: tytulZaWynik(pods?.wynik, pods?.dlugoscS),
         przydomki: przydomki(pods),

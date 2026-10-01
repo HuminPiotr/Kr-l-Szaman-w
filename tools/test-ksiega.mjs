@@ -29,7 +29,7 @@ console.log('KLUCZE TABLIC:');
     spr('nieznana długość próby = brak tablicy', kluczKsiegi({ tryb: 'proba', zew: false, dlugoscS: 45 }, null) === null);
     spr('śmieci nie rzucają', kluczKsiegi(null, null) === null && kluczKsiegi({}, undefined) === null);
     spr('nazwa: próba', nazwaTablicy('proba:60') === 'Próba 60 s');
-    spr('nazwa: próba ze Zewem', nazwaTablicy('proba:90+zew') === 'Próba 90 s · Zew');
+    spr('nazwa: próba ze Zewem', nazwaTablicy('proba:90+zew') === 'Próba 90 s ze Zewem');
     spr('nazwa: obrzęd z tytułem z manifestu', nazwaTablicy('obrzed:a.m4a', [{ plik: 'a.m4a', tytul: 'Ogień w żyłach' }]) === 'Obrzęd: Ogień w żyłach');
     spr('nazwa: obrzęd bez wpisu w manifeście = nazwa pliku bez rozszerzenia', nazwaTablicy('obrzed:Stara pieśń.m4a') === 'Obrzęd: Stara pieśń');
 }

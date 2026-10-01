@@ -43,7 +43,7 @@ export function kluczKsiegi(konfig, utwor) {
 
 /** Czytelna nazwa tablicy dla zakładek Księgi. */
 export function nazwaTablicy(klucz, piesni = []) {
-    const zew = klucz.endsWith('+zew') ? ' · Zew' : '';
+    const zew = klucz.endsWith('+zew') ? ' ze Zewem' : '';
     const baza = klucz.replace(/\+zew$/, '');
     if (baza.startsWith('proba:')) return `Próba ${baza.slice(6)} s${zew}`;
     if (baza.startsWith('obrzed:')) {
