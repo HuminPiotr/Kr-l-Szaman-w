@@ -131,3 +131,100 @@ export function parsujKonfiguracje(search) {
     if (krag.length < MIN_KRAG) krag = null;
     return { tryb, dlugoscS, piesn: Number.isFinite(idx) && idx > 0 ? idx : 0, zew, krag };
 }
+// --- ZEW ŻYWIOŁÓW ---
+
+// Id pieczęci - te same co w KOMBOSY i TRUDNOSC (js/punkty.js). Test w
+// tools/test-tryby.mjs pilnuje, że każdy ma trudność, nazwę i występuje
+// w jakimś combo - żywioł, którego nie da się złożyć, byłby martwą prośbą.
+export const ZYWIOLY = ['swarog', 'weles', 'perun', 'stribog', 'mokosz'];
+export const NAZWY_ZYWIOLOW = { swarog: 'ogień', weles: 'ziemia', perun: 'błyskawica', stribog: 'powietrze', mokosz: 'woda' };
+
+// ZGADNIĘTE - do strojenia na żywym ciele. Pierwsza prośba po chwili tańca
+// (gracz musi się rozgrzać), potem co 20 s - dość długo na złożenie pieczęci
+// (~0,9 s) i jedno combo, za krótko na nudę.
+export const ZEW_START_S = 5;
+export const ZEW_CO_S = 20;
+
+const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+
+/**
+ * Zew żywiołów: co ZEW_CO_S duch prosi o inny żywioł - pieczęć tego żywiołu
+ * i technika, która go zawiera, dają ×2. NIE JEST ZADANIEM: zignorowanie prośby
+ * nic nie kosztuje (§2), zmiana żywiołu to tylko nowa zachęta.
+ * Mnożnik dotyczy pieczęci i techniki, NIE reakcji i NIE tańca - inaczej Zew ×2
+ * na Pożodze wyprowadziłby zmierzony balans (podprojekt 1) poza cel.
+ */
+export class Zew {
+    constructor(losowa = Math.random) {
+        this._losowa = losowa;
+        this.zywiol = null;
+        this._nastepnyS = ZEW_START_S;
+    }
+
+    update(czasRundyS) {
+        if (!Number.isFinite(czasRundyS) || czasRundyS < this._nastepnyS) return;
+        // Zawsze inny niż poprzedni; clamp01 + min() dla losowej zwracającej NaN/1.0.
+        const kandydaci = ZYWIOLY.filter(z => z !== this.zywiol);
+        const idx = Math.min(kandydaci.length - 1, Math.floor(clamp01(this._losowa()) * kandydaci.length));
+        this.zywiol = kandydaci[idx];
+        // JEDEN żywioł na update, nawet po skoku czasu - nie przewijamy zaległych okien.
+        this._nastepnyS = czasRundyS + ZEW_CO_S;
+    }
+
+    /**
+     * @param {'pieczec'|'technika'|string} rodzaj
+     * @param {string|{sekwencja:string[]}} arg  id pieczęci albo definicja techniki
+     * @returns {1|2}
+     */
+    mnoznik(rodzaj, arg) {
+        if (!this.zywiol) return 1;
+        if (rodzaj === 'pieczec') return arg === this.zywiol ? 2 : 1;
+        if (rodzaj === 'technika') return Array.isArray(arg?.sekwencja) && arg.sekwencja.includes(this.zywiol) ? 2 : 1;
+        return 1;
+    }
+}
+
+// --- KRĄG ---
+
+/**
+ * Krąg - 2-6 graczy po kolei przy jednym komputerze. Wynik każdego gracza trafi
+ * do Księgi (podprojekt 3) osobno, jakby zagrał własną rundę.
+ */
+export class Krag {
+    /** @param {string[]} nicki  rzuca Error poza 2-6 graczami po oczyszczeniu */
+    constructor(nicki) {
+        if (!Array.isArray(nicki)) throw new Error('Krąg wymaga listy nicków');
+        const widziane = new Map();   // nick małymi literami -> ile razy
+        this.nicki = [];
+        for (const surowy of nicki) {
+            const nick = przytnijNick(surowy ?? '');
+            if (!nick) continue;
+            const klucz = nick.toLowerCase();
+            const n = (widziane.get(klucz) ?? 0) + 1;
+            widziane.set(klucz, n);
+            // Dubel dostaje sufiks, żeby w Księdze i na podium dwie Ole się nie zlały.
+            this.nicki.push(n === 1 ? nick : `${nick} ${n}`.slice(0, MAX_NICK + 2));
+        }
+        if (this.nicki.length < MIN_KRAG || this.nicki.length > MAX_KRAG) {
+            throw new Error(`Krąg wymaga ${MIN_KRAG}-${MAX_KRAG} graczy`);
+        }
+        this.wyniki = [];
+    }
+
+    get biezacy() { return this.nicki[this.wyniki.length] ?? null; }
+    get czyKoniec() { return this.wyniki.length >= this.nicki.length; }
+
+    zapiszWynik(wynik, rozbicie, momenty) {
+        if (this.czyKoniec) return false;
+        this.wyniki.push({
+            nick: this.biezacy,
+            wynik: Number.isFinite(wynik) && wynik > 0 ? wynik : 0,
+            rozbicie: rozbicie && typeof rozbicie === 'object' ? rozbicie : {},
+            momenty: momenty && typeof momenty === 'object' ? momenty : {}
+        });
+        return true;
+    }
+
+    /** Malejąco po wyniku; remis zostaje w kolejności wejścia do Kręgu (sort jest stabilny). */
+    get podium() { return [...this.wyniki].sort((a, b) => b.wynik - a.wynik); }
+}

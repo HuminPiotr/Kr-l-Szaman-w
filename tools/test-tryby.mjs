@@ -5,7 +5,8 @@
  */
 import {
     Runda, parsujKonfiguracje, ODLICZANIE_S, WYBRZMIENIE_S, ZAPOWIEDZ_S,
-    PROBA_DLUGOSCI, PIESN_AWARYJNA_S, OSTATNIE_S, MAX_DT_RUNDY_S
+    PROBA_DLUGOSCI, PIESN_AWARYJNA_S, OSTATNIE_S, MAX_DT_RUNDY_S,
+    Zew, Krag, ZYWIOLY, NAZWY_ZYWIOLOW, ZEW_START_S, ZEW_CO_S
 } from '../js/tryby.js';
 
 let ok = true;
@@ -161,6 +162,104 @@ console.log('\nKONFIGURACJA Z ADRESU:');
     spr('krąg: maks. 6 graczy', parsujKonfiguracje('?tryb=proba&krag=a,b,c,d,e,f,g,h').krag.length === 6);
     spr('swobodny ignoruje krąg i zew', (() => { const s = parsujKonfiguracje('?krag=a,b&zew=1'); return s.krag === null && s.zew === false; })());
     spr('NIE używa location (czysta funkcja)', typeof parsujKonfiguracje('?tryb=proba') === 'object');
+}
+
+import { KOMBOSY } from '../js/kombosy.js';
+import { TRUDNOSC } from '../js/punkty.js';
+
+console.log('\nZEW - STRAŻNIK ŻYWIOŁÓW:');
+{
+    // Zew prosi o żywioł po id pieczęci. Id spoza TRUDNOSC/KOMBOSY znaczyłoby
+    // żywioł, którego nie da się złożyć albo który nigdy nie podwaja techniki.
+    for (const z of ZYWIOLY) {
+        spr(`żywioł '${z}' ma trudność w punkty.js`, Number.isFinite(TRUDNOSC[z]));
+        spr(`żywioł '${z}' ma nazwę`, typeof NAZWY_ZYWIOLOW[z] === 'string' && NAZWY_ZYWIOLOW[z].length > 0);
+        spr(`żywioł '${z}' występuje w jakimś combo`, KOMBOSY.some(k => k.sekwencja.includes(z)));
+    }
+    spr('NAZWY_ZYWIOLOW nie ma nadmiarowych kluczy', Object.keys(NAZWY_ZYWIOLOW).length === ZYWIOLY.length);
+}
+
+console.log('\nZEW:');
+{
+    const z = new Zew(() => 0);
+    spr('przed startem brak żywiołu i mnożnik 1', z.zywiol === null && z.mnoznik('pieczec', 'swarog') === 1);
+    z.update(ZEW_START_S - 0.1);
+    spr('przed ZEW_START_S nadal brak żywiołu', z.zywiol === null);
+    z.update(ZEW_START_S + 0.1);
+    spr(`po ZEW_START_S wybrany żywioł (${z.zywiol})`, ZYWIOLY.includes(z.zywiol));
+    const pierwszy = z.zywiol;
+    spr('pieczęć żywiołu ×2', z.mnoznik('pieczec', pierwszy) === 2);
+    const inny = ZYWIOLY.find(x => x !== pierwszy);
+    spr('pieczęć innego żywiołu ×1', z.mnoznik('pieczec', inny) === 1);
+    const kombo = KOMBOSY.find(k => k.sekwencja.includes(pierwszy));
+    const bez = KOMBOSY.find(k => !k.sekwencja.includes(pierwszy));
+    spr('technika zawierająca żywioł ×2', z.mnoznik('technika', kombo) === 2);
+    if (bez) spr('technika bez żywiołu ×1', z.mnoznik('technika', bez) === 1);
+    spr('reakcje i taniec nie są mnożone', z.mnoznik('reakcja', pierwszy) === 1 && z.mnoznik('taniec', pierwszy) === 1);
+    spr('śmieci nie rzucają', [z.mnoznik('technika', null), z.mnoznik('technika', {}), z.mnoznik('pieczec', undefined), z.mnoznik(undefined, 1)].every(m => m === 1));
+    z.update(ZEW_START_S + ZEW_CO_S - 0.1);
+    spr('żywioł trwa do końca okna', z.zywiol === pierwszy);
+    z.update(ZEW_START_S + ZEW_CO_S + 0.1);
+    spr('po ZEW_CO_S nowy żywioł różny od poprzedniego', z.zywiol !== pierwszy && ZYWIOLY.includes(z.zywiol));
+}
+{
+    // Losowanie bez powtórzeń także przy najgorszej "losowej" (zawsze 0 i zawsze ~1).
+    for (const stala of [0, 0.4999, 0.9999, 1]) {
+        const z = new Zew(() => stala);
+        let poprz = null, powtorzenie = false;
+        for (let i = 0; i < 60; i++) {
+            // +1 s zapasu: wywołanie dokładnie na granicy okna zależy od zaokrągleń float.
+            z.update(ZEW_START_S + i * (ZEW_CO_S + 1));
+            if (z.zywiol === poprz) powtorzenie = true;
+            poprz = z.zywiol;
+        }
+        spr(`losowa=${stala}: żywioł nigdy nie powtarza poprzedniego`, !powtorzenie);
+    }
+    const z = new Zew(() => NaN);
+    z.update(ZEW_START_S + 1);
+    spr('zepsuta losowa (NaN) nadal daje żywioł', ZYWIOLY.includes(z.zywiol));
+    z.update(NaN); z.update(-5);
+    spr('update(NaN/ujemne) nie psuje', ZYWIOLY.includes(z.zywiol));
+    const skok = new Zew(() => 0);
+    skok.update(1000);
+    const a = skok.zywiol;
+    skok.update(1000.5);
+    spr('skok czasu daje JEDEN żywioł naraz (nie przewija wszystkich okien)', skok.zywiol === a);
+}
+
+console.log('\nKRĄG:');
+{
+    const k = new Krag(['Ola', 'Bartek', 'Ola']);
+    spr(`dubel dostaje sufiks (${k.nicki.join(', ')})`, k.nicki.join('|') === 'Ola|Bartek|Ola 2');
+    spr('pierwszy gracz = Ola', k.biezacy === 'Ola');
+    spr('nie jest koniec', k.czyKoniec === false);
+    spr('zapiszWynik zwraca true', k.zapiszWynik(300, { taniec: 100 }, { splecenia: 1 }) === true);
+    spr('następny gracz = Bartek', k.biezacy === 'Bartek');
+    k.zapiszWynik(900, {}, {});
+    spr('trzeci = Ola 2', k.biezacy === 'Ola 2');
+    k.zapiszWynik(900, {}, {});
+    spr('po ostatnim czyKoniec', k.czyKoniec === true && k.biezacy === null);
+    spr('zapiszWynik po końcu = false i nic nie dopisuje', k.zapiszWynik(1, {}, {}) === false && k.wyniki.length === 3);
+    spr('podium malejąco, remis wg kolejności wejścia', k.podium.map(w => w.nick).join('|') === 'Bartek|Ola 2|Ola');
+    spr('podium nie mutuje wyników', k.wyniki[0].nick === 'Ola');
+}
+{
+    spr('dubel bez względu na wielkość liter', new Krag(['ola', 'OLA']).nicki.join('|') === 'ola|OLA 2');
+    spr('puste i białe odpadają', new Krag(['Ola', '  ', '', 'Jan']).nicki.length === 2);
+    spr('nick przycięty do 16 znaków', new Krag(['x'.repeat(40), 'Jan']).nicki[0].length === 16);
+    let rzucil = false;
+    try { new Krag(['Ola']); } catch { rzucil = true; }
+    spr('jeden gracz - odmowa (menu pilnuje wcześniej)', rzucil);
+    rzucil = false;
+    try { new Krag(['a', 'b', 'c', 'd', 'e', 'f', 'g']); } catch { rzucil = true; }
+    spr('siedmiu graczy - odmowa', rzucil);
+    rzucil = false;
+    try { new Krag(null); } catch { rzucil = true; }
+    spr('null - odmowa', rzucil);
+    const k = new Krag(['a', 'b']);
+    k.zapiszWynik(NaN, null, null); k.zapiszWynik(-50, undefined, undefined);
+    spr('NaN i ujemny wynik -> 0', k.wyniki.every(w => w.wynik === 0));
+    spr('rozbicie/momenty null -> puste obiekty', k.wyniki.every(w => typeof w.rozbicie === 'object' && w.rozbicie !== null && typeof w.momenty === 'object' && w.momenty !== null));
 }
 
 process.exit(ok ? 0 : 1);
