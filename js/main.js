@@ -16,7 +16,7 @@ import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Punktacja } from './punkty.js';
 import { WynikHud } from './wynikHud.js';
-import { Przebieg } from './przebieg.js';
+import { Przebieg, decyzjaKlawisza } from './przebieg.js';
 import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js';
 import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn } from './piesni.js';
@@ -231,7 +231,15 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
 });
 
+// Strażnik przed podwójnym startem: przycisk zostaje w DOM pod .hidden (tylko
+// opacity:0), więc kliknięty myszą trzyma fokus, a Enter (klawisz rund) albo
+// spacja aktywowałyby go ponownie - druga kamera, drugi model, druga pętla klatek.
+let startowano = false;
+
 startBtn.addEventListener('click', async () => {
+    if (startowano) return;
+    startowano = true;
+    startBtn.disabled = true;
     // 0. Audio PIERWSZE, PRZED jakimkolwiek await (P3, 2026-09-21) - to jest
     // jedyne miejsce w całej grze z prawdziwym gestem użytkownika (klik).
     // init()+resume() wołane TU, zanim getUserMedia/MediaPipe zjedzą to okno
@@ -297,6 +305,8 @@ startBtn.addEventListener('click', async () => {
         uruchomZKonfiguracji(parsujKonfiguracje(window.location.search)).catch((e) => console.error('Tryb:', e));
 
     } catch (e) {
+        startowano = false;           // błąd kamery/modelu: wolno spróbować ponownie
+        startBtn.disabled = false;
         alert("Błąd dostępu do kamery lub inicjalizacji AI: " + e.message);
         console.error(e);
         uiStartScreen.classList.remove('hidden');
@@ -548,19 +558,24 @@ async function uruchomZKonfiguracji(konfig) {
     przebieg.start(performance.now());
 }
 
+// Faza CAPTURE (trzeci argument true): ten handler musi przeczytać stan sesji
+// nagraniowej debugHud PRZED jego własnym listenerem (DebugHud rejestruje go
+// w konstruktorze, wcześniej niż my) - ten na Esc zeruje sesję, więc w fazie
+// bubble `sesja.aktywna` byłoby już false i Esc przerywałby też rundę.
+// preventDefault: Enter na podsumowaniu inaczej aktywowałby sfokusowany
+// przycisk startu (kliknięty myszą zachowuje fokus) i uruchomił grę od nowa.
 window.addEventListener('keydown', (e) => {
-    if (!przebieg) return;
-    // Esc należy też do sesji nagraniowej debugHud (przerywa nagrywanie) - nie kradniemy go.
-    if (e.key === 'Escape' && !debugHud.sesja.aktywna) {
+    const decyzja = decyzjaKlawisza(e.key, { stan: przebieg?.stan ?? null, sesjaAktywna: debugHud.sesja.aktywna });
+    if (!decyzja) return;
+    e.preventDefault();
+    if (decyzja === 'zakoncz') {
         zakonczPrzebieg();   // bez zapisu - Esc to wyjście, nie wynik
-    } else if (e.key === 'Enter' && przebieg.stan === 'PODSUMOWANIE') {
-        if (przebieg.dalej(performance.now())) {
-            resetujModuly();
-            punkty.reset();
-            przygotujPiesn();
-        }
+    } else if (przebieg.dalej(performance.now())) {
+        resetujModuly();
+        punkty.reset();
+        przygotujPiesn();
     }
-});
+}, true);
 
 function klatka(now) {
 

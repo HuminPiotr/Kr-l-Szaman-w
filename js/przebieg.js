@@ -115,3 +115,23 @@ export class Przebieg {
         return this.zew.mnoznik(rodzaj, arg);
     }
 }
+
+/**
+ * Co robi klawisz w trakcie trybów - CZYSTA decyzja, żeby dało się ją testować
+ * bez przeglądarki (main.js wykonuje wynik).
+ *
+ * Esc przy aktywnej sesji nagraniowej debugHud NIE należy do rundy: ten Esc
+ * przerywa nagrywanie. main.js czyta stan sesji w fazie CAPTURE, PRZED
+ * listenerem debugHud (ten zerowałby stan sesji, zanim zdążymy go sprawdzić).
+ * Enter działa tylko na podsumowaniu - w trakcie rundy nic nie robi.
+ *
+ * @param {string} key
+ * @param {{stan:string|null, sesjaAktywna:boolean}} kontekst  stan = przebieg.stan albo null (swobodny)
+ * @returns {'zakoncz'|'dalej'|null}
+ */
+export function decyzjaKlawisza(key, { stan, sesjaAktywna }) {
+    if (!stan) return null;
+    if (key === 'Escape') return sesjaAktywna ? null : 'zakoncz';
+    if (key === 'Enter') return stan === 'PODSUMOWANIE' ? 'dalej' : null;
+    return null;
+}

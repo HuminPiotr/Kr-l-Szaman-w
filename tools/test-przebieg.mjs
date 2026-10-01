@@ -2,7 +2,7 @@
  * Przebieg - orkiestrator rundy, Zewu i Kręgu (fałszywy zegar, bez DOM).
  *   node tools/test-przebieg.mjs
  */
-import { Przebieg } from '../js/przebieg.js';
+import { Przebieg, decyzjaKlawisza } from '../js/przebieg.js';
 import { parsujKonfiguracje, ODLICZANIE_S, WYBRZMIENIE_S, ZAPOWIEDZ_S, ZEW_START_S } from '../js/tryby.js';
 import { KOMBOSY } from '../js/kombosy.js';
 
@@ -159,12 +159,36 @@ console.log('\nSTRAŻNIK WPIĘCIA W main.js:');
         ['punkty.aktywna =', 'punkty włączane/wyłączane stanem rundy (swobodny = wyłączone)'],
         ['parsujKonfiguracje(', 'konfiguracja z adresu'],
         ['.zakonczPiesn()', "koniec pieśni (ended) kończy rundę"],
-        ["'Escape'", 'Esc przerywa rundę'],
-        ["'Enter'", 'Enter na podsumowaniu'],
+        ["decyzja === 'zakoncz'", 'Esc przerywa rundę (decyzja z decyzjaKlawisza, bez zapisu)'],
+        ['przebieg.dalej(', 'Enter na podsumowaniu startuje następną rundę'],
         ['rundaHud.update(', 'HUD rundy aktualizowany co klatkę']
     ];
     for (const [fragment, opis] of MUSI) spr(opis, main.includes(fragment));
     spr('Esc nie koliduje z sesją nagraniową debugHud', main.includes('debugHud.sesja.aktywna'));
+}
+
+console.log('\nDECYZJA KLAWISZA (final review: Enter odpalał ponownie przycisk startu, Esc ścigał się z debugHud):');
+{
+    spr('bez przebiegu (swobodny) żaden klawisz nic nie robi', decyzjaKlawisza('Escape', { stan: null, sesjaAktywna: false }) === null && decyzjaKlawisza('Enter', { stan: null, sesjaAktywna: false }) === null);
+    spr('Esc w RUNDZIE -> zakoncz', decyzjaKlawisza('Escape', { stan: 'RUNDA', sesjaAktywna: false }) === 'zakoncz');
+    spr('Esc w PODSUMOWANIU -> zakoncz (powrót do swobodnego)', decyzjaKlawisza('Escape', { stan: 'PODSUMOWANIE', sesjaAktywna: false }) === 'zakoncz');
+    spr('Esc przy aktywnej sesji nagraniowej debugHud NIE przerywa rundy', decyzjaKlawisza('Escape', { stan: 'RUNDA', sesjaAktywna: true }) === null);
+    spr('Enter w PODSUMOWANIU -> dalej', decyzjaKlawisza('Enter', { stan: 'PODSUMOWANIE', sesjaAktywna: false }) === 'dalej');
+    spr('Enter w RUNDZIE nic nie robi (REVIEW FOCUS 4)', decyzjaKlawisza('Enter', { stan: 'RUNDA', sesjaAktywna: false }) === null);
+    spr('inne klawisze nic nie robią', ['m', 'M', 'd', ' ', 'z', '1'].every(k => decyzjaKlawisza(k, { stan: 'RUNDA', sesjaAktywna: false }) === null));
+}
+
+console.log('\nSTRAŻNIK: przycisk startu i kolejność klawiatury w main.js (final review, Critical):');
+{
+    const { readFileSync } = await import('node:fs');
+    const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+    // Tekstowe, bo main.js nie importuje się w node - sprawdzają WPIĘCIA, nie zachowanie.
+    spr('handler startu ma strażnika przed podwójnym uruchomieniem', /startBtn\.addEventListener\('click', async \(\) => \{\s*(\/\/[^\n]*\n\s*)*if \(startowano\) return;/.test(main));
+    spr('przycisk startu wyłączany po starcie (nie fokusowalny, Enter go nie odpali)', main.includes('startBtn.disabled = true'));
+    spr('błąd kamery zwalnia strażnika (można spróbować ponownie)', /startowano = false;[\s\S]{0,200}Błąd dostępu do kamery/.test(main));
+    spr('handler klawiatury rundy woła decyzjaKlawisza', main.includes('decyzjaKlawisza('));
+    spr('handler klawiatury rundy w fazie CAPTURE (przed listenerem debugHud)', /decyzjaKlawisza\([\s\S]{0,900}\}, true\);/.test(main));
+    spr('Enter/Esc obsłużone przez preventDefault', main.includes('e.preventDefault()'));
 }
 
 process.exit(ok ? 0 : 1);
