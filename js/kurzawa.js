@@ -17,6 +17,15 @@
  * elipsy, sin(kąt) < 0) idą na warstwę ZA sylwetką (js/warstwaZaSylwetka.js),
  * przednie przed nią - widać, że wiatr OWIJA gracza.
  *
+ * v2.1 (2026-10-03, drugi test): smugi 'lighter' w miętowej barwie z białym
+ * rdzeniem wyglądały jak KULE MOCY - tak gra rysuje energię. Piasek i kurz to
+ * MATERIA: ciepła ochra, zwykłe blendowanie (source-over), nic nie świeci.
+ * Wiatr składa się z (1) miękkiej mgiełki kurzu - kłęby smoke_* na ogonie,
+ * (2) ziaren piasku - krótkich kresek wzdłuż ruchu, rozrzucanych coraz szerzej
+ * ku końcowi ogona i migoczących, (3) grudek ziemi dirt_* i (4) bardzo cienkiej,
+ * bladej linii prądu jako wskazówki kierunku. Wariant "lekki": sylwetka gracza
+ * i obraz z kamery zostają wyraźne.
+ *
  * GŁADKIE WEJŚCIE W ORBITĘ: podmuch wchodzi w skrajny lewy/prawy punkt
  * elipsy, gdzie styczna jest PIONOWA - ruch w górę od dołu ekranu przechodzi
  * w orbitę bez załamania. Stąd kierunek obrotu wynika ze strony wejścia
@@ -42,14 +51,25 @@ export const NASTAWY = {
     PREDKOSC_KATOWA: 3.6,          // rad/s
     DLUGOSC_OGONA_S: 0.45,         // s toru głowy w ogonie (~1/4 okrążenia)
     PUNKTOW_OGONA: 18,
-    GRUBOSC: 0.09,                 // skala * to = grubość rdzenia smugi przy głowie
-    LICZBA_PYLU: 40,
-    ROZMIAR_PYLU_OD: 0.10, ROZMIAR_PYLU_DO: 0.22,   // skala * to
-    ROZRZUT_PYLU: 0.15,            // skala * to - pył obok toru, nie na nim
+    LICZBA_PYLU: 40,               // grudki ziemi (dirt_*)
+    ROZMIAR_PYLU_OD: 0.06, ROZMIAR_PYLU_DO: 0.14,   // skala * to
+    ROZRZUT_PYLU: 0.15,            // skala * to - grudki obok toru, nie na nim
+    LICZBA_ZIAREN: 80,             // ziarna piasku (kreski), po 20 na podmuch
+    ROZRZUT_ZIARNA: 0.35,          // skala * to - rozrzut na końcu ogona (przy głowie ~0)
+    DLUGOSC_ZIARNA: 0.05,          // skala * to - długość kreski
+    GRUBOSC_ZIARNA: 1.6,           // px (stała - to ziarno, nie skaluje się z postacią)
+    ALFA_ZIARNA: 0.75,
+    MIGOTANIE: 14,                 // zmian/s - ziarno co jakiś czas znika
+    MGLA_CO: 3,                    // kłąb kurzu co tyle punktów ogona
+    MGLA_ROZMIAR_OD: 0.5, MGLA_ROZMIAR_DO: 1.1,   // skala * to, rośnie ku końcowi ogona
+    MGLA_ALFA: 0.16,
+    GRUBOSC_LINII: 0.008,          // skala * to - cienka linia prądu
+    ALFA_LINII: 0.2,
     NAROST: 0.3, WYGASZENIE: 1.0,  // s
-    BARWA_WIATRU: [140, 235, 195], // mięta Striboga (techniki.js BARWA_ZAPLONU.aard)
-    BARWA_RDZENIA: [225, 255, 240],
-    BARWA_PYLU: [205, 165, 105]    // piaskowa ochra
+    BARWA_KURZU: [200, 172, 125],  // piaskowa ochra - kłęby mgiełki
+    BARWA_ZIARNA: [225, 205, 165], // jasny piasek
+    BARWA_LINII: [215, 195, 160],  // blady beż
+    BARWA_PYLU: [150, 118, 82]     // ciemna ziemia - grudki
 };
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
@@ -117,12 +137,48 @@ export function punktyOgona(i, t, zaczep, H) {
     return pkt;
 }
 
+/**
+ * Kłęby mgiełki kurzu na ogonie podmuchu `i`: co MGLA_CO-ty punkt toru.
+ * @returns {{x, y, przod, wiek:number}[]}  wiek 0 przy głowie -> 1 na końcu ogona; [] przed startem
+ */
+export function punktyMgielki(i, t, zaczep, H) {
+    const N = NASTAWY;
+    const wynik = [];
+    for (let k = 0; k <= N.PUNKTOW_OGONA; k += N.MGLA_CO) {
+        const p = glowaPodmuchu(i, t - i * N.START_CO - k * N.DLUGOSC_OGONA_S / N.PUNKTOW_OGONA, zaczep, H);
+        if (!p) break;
+        wynik.push({ x: p.x, y: p.y, przod: p.przod, wiek: k / N.PUNKTOW_OGONA });
+    }
+    return wynik;
+}
+
+/**
+ * Ziarno piasku w chwili `t` - czysta funkcja. Leży na torze głowy podmuchu
+ * sprzed `opoznienie` sekund, odsunięte o (dx,dy)·rozrzut, gdzie rozrzut rośnie
+ * liniowo z opóźnieniem (przy głowie ~0, na końcu ogona ROZRZUT_ZIARNA skali).
+ * @param {{podmuch, opoznienie, dx, dy}} z  dx,dy w -1..1
+ * @returns {{x, y, przod, kierunek:{x,y}}|null}  kierunek = wektor jednostkowy ruchu; null przed startem
+ */
+export function ziarnoNaTorze(z, t, zaczep, H) {
+    const N = NASTAWY;
+    const tz = t - z.podmuch * N.START_CO - z.opoznienie;
+    const p = glowaPodmuchu(z.podmuch, tz, zaczep, H);
+    if (!p) return null;
+    const wstecz = glowaPodmuchu(z.podmuch, tz - 0.03, zaczep, H) ?? p;
+    let kx = p.x - wstecz.x, ky = p.y - wstecz.y;
+    const dl = Math.hypot(kx, ky);
+    if (dl > 1e-9) { kx /= dl; ky /= dl; } else { kx = 0; ky = -1; }
+    const rozrzut = zaczep.skala * N.ROZRZUT_ZIARNA * clamp01(z.opoznienie / N.DLUGOSC_OGONA_S);
+    return { x: p.x + z.dx * rozrzut, y: p.y + z.dy * rozrzut, przod: p.przod, kierunek: { x: kx, y: ky } };
+}
+
 export class Kurzawa {
     constructor() {
         this._t = 0;
         this._trwa = false;
         this._sila = 0;
         this._pyl = [];
+        this._ziarna = [];
         this._kotwica = new Kotwica(10);
         this._warstwa = new WarstwaZaSylwetka();
         this.zaczep = null;
@@ -140,7 +196,7 @@ export class Kurzawa {
         this._t = 0;
         this._trwa = true;
         this._kotwica.reset();
-        // Pył przypisany do podmuchów, z opóźnieniem względem głowy (leci w smudze).
+        // Grudki i ziarna przypisane do podmuchów, z opóźnieniem względem głowy (lecą w smudze).
         this._pyl = Array.from({ length: N.LICZBA_PYLU }, (_, i) => ({
             podmuch: i % N.LICZBA_PODMUCHOW,
             opoznienie: Math.random() * N.DLUGOSC_OGONA_S,
@@ -150,6 +206,14 @@ export class Kurzawa {
             obrot: Math.random() * Math.PI * 2,
             vObrot: (Math.random() * 2 - 1) * 6,
             wariant: Math.floor(Math.random() * MANIFEST.odlamek.length)
+        }));
+        this._ziarna = Array.from({ length: N.LICZBA_ZIAREN }, (_, i) => ({
+            podmuch: i % N.LICZBA_PODMUCHOW,
+            opoznienie: Math.random() * N.DLUGOSC_OGONA_S,
+            dx: Math.random() * 2 - 1,
+            dy: Math.random() * 2 - 1,
+            faza: Math.random() * 4,        // przesunięcie migotania
+            jasnosc: 0.6 + Math.random() * 0.4
         }));
     }
 
@@ -174,57 +238,93 @@ export class Kurzawa {
 
         const alfa = obwiednia(this._t) * this._sila;
         if (alfa < 0.01) return;
-        const smugi = [];
-        for (let i = 0; i < NASTAWY.LICZBA_PODMUCHOW; i++) smugi.push(punktyOgona(i, this._t, this.zaczep, H));
+        const N = NASTAWY;
+        const ogony = [], mgly = [];
+        for (let i = 0; i < N.LICZBA_PODMUCHOW; i++) {
+            ogony.push(punktyOgona(i, this._t, this.zaczep, H));
+            mgly.push(punktyMgielki(i, this._t, this.zaczep, H));
+        }
         const pyl = this._pyl.map(c => [c, this._pozycjaPylu(c, H)]).filter(([, p]) => p);
+        const ziarna = this._ziarna.map(z => [z, ziarnoNaTorze(z, this._t, this.zaczep, H)]).filter(([, p]) => p);
 
         // Najpierw TYŁ (za ciałem), potem PRZÓD - kolejność rysowania = głębia.
         const tyl = this._warstwa.zacznij(W, H);
         if (tyl) {
-            for (const s of smugi) this._rysujSmuge(tyl, s, false, alfa);
-            for (const [c, p] of pyl) if (!p.przod) this._rysujPyl(tyl, c, p, alfa);
+            this._rysujStrone(tyl, false, ogony, mgly, pyl, ziarna, alfa);
             this._warstwa.zakoncz(ctx, k.maska, k.maskaSzer, k.maskaWys, k.fit);
         }
-        for (const s of smugi) this._rysujSmuge(ctx, s, true, alfa);
-        for (const [c, p] of pyl) if (p.przod) this._rysujPyl(ctx, c, p, alfa);
+        this._rysujStrone(ctx, true, ogony, mgly, pyl, ziarna, alfa);
     }
 
-    /** Odcinki smugi z jednej strony ciała: szeroka poświata + jasny rdzeń, zwężające się ku ogonowi. */
-    _rysujSmuge(c, pkt, przod, alfa) {
+    /** Warstwy jednej strony ciała od spodu: mgiełka, linia prądu, grudki, ziarna. */
+    _rysujStrone(c, przod, ogony, mgly, pyl, ziarna, alfa) {
+        c.save();
+        c.globalCompositeOperation = 'source-over';   // piasek to materia, nic nie świeci
+        mgly.forEach((m, i) => this._rysujMgielke(c, m, i, przod, alfa));
+        ogony.forEach(o => this._rysujLinie(c, o, przod, alfa));
+        for (const [d, p] of pyl) if (p.przod === przod) this._rysujPyl(c, d, p, alfa);
+        for (const [z, p] of ziarna) if (p.przod === przod) this._rysujZiarno(c, z, p, alfa);
+        c.restore();
+    }
+
+    _rysujMgielke(c, punkty, i, przod, alfa) {
+        const N = NASTAWY;
+        punkty.forEach((m, j) => {
+            if (m.przod !== przod) return;
+            const img = obraz(MANIFEST.mgla[(i * 7 + j) % MANIFEST.mgla.length]);
+            if (!img) return;   // asset jeszcze się ładuje - GEMINI.md §2
+            const rozmiar = this.zaczep.skala * (N.MGLA_ROZMIAR_OD + (N.MGLA_ROZMIAR_DO - N.MGLA_ROZMIAR_OD) * m.wiek);
+            c.save();
+            c.translate(m.x, m.y);
+            c.rotate(i * 1.7 + j * 0.9 + this._t * 0.15);   // stałe ziarno + powolny obrót, nie drżenie
+            c.globalAlpha = clamp01(alfa * N.MGLA_ALFA * (1 - 0.8 * m.wiek));
+            c.drawImage(wypalTintowany(img, N.BARWA_KURZU, 128), -rozmiar / 2, -rozmiar / 2, rozmiar, rozmiar);
+            c.restore();
+        });
+    }
+
+    /** Bardzo cienka, blada linia prądu po torze ogona - tylko wskazówka kierunku. */
+    _rysujLinie(c, pkt, przod, alfa) {
         if (pkt.length < 2) return;
         const N = NASTAWY;
-        const [r, g, b] = N.BARWA_WIATRU, [rr, gr, br] = N.BARWA_RDZENIA;
-        const grubosc = this.zaczep.skala * N.GRUBOSC;
-        c.save();
-        c.globalCompositeOperation = 'lighter';
+        const [r, g, b] = N.BARWA_LINII;
         c.lineCap = 'round';
+        c.lineWidth = Math.max(1, this.zaczep.skala * N.GRUBOSC_LINII);
         for (let i = 0; i < pkt.length - 1; i++) {
             const a = pkt[i], z = pkt[i + 1];
             if (a.przod !== przod) continue;
-            const w = grubosc * (0.25 + 0.75 * a.zwezenie);
+            c.strokeStyle = `rgba(${r},${g},${b},${(N.ALFA_LINII * alfa * a.zwezenie).toFixed(3)})`;
             c.beginPath();
             c.moveTo(a.x, a.y);
             c.lineTo(z.x, z.y);
-            c.strokeStyle = `rgba(${r},${g},${b},${(0.25 * alfa * a.zwezenie).toFixed(3)})`;
-            c.lineWidth = w * 3;
-            c.stroke();
-            c.strokeStyle = `rgba(${rr},${gr},${br},${(0.85 * alfa * a.zwezenie).toFixed(3)})`;
-            c.lineWidth = w;
             c.stroke();
         }
-        c.restore();
     }
 
     _rysujPyl(c, d, p, alfa) {
         const img = obraz(MANIFEST.odlamek[d.wariant]);
-        if (!img) return;   // asset jeszcze się ładuje - GEMINI.md §2
+        if (!img) return;
         const r = this.zaczep.skala * d.rozmiar;
         c.save();
         c.translate(p.x, p.y);
         c.rotate(d.obrot + d.vObrot * this._t);
-        c.globalCompositeOperation = 'source-over';
         c.globalAlpha = clamp01(p.alfa * alfa * 0.85);
         c.drawImage(wypalTintowany(img, NASTAWY.BARWA_PYLU, 64), -r / 2, -r / 2, r, r);
         c.restore();
+    }
+
+    /** Ziarno piasku: krótka kreska wzdłuż ruchu; co jakiś czas znika (sypkość). */
+    _rysujZiarno(c, z, p, alfa) {
+        const N = NASTAWY;
+        if (Math.floor(this._t * N.MIGOTANIE + z.faza * 7) % 4 === 0) return;
+        const dl = this.zaczep.skala * N.DLUGOSC_ZIARNA;
+        const [r, g, b] = N.BARWA_ZIARNA;
+        c.lineCap = 'round';
+        c.lineWidth = N.GRUBOSC_ZIARNA;
+        c.strokeStyle = `rgba(${r},${g},${b},${(N.ALFA_ZIARNA * z.jasnosc * alfa).toFixed(3)})`;
+        c.beginPath();
+        c.moveTo(p.x, p.y);
+        c.lineTo(p.x - p.kierunek.x * dl, p.y - p.kierunek.y * dl);
+        c.stroke();
     }
 }
