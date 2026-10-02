@@ -48,7 +48,8 @@ export const BARWA_ZAPLONU = {
     // Jasna, chłodna szarość - dym jeszcze nie płonie w chwili uzbrojenia
     // combo (patrz efekty.js TABELA.dym - ten sam powód, ta sama barwa).
     dym: [210, 210, 220],
-    kamiennaTarcza: [170, 120, 230]   // fiolet-kamień Welesa
+    kamiennaTarcza: [170, 120, 230],  // fiolet-kamień Welesa
+    kurzawa: [215, 175, 110]          // piaskowa ochra pyłu
 };
 
 /**
@@ -81,7 +82,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -154,6 +155,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
         // (barki) moduł liczy SAM co klatkę - patrz js/sledzenie.js.
         s.kamiennaTarcza.zapal(1.0);
+    } else if (technika.uzbraja === 'kurzawa') {
+        // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
+        // (barki/dłonie) moduł liczy SAM co klatkę - patrz js/sledzenie.js.
+        s.kurzawa.zapal(1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,

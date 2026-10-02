@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -249,5 +249,12 @@ spr('pierwszy weles nie odpala', k20.dodaj('weles', 0) === null);
 spr('drugi weles nie odpala', k20.dodaj('weles', 500) === null);
 spr('trzeci weles odpala Kamienną Tarczę', k20.dodaj('weles', 1000)?.id === 'kamiennaTarcza');
 spr('czwarty weles odpala PONOWNIE (łańcuch)', k20.dodaj('weles', 1500)?.id === 'kamiennaTarcza');
+
+console.log('\nKURZAWA (stribog -> weles) i łańcuch z Tarczą:');
+const k21 = new KomboSilnik();
+k21.dodaj('stribog', 0);
+spr('stribog -> weles odpala Kurzawę', k21.dodaj('weles', 500)?.id === 'kurzawa');
+k21.dodaj('weles', 1000);
+spr('...a dwa kolejne welesy - Kamienną Tarczę', k21.dodaj('weles', 1500)?.id === 'kamiennaTarcza');
 
 process.exit(ok ? 0 : 1);

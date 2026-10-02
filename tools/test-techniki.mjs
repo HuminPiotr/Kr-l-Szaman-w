@@ -42,6 +42,7 @@ function zrobWorek(log) {
         kolowrot: szpieg('kolowrot'),
         dmuchanie: szpieg('dmuchanie'),
         kamiennaTarcza: szpieg('kamiennaTarcza'),
+        kurzawa: szpieg('kurzawa'),
     };
 }
 
@@ -103,6 +104,8 @@ testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Strib
 testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
 
 testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
+
+testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
 
 // --- 3. Zaplon dostaje właściwą barwę per technika ---
 console.log('\nBARWA ZAPŁONU PER TECHNIKA:');

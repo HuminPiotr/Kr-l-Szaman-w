@@ -46,6 +46,7 @@ import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { KamiennaTarcza } from './kamiennaTarcza.js';
+import { Kurzawa } from './kurzawa.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
 import { zaladuj as zaladujAssety } from './assety.js';
@@ -201,6 +202,7 @@ let ekran = new Ekran();
 let piorun = new Piorun();
 let kolowrot = new Kolowrot();
 let kamiennaTarcza = new KamiennaTarcza();
+let kurzawa = new Kurzawa();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -479,7 +481,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -752,7 +754,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -934,6 +936,7 @@ function klatka(now) {
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
     kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
+    kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
@@ -1024,6 +1027,7 @@ function klatka(now) {
         zaplon: { aktywny: zaplon.aktywny },
         piorun: { aktywny: piorun.aktywny },
         kamiennaTarcza: { aktywny: kamiennaTarcza.aktywny },
+        kurzawa: { aktywny: kurzawa.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do

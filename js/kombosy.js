@@ -110,7 +110,14 @@ export const KOMBOSY = [
     // ZACZYNA sekwencję - test k2 w test-kombosy.mjs startuje teraz od mokosz.
     // Natychmiastowa jak Kołowrót (`uzbraja` = własne id).
     { id: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza',
-      sekwencja: ['weles', 'weles', 'weles'], uzbraja: 'kamiennaTarcza' }
+      sekwencja: ['weles', 'weles', 'weles'], uzbraja: 'kamiennaTarcza' },
+
+    // KURZAWA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md): wiatr
+    // (Stribog) podrywa ziemię (Weles) - lej pyłu wokół tancerza. Para
+    // stribog->weles nie jest prefiksem/sufiksem żadnej trójki. Łańcuch:
+    // stribog->weles->weles->weles daje Kurzawę, potem Kamienną Tarczę.
+    { id: 'kurzawa', nazwa: 'Kurzawa',
+      sekwencja: ['stribog', 'weles'], uzbraja: 'kurzawa' }
 ];
 
 export class KomboSilnik {
