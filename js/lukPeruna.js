@@ -6,8 +6,8 @@
  *
  * v2 (2026-10-03, po teście na kamerze): pierwsza wersja używała pioruna z
  * piorun.js (twardy biały rdzeń + gruba poświata) i wyglądała jak BŁYSKAWICA.
- * Teraz to ELEKTRYCZNOŚĆ - subtelna: jedna cienka (1.5 px) nitka w bladym
- * błękicie, drgająca w poprzek linii dłoń-dłoń płynnym szumem (simplex3, nie
+ * Teraz to ELEKTRYCZNOŚĆ - subtelna: jedna cienka (2 px) nitka w bladym
+ * błękicie (2 px), drgająca w poprzek linii dłoń-dłoń płynnym szumem (simplex3, nie
  * regeneracja ścieżki co klatkę), druga jeszcze cieńsza nitka w innej fazie,
  * rzadkie "zacięcie" (zmiana ziarna szumu co 0.3-0.6 s) i drobne iskry -
  * krótkie, poszarpane odskoki od łuku żyjące 40-80 ms. Wszystko source-over,
@@ -27,25 +27,25 @@ import { simplex3 } from './szum.js';
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
 import { dlonieKlatki, barkiKlatki, Kotwica, TozsamoscDloni, TOZSAMOSC } from './sledzenie.js';
 
-export const CZAS_TRWANIA = 6.0;   // s
+export const CZAS_TRWANIA = 12.0;   // s - x2 (2026-10-03, po teście: 6 s było za krótko)
 
 export const NASTAWY = {
     PUNKTOW_LUKU: 28,
-    DRGANIE_BLISKO: 0.05, DRGANIE_DALEKO: 0.22,   // skala * to = amplituda drgania w poprzek łuku
+    DRGANIE_BLISKO: 0.06, DRGANIE_DALEKO: 0.28,   // skala * to = amplituda drgania w poprzek łuku
     DYSTANS_DALEKO_MNOZNIK: 4,    // skala * to = dłonie "maksymalnie rozsunięte"
     SZUM_SKALA: 3.2,              // gęstość falowania wzdłuż łuku
     PREDKOSC_SZUMU: 1.6,          // jak szybko łuk faluje w czasie
     ZACIECIE_MIN: 0.3, ZACIECIE_MAX: 0.6,   // s - co ile zmienia się ziarno szumu (subtelne "zacięcie")
-    ALFA_LUKU: 0.55, ALFA_DRUGIEJ_NITKI: 0.3,
-    GRUBOSC_LUKU: 1.5, GRUBOSC_DRUGIEJ: 1.0,   // px - stałe: to nitka, nie belka
+    ALFA_LUKU: 0.85, ALFA_DRUGIEJ_NITKI: 0.5,   // 0.55/0.3 było za subtelne
+    GRUBOSC_LUKU: 2, GRUBOSC_DRUGIEJ: 1.2,   // px - stałe: to nitka, nie belka (test: <= 2)
     PRZYGASZENIE_ODPIECIA: 0.35,  // o tyle łuk blednie, gdy jedna dłoń jest odpięta
     ISKRY_SERIA_MIN: 3, ISKRY_SERIA_MAX: 5,
-    ISKRY_ODSTEP_MIN: 0.15, ISKRY_ODSTEP_MAX: 0.35,   // s między seriami
+    ISKRY_ODSTEP_MIN: 0.1, ISKRY_ODSTEP_MAX: 0.25,   // s między seriami
     ISKRA_ZYCIE_MIN: 0.04, ISKRA_ZYCIE_MAX: 0.08,     // s
     ISKRA_DLUGOSC_OD: 0.08, ISKRA_DLUGOSC_DO: 0.2,    // skala * to
-    ALFA_ISKRY: 0.7,
-    MGIELKA_PROMIEN: 0.5, MGIELKA_ALFA: 0.2,          // skala * to; alfa środka
-    ROZBLYSK_MNOZNIK: 0.45, ROZBLYSK_ALFA: 0.25,      // spark_* przy dłoniach
+    ALFA_ISKRY: 0.95,
+    MGIELKA_PROMIEN: 0.6, MGIELKA_ALFA: 0.32,          // skala * to; alfa środka
+    ROZBLYSK_MNOZNIK: 0.55, ROZBLYSK_ALFA: 0.4,      // spark_* przy dłoniach
     NAROST: 0.15, WYGASZENIE: 0.8,   // s
     WYSOKOSC_JEDNEJ_DLONI: TOZSAMOSC.GORA_MNOZNIK,
     BARWA: [170, 205, 255],          // blady błękit
