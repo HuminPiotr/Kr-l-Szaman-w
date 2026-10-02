@@ -1,56 +1,120 @@
 /**
  * Kurzawa - nagroda za combo stribog -> weles (proste combo 2026-10-02).
- * Wiatr (Stribog) podrywa ziemię (Weles): lej pyłu spiralą od pasa nad
- * głowę, jak diabeł pyłowy, z kilkoma zawijasami wiru (twirl_*) na różnych
- * wysokościach. Tył leja rysuje się ZA sylwetką (js/warstwaZaSylwetka.js).
+ * Wiatr (Stribog) podrywa ziemię (Weles).
  *
- * Drobiny pyłu nie mają fizyki całkowanej - ich tor to czysta funkcja
- * wieku (pozycjaDrobiny): wysokość rośnie liniowo, promień leja rośnie
- * z wysokością, kąt rośnie ze stałą prędkością. Emisja rozłożona na
- * EMISJA_S przez ujemny startowy wiek (wzorzec kolowrot.js).
+ * v2 (2026-10-03, po teście na kamerze): pierwsza wersja była lejem pyłu
+ * startującym od brzucha - "rodzi się z brzucha" i nie czytała się jako
+ * wiatr. Teraz to PAS WIATRU: cztery podmuchy wylatują SPOD DOLNEJ KRAWĘDZI
+ * EKRANU (kamera nie widzi podłogi, więc dół kadru robi za ziemię), na
+ * zmianę z lewej i prawej, wspinają się łukiem i wchodzą w poziome pasy
+ * wokół tułowia na różnych wysokościach. Sąsiednie pasy kręcą się
+ * przeciwnie.
+ *
+ * WIATR = SMUGA, nie drobiny (pamięć projektu: "efekt ciągły = kreska, nie
+ * sprite"). Ogon smugi to czysta funkcja: punkty toru głowy z ostatnich
+ * DLUGOSC_OGONA_S sekund (punktyOgona), liczone od BIEŻĄCEGO zaczepu - smuga
+ * sama podąża za ciałem, bez bufora historii. Odcinki za ciałem (górna połowa
+ * elipsy, sin(kąt) < 0) idą na warstwę ZA sylwetką (js/warstwaZaSylwetka.js),
+ * przednie przed nią - widać, że wiatr OWIJA gracza.
+ *
+ * GŁADKIE WEJŚCIE W ORBITĘ: podmuch wchodzi w skrajny lewy/prawy punkt
+ * elipsy, gdzie styczna jest PIONOWA - ruch w górę od dołu ekranu przechodzi
+ * w orbitę bez załamania. Stąd kierunek obrotu wynika ze strony wejścia
+ * (lewa: kąt rośnie, prawa: maleje), a naprzemienne strony dają naprzemienne
+ * kierunki pasów.
  */
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 
+export const CZAS_TRWANIA = 5.0;   // s
+
 export const NASTAWY = {
-    LICZBA_PYLU: 70,
-    LICZBA_WIROW: 5,
-    EMISJA_S: 3.0,            // s - przez tyle rodzą się nowe drobiny
-    ZYCIE_MIN: 1.4, ZYCIE_MAX: 2.2,
-    DOL_MNOZNIK: 1.8,         // start drobiny = barki + skala * to w dół (pas)
-    GORA_MNOZNIK: 1.6,        // koniec = barki - skala * to (nad głową)
-    PROMIEN_DOL: 0.45, PROMIEN_GORA: 1.6,   // skala * to - lej rozszerza się w górę
-    SQUASH: 0.3,
-    PREDKOSC_KATOWA: 5.0,     // rad/s
-    ROZMIAR_PYLU_OD: 0.12, ROZMIAR_PYLU_DO: 0.28,   // skala * to
-    PREDKOSC_WIRU: 3.0,       // rad/s obrotu tekstury zawijasa
-    BARWA_PYLU: [205, 165, 105],   // piaskowa ochra
-    BARWA_WIRU: [140, 235, 195]    // mięta Striboga (techniki.js BARWA_ZAPLONU.aard)
+    LICZBA_PODMUCHOW: 4,
+    PASY: [1.3, 0.7, 0.1, -0.5],   // skala * to pod barkami: biodra, brzuch, pierś, barki (pas 0 najniżej)
+    DOL_EKRANU: 0.92,              // pas nigdy niżej niż H * to - biodra bywają poza kadrem
+    START_CO: 0.25,                // s między startami kolejnych podmuchów (od najniższego)
+    T_WZNOSZENIA: 0.6,             // s - lot od dołu ekranu do pasa
+    MARGINES_STARTU: 0.25,         // skala * to pod dolną krawędzią ekranu
+    ODCHYLENIE_STARTU: 0.8,        // R * to na zewnątrz od punktu wejścia - łuk zamiast pionu
+    PROMIEN: 1.45,                 // skala * to = promień pasa
+    SQUASH: 0.28,                  // płaska elipsa - pas poziomy wokół ciała
+    PREDKOSC_KATOWA: 3.6,          // rad/s
+    DLUGOSC_OGONA_S: 0.45,         // s toru głowy w ogonie (~1/4 okrążenia)
+    PUNKTOW_OGONA: 18,
+    GRUBOSC: 0.09,                 // skala * to = grubość rdzenia smugi przy głowie
+    LICZBA_PYLU: 40,
+    ROZMIAR_PYLU_OD: 0.10, ROZMIAR_PYLU_DO: 0.22,   // skala * to
+    ROZRZUT_PYLU: 0.15,            // skala * to - pył obok toru, nie na nim
+    NAROST: 0.3, WYGASZENIE: 1.0,  // s
+    BARWA_WIATRU: [140, 235, 195], // mięta Striboga (techniki.js BARWA_ZAPLONU.aard)
+    BARWA_RDZENIA: [225, 255, 240],
+    BARWA_PYLU: [205, 165, 105]    // piaskowa ochra
 };
-export const CZAS_TRWANIA = NASTAWY.EMISJA_S + NASTAWY.ZYCIE_MAX;   // s - ostatnia drobina zdąży dolecieć
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
 
-/** Alfa zawijasów wiru - narost 0.4 s, gaśnie w ostatniej sekundzie. */
+/** Alfa całości - narost NAROST, gaśnie przez ostatnie WYGASZENIE sekund. */
 export function obwiednia(t) {
     if (!Number.isFinite(t) || t <= 0 || t >= CZAS_TRWANIA) return 0;
-    return Math.min(1, t / 0.4) * Math.min(1, (CZAS_TRWANIA - t) / 1.0);
+    return Math.min(1, t / NASTAWY.NAROST) * Math.min(1, (CZAS_TRWANIA - t) / NASTAWY.WYGASZENIE);
 }
 
-/** Tor drobiny - czysta funkcja wieku. @returns {{x,y,przod,alfa,promien}} */
-export function pozycjaDrobiny(c, srodek, skala) {
+/**
+ * Pas podmuchu `i` - czysta funkcja.
+ * @returns {{cx, cy, R, strona:-1|1, katWejscia, kierunek:-1|1}}  px; strona -1 = wejście z lewej
+ */
+export function geometriaPasa(i, zaczep, H) {
     const N = NASTAWY;
-    const u = clamp01(c.wiek / c.zycie);
-    const promien = skala * (N.PROMIEN_DOL + u * (N.PROMIEN_GORA - N.PROMIEN_DOL));
-    const kat = c.kat0 + c.kierunek * N.PREDKOSC_KATOWA * c.wiek;
+    const sk = zaczep.skala;
+    const strona = i % 2 === 0 ? -1 : 1;
     return {
-        x: srodek.x + Math.cos(kat) * promien,
-        y: srodek.y + skala * (N.DOL_MNOZNIK - u * (N.DOL_MNOZNIK + N.GORA_MNOZNIK)) + Math.sin(kat) * promien * N.SQUASH,
-        przod: Math.sin(kat) > 0,
-        alfa: Math.sin(u * Math.PI),
-        promien
+        cx: zaczep.x,
+        cy: Math.min(zaczep.y + sk * (N.PASY[i] ?? 0), H * N.DOL_EKRANU),
+        R: sk * N.PROMIEN,
+        strona,
+        katWejscia: strona < 0 ? Math.PI : 0,   // skrajny punkt elipsy po swojej stronie
+        kierunek: strona < 0 ? 1 : -1           // ruch w GÓRĘ z punktu wejścia - patrz nagłówek
     };
+}
+
+/**
+ * Głowa podmuchu `i` w chwili `tPodmuchu` (s od JEGO startu) - czysta funkcja.
+ * @returns {{x, y, przod:boolean}|null}  null przed startem
+ */
+export function glowaPodmuchu(i, tPodmuchu, zaczep, H) {
+    if (!Number.isFinite(tPodmuchu) || tPodmuchu < 0) return null;
+    const N = NASTAWY;
+    const g = geometriaPasa(i, zaczep, H);
+    const E = { x: g.cx + Math.cos(g.katWejscia) * g.R, y: g.cy };
+    if (tPodmuchu < N.T_WZNOSZENIA) {
+        // Krzywa kwadratowa S -> C -> E: start pod dołem ekranu, odsunięty na
+        // zewnątrz; C nad S na osi punktu wejścia, więc styczna w E jest pionowa.
+        const u = tPodmuchu / N.T_WZNOSZENIA;
+        const S = { x: E.x + g.strona * g.R * N.ODCHYLENIE_STARTU, y: H + zaczep.skala * N.MARGINES_STARTU };
+        const C = { x: E.x, y: (S.y + E.y) / 2 };
+        const a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
+        return { x: a * S.x + b * C.x + c * E.x, y: a * S.y + b * C.y + c * E.y, przod: true };
+    }
+    const kat = g.katWejscia + g.kierunek * N.PREDKOSC_KATOWA * (tPodmuchu - N.T_WZNOSZENIA);
+    return { x: g.cx + Math.cos(kat) * g.R, y: g.cy + Math.sin(kat) * g.R * N.SQUASH, przod: Math.sin(kat) > 0 };
+}
+
+/**
+ * Smuga podmuchu `i` w chwili `t` (s od zapal()): głowa + punkty toru z
+ * ostatnich DLUGOSC_OGONA_S sekund - czysta funkcja.
+ * @returns {{x, y, przod, zwezenie:number}[]}  zwezenie 1 przy głowie -> 0 na końcu; [] przed startem
+ */
+export function punktyOgona(i, t, zaczep, H) {
+    const N = NASTAWY;
+    const tPodmuchu = t - i * N.START_CO;
+    const pkt = [];
+    for (let k = 0; k <= N.PUNKTOW_OGONA; k++) {
+        const p = glowaPodmuchu(i, tPodmuchu - k * N.DLUGOSC_OGONA_S / N.PUNKTOW_OGONA, zaczep, H);
+        if (!p) break;
+        pkt.push({ ...p, zwezenie: 1 - k / N.PUNKTOW_OGONA });
+    }
+    return pkt;
 }
 
 export class Kurzawa {
@@ -59,7 +123,6 @@ export class Kurzawa {
         this._trwa = false;
         this._sila = 0;
         this._pyl = [];
-        this._kierunek = 1;
         this._kotwica = new Kotwica(10);
         this._warstwa = new WarstwaZaSylwetka();
         this.zaczep = null;
@@ -77,16 +140,25 @@ export class Kurzawa {
         this._t = 0;
         this._trwa = true;
         this._kotwica.reset();
-        this._kierunek = Math.random() < 0.5 ? -1 : 1;   // jeden kierunek wiru na cały lej
-        this._pyl = Array.from({ length: N.LICZBA_PYLU }, () => ({
-            kat0: Math.random() * Math.PI * 2,
-            kierunek: this._kierunek,
-            zycie: N.ZYCIE_MIN + Math.random() * (N.ZYCIE_MAX - N.ZYCIE_MIN),
-            wiek: -Math.random() * N.EMISJA_S,
+        // Pył przypisany do podmuchów, z opóźnieniem względem głowy (leci w smudze).
+        this._pyl = Array.from({ length: N.LICZBA_PYLU }, (_, i) => ({
+            podmuch: i % N.LICZBA_PODMUCHOW,
+            opoznienie: Math.random() * N.DLUGOSC_OGONA_S,
+            dx: (Math.random() * 2 - 1) * N.ROZRZUT_PYLU,
+            dy: (Math.random() * 2 - 1) * N.ROZRZUT_PYLU * 0.5,
             rozmiar: N.ROZMIAR_PYLU_OD + Math.random() * (N.ROZMIAR_PYLU_DO - N.ROZMIAR_PYLU_OD),
             obrot: Math.random() * Math.PI * 2,
+            vObrot: (Math.random() * 2 - 1) * 6,
             wariant: Math.floor(Math.random() * MANIFEST.odlamek.length)
         }));
+    }
+
+    _pozycjaPylu(c, H) {
+        const p = glowaPodmuchu(c.podmuch, this._t - c.podmuch * NASTAWY.START_CO - c.opoznienie, this.zaczep, H);
+        if (!p) return null;
+        const sk = this.zaczep.skala;
+        return { x: p.x + c.dx * sk, y: p.y + c.dy * sk, przod: p.przod,
+                 alfa: 1 - c.opoznienie / NASTAWY.DLUGOSC_OGONA_S };
     }
 
     updateAndDraw(ctx, k, dt) {
@@ -94,59 +166,65 @@ export class Kurzawa {
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         this._t += krok;
         if (this._t >= CZAS_TRWANIA) { this._trwa = false; return; }
-        for (const c of this._pyl) c.wiek += krok;
 
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
         this.zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
-        if (!ctx) return;
+        if (!ctx) return;   // guard PO zegarze i zaczepie - patrz kolowrot.js
 
-        const sk = this.zaczep.skala;
-        const zywe = this._pyl.filter(c => c.wiek >= 0 && c.wiek < c.zycie)
-            .map(c => [c, pozycjaDrobiny(c, this.zaczep, sk)]);
+        const alfa = obwiednia(this._t) * this._sila;
+        if (alfa < 0.01) return;
+        const smugi = [];
+        for (let i = 0; i < NASTAWY.LICZBA_PODMUCHOW; i++) smugi.push(punktyOgona(i, this._t, this.zaczep, H));
+        const pyl = this._pyl.map(c => [c, this._pozycjaPylu(c, H)]).filter(([, p]) => p);
 
+        // Najpierw TYŁ (za ciałem), potem PRZÓD - kolejność rysowania = głębia.
         const tyl = this._warstwa.zacznij(W, H);
         if (tyl) {
-            for (const [c, p] of zywe) if (!p.przod) this._rysujPyl(tyl, c, p, sk);
+            for (const s of smugi) this._rysujSmuge(tyl, s, false, alfa);
+            for (const [c, p] of pyl) if (!p.przod) this._rysujPyl(tyl, c, p, alfa);
             this._warstwa.zakoncz(ctx, k.maska, k.maskaSzer, k.maskaWys, k.fit);
         }
-        for (const [c, p] of zywe) if (p.przod) this._rysujPyl(ctx, c, p, sk);
-        this._rysujWiry(ctx, sk);
+        for (const s of smugi) this._rysujSmuge(ctx, s, true, alfa);
+        for (const [c, p] of pyl) if (p.przod) this._rysujPyl(ctx, c, p, alfa);
     }
 
-    _rysujPyl(c, d, p, sk) {
-        const img = obraz(MANIFEST.odlamek[d.wariant]);
-        if (!img) return;
-        const r = sk * d.rozmiar;
+    /** Odcinki smugi z jednej strony ciała: szeroka poświata + jasny rdzeń, zwężające się ku ogonowi. */
+    _rysujSmuge(c, pkt, przod, alfa) {
+        if (pkt.length < 2) return;
+        const N = NASTAWY;
+        const [r, g, b] = N.BARWA_WIATRU, [rr, gr, br] = N.BARWA_RDZENIA;
+        const grubosc = this.zaczep.skala * N.GRUBOSC;
         c.save();
-        c.translate(p.x, p.y);
-        c.rotate(d.obrot + d.wiek * 4);
-        c.globalCompositeOperation = 'source-over';
-        c.globalAlpha = clamp01(p.alfa * this._sila * 0.85);
-        c.drawImage(wypalTintowany(img, NASTAWY.BARWA_PYLU, 64), -r / 2, -r / 2, r, r);
+        c.globalCompositeOperation = 'lighter';
+        c.lineCap = 'round';
+        for (let i = 0; i < pkt.length - 1; i++) {
+            const a = pkt[i], z = pkt[i + 1];
+            if (a.przod !== przod) continue;
+            const w = grubosc * (0.25 + 0.75 * a.zwezenie);
+            c.beginPath();
+            c.moveTo(a.x, a.y);
+            c.lineTo(z.x, z.y);
+            c.strokeStyle = `rgba(${r},${g},${b},${(0.25 * alfa * a.zwezenie).toFixed(3)})`;
+            c.lineWidth = w * 3;
+            c.stroke();
+            c.strokeStyle = `rgba(${rr},${gr},${br},${(0.85 * alfa * a.zwezenie).toFixed(3)})`;
+            c.lineWidth = w;
+            c.stroke();
+        }
         c.restore();
     }
 
-    _rysujWiry(c, sk) {
-        const N = NASTAWY;
-        const alfa = obwiednia(this._t) * this._sila;
-        if (alfa < 0.01) return;
+    _rysujPyl(c, d, p, alfa) {
+        const img = obraz(MANIFEST.odlamek[d.wariant]);
+        if (!img) return;   // asset jeszcze się ładuje - GEMINI.md §2
+        const r = this.zaczep.skala * d.rozmiar;
         c.save();
-        c.globalCompositeOperation = 'lighter';
-        for (let i = 0; i < N.LICZBA_WIROW; i++) {
-            const img = obraz(MANIFEST.wiryKurzawy[i % MANIFEST.wiryKurzawy.length]);
-            if (!img) continue;
-            const u = (i + 0.5) / N.LICZBA_WIROW;
-            const y = this.zaczep.y + sk * (N.DOL_MNOZNIK - u * (N.DOL_MNOZNIK + N.GORA_MNOZNIK));
-            const d = 2 * sk * (N.PROMIEN_DOL + u * (N.PROMIEN_GORA - N.PROMIEN_DOL));
-            c.save();
-            c.translate(this.zaczep.x, y);
-            c.scale(1, N.SQUASH * 1.6);
-            c.rotate(this._kierunek * N.PREDKOSC_WIRU * this._t + i);
-            c.globalAlpha = clamp01(alfa * 0.45);
-            c.drawImage(wypalTintowany(img, N.BARWA_WIRU, 256), -d / 2, -d / 2, d, d);
-            c.restore();
-        }
+        c.translate(p.x, p.y);
+        c.rotate(d.obrot + d.vObrot * this._t);
+        c.globalCompositeOperation = 'source-over';
+        c.globalAlpha = clamp01(p.alfa * alfa * 0.85);
+        c.drawImage(wypalTintowany(img, NASTAWY.BARWA_PYLU, 64), -r / 2, -r / 2, r, r);
         c.restore();
     }
 }

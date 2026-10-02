@@ -43,11 +43,9 @@ export const MANIFEST = {
     wir: 'assets/czastki/twirl_01.png',
     // Proste combo (2026-10-02, docs/superpowers/specs/2026-10-02-proste-
     // -kombosy-design.md). dirt_* to JEDYNA prawdziwa faktura ziemi w paczce -
-    // Weles dotad nie mial zadnej (Kamienna Tarcza, Kurzawa). twirl_02/03 to
-    // dalsze ramiona wiru (01 juz niesie Aard). spark_* to NIE iskry, tylko
-    // rozgalezione pekniecia elektryczne - patrz spec 2026-09-09-assety.
+    // Weles dotad nie mial zadnej (Kamienna Tarcza, Kurzawa). spark_* to NIE
+    // iskry, tylko rozgalezione pekniecia elektryczne - patrz spec 2026-09-09-assety.
     odlamek: ['assets/czastki/dirt_01.png', 'assets/czastki/dirt_02.png', 'assets/czastki/dirt_03.png'],
-    wiryKurzawy: ['assets/czastki/twirl_02.png', 'assets/czastki/twirl_03.png'],
     wyladowanie: ['assets/czastki/spark_01.png', 'assets/czastki/spark_02.png', 'assets/czastki/spark_03.png']
 };
 
