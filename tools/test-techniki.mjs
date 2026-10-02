@@ -157,5 +157,19 @@ console.log('\nODPORNOŚĆ:');
     spr('...i nadal odpala warstwę wspólną', zawiera(log, 'zaplon.zapal') && zawiera(log, 'ekran.uderz'));
 }
 
+// --- 6. Stanowisko VFX (tools/scena.html) ma w worku KAŻDĄ z prostych technik ---
+// scena.html nie da się uruchomić w Node, a brak modułu w jego `worekTechnik`
+// wychodzi dopiero jako TypeError po kliknięciu przycisku.
+console.log('\nWOREK STANOWISKA VFX (tools/scena.html):');
+{
+    const { readFileSync } = await import('node:fs');
+    const html = readFileSync(new URL('./scena.html', import.meta.url), 'utf8');
+    const worek = html.match(/const worekTechnik = \{([^}]*)\}/)?.[1] ?? '';
+    const wBworku = new Set(worek.split(',').map(x => x.trim()).filter(Boolean));
+    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula', 'mglaMokoszy']) {
+        spr(`worekTechnik w scena.html zawiera '${id}'`, wBworku.has(id));
+    }
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

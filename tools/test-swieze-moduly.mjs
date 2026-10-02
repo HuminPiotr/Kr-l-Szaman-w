@@ -49,6 +49,15 @@ console.log('ZBIÓR KLUCZY:');
         if (POZA_RUNDA.has(nazwa)) continue;
         spr(`main.js: '${nazwa}' jest w fabryce albo świadomie poza rundą`, KLUCZE_MODULOW.includes(nazwa));
     }
+    // Drugi strażnik (2026-10-02): moduł JEST w fabryce, ale resetujModuly() w main.js
+    // musi go jeszcze PRZYPIĄĆ z powrotem do zmiennej - inaczej po restarcie rundy
+    // main.js dalej rysuje STARĄ instancję (efekt poprzedniego gracza w Kręgu).
+    const reset = main.match(/function resetujModuly\(\) \{\s*\(\{([^}]*)\}\s*=\s*swiezeModuly\(/);
+    spr('main.js: resetujModuly() destrukturyzuje wynik swiezeModuly()', !!reset);
+    const przypiete = new Set((reset?.[1] ?? '').split(',').map(x => x.trim()).filter(Boolean));
+    for (const klucz of KLUCZE_MODULOW) {
+        spr(`resetujModuly() przypina '${klucz}' z powrotem do main.js`, przypiete.has(klucz));
+    }
 }
 
 console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
