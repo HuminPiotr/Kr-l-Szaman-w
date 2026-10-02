@@ -117,7 +117,14 @@ export const KOMBOSY = [
     // stribog->weles nie jest prefiksem/sufiksem żadnej trójki. Łańcuch:
     // stribog->weles->weles->weles daje Kurzawę, potem Kamienną Tarczę.
     { id: 'kurzawa', nazwa: 'Kurzawa',
-      sekwencja: ['stribog', 'weles'], uzbraja: 'kurzawa' }
+      sekwencja: ['stribog', 'weles'], uzbraja: 'kurzawa' },
+
+    // ŁUK PERUNA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // woda przewodzi piorun - łuk elektryczny między dłońmi. Obie pieczęcie
+    // należą do najpewniej rozpoznawanych. Łańcuch: Kołowrót kończy się na
+    // mokosz, więc dołożony po nim perun odpala Łuk.
+    { id: 'lukPeruna', nazwa: 'Łuk Peruna',
+      sekwencja: ['mokosz', 'perun'], uzbraja: 'lukPeruna' }
 ];
 
 export class KomboSilnik {

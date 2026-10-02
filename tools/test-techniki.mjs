@@ -42,6 +42,7 @@ function zrobWorek(log) {
         kolowrot: szpieg('kolowrot'),
         dmuchanie: szpieg('dmuchanie'),
         kamiennaTarcza: szpieg('kamiennaTarcza'),
+        lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
     };
 }
@@ -104,6 +105,8 @@ testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Strib
 testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
 
 testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
+
+testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna');
 
 testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
 

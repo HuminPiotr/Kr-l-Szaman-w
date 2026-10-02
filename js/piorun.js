@@ -179,7 +179,9 @@ export function stanPioruna(t) {
 }
 
 /** Rysuje jedną ścieżkę: kolorowa poświata (kilka przebiegów 'lighter') + twardy biały rdzeń ('source-over'). */
-function rysujSciezke(ctx, punkty, barwa, alfaRdzen, alfaPoswiata, grubosc) {
+// Eksportowana (2026-10-02) dla js/lukPeruna.js - ten sam rdzeń source-over i ta
+// sama poświata, żeby łuk czytał się jako piorun Peruna.
+export function rysujSciezke(ctx, punkty, barwa, alfaRdzen, alfaPoswiata, grubosc) {
     if (punkty.length < 2) return;
     const [r, g, b] = barwa;
 

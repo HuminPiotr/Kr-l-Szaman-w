@@ -46,6 +46,7 @@ import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { KamiennaTarcza } from './kamiennaTarcza.js';
+import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
@@ -202,6 +203,7 @@ let ekran = new Ekran();
 let piorun = new Piorun();
 let kolowrot = new Kolowrot();
 let kamiennaTarcza = new KamiennaTarcza();
+let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -754,7 +756,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -936,6 +938,7 @@ function klatka(now) {
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
     kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
+    lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
@@ -1027,6 +1030,7 @@ function klatka(now) {
         zaplon: { aktywny: zaplon.aktywny },
         piorun: { aktywny: piorun.aktywny },
         kamiennaTarcza: { aktywny: kamiennaTarcza.aktywny },
+        lukPeruna: { aktywny: lukPeruna.aktywny },
         kurzawa: { aktywny: kurzawa.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co

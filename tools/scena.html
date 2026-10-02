@@ -184,6 +184,7 @@ const [
     import('./js/techniki.js'), import('./tools/_dlon-syntetyczna.mjs'),
 ]);
 const { KamiennaTarcza, NASTAWY: NASTAWY_KAMIENNATARCZA } = await import('./js/kamiennaTarcza.js');
+const { LukPeruna, NASTAWY: NASTAWY_LUKPERUNA } = await import('./js/lukPeruna.js');
 const { Kurzawa, NASTAWY: NASTAWY_KURZAWA } = await import('./js/kurzawa.js');
 
 zaladujFont();
@@ -209,6 +210,7 @@ const ekran = new Ekran();
 const piorun = new Piorun();
 const kolowrot = new Kolowrot();
 const kamiennaTarcza = new KamiennaTarcza();
+const lukPeruna = new LukPeruna();
 const kurzawa = new Kurzawa();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
@@ -222,6 +224,7 @@ const MODULY_NASTAWY = [
     { etykieta: 'Dym (Okadzenie)', plik: 'js/dym.js', nastawy: (await import('./js/dym.js')).NASTAWY, instancja: dym },
     { etykieta: 'Kołowrót', plik: 'js/kolowrot.js', nastawy: (await import('./js/kolowrot.js')).NASTAWY, instancja: kolowrot },
     { etykieta: 'Kamienna Tarcza', plik: 'js/kamiennaTarcza.js', nastawy: NASTAWY_KAMIENNATARCZA, instancja: kamiennaTarcza },
+    { etykieta: 'Łuk Peruna', plik: 'js/lukPeruna.js', nastawy: NASTAWY_LUKPERUNA, instancja: lukPeruna },
     { etykieta: 'Kurzawa', plik: 'js/kurzawa.js', nastawy: NASTAWY_KURZAWA, instancja: kurzawa },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
@@ -418,6 +421,7 @@ function rysujKlatke(dt, frame) {
     const kontekstTechnik = { frame, W: canvas.width, H: canvas.height, maska: frame.maska,
                               maskaSzer: MASKA_SZER, maskaWys: MASKA_WYS, fit: frame.fit };
     kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
+    lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
 
     ctx.restore();
@@ -463,6 +467,8 @@ const SCENARIUSZE = {
     kamiennaTarcza: () => odpalTechnike({ id: 'x', nazwa: 'Kamienna Tarcza', uzbraja: 'kamiennaTarcza', sekwencja: ['weles', 'weles', 'weles'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     kurzawa: () => odpalTechnike({ id: 'x', nazwa: 'Kurzawa', uzbraja: 'kurzawa', sekwencja: ['stribog', 'weles'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    lukPeruna: () => odpalTechnike({ id: 'x', nazwa: 'Łuk Peruna', uzbraja: 'lukPeruna', sekwencja: ['mokosz', 'perun'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
@@ -541,6 +547,7 @@ const TECHNIKI = [
     { uzbraja: 'dym', nazwa: 'Okadzenie (uzbrój)', sekwencja: ['swarog', 'stribog', 'swarog'] },
     { uzbraja: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza', sekwencja: ['weles', 'weles', 'weles'] },
     { uzbraja: 'kurzawa', nazwa: 'Kurzawa', sekwencja: ['stribog', 'weles'] },
+    { uzbraja: 'lukPeruna', nazwa: 'Łuk Peruna', sekwencja: ['mokosz', 'perun'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {

@@ -118,7 +118,9 @@ export const TABELA = {
     // odłamków) żyje w js/kamiennaTarcza.js.
     kamiennaTarcza: { barwa: '270, 45%, 55%', ksztalt: 'blyskIFala', czas: 1.3 },
     // Błysk AKTYWACJI Kurzawa. Trwała treść żyje w js/kurzawa.js.
-    kurzawa: { barwa: '38, 70%, 60%', ksztalt: 'blyskIFala', czas: 1.3 }
+    kurzawa: { barwa: '38, 70%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Łuk Peruna. Trwała treść żyje w js/lukPeruna.js.
+    lukPeruna: { barwa: '210, 100%, 75%', ksztalt: 'blyskIFala', czas: 1.3 }
 };
 
 export class Efekty {
