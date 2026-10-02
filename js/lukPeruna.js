@@ -1,47 +1,48 @@
 /**
  * Łuk Peruna - nagroda za combo mokosz -> perun (proste combo 2026-10-02).
  * Woda przewodzi piorun (a w części rekonstrukcji mitu Mokosz jest żoną
- * Peruna): między dłońmi iskrzy elektryczność, która rozciąga się razem
+ * Peruna): między dłońmi trzaska wyładowanie, które rozciąga się razem
  * z rękami.
  *
- * v2 (2026-10-03, po teście na kamerze): pierwsza wersja używała pioruna z
- * piorun.js (twardy biały rdzeń + gruba poświata) i wyglądała jak BŁYSKAWICA.
- * Teraz to ELEKTRYCZNOŚĆ - subtelna: jedna cienka (2 px) nitka w bladym
- * błękicie (2 px), drgająca w poprzek linii dłoń-dłoń płynnym szumem (simplex3, nie
- * regeneracja ścieżki co klatkę), druga jeszcze cieńsza nitka w innej fazie,
- * rzadkie "zacięcie" (zmiana ziarna szumu co 0.3-0.6 s) i drobne iskry -
- * krótkie, poszarpane odskoki od łuku żyjące 40-80 ms. Wszystko source-over,
- * nic nie jest addytywne ani grube. Przy dłoniach miękka mgiełka ładunku
- * i mały spark_*.
+ * HISTORIA STYLU (wszystko po testach na kamerze właściciela):
+ *  - v1: piorun z piorun.js (gruby biały rdzeń + poświata) - "za bardzo błyskawica";
+ *  - v2: cienka nitka płynnie falująca szumem - "za subtelne, nie wygląda jak
+ *    fajne błyskawice";
+ *  - v3 (2026-10-03): OSTRY ZYGZAK - kanciasta ścieżka z segmentuj() (piorun.js,
+ *    rekurencyjne przesunięcie punktu środkowego), losowana na nowo co 60-90 ms
+ *    (12-16x/s, wyraźny "trzask"), a między odświeżeniami lekko drgająca.
+ *    Niebieska linia 2 px z bladym rdzeniem 1 px, druga cieńsza nitka, iskry
+ *    z rozwidleniem. Nadal cienko i source-over - bez grubej białej belki v1.
  *
- * KOŃCE ŁUKU PO TOŻSAMOŚCI DŁONI, nie po kolejności od lewej
- * (js/sledzenie.js TozsamoscDloni): kamera często gubi dłoń, a poprzednia
- * wersja przerzucała wtedy łuk na drugą dłoń i skakała z powrotem. Teraz
- * zgubiony koniec stoi (okres łaski), potem płynnie wędruje nad widoczną
- * dłoń, a po powrocie dłoni leci do niej z ograniczoną prędkością.
- * Żadnej dłoni od początku: końce w zastępczym miejscu - nigdy brak efektu
- * (GEMINI.md §2).
+ * Ścieżka liczona w układzie ZNORMALIZOWANYM (0,0)->(1,0) i mapowana na
+ * bieżące położenie dłoni (mapujZygzak), więc łuk trzyma się dłoni co klatkę,
+ * choć kształt zmienia się tylko przy odświeżeniu.
+ *
+ * DŁONIE - PROSTA LOGIKA (powrót do v1 na życzenie właściciela; płynny dryf
+ * zgubionego końca z v2 wyglądał nienaturalnie): dwie dłonie - łuk między
+ * nimi; jedna - piorun wyskakuje z niej W GÓRĘ; żadnej - łuk stoi w ostatnim
+ * miejscu. Przejście między trybami natychmiastowe, tylko wygładzone Kotwicą.
  */
 import { segmentuj } from './piorun.js';
 import { simplex3 } from './szum.js';
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
-import { dlonieKlatki, barkiKlatki, Kotwica, TozsamoscDloni, TOZSAMOSC } from './sledzenie.js';
+import { dlonieKlatki, barkiKlatki, Kotwica } from './sledzenie.js';
 
 export const CZAS_TRWANIA = 12.0;   // s - x2 (2026-10-03, po teście: 6 s było za krótko)
 
 export const NASTAWY = {
-    PUNKTOW_LUKU: 28,
-    DRGANIE_BLISKO: 0.06, DRGANIE_DALEKO: 0.28,   // skala * to = amplituda drgania w poprzek łuku
+    ITERACJE: 5,                  // 2^5+1 = 33 punkty - dużo ostrych załamań
+    WYGIECIE_BLISKO: 0.08, WYGIECIE_DALEKO: 0.16,           // pierwszy podział: ogólne wygięcie łuku
+    CHROPOWATOSC_BLISKO: 0.28, CHROPOWATOSC_DALEKO: 0.42,   // kolejne: lokalne załamania (bez zaniku)
     DYSTANS_DALEKO_MNOZNIK: 4,    // skala * to = dłonie "maksymalnie rozsunięte"
-    SZUM_SKALA: 3.2,              // gęstość falowania wzdłuż łuku
-    PREDKOSC_SZUMU: 1.6,          // jak szybko łuk faluje w czasie
-    ZACIECIE_MIN: 0.3, ZACIECIE_MAX: 0.6,   // s - co ile zmienia się ziarno szumu (subtelne "zacięcie")
-    ALFA_LUKU: 0.85, ALFA_DRUGIEJ_NITKI: 0.5,   // 0.55/0.3 było za subtelne
-    GRUBOSC_LUKU: 2, GRUBOSC_DRUGIEJ: 1.2,   // px - stałe: to nitka, nie belka (test: <= 2)
-    PRZYGASZENIE_ODPIECIA: 0.35,  // o tyle łuk blednie, gdy jedna dłoń jest odpięta
-    // Iskry (2026-10-03): samo zwiększenie LICZBY nie dało widoczności - były
-    // za krótkie (15-40 px), za cienkie i żyły 2-5 klatek. Teraz mniej, ale
-    // dłuższe, grubsze, z rozwidleniem, błyskiem u nasady i życiem >= 5 klatek.
+    ODSWIEZANIE_MIN: 0.06, ODSWIEZANIE_MAX: 0.09,   // s - nowy kształt zygzaka (trzask)
+    DRGNIECIE: 0.02,              // skala * to - drganie punktów MIĘDZY odświeżeniami
+    PREDKOSC_DRGNIEC: 9,
+    ALFA_LUKU: 0.9, ALFA_RDZENIA: 0.85, ALFA_DRUGIEJ_NITKI: 0.45,
+    GRUBOSC_LUKU: 2, GRUBOSC_RDZENIA: 1, GRUBOSC_DRUGIEJ: 1.2,   // px - cienko (test: <= 2)
+    WYSOKOSC_JEDNEJ_DLONI: 2.2,   // skala * to - piorun w górę z jedynej widocznej dłoni
+    SZYBKOSC_KONCOW: 22,          // 1/s - wygładzenie końców (przejście trybów ~0.1 s)
+    // Iskry (2026-10-03): dłuższe, grubsze, z rozwidleniem, błyskiem u nasady i życiem >= 5 klatek.
     ISKRY_SERIA_MIN: 4, ISKRY_SERIA_MAX: 7,
     ISKRY_ODSTEP_MIN: 0.08, ISKRY_ODSTEP_MAX: 0.2,    // s między seriami
     ISKRA_ZYCIE_MIN: 0.08, ISKRA_ZYCIE_MAX: 0.16,     // s
@@ -50,12 +51,12 @@ export const NASTAWY = {
     GRUBOSC_ISKRY: 2, GRUBOSC_ODNOGI: 1.2,            // px
     ALFA_ISKRY: 0.95,
     ISKRA_BLYSK_PROMIEN: 0.08, ISKRA_BLYSK_ALFA: 0.5, // skala * to; mały błysk u nasady iskry
-    MGIELKA_PROMIEN: 0.6, MGIELKA_ALFA: 0.32,          // skala * to; alfa środka
-    ROZBLYSK_MNOZNIK: 0.55, ROZBLYSK_ALFA: 0.4,      // spark_* przy dłoniach
+    MGIELKA_PROMIEN: 0.6, MGIELKA_ALFA: 0.32,         // skala * to; alfa środka
+    ROZBLYSK_MNOZNIK: 0.55, ROZBLYSK_ALFA: 0.4,       // spark_* przy dłoniach
     NAROST: 0.15, WYGASZENIE: 0.8,   // s
-    WYSOKOSC_JEDNEJ_DLONI: TOZSAMOSC.GORA_MNOZNIK,
-    BARWA: [170, 205, 255],          // blady błękit
-    BARWA_ISKRY: [235, 245, 255]   // prawie biały - iskra ma być jaśniejsza od nitki
+    BARWA: [90, 160, 255],           // elektryczny niebieski - główna linia, druga nitka, mgiełka
+    BARWA_RDZENIA: [200, 225, 255],  // blady rdzeń - jasność bez grubej białej belki
+    BARWA_ISKRY: [190, 215, 255]     // iskry lekko niebieskie
 };
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
@@ -67,42 +68,62 @@ export function obwiednia(t) {
 }
 
 /**
- * Końce łuku ze slotów TozsamoscDloni - czysta funkcja. Sloty niosą już
- * pozycje po dryfie/łasce, więc tu tylko uzupełniamy slot NIGDY niewidziany
- * (jedna dłoń od początku): koniec wyładowuje się W GÓRĘ nad znaną dłonią.
- * @returns {{a:{x,y}, b:{x,y}}|null}  null, gdy nie widziano żadnej dłoni
+ * Końce łuku z widocznych dłoni (dlonieKlatki) - czysta funkcja.
+ * @returns {{a:{x,y}, b:{x,y}}|null}  dwie: między nimi; jedna: w górę z niej; żadnej: null
  */
-export function koncowkiLuku(sloty, skala) {
-    const { a, b } = sloty ?? {};
-    if (!a && !b) return null;
-    const gora = skala * NASTAWY.WYSOKOSC_JEDNEJ_DLONI;
-    return {
-        a: a ? { x: a.x, y: a.y } : { x: b.x, y: b.y - gora },
-        b: b ? { x: b.x, y: b.y } : { x: a.x, y: a.y - gora }
-    };
+export function koncowkiLuku(dlonie, skala) {
+    if (!Array.isArray(dlonie) || !dlonie.length) return null;
+    if (dlonie.length >= 2) return { a: dlonie[0], b: dlonie[1] };
+    const d = dlonie[0];
+    return { a: d, b: { x: d.x, y: d.y - skala * NASTAWY.WYSOKOSC_JEDNEJ_DLONI } };
 }
 
 /**
- * Punkty nitki łuku między a i b - czysta funkcja czasu (bez losowania, więc
- * łuk PŁYNIE, zamiast migotać). Końce dokładnie w dłoniach; wychylenie
- * w poprzek znika na końcach (sin(pi*s)) i rośnie z rozpiętością dłoni.
- * @param {number} seed  ziarno szumu - jego zmiana robi "zacięcie"
- * @param {number} rozpietosc  0..1
- * @param {number} faza  przesunięcie szumu (druga nitka = inna faza)
+ * Nowy kształt zygzaka w układzie znormalizowanym (0,0)->(1,0) - przesunięcie
+ * punktu środkowego, ale BEZ zaniku poszarpania na drobnych poziomach (inaczej
+ * niż segmentuj() z piorun.js, gdzie SPADEK_CHROPOWATOSCI 0.55 wygładza
+ * drobne odcinki - zmierzone: mediana największego załamania tylko 23-43°).
+ * Pierwszy podział ma małe WYGIĘCIE (łuk nie puchnie), kolejne stałe, duże
+ * ZAŁAMANIA - ostre kąty w każdej skali, jak błyskawica.
+ * Losowy - wołany tylko przy odświeżeniu.
+ * @param {number} rozpietosc  0..1 - im szerzej dłonie, tym bardziej poszarpany
  */
-export function punktyLuku(a, b, skala, t, seed, rozpietosc, faza = 0) {
+export function nowyZygzak(rozpietosc, los = Math.random) {
+    const N = NASTAWY;
+    const r = clamp01(rozpietosc);
+    const wygiecie = N.WYGIECIE_BLISKO + (N.WYGIECIE_DALEKO - N.WYGIECIE_BLISKO) * r;
+    const zalamanie = N.CHROPOWATOSC_BLISKO + (N.CHROPOWATOSC_DALEKO - N.CHROPOWATOSC_BLISKO) * r;
+    let pkt = [{ x: 0, y: 0 }, { x: 1, y: 0 }];
+    for (let it = 0; it < N.ITERACJE; it++) {
+        const ch = it === 0 ? wygiecie : zalamanie;
+        const nowe = [pkt[0]];
+        for (let i = 0; i < pkt.length - 1; i++) {
+            const a = pkt[i], b = pkt[i + 1];
+            const dx = b.x - a.x, dy = b.y - a.y, dl = Math.hypot(dx, dy);
+            const w = (los() * 2 - 1) * dl * ch;
+            nowe.push({ x: (a.x + b.x) / 2 - (dl > 1e-12 ? dy / dl : 0) * w,
+                        y: (a.y + b.y) / 2 + (dl > 1e-12 ? dx / dl : 0) * w });
+            nowe.push(b);
+        }
+        pkt = nowe;
+    }
+    return pkt;
+}
+
+/**
+ * Zygzak na odcinku a->b w pikselach, z lekkim drganiem punktów między
+ * odświeżeniami - czysta funkcja czasu (bez losowania). Końce dokładnie w dłoniach.
+ * @param {number} seed  ziarno drgania (zmieniane przy odświeżeniu)
+ */
+export function mapujZygzak(pkt, a, b, skala, t, seed) {
     const N = NASTAWY;
     const dx = b.x - a.x, dy = b.y - a.y, dl = Math.hypot(dx, dy);
     const nx = dl > 1e-9 ? -dy / dl : 0, ny = dl > 1e-9 ? dx / dl : 1;
-    const amp = skala * (N.DRGANIE_BLISKO + (N.DRGANIE_DALEKO - N.DRGANIE_BLISKO) * clamp01(rozpietosc));
-    const pkt = [];
-    for (let k = 0; k < N.PUNKTOW_LUKU; k++) {
-        const s = k / (N.PUNKTOW_LUKU - 1);
-        const wych = k === 0 || k === N.PUNKTOW_LUKU - 1 ? 0
-            : amp * Math.sin(Math.PI * s) * simplex3(s * N.SZUM_SKALA + faza * 7.3, t * N.PREDKOSC_SZUMU, seed);
-        pkt.push({ x: a.x + dx * s + nx * wych, y: a.y + dy * s + ny * wych });
-    }
-    return pkt;
+    const amp = skala * N.DRGNIECIE;
+    return pkt.map((p, i) => {
+        const drg = i === 0 || i === pkt.length - 1 ? 0 : amp * simplex3(i * 0.7, t * N.PREDKOSC_DRGNIEC, seed);
+        return { x: a.x + p.x * dx - p.y * dy + nx * drg, y: a.y + p.x * dy + p.y * dx + ny * drg };
+    });
 }
 
 /**
@@ -155,15 +176,17 @@ export class LukPeruna {
         this._t = 0;
         this._trwa = false;
         this._sila = 0;
+        this._zygzak = null;
+        this._zygzak2 = null;
         this._seed = 0;
-        this._doZaciecia = 0;
+        this._doOdswiezenia = 0;
         this._doSerii = 0;
         this._iskry = [];
         this._rozblyski = [0, 0];
-        this._dlonie = new TozsamoscDloni();
+        this._a = new Kotwica(NASTAWY.SZYBKOSC_KONCOW);
+        this._b = new Kotwica(NASTAWY.SZYBKOSC_KONCOW);
         this._skala = new Kotwica(6);
         this.konce = null;
-        this._odpiecie = 0;
     }
 
     get aktywny() { return this._trwa; }
@@ -176,16 +199,15 @@ export class LukPeruna {
         this._sila = s;
         this._t = 0;
         this._trwa = true;
-        this._seed = Math.random() * 100;
-        this._doZaciecia = 0;
+        this._zygzak = null;
+        this._zygzak2 = null;
+        this._doOdswiezenia = 0;
         this._doSerii = 0;
         this._iskry = [];
         this._rozblyski = [Math.floor(Math.random() * MANIFEST.wyladowanie.length),
                            Math.floor(Math.random() * MANIFEST.wyladowanie.length)];
-        this._dlonie.reset();
-        this._skala.reset();
+        this._a.reset(); this._b.reset(); this._skala.reset();
         this.konce = null;
-        this._odpiecie = 0;
     }
 
     updateAndDraw(ctx, k, dt) {
@@ -198,17 +220,20 @@ export class LukPeruna {
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
         const barki = barkiKlatki(k?.frame, W, H);
         const sk = this._skala.prowadz(barki ? { s: barki.skala } : null, krok)?.s ?? W * 0.12;
-        const sloty = this._dlonie.prowadz(dlonieKlatki(k?.frame, W, H), sk, krok);
-        this.konce = koncowkiLuku(sloty, sk)
-            ?? this.konce
-            ?? { a: { x: W * 0.4, y: H * 0.45 }, b: { x: W * 0.6, y: H * 0.45 } };
-        this._odpiecie = Math.max(sloty.a?.odpiecie ?? 0, sloty.b?.odpiecie ?? 0);
-        const { a, b } = this.konce;
+        const cel = koncowkiLuku(dlonieKlatki(k?.frame, W, H), sk);
+        const a = this._a.prowadz(cel?.a ?? null, krok) ?? { x: W * 0.4, y: H * 0.45 };
+        const b = this._b.prowadz(cel?.b ?? null, krok) ?? { x: W * 0.6, y: H * 0.45 };
+        this.konce = { a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } };
         const rozpietosc = clamp01(Math.hypot(b.x - a.x, b.y - a.y) / (sk * N.DYSTANS_DALEKO_MNOZNIK));
 
-        // "Zacięcie": rzadka zmiana ziarna szumu - łuk subtelnie zmienia kształt.
-        this._doZaciecia -= krok;
-        if (this._doZaciecia <= 0) { this._seed = Math.random() * 100; this._doZaciecia = losuj(N.ZACIECIE_MIN, N.ZACIECIE_MAX); }
+        // Trzask: nowy kształt obu nitek co ODSWIEZANIE_* s.
+        this._doOdswiezenia -= krok;
+        if (this._doOdswiezenia <= 0 || !this._zygzak) {
+            this._zygzak = nowyZygzak(rozpietosc);
+            this._zygzak2 = nowyZygzak(rozpietosc);
+            this._seed = Math.random() * 100;
+            this._doOdswiezenia = losuj(N.ODSWIEZANIE_MIN, N.ODSWIEZANIE_MAX);
+        }
 
         // Iskry: serie odskoków (ISKRY_SERIA_*) co ISKRY_ODSTEP_* s.
         this._doSerii -= krok;
@@ -219,27 +244,33 @@ export class LukPeruna {
         }
         for (const i of this._iskry) i.wiek += krok;
         this._iskry = this._iskry.filter(i => i.wiek < i.zycie);
-        if (!ctx) return;   // guard PO zegarze, końcach i iskrach - patrz kolowrot.js
+        if (!ctx) return;   // guard PO zegarze, końcach, zygzaku i iskrach - patrz kolowrot.js
 
-        const obw = obwiednia(this._t) * this._sila * (1 - N.PRZYGASZENIE_ODPIECIA * this._odpiecie);
+        const obw = obwiednia(this._t) * this._sila;
         if (obw < 0.01) return;
-        const luk = punktyLuku(a, b, sk, this._t, this._seed, rozpietosc, 0);
-        const luk2 = punktyLuku(a, b, sk, this._t, this._seed, rozpietosc, 1);
-        const [r, g, bb] = N.BARWA, [ri, gi, bi] = N.BARWA_ISKRY;
+        const luk = mapujZygzak(this._zygzak, a, b, sk, this._t, this._seed);
+        const luk2 = mapujZygzak(this._zygzak2, a, b, sk, this._t, this._seed + 31);
+        const [ri, gi, bi] = N.BARWA_ISKRY;
 
         ctx.save();
-        ctx.globalCompositeOperation = 'source-over';   // elektryczność subtelna: nic nie świeci addytywnie
-        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';   // bez blendowania addytywnego
+        ctx.lineJoin = 'miter';                          // ostre załamania zostają ostre
         ctx.lineCap = 'round';
         this._mgielkaIRozblysk(ctx, a, 0, sk, obw);
         this._mgielkaIRozblysk(ctx, b, 1, sk, obw);
-        for (const [pkt, alfa, grubosc] of [[luk2, N.ALFA_DRUGIEJ_NITKI, N.GRUBOSC_DRUGIEJ], [luk, N.ALFA_LUKU, N.GRUBOSC_LUKU]]) {
+        const nitki = [
+            [luk2, N.BARWA, N.ALFA_DRUGIEJ_NITKI, N.GRUBOSC_DRUGIEJ],
+            [luk, N.BARWA, N.ALFA_LUKU, N.GRUBOSC_LUKU],
+            [luk, N.BARWA_RDZENIA, N.ALFA_RDZENIA, N.GRUBOSC_RDZENIA]
+        ];
+        for (const [pkt, [r, g, bb], alfa, grubosc] of nitki) {
             ctx.strokeStyle = `rgba(${r},${g},${bb},${(alfa * obw).toFixed(3)})`;
             ctx.lineWidth = grubosc;
             ctx.beginPath();
             pkt.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
             ctx.stroke();
         }
+        ctx.lineJoin = 'round';
         for (const iskra of this._iskry) {
             // Jasna przez pierwszą połowę życia, potem gaśnie - iskra ma być WIDOCZNA, nie mignięcie.
             const jas = Math.min(1, (1 - iskra.wiek / iskra.zycie) * 1.6) * obw;
