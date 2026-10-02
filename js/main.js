@@ -45,6 +45,7 @@ import { Zaplon } from './zaplon.js';
 import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
+import { KamiennaTarcza } from './kamiennaTarcza.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
 import { zaladuj as zaladujAssety } from './assety.js';
@@ -199,6 +200,7 @@ let zaplon = new Zaplon();
 let ekran = new Ekran();
 let piorun = new Piorun();
 let kolowrot = new Kolowrot();
+let kamiennaTarcza = new KamiennaTarcza();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -477,7 +479,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -750,7 +752,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -921,11 +923,17 @@ function klatka(now) {
         ekran.uderz(wystrzal.sila);
         ekran.falaPowietrza(zaczepPx, wystrzal.kierunek, wystrzal.sila);
     }
+    // Kontekst technik, które PODĄŻAJĄ za ciałem (proste combo 2026-10-02) -
+    // każda czyta z niego zaczep co klatkę (js/sledzenie.js), a Mgła/Tarcza/
+    // Kurzawa także maskę, żeby rysować ZA sylwetką (js/warstwaZaSylwetka.js).
+    const kontekstTechnik = { frame, W: canvas.width, H: canvas.height,
+                              maska: frame.pose ? maskaDane : null, maskaSzer, maskaWys, fit };
     // Piorun PRZED falą/iskrami - uderza z góry, dopiero potem pęka ziemia.
     piorun.updateAndDraw(ctx, dt);
     fala.updateAndDraw(ctx, dt);
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
+    kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
@@ -1015,6 +1023,7 @@ function klatka(now) {
         iskry: { czastki: iskry.liczba },
         zaplon: { aktywny: zaplon.aktywny },
         piorun: { aktywny: piorun.aktywny },
+        kamiennaTarcza: { aktywny: kamiennaTarcza.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do

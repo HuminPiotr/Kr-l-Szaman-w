@@ -183,6 +183,7 @@ const [
     import('./js/kombosy.js'), import('./js/sekwencja.js'),
     import('./js/techniki.js'), import('./tools/_dlon-syntetyczna.mjs'),
 ]);
+const { KamiennaTarcza, NASTAWY: NASTAWY_KAMIENNATARCZA } = await import('./js/kamiennaTarcza.js');
 
 zaladujFont();
 zaladujAssety().catch(() => {});
@@ -206,6 +207,7 @@ const iskry = new Iskry();
 const ekran = new Ekran();
 const piorun = new Piorun();
 const kolowrot = new Kolowrot();
+const kamiennaTarcza = new KamiennaTarcza();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
 
@@ -217,6 +219,7 @@ const MODULY_NASTAWY = [
     { etykieta: 'Fala (Aard/Grom)', plik: 'js/fala.js', nastawy: (await import('./js/fala.js')).NASTAWY, instancja: fala },
     { etykieta: 'Dym (Okadzenie)', plik: 'js/dym.js', nastawy: (await import('./js/dym.js')).NASTAWY, instancja: dym },
     { etykieta: 'Kołowrót', plik: 'js/kolowrot.js', nastawy: (await import('./js/kolowrot.js')).NASTAWY, instancja: kolowrot },
+    { etykieta: 'Kamienna Tarcza', plik: 'js/kamiennaTarcza.js', nastawy: NASTAWY_KAMIENNATARCZA, instancja: kamiennaTarcza },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
     { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
@@ -342,7 +345,7 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza
 };
 const worekPieczeci = { efekty, runy, aura };
 
@@ -408,6 +411,10 @@ function rysujKlatke(dt, frame) {
     fala.updateAndDraw(ctx, dt);
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
+    // Kontekst technik śledzących ciało (jak w main.js) - maska syntetycznej sylwetki.
+    const kontekstTechnik = { frame, W: canvas.width, H: canvas.height, maska: frame.maska,
+                              maskaSzer: MASKA_SZER, maskaWys: MASKA_WYS, fit: frame.fit };
+    kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
@@ -449,6 +456,8 @@ const SCENARIUSZE = {
                                       zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.dmuchaOkadzenie = true; },
     palec: () => { odpalTechnike({ id: 'x', nazwa: 'Grom w Ogniu', uzbraja: 'ogien', sekwencja: ['swarog', 'perun'] },
                                   zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.palecPlonie = true; },
+    kamiennaTarcza: () => odpalTechnike({ id: 'x', nazwa: 'Kamienna Tarcza', uzbraja: 'kamiennaTarcza', sekwencja: ['weles', 'weles', 'weles'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
                        SCENARIUSZE.okadzenie(); SCENARIUSZE.palec(); },
@@ -524,6 +533,7 @@ const TECHNIKI = [
     { uzbraja: 'ogien', nazwa: 'Grom w Ogniu (uzbrój)', sekwencja: ['swarog', 'perun'] },
     { uzbraja: 'aard', nazwa: 'Podmuch (uzbrój)', sekwencja: ['stribog', 'stribog'] },
     { uzbraja: 'dym', nazwa: 'Okadzenie (uzbrój)', sekwencja: ['swarog', 'stribog', 'swarog'] },
+    { uzbraja: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza', sekwencja: ['weles', 'weles', 'weles'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {

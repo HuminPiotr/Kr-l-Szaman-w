@@ -65,6 +65,7 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('efekty puste', m.efekty.aktywne.length === 0);
     spr('runy puste', m.runy.aktywne.length === 0);
     spr('kołowrót nie trwa', m.kolowrot._trwa === false);
+    spr('kamienna tarcza nie trwa', m.kamiennaTarcza.aktywny === false);
     spr('zapłon nie trwa', m.zaplon._trwa === false);
     spr('ekran nie drży', m.ekran._trwa === false);
     spr('piorun nie bije', m.piorun._trwa === false);

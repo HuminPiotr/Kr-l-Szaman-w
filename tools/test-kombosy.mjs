@@ -21,6 +21,10 @@ import { KomboSilnik, KOMBOSY, OKNO_MS } from '../js/kombosy.js';
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
 
+// Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
+// Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza'];
+
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
 spr('pierwsza pieczęć nie odpala kombo', k1.dodaj('swarog', 0) === null);
@@ -29,10 +33,10 @@ spr(`swaróg -> perun odpala Grom w Ogniu (${grom?.id})`, grom?.id === 'gromWOgn
 
 console.log('\nBUFOR NIE JEST CZYSZCZONY ZA POMYŁKĘ:');
 const k2 = new KomboSilnik();
-// 'weles' (ziemia) jest środkowym elementem Gromu w Ziemię, więc nadal
-// ŚWIADOMIE nigdy nie ROZPOCZYNA żadnej sekwencji - idealna pieczęć "nie ta"
-// na START bufora, bo żadne combo nie zaczyna się od welesa.
-k2.dodaj('weles', 0);
+// Pieczęć "nie ta" na START bufora: mokosz, po którym idzie swarog - para
+// mokosz->swarog nie jest żadnym combo. (Do 2026-10-02 był tu weles, ale
+// Kamienna Tarcza - weles×3 - sprawiła, że weles ZACZYNA sekwencję.)
+k2.dodaj('mokosz', 0);
 k2.dodaj('swarog', 500);
 const nadal = k2.dodaj('perun', 1000);
 spr(`pieczęć "nie ta" nie psuje późniejszego kombo (${nadal?.id})`, nadal?.id === 'gromWOgniu');
@@ -95,9 +99,8 @@ spr(`stribog x2 -> swarog nie psuje niczego (${gromPoAard})`, gromPoAard === nul
 
 // --- POLE uzbraja ---
 // main.js routuje po nim techniki; wiersz bez tego pola uzbroiłby złą technikę.
-spr('każdy kombos deklaruje, którą technikę uzbraja',
-    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard' || k.uzbraja === 'tecza' ||
-                        k.uzbraja === 'gromWZiemie' || k.uzbraja === 'kolowrot' || k.uzbraja === 'dym'));
+spr('każdy kombos deklaruje, którą technikę uzbraja (ZNANE_UZBRAJA)',
+    KOMBOSY.every(k => ZNANE_UZBRAJA.includes(k.uzbraja)));
 
 // --- SEKWENCJA TRÓJELEMENTOWA: swarog -> mokosz -> stribog -> Tęcza ---
 console.log('\nTRÓJELEMENTOWA SEKWENCJA (swarog -> mokosz -> stribog):');
@@ -116,9 +119,8 @@ const tecza2 = k9.dodaj('stribog', 2500);
 spr(`powtórna trójka odpala Teczę PONOWNIE (${tecza2?.id})`, tecza2?.id === 'tecza');
 
 // Pole uzbraja obejmuje SZEŚĆ wartości.
-spr('każdy kombos deklaruje, którą technikę uzbraja (ogien/aard/tecza/gromWZiemie/kolowrot/dym)',
-    KOMBOSY.every(k => k.uzbraja === 'ogien' || k.uzbraja === 'aard' || k.uzbraja === 'tecza' ||
-                        k.uzbraja === 'gromWZiemie' || k.uzbraja === 'kolowrot' || k.uzbraja === 'dym'));
+spr('każdy kombos deklaruje znaną technikę (ZNANE_UZBRAJA)',
+    KOMBOSY.every(k => ZNANE_UZBRAJA.includes(k.uzbraja)));
 
 // --- ZIEMIA (weles) DOSTAJE PIERWSZY KOMBOS: GROM W ZIEMIĘ ---
 console.log('\nZIEMIA (weles) DOSTAJE PIERWSZY KOMBOS - Grom w Ziemię (swarog -> weles -> perun):');
@@ -127,16 +129,20 @@ spr('pierwszy element (swarog) nie odpala', k10.dodaj('swarog', 0) === null);
 spr('drugi element (weles) nie odpala (jeszcze za krótka sekwencja)', k10.dodaj('weles', 500) === null);
 const gromZiemia = k10.dodaj('perun', 1000);
 spr(`trzeci element (perun) odpala Grom w Ziemię (${gromZiemia?.id})`, gromZiemia?.id === 'gromWZiemie');
-// ZASTĄPIONE (2026-09-09, Kołowrót): "dokładnie jedna sekwencja zawiera
-// welesa" przestało być prawdą, gdy doszedł Kołowrót (perun->weles->mokosz) -
-// weles występuje teraz w DWÓCH sekwencjach. Nowa asercja pilnuje
-// NIEZMIENNIKA, na którym faktycznie opiera się reszta pliku: komentarz
-// przy teście k2 wyżej ("idealna pieczęć »nie ta« na start bufora") zakłada,
-// że weles NIGDY nie ROZPOCZYNA żadnej sekwencji - to musi zostać prawdą
-// niezależnie od tego, ile sekwencji go zawiera.
-spr('weles występuje w dwóch sekwencjach (Grom w Ziemię, Kołowrót) i w ŻADNEJ nie jest pierwszym elementem',
-    KOMBOSY.filter(k => k.sekwencja.includes('weles')).length === 2 &&
-    KOMBOSY.filter(k => k.sekwencja.includes('weles')).every(k => k.sekwencja[0] !== 'weles'));
+// ZASTĄPIONE (2026-10-02, proste combo): niezmiennik "weles nigdy nie
+// zaczyna" przestał być prawdą (Kamienna Tarcza = weles×3). Pilnujemy
+// tego, na czym naprawdę opiera się silnik: żadna sekwencja nie jest
+// PREFIKSEM ani SUFIKSEM innej - inaczej krótsza odpalałaby się w środku
+// dłuższej albo _dopasuj() (pierwszy pasujący wpis) wybierałby po cichu.
+const jestPrefiksem = (krotszy, dluzszy) =>
+    dluzszy.length > krotszy.length && dluzszy.slice(0, krotszy.length).join() === krotszy.join();
+const jestSufiksemCalej = (krotszy, dluzszy) =>
+    dluzszy.length > krotszy.length && dluzszy.slice(-krotszy.length).join() === krotszy.join();
+spr('żadna sekwencja nie jest prefiksem ani sufiksem innej',
+    KOMBOSY.every(a => KOMBOSY.every(b => a === b ||
+        (!jestPrefiksem(a.sekwencja, b.sekwencja) && !jestSufiksemCalej(a.sekwencja, b.sekwencja)))));
+spr('żadne dwie techniki nie mają identycznej sekwencji',
+    new Set(KOMBOSY.map(k => k.sekwencja.join())).size === KOMBOSY.length);
 
 // Powtórka całej trójki odpala PONOWNIE - to samo celowe zachowanie
 // łańcuchów co przy Tęczy (k9) i powtórzonym id (k8).
@@ -236,5 +242,12 @@ const kolowrotTrafil = k15.dodaj('mokosz', 1000);
 spr(`perun -> weles -> mokosz odpala Kołowrót (${kolowrotTrafil?.id})`, kolowrotTrafil?.id === 'kolowrot');
 spr('pasek po trafieniu combo dalej pokazuje wszystkie trzy sloty',
     k15.aktywne(1200).length === 3);
+
+console.log('\nKAMIENNA TARCZA (weles × 3):');
+const k20 = new KomboSilnik();
+spr('pierwszy weles nie odpala', k20.dodaj('weles', 0) === null);
+spr('drugi weles nie odpala', k20.dodaj('weles', 500) === null);
+spr('trzeci weles odpala Kamienną Tarczę', k20.dodaj('weles', 1000)?.id === 'kamiennaTarcza');
+spr('czwarty weles odpala PONOWNIE (łańcuch)', k20.dodaj('weles', 1500)?.id === 'kamiennaTarcza');
 
 process.exit(ok ? 0 : 1);

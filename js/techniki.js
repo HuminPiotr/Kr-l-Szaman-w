@@ -47,7 +47,8 @@ export const BARWA_ZAPLONU = {
     kolowrot: BARWA_KOLOWROTU,
     // Jasna, chłodna szarość - dym jeszcze nie płonie w chwili uzbrojenia
     // combo (patrz efekty.js TABELA.dym - ten sam powód, ta sama barwa).
-    dym: [210, 210, 220]
+    dym: [210, 210, 220],
+    kamiennaTarcza: [170, 120, 230]   // fiolet-kamień Welesa
 };
 
 /**
@@ -80,7 +81,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -149,6 +150,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Trzecia technika KANAŁOWANA (jak 'ogien'/'aard') - uzbraja,
         // nie odpala natychmiast. Gest aktywacji: js/dmuchanie.js.
         s.dmuchanie.uzbrój(now);
+    } else if (technika.uzbraja === 'kamiennaTarcza') {
+        // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
+        // (barki) moduł liczy SAM co klatkę - patrz js/sledzenie.js.
+        s.kamiennaTarcza.zapal(1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,

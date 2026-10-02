@@ -102,7 +102,15 @@ export const KOMBOSY = [
     // [swarog, perun] w chwili czwartej pieczęci) - dokładnie łańcuch "dym,
     // potem zapałka", jakiego wymaga podpalenie dymu. Patrz test-kombosy.mjs.
     { id: 'dym', nazwa: 'Okadzenie',
-      sekwencja: ['swarog', 'stribog', 'swarog'], uzbraja: 'dym' }
+      sekwencja: ['swarog', 'stribog', 'swarog'], uzbraja: 'dym' },
+
+    // KAMIENNA TARCZA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // ziemia złożona trzy razy - odłamki krążą wokół tułowia. Jedyne nowe
+    // POWTÓRZENIE w tej partii (wybór właściciela gry). Weles po raz pierwszy
+    // ZACZYNA sekwencję - test k2 w test-kombosy.mjs startuje teraz od mokosz.
+    // Natychmiastowa jak Kołowrót (`uzbraja` = własne id).
+    { id: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza',
+      sekwencja: ['weles', 'weles', 'weles'], uzbraja: 'kamiennaTarcza' }
 ];
 
 export class KomboSilnik {

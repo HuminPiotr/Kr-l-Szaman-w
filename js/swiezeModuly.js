@@ -34,12 +34,13 @@ import { Zaplon } from './zaplon.js';
 import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
+import { KamiennaTarcza } from './kamiennaTarcza.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
     'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza'
 ];
 
 /**
@@ -68,6 +69,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         zaplon: new Zaplon(),
         ekran: new Ekran(),
         piorun: new Piorun(),
-        kolowrot: new Kolowrot()
+        kolowrot: new Kolowrot(),
+        kamiennaTarcza: new KamiennaTarcza()
     };
 }

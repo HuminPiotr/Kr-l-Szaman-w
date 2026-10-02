@@ -113,7 +113,10 @@ export const TABELA = {
     // dymu, który zaraz zacznie unosić się naprawdę (js/dym.js). Chłodna,
     // jasna szarość - ŚWIADOMIE nie pomarańcz/fiolet/bursztyn jak inne
     // błyski technik: dym jeszcze nie płonie.
-    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 }
+    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 },
+    // Błysk AKTYWACJI Kamiennej Tarczy (weles×3). Trwała treść (orbita
+    // odłamków) żyje w js/kamiennaTarcza.js.
+    kamiennaTarcza: { barwa: '270, 45%, 55%', ksztalt: 'blyskIFala', czas: 1.3 }
 };
 
 export class Efekty {
