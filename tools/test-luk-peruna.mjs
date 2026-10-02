@@ -3,7 +3,7 @@
  * trzymane po TOŻSAMOŚCI dłoni, cykl życia; bez document.
  *   node tools/test-luk-peruna.mjs
  */
-import { LukPeruna, obwiednia, koncowkiLuku, punktyLuku, nowaIskra, punktyIskry, CZAS_TRWANIA, NASTAWY } from '../js/lukPeruna.js';
+import { LukPeruna, obwiednia, koncowkiLuku, punktyLuku, nowaIskra, punktyIskry, punktyOdnogi, CZAS_TRWANIA, NASTAWY } from '../js/lukPeruna.js';
 import { klatka, kontekst, przepusc, atrapaCtx } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -42,6 +42,14 @@ spr('wyrasta z punktu na łuku (s w 0..1)', iskra.s >= 0 && iskra.s <= 1);
 const pi = punktyIskry(iskra, luk, SK);
 spr('iskra jest krótka (nie dłuższa niż ISKRA_DLUGOSC_DO skali)', pi.length > 1 && Math.hypot(pi[pi.length - 1].x - pi[0].x, pi[pi.length - 1].y - pi[0].y) <= SK * NASTAWY.ISKRA_DLUGOSC_DO * 1.01);
 spr('iskra zaczyna się NA łuku', luk.some(p => Math.hypot(p.x - pi[0].x, p.y - pi[0].y) < 1e-6));
+// WIDOCZNOŚĆ (2026-10-03): samo zwiększenie liczby iskier nie pomogło - były za krótkie i za krótko żyły.
+spr('iskra trwa co najmniej 5 klatek przy 60 FPS (nie mignięcie)', NASTAWY.ISKRA_ZYCIE_MIN * 60 >= 4.8);
+const dlIskry = Math.hypot(pi[pi.length - 1].x - pi[0].x, pi[pi.length - 1].y - pi[0].y);
+spr('iskra jest wyraźnie długa (>= ISKRA_DLUGOSC_OD skali)', dlIskry >= SK * NASTAWY.ISKRA_DLUGOSC_OD * 0.99);
+spr('iskra ma rozwidlenie (odnogę)', Array.isArray(iskra.odnoga) && iskra.odnoga.length > 1);
+const odn = punktyOdnogi(iskra, luk, SK);
+spr('odnoga wyrasta Z iskry (jej początek leży na punkcie iskry)', pi.some(p => Math.hypot(p.x - odn[0].x, p.y - odn[0].y) < 1e-6));
+spr('odnoga jest krótsza od iskry', Math.hypot(odn[odn.length - 1].x - odn[0].x, odn[odn.length - 1].y - odn[0].y) < dlIskry);
 
 console.log('\nCYKL ŻYCIA I TOŻSAMOŚĆ W KLASIE:');
 const l = new LukPeruna();

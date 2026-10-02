@@ -39,17 +39,23 @@ export const NASTAWY = {
     ALFA_LUKU: 0.85, ALFA_DRUGIEJ_NITKI: 0.5,   // 0.55/0.3 było za subtelne
     GRUBOSC_LUKU: 2, GRUBOSC_DRUGIEJ: 1.2,   // px - stałe: to nitka, nie belka (test: <= 2)
     PRZYGASZENIE_ODPIECIA: 0.35,  // o tyle łuk blednie, gdy jedna dłoń jest odpięta
-    ISKRY_SERIA_MIN: 6, ISKRY_SERIA_MAX: 10,   // 3-5 było za mało (2026-10-03)
-    ISKRY_ODSTEP_MIN: 0.06, ISKRY_ODSTEP_MAX: 0.15,   // s między seriami
-    ISKRA_ZYCIE_MIN: 0.04, ISKRA_ZYCIE_MAX: 0.08,     // s
-    ISKRA_DLUGOSC_OD: 0.08, ISKRA_DLUGOSC_DO: 0.2,    // skala * to
+    // Iskry (2026-10-03): samo zwiększenie LICZBY nie dało widoczności - były
+    // za krótkie (15-40 px), za cienkie i żyły 2-5 klatek. Teraz mniej, ale
+    // dłuższe, grubsze, z rozwidleniem, błyskiem u nasady i życiem >= 5 klatek.
+    ISKRY_SERIA_MIN: 4, ISKRY_SERIA_MAX: 7,
+    ISKRY_ODSTEP_MIN: 0.08, ISKRY_ODSTEP_MAX: 0.2,    // s między seriami
+    ISKRA_ZYCIE_MIN: 0.08, ISKRA_ZYCIE_MAX: 0.16,     // s
+    ISKRA_DLUGOSC_OD: 0.15, ISKRA_DLUGOSC_DO: 0.4,    // skala * to
+    ISKRA_ODNOGA: 0.45,                               // długość odnogi / długość iskry
+    GRUBOSC_ISKRY: 2, GRUBOSC_ODNOGI: 1.2,            // px
     ALFA_ISKRY: 0.95,
+    ISKRA_BLYSK_PROMIEN: 0.08, ISKRA_BLYSK_ALFA: 0.5, // skala * to; mały błysk u nasady iskry
     MGIELKA_PROMIEN: 0.6, MGIELKA_ALFA: 0.32,          // skala * to; alfa środka
     ROZBLYSK_MNOZNIK: 0.55, ROZBLYSK_ALFA: 0.4,      // spark_* przy dłoniach
     NAROST: 0.15, WYGASZENIE: 0.8,   // s
     WYSOKOSC_JEDNEJ_DLONI: TOZSAMOSC.GORA_MNOZNIK,
     BARWA: [170, 205, 255],          // blady błękit
-    BARWA_ISKRY: [210, 230, 255]
+    BARWA_ISKRY: [235, 245, 255]   // prawie biały - iskra ma być jaśniejsza od nitki
 };
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
@@ -109,27 +115,40 @@ export function nowaIskra(los = Math.random) {
     const dl = losuj(N.ISKRA_DLUGOSC_OD, N.ISKRA_DLUGOSC_DO, los);
     // Głównie w poprzek łuku (+-60..120 deg od stycznej), na obie strony.
     const kat = (Math.PI / 3 + los() * Math.PI / 3) * (los() < 0.5 ? 1 : -1);
+    const lokalne = segmentuj({ x: 0, y: 0 }, { x: Math.cos(kat) * dl, y: Math.sin(kat) * dl }, 2, 0.3);
+    // Rozwidlenie: z środka iskry odchodzi krótsza odnoga pod +-35..55 deg.
+    const zrodlo = lokalne[Math.floor(lokalne.length / 2)];
+    const katOdn = kat + (0.6 + los() * 0.4) * (los() < 0.5 ? 1 : -1);
+    const dlOdn = dl * N.ISKRA_ODNOGA;
+    const odnoga = segmentuj(zrodlo, { x: zrodlo.x + Math.cos(katOdn) * dlOdn, y: zrodlo.y + Math.sin(katOdn) * dlOdn }, 1, 0.3);
     return {
         s: 0.1 + los() * 0.8,
         wiek: 0,
         zycie: losuj(N.ISKRA_ZYCIE_MIN, N.ISKRA_ZYCIE_MAX, los),
-        lokalne: segmentuj({ x: 0, y: 0 }, { x: Math.cos(kat) * dl, y: Math.sin(kat) * dl }, 2, 0.3)
+        lokalne,
+        odnoga
     };
 }
 
-/** Iskra w pikselach: zaczepiona w punkcie łuku `luk` o względnej pozycji `s`, wzdłuż jego stycznej. */
-export function punktyIskry(iskra, luk, skala) {
+/** Układ lokalny iskry (lx wzdłuż stycznej łuku, ly w poprzek, w skali) -> piksele, zaczepiony na łuku. */
+function mapujLokalne(lok, iskra, luk, skala) {
     const n = luk.length;
     const idx = Math.max(0, Math.min(n - 1, Math.round(iskra.s * (n - 1))));
     const p = luk[idx], przed = luk[Math.max(0, idx - 1)], po = luk[Math.min(n - 1, idx + 1)];
     let tx = po.x - przed.x, ty = po.y - przed.y;
     const dl = Math.hypot(tx, ty);
     if (dl > 1e-9) { tx /= dl; ty /= dl; } else { tx = 1; ty = 0; }
-    return iskra.lokalne.map(q => ({
+    return lok.map(q => ({
         x: p.x + tx * q.x * skala - ty * q.y * skala,
         y: p.y + ty * q.x * skala + tx * q.y * skala
     }));
 }
+
+/** Iskra w pikselach: zaczepiona w punkcie łuku `luk` o względnej pozycji `s`, wzdłuż jego stycznej. */
+export function punktyIskry(iskra, luk, skala) { return mapujLokalne(iskra.lokalne, iskra, luk, skala); }
+
+/** Odnoga iskry w pikselach (zaczyna się w środku iskry). */
+export function punktyOdnogi(iskra, luk, skala) { return mapujLokalne(iskra.odnoga, iskra, luk, skala); }
 
 export class LukPeruna {
     constructor() {
@@ -191,7 +210,7 @@ export class LukPeruna {
         this._doZaciecia -= krok;
         if (this._doZaciecia <= 0) { this._seed = Math.random() * 100; this._doZaciecia = losuj(N.ZACIECIE_MIN, N.ZACIECIE_MAX); }
 
-        // Iskry: serie krótkich odskoków (ISKRY_SERIA_*) co ISKRY_ODSTEP_* s.
+        // Iskry: serie odskoków (ISKRY_SERIA_*) co ISKRY_ODSTEP_* s.
         this._doSerii -= krok;
         if (this._doSerii <= 0) {
             const ile = Math.floor(losuj(N.ISKRY_SERIA_MIN, N.ISKRY_SERIA_MAX + 1));
@@ -221,14 +240,34 @@ export class LukPeruna {
             pkt.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
             ctx.stroke();
         }
-        ctx.lineWidth = 1;
         for (const iskra of this._iskry) {
-            ctx.strokeStyle = `rgba(${ri},${gi},${bi},${(N.ALFA_ISKRY * (1 - iskra.wiek / iskra.zycie) * obw).toFixed(3)})`;
-            ctx.beginPath();
-            punktyIskry(iskra, luk, sk).forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-            ctx.stroke();
+            // Jasna przez pierwszą połowę życia, potem gaśnie - iskra ma być WIDOCZNA, nie mignięcie.
+            const jas = Math.min(1, (1 - iskra.wiek / iskra.zycie) * 1.6) * obw;
+            const pkt = punktyIskry(iskra, luk, sk);
+            this._blyskNasady(ctx, pkt[0], sk, jas);
+            for (const [linia, grubosc, mnoz] of [[pkt, N.GRUBOSC_ISKRY, 1], [punktyOdnogi(iskra, luk, sk), N.GRUBOSC_ODNOGI, 0.7]]) {
+                ctx.strokeStyle = `rgba(${ri},${gi},${bi},${(N.ALFA_ISKRY * jas * mnoz).toFixed(3)})`;
+                ctx.lineWidth = grubosc;
+                ctx.beginPath();
+                linia.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+                ctx.stroke();
+            }
         }
         ctx.restore();
+    }
+
+    /** Mały błysk u nasady iskry - to on sprawia, że iskra jest widoczna jako wyładowanie. */
+    _blyskNasady(ctx, p, sk, jas) {
+        const N = NASTAWY;
+        const [r, g, b] = N.BARWA_ISKRY;
+        const R = sk * N.ISKRA_BLYSK_PROMIEN;
+        const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+        gr.addColorStop(0, `rgba(${r},${g},${b},${(N.ISKRA_BLYSK_ALFA * jas).toFixed(3)})`);
+        gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gr;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     /** Miękka mgiełka ładunku przy dłoni i mały spark_* - bez blendowania addytywnego. */
