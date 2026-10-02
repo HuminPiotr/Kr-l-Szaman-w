@@ -1,6 +1,6 @@
 /**
  * Śledzenie ciała dla technik, które TRWAJĄ i PODĄŻAJĄ za graczem (proste
- * combo 2026-10-02: Kamienna Tarcza, Kurzawa, Łuk Peruna, Wodna Kula, Mgła).
+ * combo 2026-10-02: Kamienna Tarcza, Kurzawa, Łuk Peruna, Kręgi Mokoszy, Mgła).
  *
  * Kołowrót zamraża zaczep w chwili zapal() - to wystarcza efektowi, który
  * rośnie i gaśnie w miejscu. Te techniki krążą WOKÓŁ ciała albo trzymają się

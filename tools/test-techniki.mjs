@@ -43,7 +43,7 @@ function zrobWorek(log) {
         dmuchanie: szpieg('dmuchanie'),
         kamiennaTarcza: szpieg('kamiennaTarcza'),
         mglaMokoszy: szpieg('mglaMokoszy'),
-        wodnaKula: szpieg('wodnaKula'),
+        kregiMokoszy: szpieg('kregiMokoszy'),
         lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
     };
@@ -110,7 +110,7 @@ testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zap
 
 testTechnika('mglaMokoszy', ['stribog', 'mokosz'], ['mglaMokoszy.zapal'], 'Mgła Mokoszy');
 
-testTechnika('wodnaKula', ['mokosz', 'weles'], ['wodnaKula.zapal'], 'Wodna Kula');
+testTechnika('kregiMokoszy', ['mokosz', 'weles'], ['kregiMokoszy.zapal'], 'Kręgi Mokoszy');
 
 testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna');
 
@@ -166,7 +166,7 @@ console.log('\nWOREK STANOWISKA VFX (tools/scena.html):');
     const html = readFileSync(new URL('./scena.html', import.meta.url), 'utf8');
     const worek = html.match(/const worekTechnik = \{([^}]*)\}/)?.[1] ?? '';
     const wBworku = new Set(worek.split(',').map(x => x.trim()).filter(Boolean));
-    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula', 'mglaMokoszy']) {
+    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy']) {
         spr(`worekTechnik w scena.html zawiera '${id}'`, wBworku.has(id));
     }
 }

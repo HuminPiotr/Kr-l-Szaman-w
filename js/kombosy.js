@@ -126,13 +126,13 @@ export const KOMBOSY = [
     { id: 'lukPeruna', nazwa: 'Łuk Peruna',
       sekwencja: ['mokosz', 'perun'], uzbraja: 'lukPeruna' },
 
-    // WODNA KULA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
-    // Mokosz - "Mać Ziemia Wilgotna" - woda wydobyta z ziemi zbiera się
-    // w kulę między dłońmi. Mokosz zaczyna Łuk i Kulę: druga pieczęć
+    // KRĘGI MOKOSZY (2026-10-03, zastąpiły Wodną Kulę z 2026-10-02):
+    // Mokosz - "Mać Ziemia Wilgotna" - gracz stoi po pas w wodzie, od ciała
+    // rozchodzą się kręgi fal. Mokosz zaczyna Łuk i Kręgi: druga pieczęć
     // rozstrzyga, jak rozgałęzienie w bijatyce. Łańcuch: mokosz->weles×3
-    // daje Kulę, potem Kamienną Tarczę.
-    { id: 'wodnaKula', nazwa: 'Wodna Kula',
-      sekwencja: ['mokosz', 'weles'], uzbraja: 'wodnaKula' },
+    // daje Kręgi, potem Kamienną Tarczę.
+    { id: 'kregiMokoszy', nazwa: 'Kręgi Mokoszy',
+      sekwencja: ['mokosz', 'weles'], uzbraja: 'kregiMokoszy' },
 
     // MGŁA MOKOSZY (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
     // wiatr (Stribog) niesie wilgoć (Mokosz) - mgła przetacza się przez

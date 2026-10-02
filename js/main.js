@@ -47,7 +47,7 @@ import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { KamiennaTarcza } from './kamiennaTarcza.js';
 import { MglaMokoszy } from './mglaMokoszy.js';
-import { WodnaKula } from './wodnaKula.js';
+import { KregiMokoszy } from './kregiMokoszy.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
@@ -206,7 +206,7 @@ let piorun = new Piorun();
 let kolowrot = new Kolowrot();
 let kamiennaTarcza = new KamiennaTarcza();
 let mglaMokoszy = new MglaMokoszy();
-let wodnaKula = new WodnaKula();
+let kregiMokoszy = new KregiMokoszy();
 let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
 
@@ -487,7 +487,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, wodnaKula, mglaMokoszy } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -760,7 +760,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, wodnaKula, mglaMokoszy
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -943,7 +943,7 @@ function klatka(now) {
     kolowrot.updateAndDraw(ctx, dt);
     kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
     mglaMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
-    wodnaKula.updateAndDraw(ctx, kontekstTechnik, dt);
+    kregiMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
 
@@ -1037,7 +1037,7 @@ function klatka(now) {
         piorun: { aktywny: piorun.aktywny },
         kamiennaTarcza: { aktywny: kamiennaTarcza.aktywny },
         mglaMokoszy: { aktywny: mglaMokoszy.aktywny },
-        wodnaKula: { aktywny: wodnaKula.aktywny },
+        kregiMokoszy: { aktywny: kregiMokoszy.aktywny },
         lukPeruna: { aktywny: lukPeruna.aktywny },
         kurzawa: { aktywny: kurzawa.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
