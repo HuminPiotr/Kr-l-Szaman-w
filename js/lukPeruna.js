@@ -28,7 +28,7 @@ import { simplex3 } from './szum.js';
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
 import { dlonieKlatki, barkiKlatki, Kotwica } from './sledzenie.js';
 
-export const CZAS_TRWANIA = 4.0;   // s - po testach: 6 s za krótko przy subtelnej v2, 12 s za długo przy wyraźnej v3
+export const CZAS_TRWANIA = 6.0;   // s - po testach: 6 s za krótko przy subtelnej v2, 12 s za długo, 4 s za mało przy wyraźnej v3
 
 export const NASTAWY = {
     ITERACJE: 5,                  // 2^5+1 = 33 punkty - dużo ostrych załamań
