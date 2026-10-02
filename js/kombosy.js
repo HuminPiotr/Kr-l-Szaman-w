@@ -132,7 +132,14 @@ export const KOMBOSY = [
     // rozstrzyga, jak rozgałęzienie w bijatyce. Łańcuch: mokosz->weles×3
     // daje Kulę, potem Kamienną Tarczę.
     { id: 'wodnaKula', nazwa: 'Wodna Kula',
-      sekwencja: ['mokosz', 'weles'], uzbraja: 'wodnaKula' }
+      sekwencja: ['mokosz', 'weles'], uzbraja: 'wodnaKula' },
+
+    // MGŁA MOKOSZY (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // wiatr (Stribog) niesie wilgoć (Mokosz) - mgła przetacza się przez
+    // kadr, gracz wynurza się z niej. Para stribog->mokosz nie koliduje
+    // z Tęczą (ta kończy się mokosz->stribog, odwrotnie).
+    { id: 'mglaMokoszy', nazwa: 'Mgła Mokoszy',
+      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' }
 ];
 
 export class KomboSilnik {

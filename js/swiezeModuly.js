@@ -35,6 +35,7 @@ import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { KamiennaTarcza } from './kamiennaTarcza.js';
+import { MglaMokoszy } from './mglaMokoszy.js';
 import { WodnaKula } from './wodnaKula.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
@@ -43,7 +44,7 @@ import { Kurzawa } from './kurzawa.js';
 export const KLUCZE_MODULOW = [
     'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula', 'mglaMokoszy'
 ];
 
 /**
@@ -76,6 +77,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         kamiennaTarcza: new KamiennaTarcza(),
         kurzawa: new Kurzawa(),
         lukPeruna: new LukPeruna(),
-        wodnaKula: new WodnaKula()
+        wodnaKula: new WodnaKula(),
+        mglaMokoszy: new MglaMokoszy()
     };
 }

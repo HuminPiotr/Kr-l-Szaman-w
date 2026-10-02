@@ -85,6 +85,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/sledzenie.js` | Zaczepy technik, które PODĄŻAJĄ za graczem (proste combo 2026-10-02): środki dłoni posortowane po x, środek i szerokość barków, `Kotwica` - wygładzenie + trzymanie ostatniego stanu, gdy dłoń/poza zniknie |
 | `js/warstwaZaSylwetka.js` | Płótno pomocnicze dla efektów ZA ciałem (Mgła, tył orbity Tarczy i Kurzawy): wycina maskę segmentacji (`destination-out`, ten sam `fit` co zaplon.js) przed nałożeniem na scenę; bez maski nakłada bez wycinania |
 | `js/kamiennaTarcza.js` | Kamienna Tarcza (weles×3) - odłamki ziemi (dirt_*) na orbicie wokół tułowia, tył orbity ZA sylwetką; zaczep śledzi barki co klatkę |
+| `js/mglaMokoszy.js` | Mgła Mokoszy (stribog→mokosz) - pas mgły (smoke_*) przetacza się przez kadr na wysokości tułowia, zwalnia przy graczu, rysowana ZA sylwetką |
 | `js/wodnaKula.js` | Wodna Kula (mokosz→weles) - kula wody między dłońmi: soczewka własna (kopia sceny, clip do koła), falujący brzeg-kreska (simplex3), krople-kreski, pęknięcie na końcu |
 | `js/lukPeruna.js` | Łuk Peruna (mokosz→perun) - łuk elektryczny między dłońmi (ścieżki piorun.js w układzie znormalizowanym, regenerowane co 60-90 ms), spark_* w końcówkach; jedna dłoń = wyładowanie w górę |
 | `js/kurzawa.js` | Kurzawa (stribog→weles) - lej pyłu (dirt_*) spiralą od pasa nad głowę z zawijasami wiru (twirl_*), tył leja ZA sylwetką; śledzi barki |

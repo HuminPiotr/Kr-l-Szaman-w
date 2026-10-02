@@ -42,6 +42,7 @@ function zrobWorek(log) {
         kolowrot: szpieg('kolowrot'),
         dmuchanie: szpieg('dmuchanie'),
         kamiennaTarcza: szpieg('kamiennaTarcza'),
+        mglaMokoszy: szpieg('mglaMokoszy'),
         wodnaKula: szpieg('wodnaKula'),
         lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
@@ -106,6 +107,8 @@ testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Strib
 testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
 
 testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
+
+testTechnika('mglaMokoszy', ['stribog', 'mokosz'], ['mglaMokoszy.zapal'], 'Mgła Mokoszy');
 
 testTechnika('wodnaKula', ['mokosz', 'weles'], ['wodnaKula.zapal'], 'Wodna Kula');
 

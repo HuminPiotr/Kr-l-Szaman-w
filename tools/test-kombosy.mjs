@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula', 'mglaMokoszy'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -270,5 +270,13 @@ spr('mokosz -> weles odpala Wodną Kulę', k23.dodaj('weles', 500)?.id === 'wodn
 const k24 = new KomboSilnik();
 k24.dodaj('mokosz', 0);
 spr('mokosz -> perun odpala Łuk (ta sama pierwsza pieczęć, inna technika)', k24.dodaj('perun', 500)?.id === 'lukPeruna');
+
+console.log('\nMGŁA MOKOSZY (stribog -> mokosz):');
+const k25 = new KomboSilnik();
+k25.dodaj('stribog', 0);
+spr('stribog -> mokosz odpala Mgłę Mokoszy', k25.dodaj('mokosz', 500)?.id === 'mglaMokoszy');
+const k26 = new KomboSilnik();
+k26.dodaj('swarog', 0); k26.dodaj('mokosz', 500);
+spr('Tęcza (swarog->mokosz->stribog) nadal odpala - odwrotna para nie koliduje', k26.dodaj('stribog', 1000)?.id === 'tecza');
 
 process.exit(ok ? 0 : 1);

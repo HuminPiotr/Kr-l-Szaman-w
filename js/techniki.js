@@ -51,7 +51,8 @@ export const BARWA_ZAPLONU = {
     kamiennaTarcza: [170, 120, 230],  // fiolet-kamień Welesa
     kurzawa: [215, 175, 110],          // piaskowa ochra pyłu
     lukPeruna: [150, 200, 255],   // błękit-biel Peruna
-    wodnaKula: [90, 200, 255]   // turkusowy błękit Mokoszy
+    wodnaKula: [90, 200, 255],   // turkusowy błękit Mokoszy
+    mglaMokoszy: [200, 228, 235]   // chłodna perła mgły
 };
 
 /**
@@ -84,7 +85,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, wodnaKula}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, wodnaKula, mglaMokoszy}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -157,6 +158,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
         // (barki) moduł liczy SAM co klatkę - patrz js/sledzenie.js.
         s.kamiennaTarcza.zapal(1.0);
+    } else if (technika.uzbraja === 'mglaMokoszy') {
+        // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
+        // (barki/dłonie) moduł liczy SAM co klatkę - patrz js/sledzenie.js.
+        s.mglaMokoszy.zapal(1.0);
     } else if (technika.uzbraja === 'wodnaKula') {
         // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
         // (barki/dłonie) moduł liczy SAM co klatkę - patrz js/sledzenie.js.

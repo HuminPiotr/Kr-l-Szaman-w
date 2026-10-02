@@ -122,7 +122,9 @@ export const TABELA = {
     // Błysk AKTYWACJI Łuk Peruna. Trwała treść żyje w js/lukPeruna.js.
     lukPeruna: { barwa: '210, 100%, 75%', ksztalt: 'blyskIFala', czas: 1.3 },
     // Błysk AKTYWACJI Wodna Kula. Trwała treść żyje w js/wodnaKula.js.
-    wodnaKula: { barwa: '195, 100%, 60%', ksztalt: 'blyskIFala', czas: 1.3 }
+    wodnaKula: { barwa: '195, 100%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Mgła Mokoszy. Trwała treść żyje w js/mglaMokoszy.js.
+    mglaMokoszy: { barwa: '190, 30%, 85%', ksztalt: 'blyskIFala', czas: 1.3 }
 };
 
 export class Efekty {
