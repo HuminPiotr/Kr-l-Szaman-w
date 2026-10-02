@@ -46,6 +46,7 @@ import { Ekran } from './ekran.js';
 import { Piorun } from './piorun.js';
 import { Kolowrot } from './kolowrot.js';
 import { KamiennaTarcza } from './kamiennaTarcza.js';
+import { WodnaKula } from './wodnaKula.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
@@ -203,6 +204,7 @@ let ekran = new Ekran();
 let piorun = new Piorun();
 let kolowrot = new Kolowrot();
 let kamiennaTarcza = new KamiennaTarcza();
+let wodnaKula = new WodnaKula();
 let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
 
@@ -756,7 +758,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, wodnaKula
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -938,6 +940,7 @@ function klatka(now) {
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
     kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
+    wodnaKula.updateAndDraw(ctx, kontekstTechnik, dt);
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
 
@@ -1030,6 +1033,7 @@ function klatka(now) {
         zaplon: { aktywny: zaplon.aktywny },
         piorun: { aktywny: piorun.aktywny },
         kamiennaTarcza: { aktywny: kamiennaTarcza.aktywny },
+        wodnaKula: { aktywny: wodnaKula.aktywny },
         lukPeruna: { aktywny: lukPeruna.aktywny },
         kurzawa: { aktywny: kurzawa.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },

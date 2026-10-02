@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'wodnaKula'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -262,5 +262,13 @@ const k22 = new KomboSilnik();
 k22.dodaj('perun', 0); k22.dodaj('weles', 500);
 spr('perun->weles->mokosz odpala Kołowrót', k22.dodaj('mokosz', 1000)?.id === 'kolowrot');
 spr('...a dołożony perun - Łuk Peruna', k22.dodaj('perun', 1500)?.id === 'lukPeruna');
+
+console.log('\nWODNA KULA (mokosz -> weles) - rozgałęzienie po mokosz:');
+const k23 = new KomboSilnik();
+k23.dodaj('mokosz', 0);
+spr('mokosz -> weles odpala Wodną Kulę', k23.dodaj('weles', 500)?.id === 'wodnaKula');
+const k24 = new KomboSilnik();
+k24.dodaj('mokosz', 0);
+spr('mokosz -> perun odpala Łuk (ta sama pierwsza pieczęć, inna technika)', k24.dodaj('perun', 500)?.id === 'lukPeruna');
 
 process.exit(ok ? 0 : 1);

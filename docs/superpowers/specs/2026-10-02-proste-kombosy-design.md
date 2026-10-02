@@ -45,9 +45,9 @@ efekt trzyma ostatni znany zaczep (wygładzony), nie znika i nie skacze.
 **Reużywane klocki:**
 - `js/piorun.js` — `generujPiorun(start, koniec, opcje)` / `segmentuj` dla Łuku (ścieżka
   dłoń↔dłoń regenerowana co ~60–90 ms = trzask); rdzeń `source-over` jak piorun.
-- `js/ekran.js` — `uderz()` w warstwie wspólnej (już w `odpalTechnike`); dla Kuli
-  wariant soczewki: nowa metoda `soczewka(srodek, promien)` oparta na tej samej
-  technice co `falaPowietrza` (kopia sceny przeskalowana, clip do koła).
+- `js/ekran.js` — `uderz()` w warstwie wspólnej (już w `odpalTechnike`). Wodna Kula ma
+  soczewkę WŁASNĄ (ten sam mechanizm co `_falaPowietrza`: kopia sceny przeskalowana,
+  clip do koła) — żeby odrzucenie Kuli nie zostawiało martwego kodu w `ekran.js`.
 - `js/czastki.js` — `krokTlumienia`, `obwiedniaCzastki`.
 - `js/assety.js` — `MANIFEST`, `obraz`, `wypalTintowany`.
 - `js/zaplon.js` — zapłon sylwetki (już wspólny w `odpalTechnike`).
@@ -86,7 +86,7 @@ Barwy podbite do pełnego nasycenia (rysowanie `'lighter'`), z rejestru `efekty.
    Barwa: błękit-biel Peruna.
 2. **Wodna Kula** (~6 s). Kula w środku między dłońmi, promień ~ połowa odległości
    dłoni (min/max względem skali barków). Brzeg = zamknięta kreska z falującym
-   promieniem (szum `js/szum.js`), wnętrze = soczewka refrakcyjna (`ekran.soczewka`),
+   promieniem (szum `js/szum.js`), wnętrze = soczewka refrakcyjna (soczewka własna w module Kuli),
    po obwodzie kilka kropel-kresek odrywających się stycznie. Na koniec kula pęka
    w krople. Barwa: turkus/błękit Mokoszy.
 3. **Mgła Mokoszy** (~7 s). Pas teksturowanej mgły (`smoke_*`) wjeżdża z jednej strony
@@ -134,6 +134,6 @@ Barwy podbite do pełnego nasycenia (rysowanie `'lighter'`), z rejestru `efekty.
 
 0. Zapis tego projektu jako spec `docs/superpowers/specs/2026-10-02-proste-kombosy-design.md`
    + commit; recenzja specu przez użytkownika; potem skill writing-plans.
-1. Fundament (1 commit): pobranie tekstur + MANIFEST, `ekran.soczewka`, przeróbka testu k2.
+1. Fundament (1 commit): pobranie tekstur + MANIFEST, przeróbka testu k2.
 2. Po jednym commicie: Kamienna Tarcza → Kurzawa (dzielą `dirt_*`) → Łuk Peruna →
    Wodna Kula → Mgła Mokoszy. Po każdej: testy + scena.

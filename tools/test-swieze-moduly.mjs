@@ -66,6 +66,7 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('runy puste', m.runy.aktywne.length === 0);
     spr('kołowrót nie trwa', m.kolowrot._trwa === false);
     spr('kamienna tarcza nie trwa', m.kamiennaTarcza.aktywny === false);
+    spr('wodna kula nie trwa', m.wodnaKula.aktywny === false);
     spr('łuk peruna nie trwa', m.lukPeruna.aktywny === false);
     spr('kurzawa nie trwa', m.kurzawa.aktywny === false);
     spr('zapłon nie trwa', m.zaplon._trwa === false);

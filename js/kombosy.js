@@ -124,7 +124,15 @@ export const KOMBOSY = [
     // należą do najpewniej rozpoznawanych. Łańcuch: Kołowrót kończy się na
     // mokosz, więc dołożony po nim perun odpala Łuk.
     { id: 'lukPeruna', nazwa: 'Łuk Peruna',
-      sekwencja: ['mokosz', 'perun'], uzbraja: 'lukPeruna' }
+      sekwencja: ['mokosz', 'perun'], uzbraja: 'lukPeruna' },
+
+    // WODNA KULA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // Mokosz - "Mać Ziemia Wilgotna" - woda wydobyta z ziemi zbiera się
+    // w kulę między dłońmi. Mokosz zaczyna Łuk i Kulę: druga pieczęć
+    // rozstrzyga, jak rozgałęzienie w bijatyce. Łańcuch: mokosz->weles×3
+    // daje Kulę, potem Kamienną Tarczę.
+    { id: 'wodnaKula', nazwa: 'Wodna Kula',
+      sekwencja: ['mokosz', 'weles'], uzbraja: 'wodnaKula' }
 ];
 
 export class KomboSilnik {
