@@ -97,7 +97,7 @@ console.log('\nSTYLISTYKA (elektryczność, nie błyskawica):');
     spr('coś się rysuje (nitki + iskry)', kreski > 0);
     spr('bez blendowania addytywnego "lighter" (nic nie świeci jak błyskawica)', !ops.has('lighter'));
     spr(`linie cienkie (maks. ${maxGrubosc} px <= 2)`, maxGrubosc <= 2);
-    spr('iskry żyją krótko - nigdy więcej niż kilkanaście naraz', lk._iskry.length <= 15 && lk._iskry.every(x => x.zycie <= NASTAWY.ISKRA_ZYCIE_MAX));
+    spr('iskry żyją krótko - nigdy więcej niż kilkadziesiąt naraz (limit pamięci)', lk._iskry.length <= 30 && lk._iskry.every(x => x.zycie <= NASTAWY.ISKRA_ZYCIE_MAX));
 }
 
 przepusc(l, klatka(), CZAS_TRWANIA);

@@ -39,8 +39,8 @@ export const NASTAWY = {
     ALFA_LUKU: 0.85, ALFA_DRUGIEJ_NITKI: 0.5,   // 0.55/0.3 było za subtelne
     GRUBOSC_LUKU: 2, GRUBOSC_DRUGIEJ: 1.2,   // px - stałe: to nitka, nie belka (test: <= 2)
     PRZYGASZENIE_ODPIECIA: 0.35,  // o tyle łuk blednie, gdy jedna dłoń jest odpięta
-    ISKRY_SERIA_MIN: 3, ISKRY_SERIA_MAX: 5,
-    ISKRY_ODSTEP_MIN: 0.1, ISKRY_ODSTEP_MAX: 0.25,   // s między seriami
+    ISKRY_SERIA_MIN: 6, ISKRY_SERIA_MAX: 10,   // 3-5 było za mało (2026-10-03)
+    ISKRY_ODSTEP_MIN: 0.06, ISKRY_ODSTEP_MAX: 0.15,   // s między seriami
     ISKRA_ZYCIE_MIN: 0.04, ISKRA_ZYCIE_MAX: 0.08,     // s
     ISKRA_DLUGOSC_OD: 0.08, ISKRA_DLUGOSC_DO: 0.2,    // skala * to
     ALFA_ISKRY: 0.95,
@@ -191,7 +191,7 @@ export class LukPeruna {
         this._doZaciecia -= krok;
         if (this._doZaciecia <= 0) { this._seed = Math.random() * 100; this._doZaciecia = losuj(N.ZACIECIE_MIN, N.ZACIECIE_MAX); }
 
-        // Iskry: serie 3-5 krótkich odskoków co 0.15-0.35 s.
+        // Iskry: serie krótkich odskoków (ISKRY_SERIA_*) co ISKRY_ODSTEP_* s.
         this._doSerii -= krok;
         if (this._doSerii <= 0) {
             const ile = Math.floor(losuj(N.ISKRY_SERIA_MIN, N.ISKRY_SERIA_MAX + 1));
