@@ -4,7 +4,7 @@
  *   node tools/test-kregi-mokoszy.mjs
  */
 import { KregiMokoszy, obwiednia, poziomWody, stanKregu, stanDysku, punktyKregu, prostokatSoczewki,
-         barwaKregu, nowePromienie, stanPromienia, pozycjaPromienia, CZAS_TRWANIA, NASTAWY } from '../js/kregiMokoszy.js';
+         barwaKregu, nowePromienie, stanPromienia, pozycjaPromienia, punktyPradu, CZAS_TRWANIA, NASTAWY } from '../js/kregiMokoszy.js';
 import { klatka, kontekst, przepusc, atrapaCtx, W, H } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -95,6 +95,26 @@ let rzucil = false;
 try { s.updateAndDraw(atrapaCtx(), kontekst(klatka()), 1 / 60); } catch (e) { rzucil = e; }
 spr('rysowanie (soczewka, tekstury, promienie) bez assetów i bez document nie rzuca', rzucil === false);
 
+console.log('\nPRĄD NA KRĘGACH (reakcja Przewodzenie):');
+{
+    const g = new KregiMokoszy();
+    spr('nieaktywne: geometria() null, naelektryzuj() false', g.geometria() === null && g.naelektryzuj() === false);
+    g.zapal(1);
+    przepusc(g, klatka(), 0.2);
+    const geo = g.geometria();
+    spr('geometria: środek na pasie, promień każdego żyjącego kręgu', !!geo && geo.cy === poziomWody(g.zaczep, H) && geo.promienie.length === g._kregi.length && geo.squash === NASTAWY.SQUASH);
+    spr('naelektryzuj() -> true', g.naelektryzuj() === true && g._elektryzacja > 0);
+    przepusc(g, klatka(), NASTAWY.ELEKTRYZACJA_S + 0.02);
+    spr('elektryzacja gaśnie po ELEKTRYZACJA_S bez odświeżenia', g._elektryzacja === 0);
+    const pp = punktyPradu(960, 600, 300, 0, 1);
+    spr('prąd: poszarpana linia (więcej punktów niż próbek łuku)', pp.length > NASTAWY.PRAD_PROBEK + 1);
+    spr('prąd leży przy elipsie kręgu (do 15% promienia)', pp.every(q => Math.abs(Math.hypot((q.x - 960) / 300, (q.y - 600) / (300 * NASTAWY.SQUASH)) - 1) < 0.15 / NASTAWY.SQUASH));
+    const g2 = new KregiMokoszy();
+    g2.zapal(1);
+    przepusc(g2, klatka(), CZAS_TRWANIA - 0.2);   // emisja stoi od 4.5 s, ostatni krąg ginie ~6.1 s
+    spr('trwają, ale bez żyjącego kręgu -> geometria() null', g2.aktywny && g2._kregi.length === 0 && g2.geometria() === null);
+}
+
 console.log('\nRYSOWANIE:');
 {
     const ops = new Set(); let kreski = 0;
@@ -110,7 +130,10 @@ console.log('\nRYSOWANIE:');
     });
     const kd = new KregiMokoszy();
     kd.zapal(1);
-    for (let i = 0; i < 60; i++) kd.updateAndDraw(rejestrator, kontekst(klatka()), 1 / 60);
+    for (let i = 0; i < 60; i++) {
+        if (i % 10 === 0) kd.naelektryzuj();   // prąd na kręgach też się rysuje
+        kd.updateAndDraw(rejestrator, kontekst(klatka()), 1 / 60);
+    }
     spr('kręgi się rysują', kreski > 0);
     spr('świecą (\'lighter\') - eteryczna energia, nie woda', ops.has('lighter'));
 }

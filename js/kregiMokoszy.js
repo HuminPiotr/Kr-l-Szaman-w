@@ -25,6 +25,7 @@
  * razy, przyciętą prostokątem nad i pod poziomem środka.
  */
 import { simplex3 } from './szum.js';
+import { segmentuj } from './piorun.js';
 import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } from './assety.js';
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
@@ -62,6 +63,14 @@ export const NASTAWY = {
     PROMIEN_DLUGOSC_OD: 0.3, PROMIEN_DLUGOSC_DO: 1.4,   // skala * to
     PROMIEN_SZEROKOSC: 0.14,      // skala * to
     ALFA_PROMIENIA: 0.8,
+    // Reakcja Przewodzenie (js/reakcjeTechnik.js): prąd biegnący po kręgach.
+    ELEKTRYZACJA_S: 0.4,          // s - tyle trwa elektryzacja po ostatnim naelektryzuj()
+    PRAD_NA_KRAG: 3,              // wyładowań na krąg
+    PRAD_ROZPIETOSC: Math.PI / 2, // ~1/4 obwodu
+    PRAD_PROBEK: 8,
+    PRAD_PREDKOSC: 4,             // rad/s - wyładowania biegną po kręgu
+    PRAD_ROZJASNIENIE: 0.4,       // alfa tekstury kręgu x (1 + to) przy pełnej elektryzacji
+    BARWA_PRADU: [90, 160, 255], BARWA_PRADU_RDZEN: [200, 225, 255],
     NAROST: 0.2, WYGASZENIE: 1.0, // s
     BARWA: [80, 220, 255],        // turkus Mokoszy - krąg przy narodzinach
     BARWA_KONCOWA: [40, 110, 255],// głęboki błękit - krąg na końcu życia
@@ -170,6 +179,26 @@ export function punktyKregu(cx, cy, R, t, seed) {
 }
 
 /**
+ * Poszarpane wyładowanie biegnące po kręgu (reakcja Przewodzenie) - próbki
+ * łuku elipsy połączone zygzakiem segmentuj(). Losowe przy każdym wołaniu (trzask).
+ * @returns {{x, y, przod:boolean}[]}
+ */
+export function punktyPradu(cx, cy, R, katStart, t) {
+    const N = NASTAWY;
+    const probki = [];
+    for (let i = 0; i <= N.PRAD_PROBEK; i++) {
+        const kat = katStart + (i / N.PRAD_PROBEK) * N.PRAD_ROZPIETOSC;
+        probki.push({ x: cx + Math.cos(kat) * R, y: cy + Math.sin(kat) * R * N.SQUASH, przod: Math.sin(kat) > 0 });
+    }
+    const wynik = [probki[0]];
+    for (let i = 0; i < probki.length - 1; i++) {
+        const seg = segmentuj(probki[i], probki[i + 1], 2, 0.35);
+        for (let j = 1; j < seg.length; j++) wynik.push({ x: seg[j].x, y: seg[j].y, przod: probki[i].przod });
+    }
+    return wynik;
+}
+
+/**
  * Prostokąt kopii sceny pod pierścieniem soczewki (zewnętrzna elipsa + margines),
  * przycięty do płótna - czysta funkcja.
  * @returns {{x0, y0, w, h}|null}  null, gdy pierścień całkiem poza kadrem
@@ -206,6 +235,8 @@ export class KregiMokoszy {
         this._promienie = [];  // [{ wiek, kat, wariant, dlugoscWsp }]
         this._doKregu = 0;
         this._urodzone = 0;
+        this._elektryzacja = 0;   // s do końca elektryzacji (reakcja Przewodzenie)
+        this._geom = null;        // geometria dla reakcji - patrz geometria()
         this._kotwica = new Kotwica(10);
         this._warstwa = new WarstwaZaSylwetka();
         this._plotno = null;
@@ -216,6 +247,16 @@ export class KregiMokoszy {
     get aktywny() { return this._trwa; }
 
     wyczyscCache() { wyczyscCacheAssetow(); }
+
+    /** Geometria żyjących kręgów (dla js/reakcjeTechnik.js). null, gdy nie trwa albo brak kręgu. */
+    geometria() { return this._trwa ? this._geom : null; }
+
+    /** Reakcja Przewodzenie: kręgi elektryzują się na ELEKTRYZACJA_S. @returns {boolean} */
+    naelektryzuj() {
+        if (!this._trwa) return false;
+        this._elektryzacja = NASTAWY.ELEKTRYZACJA_S;
+        return true;
+    }
 
     zapal(sila = 1) {
         const s = clamp01(sila);
@@ -228,6 +269,8 @@ export class KregiMokoszy {
         this._promienie = [];
         this._doKregu = 0;
         this._urodzone = 0;
+        this._elektryzacja = 0;
+        this._geom = null;
         this._kotwica.reset();
     }
 
@@ -242,6 +285,7 @@ export class KregiMokoszy {
         this.zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
         const sk = this.zaczep.skala, cx = this.zaczep.x, cy = poziomWody(this.zaczep, H);
+        this._elektryzacja = Math.max(0, this._elektryzacja - krok);
 
         for (const kr of this._kregi) kr.wiek += krok;
         for (const d of this._dyski) d.wiek += krok;
@@ -259,6 +303,9 @@ export class KregiMokoszy {
                 this._doKregu += N.ODSTEP_KREGOW;
             }
         }
+        // Geometria dla reakcji (js/reakcjeTechnik.js) - tylko żyjące kręgi.
+        const zywe = this._kregi.map(kr => stanKregu(kr.wiek)).filter(Boolean);
+        this._geom = zywe.length ? { cx, cy, squash: N.SQUASH, promienie: zywe.map(st => sk * st.promien) } : null;
         if (!ctx) return;   // guard PO zegarze, zaczepie i narodzinach - patrz kolowrot.js
 
         const alfa = obwiednia(this._t) * this._sila;
@@ -305,7 +352,7 @@ export class KregiMokoszy {
                 c.save();
                 c.translate(cx, cy);
                 c.scale(1, N.SQUASH);
-                c.globalAlpha = clamp01(N.ALFA_TEKSTURY * st.alfa * alfa);
+                c.globalAlpha = clamp01(N.ALFA_TEKSTURY * st.alfa * alfa * (1 + N.PRAD_ROZJASNIENIE * this._elektryzacja / N.ELEKTRYZACJA_S));
                 c.drawImage(wypalTintowany(img, barwaKregu(q), 256), -S / 2, -S / 2, S, S);
                 c.restore();
             }
@@ -318,6 +365,21 @@ export class KregiMokoszy {
             c.lineWidth = N.GRUBOSC_RDZENIA * st.grubosc;
             c.strokeStyle = `rgba(${rr},${gr},${br},${(N.ALFA_RDZENIA * st.alfa * alfa).toFixed(3)})`;
             rysujStrone(c, pkt, przod);
+        }
+        // Prąd na kręgach (reakcja Przewodzenie) - wyładowania biegną po obwodzie.
+        const e = this._elektryzacja / N.ELEKTRYZACJA_S;
+        if (e > 0) {
+            for (const { st } of kregi) {
+                const R = sk * st.promien;
+                for (let i = 0; i < N.PRAD_NA_KRAG; i++) {
+                    const pkt = punktyPradu(cx, cy, R, this._t * N.PRAD_PREDKOSC + i * Math.PI * 2 / N.PRAD_NA_KRAG, this._t);
+                    for (const [[r, g, b], a, w] of [[N.BARWA_PRADU, 0.9, 2], [N.BARWA_PRADU_RDZEN, 0.85, 1]]) {
+                        c.lineWidth = w;
+                        c.strokeStyle = `rgba(${r},${g},${b},${(a * e * st.alfa * alfa).toFixed(3)})`;
+                        rysujStrone(c, pkt, przod);
+                    }
+                }
+            }
         }
         // Promienie - smugi trace_* biegnące na zewnątrz przed krawędzią kręgu.
         for (const { pr, st, poz } of promienie) {
