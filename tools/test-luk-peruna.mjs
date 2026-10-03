@@ -94,6 +94,26 @@ let rzucil = false;
 try { bez.updateAndDraw(atrapaCtx(), kontekst(klatka({ barki: null })), 1 / 60); } catch (e) { rzucil = e; }
 spr('bez dłoni i pozy od początku - zastępcze końce, bez wyjątku', rzucil === false);
 
+console.log('\nODNOGI (reakcja Przewodzenie):');
+{
+    const lo = new LukPeruna();
+    spr('nieaktywny: srodek() null, wyladowanieDo() false', lo.srodek() === null && lo.wyladowanieDo({ x: 1, y: 1 }) === false);
+    lo.zapal(1);
+    przepusc(lo, dwieF, 0.3);
+    const sr = lo.srodek();
+    spr('srodek() = środek odcinka dłoń-dłoń', Math.abs(sr.x - 0.5 * 1920) < 3 && Math.abs(sr.y - 0.5 * 1080) < 3);
+    spr('zły cel -> false, bez wyjątku', lo.wyladowanieDo(null) === false && lo.wyladowanieDo({ x: NaN, y: 1 }) === false);
+    const cel = { x: 960, y: 900 };
+    spr('wyladowanieDo(punkt) -> true i nowa odnoga', lo.wyladowanieDo(cel) === true && lo._odnogi.length === 1);
+    const o = lo._odnogi[0];
+    spr('odnoga startuje NA zygzaku łuku i kończy w celu', lo._luk.some(p => p.x === o.start.x && p.y === o.start.y) && o.cel.x === 960 && o.cel.y === 900);
+    przepusc(lo, dwieF, NASTAWY.ODNOGA_ZYCIE + 0.02);
+    spr('odnoga ginie po ODNOGA_ZYCIE', lo._odnogi.length === 0);
+    lo.wyladowanieDo(cel);
+    lo.zapal(1);
+    spr('zapal() czyści odnogi', lo._odnogi.length === 0);
+}
+
 console.log('\nSTYLISTYKA:');
 {
     const ops = new Set(); let maxGrubosc = 0, kreski = 0;
@@ -113,7 +133,10 @@ console.log('\nSTYLISTYKA:');
     });
     const lk = new LukPeruna();
     lk.zapal(1);
-    for (let i = 0; i < 120; i++) lk.updateAndDraw(rejestrator, kontekst(dwieF), 1 / 60);
+    for (let i = 0; i < 120; i++) {
+        if (i % 10 === 5) lk.wyladowanieDo({ x: 960, y: 900 });   // odnogi tez <= 2 px i bez 'lighter'
+        lk.updateAndDraw(rejestrator, kontekst(dwieF), 1 / 60);
+    }
     spr('coś się rysuje', kreski > 0);
     spr('bez blendowania addytywnego "lighter"', !ops.has('lighter'));
     spr(`linie cienkie (maks. ${maxGrubosc} px <= 2)`, maxGrubosc <= 2);

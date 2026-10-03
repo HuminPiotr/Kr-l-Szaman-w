@@ -53,6 +53,7 @@ export const NASTAWY = {
     ISKRA_BLYSK_PROMIEN: 0.08, ISKRA_BLYSK_ALFA: 0.5, // skala * to; mały błysk u nasady iskry
     MGIELKA_PROMIEN: 0.6, MGIELKA_ALFA: 0.32,         // skala * to; alfa środka
     ROZBLYSK_MNOZNIK: 0.55, ROZBLYSK_ALFA: 0.4,       // spark_* przy dłoniach
+    ODNOGA_ZYCIE: 0.15,              // s - odnoga do kręgu (reakcja Przewodzenie, js/reakcjeTechnik.js)
     NAROST: 0.15, WYGASZENIE: 0.8,   // s
     BARWA: [90, 160, 255],           // elektryczny niebieski - główna linia, druga nitka, mgiełka
     BARWA_RDZENIA: [200, 225, 255],  // blady rdzeń - jasność bez grubej białej belki
@@ -178,6 +179,8 @@ export class LukPeruna {
         this._sila = 0;
         this._zygzak = null;
         this._zygzak2 = null;
+        this._luk = null;      // bieżący zygzak w px - czytany przez wyladowanieDo()
+        this._odnogi = [];     // [{ start, cel, zygzak, seed, wiek }] - reakcja Przewodzenie
         this._seed = 0;
         this._doOdswiezenia = 0;
         this._doSerii = 0;
@@ -193,6 +196,28 @@ export class LukPeruna {
 
     wyczyscCache() { wyczyscCacheAssetow(); }
 
+    /** Środek odcinka dłoń-dłoń (dla js/reakcjeTechnik.js). null, gdy Łuk nie trwa. */
+    srodek() {
+        if (!this._trwa || !this.konce) return null;
+        return { x: (this.konce.a.x + this.konce.b.x) / 2, y: (this.konce.a.y + this.konce.b.y) / 2 };
+    }
+
+    /**
+     * Reakcja Przewodzenie: krótka odnoga zygzaka z najbliższego punktu łuku do `punkt`.
+     * @returns {boolean} false, gdy Łuk nie trwa albo cel jest zepsuty
+     */
+    wyladowanieDo(punkt) {
+        if (!this._trwa || !this._luk?.length || !punkt || !Number.isFinite(punkt.x) || !Number.isFinite(punkt.y)) return false;
+        let start = this._luk[0], naj = Infinity;
+        for (const p of this._luk) {
+            const d = Math.hypot(p.x - punkt.x, p.y - punkt.y);
+            if (d < naj) { naj = d; start = p; }
+        }
+        this._odnogi.push({ start: { x: start.x, y: start.y }, cel: { x: punkt.x, y: punkt.y },
+                            zygzak: nowyZygzak(0.6), seed: Math.random() * 100, wiek: 0 });
+        return true;
+    }
+
     zapal(sila = 1) {
         const s = clamp01(sila);
         if (s <= 0.01) return;
@@ -201,6 +226,8 @@ export class LukPeruna {
         this._trwa = true;
         this._zygzak = null;
         this._zygzak2 = null;
+        this._luk = null;
+        this._odnogi = [];
         this._doOdswiezenia = 0;
         this._doSerii = 0;
         this._iskry = [];
@@ -235,6 +262,11 @@ export class LukPeruna {
             this._doOdswiezenia = losuj(N.ODSWIEZANIE_MIN, N.ODSWIEZANIE_MAX);
         }
 
+        // Bieżący zygzak w px liczony przed guardem ctx - czytają go reakcje (wyladowanieDo) co klatkę.
+        this._luk = mapujZygzak(this._zygzak, a, b, sk, this._t, this._seed);
+        for (const o of this._odnogi) o.wiek += krok;
+        this._odnogi = this._odnogi.filter(o => o.wiek < N.ODNOGA_ZYCIE);
+
         // Iskry: serie odskoków (ISKRY_SERIA_*) co ISKRY_ODSTEP_* s.
         this._doSerii -= krok;
         if (this._doSerii <= 0) {
@@ -248,7 +280,7 @@ export class LukPeruna {
 
         const obw = obwiednia(this._t) * this._sila;
         if (obw < 0.01) return;
-        const luk = mapujZygzak(this._zygzak, a, b, sk, this._t, this._seed);
+        const luk = this._luk;
         const luk2 = mapujZygzak(this._zygzak2, a, b, sk, this._t, this._seed + 31);
         const [ri, gi, bi] = N.BARWA_ISKRY;
 
@@ -269,6 +301,18 @@ export class LukPeruna {
             ctx.beginPath();
             pkt.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
             ctx.stroke();
+        }
+        // Odnogi do kręgów (reakcja Przewodzenie) - ten sam styl co główna linia.
+        for (const o of this._odnogi) {
+            const jas = (1 - o.wiek / N.ODNOGA_ZYCIE) * obw;
+            const pkt = mapujZygzak(o.zygzak, o.start, o.cel, sk, this._t, o.seed);
+            for (const [[r, g, bb], alfa, grubosc] of [[N.BARWA, N.ALFA_LUKU, N.GRUBOSC_LUKU], [N.BARWA_RDZENIA, N.ALFA_RDZENIA, N.GRUBOSC_RDZENIA]]) {
+                ctx.strokeStyle = `rgba(${r},${g},${bb},${(alfa * jas).toFixed(3)})`;
+                ctx.lineWidth = grubosc;
+                ctx.beginPath();
+                pkt.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+                ctx.stroke();
+            }
         }
         ctx.lineJoin = 'round';
         for (const iskra of this._iskry) {
