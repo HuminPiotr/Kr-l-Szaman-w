@@ -30,14 +30,14 @@ import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } 
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 
-export const CZAS_TRWANIA = 6.0;   // s
+export const CZAS_TRWANIA = 12.0;   // s - x2 (2026-10-03): trzeba zdążyć z drugim combo (reakcje)
 
 export const NASTAWY = {
     POZIOM_MNOZNIK: 1.3,          // skala * to pod barkami = wysokość kręgów (pas)
     DOL_EKRANU: 0.9,              // nigdy niżej niż H * to
-    EMISJA_S: 4.5,                // s - przez tyle rodzą się nowe kręgi
-    ODSTEP_KREGOW: 1.0,           // s
-    ZYCIE_KREGU: 1.6,             // s
+    EMISJA_S: 9,                  // s - przez tyle rodzą się nowe kręgi (było 4.5)
+    ODSTEP_KREGOW: 1.8,           // s (było 1.0)
+    ZYCIE_KREGU: 3.2,             // s - krąg rozchodzi się 2x wolniej (było 1.6)
     PROMIEN_OD: 0.6, PROMIEN_DO: 5.5,   // skala * to
     SQUASH: 0.28,                 // płaska elipsa wokół pasa
     FALOWANIE: 0.02,              // ułamek promienia - rdzeń nie jest idealną elipsą

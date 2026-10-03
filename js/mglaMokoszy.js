@@ -14,13 +14,13 @@ import { MANIFEST, obraz, wypalTintowany, wyczyscCache as wyczyscCacheAssetow } 
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 
-export const CZAS_TRWANIA = 7.0;   // s
+export const CZAS_TRWANIA = 11.0;   // s - było 7 (2026-10-03): trzeba zdążyć z drugim combo (reakcje)
 
 export const NASTAWY = {
     LICZBA: 28,
-    OPOZNIENIE_MAX: 1.6,       // s - kłęby wjeżdżają falą, nie ścianą
-    CZAS_PRZEJAZDU: 3.2,       // s na przejazd przez całe W bez zwalniania
-    ZWOLNIENIE: 0.45,          // minimalny mnożnik prędkości przy sylwetce
+    OPOZNIENIE_MAX: 3.0,       // s - kłęby wjeżdżają falą, nie ścianą (było 1.6)
+    CZAS_PRZEJAZDU: 6.5,       // s na przejazd przez całe W bez zwalniania (było 3.2)
+    ZWOLNIENIE: 0.3,           // minimalny mnożnik prędkości przy sylwetce (było 0.45) - mgła dłużej wisi wokół gracza
     ZASIEG_ZWOLNIENIA: 2.2,    // skala * to - od tej odległości od ciała mgła zwalnia
     PAS_OD: -0.6, PAS_DO: 2.0, // skala * to względem barków - pas od szyi do bioder
     ROZMIAR_OD: 2.0, ROZMIAR_DO: 3.6,   // skala * to
