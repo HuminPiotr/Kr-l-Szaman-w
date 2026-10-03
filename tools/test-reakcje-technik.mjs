@@ -1,0 +1,84 @@
+/**
+ * js/reakcjeTechnik.js - warunki, rytm i jednostki reakcji Przewodzenie i
+ * Burza w mgle; techniki zastąpione szpiegami.
+ *   node tools/test-reakcje-technik.mjs
+ */
+import { ReakcjeTechnik, punktNaKregu, NASTAWY } from '../js/reakcjeTechnik.js';
+
+let ok = true;
+const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
+const DT = 1 / 60;
+
+function szpiedzy({ luk = false, kregi = false, mgla = false, piorun = false,
+                    geom = { cx: 960, cy: 700, squash: 0.28, promienie: [300] }, uderzenie = { x: 900, y: 950 } } = {}) {
+    const log = [];
+    return {
+        log,
+        t: {
+            lukPeruna: { aktywny: luk, srodek: () => ({ x: 960, y: 500 }), wyladowanieDo: (p) => { log.push(['luk.wyladowanieDo', p]); return true; } },
+            kregiMokoszy: { aktywny: kregi, geometria: () => geom, naelektryzuj: () => { log.push(['kregi.naelektryzuj']); return true; } },
+            mglaMokoszy: { aktywny: mgla, rozblysk: (z, s) => { log.push(['mgla.rozblysk', z, s]); return true; } },
+            piorun: { aktywny: piorun, punktUderzenia: uderzenie }
+        }
+    };
+}
+const biegnij = (r, t, sek, los) => {
+    const s = { przewodzenie: 0, burzaWMgle: 0 };
+    for (let i = 0; i < Math.round(sek / DT); i++) { const w = r.klatka(t, DT, los); s.przewodzenie += w.przewodzenie; s.burzaWMgle += w.burzaWMgle; }
+    return s;
+};
+
+console.log('PUNKT NA KRĘGU:');
+const geom = { cx: 960, cy: 700, squash: 0.28, promienie: [300, 500] };
+const p = punktNaKregu(geom, { x: 960, y: 200 }, 1);
+spr('leży na elipsie wskazanego kręgu', Math.abs(Math.hypot((p.x - 960) / 500, (p.y - 700) / (500 * 0.28)) - 1) < 1e-9);
+spr('po stronie celu (cel nad środkiem -> punkt nad środkiem)', p.y < 700);
+spr('zła geometria/cel -> null', punktNaKregu(null, { x: 1, y: 1 }, 0) === null && punktNaKregu(geom, null, 0) === null && punktNaKregu(geom, { x: 1, y: 1 }, 9) === null);
+
+console.log('\nPRZEWODZENIE:');
+{
+    const { t, log } = szpiedzy({ luk: true, kregi: true });
+    const s = biegnij(new ReakcjeTechnik(), t, 3, () => 0.5);
+    const oczek = Math.floor(3 / NASTAWY.ODSTEP_PRZEWODZENIA) + 1;
+    spr(`wyładowanie co ${NASTAWY.ODSTEP_PRZEWODZENIA} s, pierwsze od razu (${s.przewodzenie} ~ ${oczek})`, Math.abs(s.przewodzenie - oczek) <= 1);
+    spr('każde wyładowanie: łuk sięga do kręgu i kręgi się elektryzują',
+        log.filter(w => w[0] === 'luk.wyladowanieDo').length === s.przewodzenie && log.filter(w => w[0] === 'kregi.naelektryzuj').length === s.przewodzenie);
+    for (const [opis, o] of [['bez Łuku', { kregi: true }], ['bez Kręgów', { luk: true }], ['Kręgi bez żyjącego kręgu', { luk: true, kregi: true, geom: null }]]) {
+        const sp = szpiedzy(o);
+        const w = biegnij(new ReakcjeTechnik(), sp.t, 1);
+        spr(`${opis}: zero jednostek i zero wywołań`, w.przewodzenie === 0 && !sp.log.some(x => x[0] !== 'mgla.rozblysk'));
+    }
+}
+
+console.log('\nBURZA W MGLE:');
+{
+    const { t, log } = szpiedzy({ luk: true, mgla: true });
+    const s = biegnij(new ReakcjeTechnik(), t, 2, () => 0.5);
+    const odstep = NASTAWY.BLYSK_ODSTEP_MIN + 0.5 * (NASTAWY.BLYSK_ODSTEP_MAX - NASTAWY.BLYSK_ODSTEP_MIN);
+    // Odstęp ~0.105 s to ~6.3 klatki - kwantyzacja do pełnych klatek daje kilka błysków mniej, stąd tolerancja 3.
+    spr(`błyski w rytmie (${s.burzaWMgle} ~ ${Math.floor(2 / odstep) + 1})`, Math.abs(s.burzaWMgle - (Math.floor(2 / odstep) + 1)) <= 3);
+    spr('źródło: środek Łuku, gdy Łuk trwa', log.filter(w => w[0] === 'mgla.rozblysk').every(w => w[1].x === 960 && w[1].y === 500));
+    const g = szpiedzy({ piorun: true, mgla: true });
+    biegnij(new ReakcjeTechnik(), g.t, 0.5, () => 0.5);
+    spr('bez Łuku źródłem jest punkt uderzenia pioruna', g.log.length > 0 && g.log.every(w => w[1].x === 900 && w[1].y === 950));
+    const brak = szpiedzy({ piorun: true, mgla: true, uderzenie: null });
+    const wb = biegnij(new ReakcjeTechnik(), brak.t, 0.5);
+    spr('punkt uderzenia null -> nic nie liczone ani wołane', wb.burzaWMgle === 0 && brak.log.length === 0);
+    const bezMgly = szpiedzy({ luk: true, piorun: true });
+    spr('bez Mgły: zero', biegnij(new ReakcjeTechnik(), bezMgly.t, 1).burzaWMgle === 0);
+}
+
+console.log('\nODPORNOŚĆ:');
+{
+    const { t } = szpiedzy({ luk: true, kregi: true, mgla: true });
+    const w = new ReakcjeTechnik().klatka(t, 5);   // karta wróciła po 5 s
+    spr('ogromne dt -> najwyżej 1 jednostka na reakcję', w.przewodzenie <= 1 && w.burzaWMgle <= 1);
+    let rzucil = false;
+    try { new ReakcjeTechnik().klatka({}, DT); new ReakcjeTechnik().klatka(null, NaN); } catch { rzucil = true; }
+    spr('brak technik / zepsute dt - bez wyjątku', !rzucil);
+    const r = new ReakcjeTechnik();
+    spr('nowa instancja bezczynna', r._doPrzewodzenia === 0 && r._doBlysku === 0);
+}
+
+console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
+process.exit(ok ? 0 : 1);

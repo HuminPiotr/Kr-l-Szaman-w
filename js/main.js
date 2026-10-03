@@ -50,6 +50,7 @@ import { MglaMokoszy } from './mglaMokoszy.js';
 import { KregiMokoszy } from './kregiMokoszy.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
+import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
 import { zaladuj as zaladujAssety } from './assety.js';
@@ -209,6 +210,7 @@ let mglaMokoszy = new MglaMokoszy();
 let kregiMokoszy = new KregiMokoszy();
 let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
+let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
 // zamiast natychmiast wracać do zaproszenia do tańca.
@@ -487,7 +489,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -946,6 +948,11 @@ function klatka(now) {
     kregiMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
+    // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
+    // techniki w następnej klatce; tu tylko warunki i punkty.
+    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
+    punkty.reakcja('przewodzenie', reakcjeKlatki.przewodzenie, now);
+    punkty.reakcja('burzaWMgle', reakcjeKlatki.burzaWMgle, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w

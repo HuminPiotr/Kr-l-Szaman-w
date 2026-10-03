@@ -74,6 +74,7 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('efekty puste', m.efekty.aktywne.length === 0);
     spr('runy puste', m.runy.aktywne.length === 0);
     spr('kołowrót nie trwa', m.kolowrot._trwa === false);
+    spr('reakcje technik bezczynne', m.reakcjeTechnik._doPrzewodzenia === 0 && m.reakcjeTechnik._doBlysku === 0);
     spr('kamienna tarcza nie trwa', m.kamiennaTarcza.aktywny === false);
     spr('mgła mokoszy nie trwa', m.mglaMokoszy.aktywny === false);
     spr('kręgi mokoszy nie trwają', m.kregiMokoszy.aktywny === false);

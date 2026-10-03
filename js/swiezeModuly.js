@@ -39,12 +39,13 @@ import { MglaMokoszy } from './mglaMokoszy.js';
 import { KregiMokoszy } from './kregiMokoszy.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
+import { ReakcjeTechnik } from './reakcjeTechnik.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
     'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'reakcjeTechnik'
 ];
 
 /**
@@ -78,6 +79,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         kurzawa: new Kurzawa(),
         lukPeruna: new LukPeruna(),
         kregiMokoszy: new KregiMokoszy(),
-        mglaMokoszy: new MglaMokoszy()
+        mglaMokoszy: new MglaMokoszy(),
+        reakcjeTechnik: new ReakcjeTechnik()
     };
 }

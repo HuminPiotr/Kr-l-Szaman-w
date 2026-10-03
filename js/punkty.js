@@ -60,7 +60,13 @@ export const REAKCJE = {
     // Wybuchnięty kłąb podpalonego dymu (js/dym.js - updateAndDraw).
     pozoga: { nazwa: 'Pożoga', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
-    rozwianie: { nazwa: 'Rozwianie', punkty: 2, pelneDo: 30, przerwaMs: 10000 }
+    rozwianie: { nazwa: 'Rozwianie', punkty: 2, pelneDo: 30, przerwaMs: 10000 },
+    // Łuk Peruna wypuszcza odnogę do kręgu Kręgów Mokoszy (js/reakcjeTechnik.js), co 0.3 s.
+    // Typowe nałożenie ~4.5 s = ~15 wyładowań = ~200 pkt (jak jedna prosta technika).
+    przewodzenie: { nazwa: 'Przewodzenie', punkty: 15, pelneDo: 10, przerwaMs: 1500 },
+    // Błysk mgły Mokoszy od Łuku Peruna lub pioruna Gromu w Ziemię, co 60-150 ms.
+    // Pojedynczy Grom ~45 pkt; Łuk w mgle ~5 s ~200 pkt.
+    burzaWMgle: { nazwa: 'Burza w mgle', punkty: 10, pelneDo: 12, przerwaMs: 1500 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

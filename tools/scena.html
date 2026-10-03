@@ -188,6 +188,7 @@ const { MglaMokoszy, NASTAWY: NASTAWY_MGLAMOKOSZY } = await import('./js/mglaMok
 const { KregiMokoszy, NASTAWY: NASTAWY_KREGIMOKOSZY } = await import('./js/kregiMokoszy.js');
 const { LukPeruna, NASTAWY: NASTAWY_LUKPERUNA } = await import('./js/lukPeruna.js');
 const { Kurzawa, NASTAWY: NASTAWY_KURZAWA } = await import('./js/kurzawa.js');
+const { ReakcjeTechnik } = await import('./js/reakcjeTechnik.js');
 
 zaladujFont();
 zaladujAssety().catch(() => {});
@@ -216,6 +217,7 @@ const mglaMokoszy = new MglaMokoszy();
 const kregiMokoszy = new KregiMokoszy();
 const lukPeruna = new LukPeruna();
 const kurzawa = new Kurzawa();
+const reakcjeTechnik = new ReakcjeTechnik();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
 
@@ -431,6 +433,7 @@ function rysujKlatke(dt, frame) {
     kregiMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
+    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
