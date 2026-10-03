@@ -235,6 +235,17 @@ export class Piorun {
     get aktywny() { return this._trwa; }
 
     /**
+     * Punkt uderzenia bieżącego błysku (koniec głównej ścieżki) - dla reakcji
+     * Burza w mgle (js/reakcjeTechnik.js). null, gdy piorun nie trwa.
+     */
+    get punktUderzenia() {
+        if (!this._trwa || !this._blyski.length) return null;
+        const glowna = this._blyski[0].glowna;
+        const p = glowna?.[glowna.length - 1];
+        return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: p.x, y: p.y } : null;
+    }
+
+    /**
      * Uderzenie. Ścieżki WSZYSTKICH błysków generowane TERAZ, raz - patrz
      * nagłówek pliku ("nie regenerowana klatka po klatce").
      *
