@@ -25,6 +25,10 @@ export const NASTAWY = {
     PAS_OD: -0.6, PAS_DO: 2.0, // skala * to względem barków - pas od szyi do bioder
     ROZMIAR_OD: 2.0, ROZMIAR_DO: 3.6,   // skala * to
     ALFA: 0.38,
+    // Reakcja Burza w mgle (js/reakcjeTechnik.js): mgła błyska od środka.
+    BLYSK_ZYCIE: 0.12,             // s
+    ZASIEG_BLYSKU: 4,              // skala * to - dalej od źródła błysk nie sięga
+    BARWA_BLYSKU: [200, 225, 255],
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
@@ -43,6 +47,11 @@ export function predkoscKlebu(x, cx, v0, skala) {
     return v0 * (N.ZWOLNIENIE + (1 - N.ZWOLNIENIE) * blisko);
 }
 
+/** Jasność błysku kłębu w odległości `odl` px od źródła - 1 przy źródle, 0 od ZASIEG_BLYSKU skali. */
+export function jasnoscBlysku(odl, skala) {
+    return clamp01(1 - odl / (skala * NASTAWY.ZASIEG_BLYSKU));
+}
+
 export class MglaMokoszy {
     constructor() {
         this._t = 0;
@@ -50,6 +59,7 @@ export class MglaMokoszy {
         this._sila = 0;
         this._kleby = [];
         this._doNarodzin = false;
+        this._blysk = null;   // { x, y, sila, wiek } - reakcja Burza w mgle
         this._kotwica = new Kotwica(8);
         this._warstwa = new WarstwaZaSylwetka();
     }
@@ -57,6 +67,13 @@ export class MglaMokoszy {
     get aktywny() { return this._trwa; }
 
     wyczyscCache() { wyczyscCacheAssetow(); }
+
+    /** Reakcja Burza w mgle: mgła błyska od `zrodlo` (px). @returns {boolean} */
+    rozblysk(zrodlo, sila = 1) {
+        if (!this._trwa || !zrodlo || !Number.isFinite(zrodlo.x) || !Number.isFinite(zrodlo.y)) return false;
+        this._blysk = { x: zrodlo.x, y: zrodlo.y, sila: clamp01(sila), wiek: 0 };
+        return true;
+    }
 
     zapal(sila = 1) {
         const s = clamp01(sila);
@@ -66,6 +83,7 @@ export class MglaMokoszy {
         this._trwa = true;
         this._kleby = [];
         this._doNarodzin = true;
+        this._blysk = null;
         this._kotwica.reset();
     }
 
@@ -104,6 +122,10 @@ export class MglaMokoszy {
             c.x += predkoscKlebu(c.x, zaczep.x, c.v0, zaczep.skala) * krok;
             c.obrot += c.vObrot * krok;
         }
+        if (this._blysk) {
+            this._blysk.wiek += krok;
+            if (this._blysk.wiek >= NASTAWY.BLYSK_ZYCIE) this._blysk = null;
+        }
         if (!ctx) return;
 
         const alfa = obwiednia(this._t) * this._sila * NASTAWY.ALFA;
@@ -119,6 +141,17 @@ export class MglaMokoszy {
             warstwa.rotate(c.obrot);
             warstwa.globalAlpha = clamp01(alfa * Math.min(1, c.wiek / 0.5));
             warstwa.drawImage(wypalTintowany(img, NASTAWY.BARWA, 256), -c.rozmiar / 2, -c.rozmiar / 2, c.rozmiar, c.rozmiar);
+            if (this._blysk) {
+                // Błysk od środka: ten sam kłąb, jasny i addytywny, słabnący z odległością od wyładowania.
+                const b = this._blysk;
+                const jas = jasnoscBlysku(Math.hypot(c.x - b.x, c.y - b.y), zaczep.skala) * (1 - b.wiek / NASTAWY.BLYSK_ZYCIE) * b.sila;
+                if (jas > 0.01) {
+                    warstwa.globalCompositeOperation = 'lighter';
+                    warstwa.globalAlpha = clamp01(jas * this._sila);
+                    warstwa.drawImage(wypalTintowany(img, NASTAWY.BARWA_BLYSKU, 256), -c.rozmiar / 2, -c.rozmiar / 2, c.rozmiar, c.rozmiar);
+                    warstwa.globalCompositeOperation = 'source-over';
+                }
+            }
             warstwa.restore();
         }
         this._warstwa.zakoncz(ctx, k.maska, k.maskaSzer, k.maskaWys, k.fit);

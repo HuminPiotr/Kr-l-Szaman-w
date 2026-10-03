@@ -2,7 +2,7 @@
  * Mgła Mokoszy - przetaczanie się przez kadr, zwalnianie przy sylwetce; bez document.
  *   node tools/test-mgla-mokoszy.mjs
  */
-import { MglaMokoszy, obwiednia, predkoscKlebu, CZAS_TRWANIA, NASTAWY } from '../js/mglaMokoszy.js';
+import { MglaMokoszy, obwiednia, predkoscKlebu, jasnoscBlysku, CZAS_TRWANIA, NASTAWY } from '../js/mglaMokoszy.js';
 import { klatka, kontekst, przepusc, atrapaCtx, W } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -31,6 +31,24 @@ try { m.updateAndDraw(atrapaCtx(), kontekst(klatka()), 1 / 60); } catch (e) { rz
 spr('rysowanie (atrapa, bez assetów i document) nie rzuca', rzucil === false);
 przepusc(m, klatka(), CZAS_TRWANIA);
 spr('gaśnie po CZAS_TRWANIA', m.aktywny === false);
+
+console.log('\nBŁYSK W MGLE (reakcja Burza w mgle):');
+{
+    spr('jasność 1 przy źródle, maleje z odległością, 0 daleko',
+        jasnoscBlysku(0, 200) === 1 && jasnoscBlysku(200, 200) < 1 && jasnoscBlysku(200, 200) > jasnoscBlysku(500, 200) && jasnoscBlysku(1e6, 200) === 0);
+    const mb = new MglaMokoszy();
+    spr('nieaktywna: rozblysk() false', mb.rozblysk({ x: 1, y: 1 }, 1) === false);
+    mb.zapal(1);
+    przepusc(mb, klatka(), 0.5);
+    spr('zły punkt -> false, bez wyjątku', mb.rozblysk(null, 1) === false && mb.rozblysk({ x: NaN, y: 0 }, 1) === false);
+    spr('rozblysk() -> true', mb.rozblysk({ x: 960, y: 500 }, 1) === true && mb._blysk !== null);
+    przepusc(mb, klatka(), NASTAWY.BLYSK_ZYCIE + 0.02);
+    spr('błysk gaśnie po BLYSK_ZYCIE', mb._blysk === null);
+    mb.rozblysk({ x: 960, y: 500 }, 1);
+    let rzucilB = false;
+    try { mb.updateAndDraw(atrapaCtx(), kontekst(klatka()), 1 / 60); } catch (e) { rzucilB = e; }
+    spr('rysowanie z błyskiem nie rzuca', rzucilB === false);
+}
 
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);
