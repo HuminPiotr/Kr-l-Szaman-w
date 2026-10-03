@@ -102,7 +102,44 @@ export const KOMBOSY = [
     // [swarog, perun] w chwili czwartej pieczęci) - dokładnie łańcuch "dym,
     // potem zapałka", jakiego wymaga podpalenie dymu. Patrz test-kombosy.mjs.
     { id: 'dym', nazwa: 'Okadzenie',
-      sekwencja: ['swarog', 'stribog', 'swarog'], uzbraja: 'dym' }
+      sekwencja: ['swarog', 'stribog', 'swarog'], uzbraja: 'dym' },
+
+    // KAMIENNA TARCZA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // ziemia złożona trzy razy - odłamki krążą wokół tułowia. Jedyne nowe
+    // POWTÓRZENIE w tej partii (wybór właściciela gry). Weles po raz pierwszy
+    // ZACZYNA sekwencję - test k2 w test-kombosy.mjs startuje teraz od mokosz.
+    // Natychmiastowa jak Kołowrót (`uzbraja` = własne id).
+    { id: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza',
+      sekwencja: ['weles', 'weles', 'weles'], uzbraja: 'kamiennaTarcza' },
+
+    // KURZAWA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md): wiatr
+    // (Stribog) podrywa ziemię (Weles) - lej pyłu wokół tancerza. Para
+    // stribog->weles nie jest prefiksem/sufiksem żadnej trójki. Łańcuch:
+    // stribog->weles->weles->weles daje Kurzawę, potem Kamienną Tarczę.
+    { id: 'kurzawa', nazwa: 'Kurzawa',
+      sekwencja: ['stribog', 'weles'], uzbraja: 'kurzawa' },
+
+    // ŁUK PERUNA (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // woda przewodzi piorun - łuk elektryczny między dłońmi. Obie pieczęcie
+    // należą do najpewniej rozpoznawanych. Łańcuch: Kołowrót kończy się na
+    // mokosz, więc dołożony po nim perun odpala Łuk.
+    { id: 'lukPeruna', nazwa: 'Łuk Peruna',
+      sekwencja: ['mokosz', 'perun'], uzbraja: 'lukPeruna' },
+
+    // KRĘGI MOKOSZY (2026-10-03, zastąpiły Wodną Kulę z 2026-10-02):
+    // Mokosz - "Mać Ziemia Wilgotna" - gracz stoi po pas w wodzie, od ciała
+    // rozchodzą się kręgi fal. Mokosz zaczyna Łuk i Kręgi: druga pieczęć
+    // rozstrzyga, jak rozgałęzienie w bijatyce. Łańcuch: mokosz->weles×3
+    // daje Kręgi, potem Kamienną Tarczę.
+    { id: 'kregiMokoszy', nazwa: 'Kręgi Mokoszy',
+      sekwencja: ['mokosz', 'weles'], uzbraja: 'kregiMokoszy' },
+
+    // MGŁA MOKOSZY (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
+    // wiatr (Stribog) niesie wilgoć (Mokosz) - mgła przetacza się przez
+    // kadr, gracz wynurza się z niej. Para stribog->mokosz nie koliduje
+    // z Tęczą (ta kończy się mokosz->stribog, odwrotnie).
+    { id: 'mglaMokoszy', nazwa: 'Mgła Mokoszy',
+      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' }
 ];
 
 export class KomboSilnik {

@@ -166,4 +166,15 @@ pi6.uderz({ x: 0, y: 0 }, [1, 1, 1], 1);
 pi6.updateAndDraw(null, NaN);
 spr('NaN dt -> krok zero, bez wyjątku, dalej aktywny', pi6._t === 0 && pi6.aktywny === true);
 
+console.log('\nPUNKT UDERZENIA (dla reakcji Burza w mgle):');
+{
+    const p = new Piorun();
+    spr('przed uderzeniem: null', p.punktUderzenia === null);
+    p.uderz({ x: 700, y: 900 }, [190, 100, 255], 1);
+    const pu = p.punktUderzenia;
+    spr('w trakcie: koniec głównej ścieżki = punkt uderzenia', !!pu && pu.x === 700 && pu.y === 900);
+    for (let i = 0; i < Math.ceil((T_CALKOWITY + 0.1) * 60); i++) p.updateAndDraw(null, 1 / 60);
+    spr('po zgaśnięciu: null', p.punktUderzenia === null);
+}
+
 process.exit(ok ? 0 : 1);

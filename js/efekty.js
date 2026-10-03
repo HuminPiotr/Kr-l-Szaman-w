@@ -113,7 +113,18 @@ export const TABELA = {
     // dymu, który zaraz zacznie unosić się naprawdę (js/dym.js). Chłodna,
     // jasna szarość - ŚWIADOMIE nie pomarańcz/fiolet/bursztyn jak inne
     // błyski technik: dym jeszcze nie płonie.
-    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 }
+    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 },
+    // Błysk AKTYWACJI Kamiennej Tarczy (weles×3). Trwała treść (orbita
+    // odłamków) żyje w js/kamiennaTarcza.js.
+    kamiennaTarcza: { barwa: '270, 45%, 55%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Kurzawa. Trwała treść żyje w js/kurzawa.js.
+    kurzawa: { barwa: '38, 70%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Łuk Peruna. Trwała treść żyje w js/lukPeruna.js.
+    lukPeruna: { barwa: '210, 100%, 75%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Kręgi Mokoszy. Trwała treść żyje w js/kregiMokoszy.js.
+    kregiMokoszy: { barwa: '195, 100%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
+    // Błysk AKTYWACJI Mgła Mokoszy. Trwała treść żyje w js/mglaMokoszy.js.
+    mglaMokoszy: { barwa: '190, 30%, 85%', ksztalt: 'blyskIFala', czas: 1.3 }
 };
 
 export class Efekty {

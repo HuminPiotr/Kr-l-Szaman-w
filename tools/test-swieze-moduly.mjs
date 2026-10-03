@@ -49,6 +49,15 @@ console.log('ZBIÓR KLUCZY:');
         if (POZA_RUNDA.has(nazwa)) continue;
         spr(`main.js: '${nazwa}' jest w fabryce albo świadomie poza rundą`, KLUCZE_MODULOW.includes(nazwa));
     }
+    // Drugi strażnik (2026-10-02): moduł JEST w fabryce, ale resetujModuly() w main.js
+    // musi go jeszcze PRZYPIĄĆ z powrotem do zmiennej - inaczej po restarcie rundy
+    // main.js dalej rysuje STARĄ instancję (efekt poprzedniego gracza w Kręgu).
+    const reset = main.match(/function resetujModuly\(\) \{\s*\(\{([^}]*)\}\s*=\s*swiezeModuly\(/);
+    spr('main.js: resetujModuly() destrukturyzuje wynik swiezeModuly()', !!reset);
+    const przypiete = new Set((reset?.[1] ?? '').split(',').map(x => x.trim()).filter(Boolean));
+    for (const klucz of KLUCZE_MODULOW) {
+        spr(`resetujModuly() przypina '${klucz}' z powrotem do main.js`, przypiete.has(klucz));
+    }
 }
 
 console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
@@ -65,6 +74,12 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('efekty puste', m.efekty.aktywne.length === 0);
     spr('runy puste', m.runy.aktywne.length === 0);
     spr('kołowrót nie trwa', m.kolowrot._trwa === false);
+    spr('reakcje technik bezczynne', m.reakcjeTechnik._doPrzewodzenia === 0 && m.reakcjeTechnik._doBlysku === 0);
+    spr('kamienna tarcza nie trwa', m.kamiennaTarcza.aktywny === false);
+    spr('mgła mokoszy nie trwa', m.mglaMokoszy.aktywny === false);
+    spr('kręgi mokoszy nie trwają', m.kregiMokoszy.aktywny === false);
+    spr('łuk peruna nie trwa', m.lukPeruna.aktywny === false);
+    spr('kurzawa nie trwa', m.kurzawa.aktywny === false);
     spr('zapłon nie trwa', m.zaplon._trwa === false);
     spr('ekran nie drży', m.ekran._trwa === false);
     spr('piorun nie bije', m.piorun._trwa === false);

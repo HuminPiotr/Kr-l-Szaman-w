@@ -41,6 +41,11 @@ function zrobWorek(log) {
         iskry: szpieg('iskry'),
         kolowrot: szpieg('kolowrot'),
         dmuchanie: szpieg('dmuchanie'),
+        kamiennaTarcza: szpieg('kamiennaTarcza'),
+        mglaMokoszy: szpieg('mglaMokoszy'),
+        kregiMokoszy: szpieg('kregiMokoszy'),
+        lukPeruna: szpieg('lukPeruna'),
+        kurzawa: szpieg('kurzawa'),
     };
 }
 
@@ -101,6 +106,16 @@ testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Strib
 
 testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
 
+testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
+
+testTechnika('mglaMokoszy', ['stribog', 'mokosz'], ['mglaMokoszy.zapal'], 'Mgła Mokoszy');
+
+testTechnika('kregiMokoszy', ['mokosz', 'weles'], ['kregiMokoszy.zapal'], 'Kręgi Mokoszy');
+
+testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna');
+
+testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
+
 // --- 3. Zaplon dostaje właściwą barwę per technika ---
 console.log('\nBARWA ZAPŁONU PER TECHNIKA:');
 {
@@ -140,6 +155,20 @@ console.log('\nODPORNOŚĆ:');
     } catch { rzucil = true; }
     spr('nieznana gałąź uzbraja nie rzuca wyjątku', !rzucil);
     spr('...i nadal odpala warstwę wspólną', zawiera(log, 'zaplon.zapal') && zawiera(log, 'ekran.uderz'));
+}
+
+// --- 6. Stanowisko VFX (tools/scena.html) ma w worku KAŻDĄ z prostych technik ---
+// scena.html nie da się uruchomić w Node, a brak modułu w jego `worekTechnik`
+// wychodzi dopiero jako TypeError po kliknięciu przycisku.
+console.log('\nWOREK STANOWISKA VFX (tools/scena.html):');
+{
+    const { readFileSync } = await import('node:fs');
+    const html = readFileSync(new URL('./scena.html', import.meta.url), 'utf8');
+    const worek = html.match(/const worekTechnik = \{([^}]*)\}/)?.[1] ?? '';
+    const wBworku = new Set(worek.split(',').map(x => x.trim()).filter(Boolean));
+    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy']) {
+        spr(`worekTechnik w scena.html zawiera '${id}'`, wBworku.has(id));
+    }
 }
 
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');

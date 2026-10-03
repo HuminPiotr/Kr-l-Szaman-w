@@ -183,6 +183,12 @@ const [
     import('./js/kombosy.js'), import('./js/sekwencja.js'),
     import('./js/techniki.js'), import('./tools/_dlon-syntetyczna.mjs'),
 ]);
+const { KamiennaTarcza, NASTAWY: NASTAWY_KAMIENNATARCZA } = await import('./js/kamiennaTarcza.js');
+const { MglaMokoszy, NASTAWY: NASTAWY_MGLAMOKOSZY } = await import('./js/mglaMokoszy.js');
+const { KregiMokoszy, NASTAWY: NASTAWY_KREGIMOKOSZY } = await import('./js/kregiMokoszy.js');
+const { LukPeruna, NASTAWY: NASTAWY_LUKPERUNA } = await import('./js/lukPeruna.js');
+const { Kurzawa, NASTAWY: NASTAWY_KURZAWA } = await import('./js/kurzawa.js');
+const { ReakcjeTechnik } = await import('./js/reakcjeTechnik.js');
 
 zaladujFont();
 zaladujAssety().catch(() => {});
@@ -206,6 +212,12 @@ const iskry = new Iskry();
 const ekran = new Ekran();
 const piorun = new Piorun();
 const kolowrot = new Kolowrot();
+const kamiennaTarcza = new KamiennaTarcza();
+const mglaMokoszy = new MglaMokoszy();
+const kregiMokoszy = new KregiMokoszy();
+const lukPeruna = new LukPeruna();
+const kurzawa = new Kurzawa();
+const reakcjeTechnik = new ReakcjeTechnik();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
 
@@ -217,6 +229,11 @@ const MODULY_NASTAWY = [
     { etykieta: 'Fala (Aard/Grom)', plik: 'js/fala.js', nastawy: (await import('./js/fala.js')).NASTAWY, instancja: fala },
     { etykieta: 'Dym (Okadzenie)', plik: 'js/dym.js', nastawy: (await import('./js/dym.js')).NASTAWY, instancja: dym },
     { etykieta: 'Kołowrót', plik: 'js/kolowrot.js', nastawy: (await import('./js/kolowrot.js')).NASTAWY, instancja: kolowrot },
+    { etykieta: 'Kamienna Tarcza', plik: 'js/kamiennaTarcza.js', nastawy: NASTAWY_KAMIENNATARCZA, instancja: kamiennaTarcza },
+    { etykieta: 'Mgła Mokoszy', plik: 'js/mglaMokoszy.js', nastawy: NASTAWY_MGLAMOKOSZY, instancja: mglaMokoszy },
+    { etykieta: 'Kręgi Mokoszy', plik: 'js/kregiMokoszy.js', nastawy: NASTAWY_KREGIMOKOSZY, instancja: kregiMokoszy },
+    { etykieta: 'Łuk Peruna', plik: 'js/lukPeruna.js', nastawy: NASTAWY_LUKPERUNA, instancja: lukPeruna },
+    { etykieta: 'Kurzawa', plik: 'js/kurzawa.js', nastawy: NASTAWY_KURZAWA, instancja: kurzawa },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
     { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
@@ -342,7 +359,7 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy
 };
 const worekPieczeci = { efekty, runy, aura };
 
@@ -408,6 +425,15 @@ function rysujKlatke(dt, frame) {
     fala.updateAndDraw(ctx, dt);
     iskry.updateAndDraw(ctx, dt);
     kolowrot.updateAndDraw(ctx, dt);
+    // Kontekst technik śledzących ciało (jak w main.js) - maska syntetycznej sylwetki.
+    const kontekstTechnik = { frame, W: canvas.width, H: canvas.height, maska: frame.maska,
+                              maskaSzer: MASKA_SZER, maskaWys: MASKA_WYS, fit: frame.fit };
+    kamiennaTarcza.updateAndDraw(ctx, kontekstTechnik, dt);
+    mglaMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
+    kregiMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
+    lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
+    kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
+    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
@@ -449,6 +475,16 @@ const SCENARIUSZE = {
                                       zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.dmuchaOkadzenie = true; },
     palec: () => { odpalTechnike({ id: 'x', nazwa: 'Grom w Ogniu', uzbraja: 'ogien', sekwencja: ['swarog', 'perun'] },
                                   zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik); stan.palecPlonie = true; },
+    kamiennaTarcza: () => odpalTechnike({ id: 'x', nazwa: 'Kamienna Tarcza', uzbraja: 'kamiennaTarcza', sekwencja: ['weles', 'weles', 'weles'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    kurzawa: () => odpalTechnike({ id: 'x', nazwa: 'Kurzawa', uzbraja: 'kurzawa', sekwencja: ['stribog', 'weles'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    lukPeruna: () => odpalTechnike({ id: 'x', nazwa: 'Łuk Peruna', uzbraja: 'lukPeruna', sekwencja: ['mokosz', 'perun'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    kregiMokoszy: () => odpalTechnike({ id: 'x', nazwa: 'Kręgi Mokoszy', uzbraja: 'kregiMokoszy', sekwencja: ['mokosz', 'weles'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    mglaMokoszy: () => odpalTechnike({ id: 'x', nazwa: 'Mgła Mokoszy', uzbraja: 'mglaMokoszy', sekwencja: ['stribog', 'mokosz'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
                        SCENARIUSZE.okadzenie(); SCENARIUSZE.palec(); },
@@ -524,6 +560,11 @@ const TECHNIKI = [
     { uzbraja: 'ogien', nazwa: 'Grom w Ogniu (uzbrój)', sekwencja: ['swarog', 'perun'] },
     { uzbraja: 'aard', nazwa: 'Podmuch (uzbrój)', sekwencja: ['stribog', 'stribog'] },
     { uzbraja: 'dym', nazwa: 'Okadzenie (uzbrój)', sekwencja: ['swarog', 'stribog', 'swarog'] },
+    { uzbraja: 'kamiennaTarcza', nazwa: 'Kamienna Tarcza', sekwencja: ['weles', 'weles', 'weles'] },
+    { uzbraja: 'kurzawa', nazwa: 'Kurzawa', sekwencja: ['stribog', 'weles'] },
+    { uzbraja: 'lukPeruna', nazwa: 'Łuk Peruna', sekwencja: ['mokosz', 'perun'] },
+    { uzbraja: 'kregiMokoszy', nazwa: 'Kręgi Mokoszy', sekwencja: ['mokosz', 'weles'] },
+    { uzbraja: 'mglaMokoszy', nazwa: 'Mgła Mokoszy', sekwencja: ['stribog', 'mokosz'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {

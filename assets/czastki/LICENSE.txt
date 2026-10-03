@@ -6,9 +6,12 @@ https://creativecommons.org/publicdomain/zero/1.0/
 
 CC0 nie wymaga atrybucji, ale autor o nią prosi - stąd ten plik.
 
-Pliki użyte w tym repo (21 z 80 w paczce):
+Pliki użyte w tym repo (31 z 80 w paczce):
 - combo "Kołowrót" (js/kolowrot.js): magic_01, magic_02, smoke_01,
   smoke_05, smoke_08, smoke_10, star_02, star_04, star_07, light_01.
 - combo "Okadzenie" (js/dym.js, 2026-09-11): flame_01..06, fire_01,
   fire_02, scorch_01..03 (kula ognia i błysk uderzenia przy podpaleniu
   dymu). smoke_* reużyte z Kołowrótu.
+- proste combo (2026-10-02): dirt_01..03 (Kamienna Tarcza, Kurzawa),
+  spark_01..03 (Luk Peruna).
+- Kregi Mokoszy (2026-10-03): circle_01, circle_03, trace_01, trace_07.

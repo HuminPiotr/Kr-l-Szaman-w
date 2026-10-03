@@ -40,7 +40,20 @@ export const MANIFEST = {
     // w dłoni w chwili rzutu (otwarty zawijas C).
     smugaWiatru: ['assets/czastki/slash_01.png', 'assets/czastki/slash_02.png',
                   'assets/czastki/slash_04.png'],
-    wir: 'assets/czastki/twirl_01.png'
+    wir: 'assets/czastki/twirl_01.png',
+    // Proste combo (2026-10-02, docs/superpowers/specs/2026-10-02-proste-
+    // -kombosy-design.md). dirt_* to JEDYNA prawdziwa faktura ziemi w paczce -
+    // Weles dotad nie mial zadnej (Kamienna Tarcza, Kurzawa). spark_* to NIE
+    // iskry, tylko rozgalezione pekniecia elektryczne - patrz spec 2026-09-09-assety.
+    odlamek: ['assets/czastki/dirt_01.png', 'assets/czastki/dirt_02.png', 'assets/czastki/dirt_03.png'],
+    wyladowanie: ['assets/czastki/spark_01.png', 'assets/czastki/spark_02.png', 'assets/czastki/spark_03.png'],
+    // Kręgi Mokoszy (2026-10-03): circle_03 to podwójny pierścień (jasna poświata
+    // na zewnątrz, ciemniejszy środek) - główny krąg fali; circle_01 to miękki
+    // dysk - błyskawiczny dysk uderzeniowy przy narodzinach kręgu; trace_01/07
+    // to proste świetliste smugi - promienie rozbiegające się z kręgiem.
+    kragFali: 'assets/czastki/circle_03.png',
+    dyskUderzenia: 'assets/czastki/circle_01.png',
+    promien: ['assets/czastki/trace_01.png', 'assets/czastki/trace_07.png']
 };
 
 const _obrazy = new Map();   // ścieżka -> HTMLImageElement, WPISYWANY dopiero po onload

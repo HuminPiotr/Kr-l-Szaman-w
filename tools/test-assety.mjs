@@ -30,6 +30,11 @@ spr('MANIFEST.drobina to tablica wariantów', Array.isArray(MANIFEST.drobina) &&
 spr('MANIFEST ma rozbłysk (string)', typeof MANIFEST.rozblysk === 'string');
 spr('MANIFEST.smugaWiatru to tablica wariantów (Aard v2)', Array.isArray(MANIFEST.smugaWiatru) && MANIFEST.smugaWiatru.length > 1);
 spr('MANIFEST ma wir (string, Aard v2)', typeof MANIFEST.wir === 'string');
+spr('MANIFEST.odlamek - trzy warianty ziemi (Kamienna Tarcza, Kurzawa)', Array.isArray(MANIFEST.odlamek) && MANIFEST.odlamek.length === 3);
+spr('wiryKurzawy usunięte (Kurzawa v2 nie używa zawijasów)', MANIFEST.wiryKurzawy === undefined);
+spr('MANIFEST.kragFali i dyskUderzenia - pierścienie Kręgów Mokoszy (stringi)', typeof MANIFEST.kragFali === 'string' && typeof MANIFEST.dyskUderzenia === 'string');
+spr('MANIFEST.promien - smugi promieni Kręgów Mokoszy (2 warianty)', Array.isArray(MANIFEST.promien) && MANIFEST.promien.length === 2);
+spr('MANIFEST.wyladowanie - trzy pęknięcia elektryczne (Łuk Peruna)', Array.isArray(MANIFEST.wyladowanie) && MANIFEST.wyladowanie.length === 3);
 
 console.log('\nMANIFEST - PLIKI FAKTYCZNIE ISTNIEJĄ NA DYSKU:');
 // Łapie literówkę w nazwie pliku ZANIM zobaczy ją gracz (w przeglądarce
