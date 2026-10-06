@@ -124,9 +124,9 @@ export const TABELA = {
     // Błysk AKTYWACJI Kręgi Mokoszy. Trwała treść żyje w js/kregiMokoszy.js.
     kregiMokoszy: { barwa: '195, 100%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
     // Błysk AKTYWACJI Mgła Mokoszy. Trwała treść żyje w js/mglaMokoszy.js.
-    mglaMokoszy: { barwa: '190, 30%, 85%', ksztalt: 'blyskIFala', czas: 1.3 },
-    // Błysk AKTYWACJI Bania. Trwała treść żyje w js/bania.js.
-    bania: { barwa: '35, 30%, 92%', ksztalt: 'blyskIFala', czas: 1.3 }
+    mglaMokoszy: { barwa: '190, 30%, 85%', ksztalt: 'blyskIFala', czas: 1.3 }
+    // Bania CELOWO bez wiersza (2026-10-06, życzenie właściciela): okrąg
+    // aktywacji odstawał od smug pary, a odpal() bez wpisu nic nie rysuje.
 };
 
 export class Efekty {
