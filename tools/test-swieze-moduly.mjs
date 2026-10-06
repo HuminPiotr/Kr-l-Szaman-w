@@ -80,6 +80,7 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('kręgi mokoszy nie trwają', m.kregiMokoszy.aktywny === false);
     spr('łuk peruna nie trwa', m.lukPeruna.aktywny === false);
     spr('kurzawa nie trwa', m.kurzawa.aktywny === false);
+    spr('bania nie trwa', m.bania.aktywny === false);
     spr('zapłon nie trwa', m.zaplon._trwa === false);
     spr('ekran nie drży', m.ekran._trwa === false);
     spr('piorun nie bije', m.piorun._trwa === false);

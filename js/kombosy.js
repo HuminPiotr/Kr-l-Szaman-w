@@ -139,7 +139,15 @@ export const KOMBOSY = [
     // kadr, gracz wynurza się z niej. Para stribog->mokosz nie koliduje
     // z Tęczą (ta kończy się mokosz->stribog, odwrotnie).
     { id: 'mglaMokoszy', nazwa: 'Mgła Mokoszy',
-      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' }
+      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' },
+
+    // BANIA (2026-10-06): woda (Mokosz) na rozgrzane ciało (Swaróg) - para
+    // bucha z głowy, barków i łokci. Dwójka, więc skromna i krótka (~1.4 s).
+    // Para mokosz->swarog nie jest prefiksem/sufiksem żadnej trójki (Tęcza
+    // zaczyna się swarog->mokosz, odwrotnie). Łańcuch: Kołowrót kończy się
+    // na mokosz, więc dołożony po nim swarog odpala Banię.
+    { id: 'bania', nazwa: 'Bania',
+      sekwencja: ['mokosz', 'swarog'], uzbraja: 'bania' }
 ];
 
 export class KomboSilnik {

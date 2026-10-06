@@ -46,6 +46,7 @@ function zrobWorek(log) {
         kregiMokoszy: szpieg('kregiMokoszy'),
         lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
+        bania: szpieg('bania'),
     };
 }
 
@@ -114,6 +115,8 @@ testTechnika('kregiMokoszy', ['mokosz', 'weles'], ['kregiMokoszy.zapal'], 'Kręg
 
 testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna');
 
+testTechnika('bania', ['mokosz', 'swarog'], ['bania.zapal'], 'Bania');
+
 testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
 
 // --- 3. Zaplon dostaje właściwą barwę per technika ---
@@ -166,7 +169,7 @@ console.log('\nWOREK STANOWISKA VFX (tools/scena.html):');
     const html = readFileSync(new URL('./scena.html', import.meta.url), 'utf8');
     const worek = html.match(/const worekTechnik = \{([^}]*)\}/)?.[1] ?? '';
     const wBworku = new Set(worek.split(',').map(x => x.trim()).filter(Boolean));
-    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy']) {
+    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania']) {
         spr(`worekTechnik w scena.html zawiera '${id}'`, wBworku.has(id));
     }
 }
