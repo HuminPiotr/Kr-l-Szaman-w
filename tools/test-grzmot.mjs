@@ -2,7 +2,7 @@
  * Grzmot v2 - błysk, pierścień od środka ciała, iglice, dudnienie, pchnięcie dymu; bez document.
  *   node tools/test-grzmot.mjs
  */
-import { Grzmot, zaczepKlatki, promienPierscienia, alfaPierscienia, jasnoscBlysku, zygzak, NASTAWY, CZAS_CALKOWITY } from '../js/grzmot.js';
+import { Grzmot, zaczepKlatki, promienPierscienia, alfaPierscienia, jasnoscBlysku, zygzak, losujProfil, wartoscProfilu, promienCzola, jasnoscOdcinka, NASTAWY, CZAS_CALKOWITY } from '../js/grzmot.js';
 import { klatka, kontekst, przepusc, atrapaCtx, W, H } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -23,6 +23,27 @@ spr('dociera do rogu kadru (promień max) w CZAS_PIERSCIENIA', Math.abs(promienP
 spr('ease-out: szybki start (w połowie czasu > 70% drogi)', promienPierscienia(NASTAWY.CZAS_PIERSCIENIA / 2, RMAX) > 0.7 * RMAX);
 spr('promień max sięga rogu z KAŻDEGO środka w kadrze', RMAX >= Math.hypot(W, H));
 spr('alfa: 0 na końcach, NaN -> 0, szybki narost', alfaPierscienia(0) === 0 && alfaPierscienia(NASTAWY.CZAS_PIERSCIENIA) === 0 && alfaPierscienia(NaN) === 0 && alfaPierscienia(0.05) > 0.4);
+
+console.log('\nPOSZARPANE CZOŁO (v3):');
+{
+    let x = 0.123;
+    const los = () => (x = (x * 9301 + 49297) % 233280 / 233280);
+    const profil = losujProfil(los);
+    const katy = Array.from({ length: 360 }, (_, i) => i / 360 * Math.PI * 2);
+    const wart = katy.map(k => wartoscProfilu(profil, k, 0.2));
+    spr('profil gładki i ograniczony -1..1', wart.every(v => Number.isFinite(v) && Math.abs(v) <= 1 + 1e-9));
+    spr('profil deterministyczny dla tych samych argumentów', wartoscProfilu(profil, 1.3, 0.2) === wartoscProfilu(profil, 1.3, 0.2));
+    const r = katy.map(k => promienCzola(500, profil, k, 0.2));
+    const rozrzut = Math.max(...r) - Math.min(...r);
+    spr(`promień zmienia się wzdłuż obwodu - NIE idealny okrąg (rozrzut ${rozrzut.toFixed(1)} px przy R=500)`, rozrzut > 500 * NASTAWY.NIEREGULARNOSC * 0.5);
+    spr(`...ale zostaje falą, nie gwiazdą (±${(NASTAWY.NIEREGULARNOSC * 100).toFixed(0)}%)`, r.every(v => Math.abs(v - 500) <= 500 * NASTAWY.NIEREGULARNOSC + 1e-6));
+    const jas = katy.map(k => jasnoscOdcinka(profil, k, 0.2));
+    spr('jasność odcinków nierówna, z przerwami (zera) i pełnymi fragmentami', jas.some(v => v === 0) && jas.some(v => v > 0.8) && jas.every(v => v >= 0 && v <= 1));
+    spr('kształt przelewa się w czasie', wartoscProfilu(profil, 1.3, 0) !== wartoscProfilu(profil, 1.3, 0.4));
+    spr('zły profil/kąt -> 0, promień zły -> 0', wartoscProfilu(null, 1, 0) === 0 && wartoscProfilu(profil, NaN, 0) === 0 && promienCzola(NaN, profil, 1, 0) === 0);
+    const inny = losujProfil();
+    spr('każdy Grzmot ma inny kształt (losowe fazy)', profil.some((h, i) => h.faza !== inny[i].faza));
+}
 
 console.log('\nBŁYSK:');
 spr('0 na końcach i dla NaN', jasnoscBlysku(0) === 0 && jasnoscBlysku(NASTAWY.BLYSK_CZAS) === 0 && jasnoscBlysku(NaN) === 0);

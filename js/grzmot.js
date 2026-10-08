@@ -18,6 +18,14 @@
  *  5. dźwięk: js/dzwiekGrzmotu.js (jedyny efekt dźwiękowy gry - wyjątek
  *     świadomie dopisany do strażnika, GEMINI.md).
  *
+ * v3 (2026-10-08, "okręgi zbyt proste, zbyt jednolite - ma przypominać
+ * realistyczną falę uderzeniową"): idealny arc() o równej grubości czytał się
+ * jak grafika, nie zjawisko. Prawdziwa fala ma trzy cechy, których brakowało:
+ *  - ZAGINA OBRAZ za sobą - soczewka (_soczewka, trik Aarda z ekran.js),
+ *  - POSZARPANE CZOŁO - promień i jasność zmieniają się wzdłuż obwodu
+ *    (losowe harmoniczne per Grzmot, powoli się przelewają), z przerwami,
+ *  - PĘD - promieniste smugi tuż za czołem i mgiełka sprężonego powietrza.
+ *
  * Energia (Perun), więc pierścień i błysk idą 'lighter' - inaczej niż materia
  * (Kurzawa, Zawierucha) rysowana source-over.
  *
@@ -55,10 +63,67 @@ export const NASTAWY = {
     PUNKTOW_PCHNIECIA: 40,
     BARWA: [170, 205, 255],      // błękit Peruna
     BARWA_RDZENIA: [235, 245, 255],
-    BARWA_BLYSKU: [200, 220, 255]
+    BARWA_BLYSKU: [200, 220, 255],
+
+    // --- v3: realistyczna fala uderzeniowa (nagłówek "v3") ---
+    SEGMENTOW: 120,              // obwód rysowany odcinkami - każdy z własną jasnością/grubością
+    NIEREGULARNOSC: 0.07,        // ułamek promienia - poszarpanie czoła
+    HARMONICZNE: [3, 5, 8, 13],  // fale wzdłuż obwodu (losowe fazy per Grzmot)
+    PRZERWA_PROG: 0.2,           // jasność odcinka poniżej = przerwa w czole
+    // Soczewka: obraz pod pierścieniem rozepchnięty na zewnątrz (jak Aard w ekran.js).
+    WYBRZUSZENIE: 0.06,          // maks. mnożnik skali kopii sceny - 1
+    GRUBOSC_SOCZEWKI_OD: 0.16, GRUBOSC_SOCZEWKI_DO: 0.05,   // ułamek promienia: cienieje w locie
+    // Mgiełka sprężonego powietrza tuż ZA czołem (cień kondensacji).
+    MGIELKA_ZA: 0.9,             // promień mgiełki = R * to
+    MGIELKA_SZER: 0.9,           // skala * to
+    MGIELKA_ALFA: 0.12,
+    // Smugi pędu: promieniste kreski za czołem - "coś pędzi na zewnątrz".
+    SMUG_PEDU: 56,
+    SMUGA_DLUGOSC_OD: 0.05, SMUGA_DLUGOSC_DO: 0.16,   // ułamek promienia
+    SMUGA_ALFA: 0.55
 };
 
 export const CZAS_CALKOWITY = NASTAWY.ECHO_OPOZNIENIE_S + NASTAWY.CZAS_PIERSCIENIA;
+
+/**
+ * Losowy profil kształtu czoła - fazy i amplitudy harmonicznych. Losowany RAZ
+ * na Grzmot (nie co klatkę - migotałby), żeby żadne dwa nie były identyczne.
+ * @param {() => number} [los]
+ */
+export function losujProfil(los = Math.random) {
+    return NASTAWY.HARMONICZNE.map((k) => ({
+        k,
+        faza: los() * Math.PI * 2,
+        amp: 0.4 + los() * 0.6,
+        dryf: (los() * 2 - 1) * 2.5   // rad/s - kształt powoli się przelewa
+    }));
+}
+
+/**
+ * Wartość profilu w kącie `kat` i chwili `t` - gładka, -1..1. Czysta funkcja.
+ */
+export function wartoscProfilu(profil, kat, t) {
+    if (!Array.isArray(profil) || !profil.length || !Number.isFinite(kat)) return 0;
+    const tt = Number.isFinite(t) ? t : 0;
+    let suma = 0, norma = 0;
+    for (const h of profil) {
+        suma += h.amp * Math.sin(h.k * kat + h.faza + h.dryf * tt);
+        norma += h.amp;
+    }
+    return norma > 0 ? suma / norma : 0;
+}
+
+/** Promień poszarpanego czoła w kącie `kat`: R·(1 + NIEREGULARNOSC·profil). Czysta funkcja. */
+export function promienCzola(R, profil, kat, t) {
+    if (!Number.isFinite(R) || R <= 0) return 0;
+    return R * (1 + NASTAWY.NIEREGULARNOSC * wartoscProfilu(profil, kat, t));
+}
+
+/** Jasność odcinka czoła 0..1 - nierówna, z przerwami (poniżej PRZERWA_PROG = 0). Czysta funkcja. */
+export function jasnoscOdcinka(profil, kat, t) {
+    const v = 0.5 + 0.75 * wartoscProfilu(profil, kat, t);
+    return v < NASTAWY.PRZERWA_PROG ? 0 : clamp01(v);
+}
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
 const punktOk = (p) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -101,9 +166,13 @@ const los01 = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
  * (deterministyczna: te same argumenty, ten sam kształt).
  * @returns {{x:number, y:number}[]}  IGLICA_SEGMENTOW + 1 punktów w px; leży na obwodzie pierścienia
  */
+export function katIglicy(i) {
+    return (i / NASTAWY.IGLIC) * Math.PI * 2 + (los01(i, 1) - 0.5) * 0.9;
+}
+
 export function zygzak(i, krok, cx, cy, promien, skala) {
     const N = NASTAWY;
-    const kat = (i / N.IGLIC) * Math.PI * 2 + (los01(i, 1) - 0.5) * 0.9;
+    const kat = katIglicy(i);
     const dl = skala * N.IGLICA_DLUGOSC;
     const tx = -Math.sin(kat), ty = Math.cos(kat);   // styczna do okręgu
     const nx = Math.cos(kat), ny = Math.sin(kat);    // promień
@@ -126,6 +195,11 @@ export class Grzmot {
         this._zaczep = null;
         this._W = 1920; this._H = 1080;
         this._nastepneDudnienie = 0;
+        this._ksztalt = [];      // profil promienia czoła (losujProfil)
+        this._jasnosc = [];      // profil jasności odcinków - osobny, żeby przerwy nie szły w parze z wybrzuszeniami
+        this._smugi = [];        // smugi pędu: { kat, dlugosc, opoznienie, faza }
+        this._plotnoSoczewki = null;
+        this._ctxSoczewki = null;
         this.wybuch = null;      // {x, y, skala, sila} - jedna klatka po zapal()
         this.dudnienia = [];     // siły uderzeń ekranu do wykonania w TEJ klatce
     }
@@ -144,6 +218,15 @@ export class Grzmot {
         this._sila = s;
         this._zaczep = { x: zaczep.x, y: zaczep.y, skala: zaczep.skala };
         this._nastepneDudnienie = 0;
+        this._ksztalt = losujProfil();
+        this._jasnosc = losujProfil();
+        const N = NASTAWY;
+        this._smugi = Array.from({ length: N.SMUG_PEDU }, () => ({
+            kat: Math.random() * Math.PI * 2,
+            dlugosc: N.SMUGA_DLUGOSC_OD + Math.random() * (N.SMUGA_DLUGOSC_DO - N.SMUGA_DLUGOSC_OD),
+            opoznienie: Math.random() * 0.08,    // nie wszystkie startują naraz
+            faza: Math.random() * 10
+        }));
         this._doWybuchu = { x: zaczep.x, y: zaczep.y, skala: zaczep.skala, sila: s };
     }
 
@@ -169,6 +252,8 @@ export class Grzmot {
     _rysuj(ctx) {
         const N = NASTAWY, z = this._zaczep, sk = z.skala;
         const W = this._W, H = this._H;
+        // Soczewka PIERWSZA - kopiuje scenę bez naszych kresek, inaczej rozepchnęłaby własne czoło.
+        this._soczewka(ctx);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
@@ -180,43 +265,156 @@ export class Grzmot {
         }
 
         ctx.lineCap = 'round';
-        const pierscienie = [
-            { t: this._t, mnoznik: 1 },
-            { t: this._t - N.ECHO_OPOZNIENIE_S, mnoznik: N.ECHO_ALFA }
-        ];
-        for (const p of pierscienie) {
-            const a = alfaPierscienia(p.t) * p.mnoznik * this._sila;
-            const R = promienPierscienia(p.t, this._promienMax());
-            if (a < 0.01 || R < 2) continue;
-            ctx.beginPath();
-            ctx.arc(z.x, z.y, R, 0, Math.PI * 2);
+        ctx.lineJoin = 'round';
+        const aGl = alfaPierscienia(this._t) * this._sila;
+        const RGl = promienPierscienia(this._t, this._promienMax());
+
+        // Mgiełka sprężonego powietrza tuż ZA czołem - tylko pierścień główny.
+        if (aGl > 0.01 && RGl > 2) {
             ctx.strokeStyle = `rgb(${N.BARWA.join(',')})`;
-            ctx.lineWidth = Math.max(6, sk * N.POSWIATA_SZER);
-            ctx.globalAlpha = clamp01(a * N.POSWIATA_ALFA);
-            ctx.stroke();
-            ctx.strokeStyle = `rgb(${N.BARWA_RDZENIA.join(',')})`;
-            ctx.lineWidth = N.RDZEN_PX;
-            ctx.globalAlpha = clamp01(a * 0.95);
+            ctx.lineWidth = Math.max(8, sk * N.MGIELKA_SZER);
+            ctx.globalAlpha = clamp01(aGl * N.MGIELKA_ALFA);
+            this._sciezkaCzola(ctx, RGl * N.MGIELKA_ZA, this._t, 0, 0);
             ctx.stroke();
         }
 
-        // Iglice tylko na pierścieniu głównym, dopóki jest wyraźny.
-        const aGl = alfaPierscienia(this._t) * this._sila;
-        const RGl = promienPierscienia(this._t, this._promienMax());
+        // Czoło główne i echo - odcinkami, każdy z własną jasnością i grubością.
+        this._czolo(ctx, this._t, 1);
+        this._czolo(ctx, this._t - N.ECHO_OPOZNIENIE_S, N.ECHO_ALFA);
+
+        // Smugi pędu - promieniste kreski tuż za czołem, migoczące.
+        if (aGl > 0.02 && RGl > 2) {
+            ctx.strokeStyle = `rgb(${N.BARWA_RDZENIA.join(',')})`;
+            ctx.lineWidth = 1.5;
+            for (const s of this._smugi) {
+                const ts = this._t - s.opoznienie;
+                const a = alfaPierscienia(ts) * this._sila * N.SMUGA_ALFA * (0.55 + 0.45 * Math.sin(s.faza + this._t * 40));
+                if (a < 0.01) continue;
+                const koniec = promienCzola(promienPierscienia(ts, this._promienMax()), this._ksztalt, s.kat, this._t) * 0.985;
+                const poczatek = koniec * (1 - s.dlugosc);
+                const c = Math.cos(s.kat), sn = Math.sin(s.kat);
+                ctx.globalAlpha = clamp01(a);
+                ctx.beginPath();
+                ctx.moveTo(z.x + c * poczatek, z.y + sn * poczatek);
+                ctx.lineTo(z.x + c * koniec, z.y + sn * koniec);
+                ctx.stroke();
+            }
+        }
+
+        // Iglice tylko na pierścieniu głównym, dopóki jest wyraźny - na POSZARPANYM czole.
         if (aGl > 0.05 && RGl > 2) {
             const krokIglic = Math.floor(this._t / N.IGLICA_KROK_S);
             ctx.strokeStyle = `rgb(${N.BARWA_RDZENIA.join(',')})`;
             ctx.lineWidth = 2.2;
-            ctx.lineJoin = 'round';
             ctx.globalAlpha = clamp01(aGl);
             for (let i = 0; i < N.IGLIC; i++) {
-                const pkt = zygzak(i, krokIglic, z.x, z.y, RGl, sk);
+                const R = promienCzola(RGl, this._ksztalt, katIglicy(i), this._t);
+                const pkt = zygzak(i, krokIglic, z.x, z.y, R, sk);
                 ctx.beginPath();
                 ctx.moveTo(pkt[0].x, pkt[0].y);
                 for (let s = 1; s < pkt.length; s++) ctx.lineTo(pkt[s].x, pkt[s].y);
                 ctx.stroke();
             }
         }
+        ctx.restore();
+    }
+
+    /** Zamknięta ścieżka poszarpanego czoła o bazowym promieniu R, przesunięta o (dx, dy). */
+    _sciezkaCzola(ctx, R, t, dx, dy) {
+        const N = NASTAWY, z = this._zaczep;
+        ctx.beginPath();
+        for (let i = 0; i <= N.SEGMENTOW; i++) {
+            const kat = (i / N.SEGMENTOW) * Math.PI * 2;
+            const r = promienCzola(R, this._ksztalt, kat, t);
+            const x = z.x + dx + Math.cos(kat) * r, y = z.y + dy + Math.sin(kat) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+    }
+
+    /** Czoło w chwili `t` pierścienia: najpierw poświata, potem rdzeń - odcinkami, z przerwami. */
+    _czolo(ctx, t, mnoznik) {
+        const N = NASTAWY, z = this._zaczep, sk = z.skala;
+        const a = alfaPierscienia(t) * mnoznik * this._sila;
+        const R = promienPierscienia(t, this._promienMax());
+        if (a < 0.01 || R < 2) return;
+        const pkt = [];
+        for (let i = 0; i <= N.SEGMENTOW; i++) {
+            const kat = (i / N.SEGMENTOW) * Math.PI * 2;
+            const r = promienCzola(R, this._ksztalt, kat, this._t);
+            pkt.push({ x: z.x + Math.cos(kat) * r, y: z.y + Math.sin(kat) * r,
+                       b: jasnoscOdcinka(this._jasnosc, kat + Math.PI / N.SEGMENTOW, this._t) });
+        }
+        const przebiegi = [
+            { barwa: N.BARWA, szer: (b) => Math.max(6, sk * N.POSWIATA_SZER) * (0.5 + b), alfa: (b) => N.POSWIATA_ALFA * (0.4 + 0.6 * b) },
+            { barwa: N.BARWA_RDZENIA, szer: (b) => N.RDZEN_PX * (0.5 + 1.5 * b), alfa: (b) => 0.95 * b }
+        ];
+        for (const p of przebiegi) {
+            ctx.strokeStyle = `rgb(${p.barwa.join(',')})`;
+            for (let i = 0; i < N.SEGMENTOW; i++) {
+                const b = pkt[i].b;
+                if (b <= 0) continue;   // przerwa w czole
+                ctx.globalAlpha = clamp01(a * p.alfa(b));
+                ctx.lineWidth = p.szer(b);
+                ctx.beginPath();
+                ctx.moveTo(pkt[i].x, pkt[i].y);
+                ctx.lineTo(pkt[i + 1].x, pkt[i + 1].y);
+                ctx.stroke();
+            }
+        }
+    }
+
+    /**
+     * Soczewka sprężonego powietrza: scena pod pierścieniem skopiowana i narysowana
+     * z powrotem rozepchnięta o kilka % wokół środka (ten sam trik co Aard,
+     * js/ekran.js _falaPowietrza), przycięta do POSZARPANEGO pierścienia.
+     * W układzie URZĄDZENIA (setTransform) - kopia pikseli płótna nie zna
+     * przesunięcia wstrząsu, więc geometrię przesuwamy o nie ręcznie.
+     */
+    _soczewka(ctx) {
+        const N = NASTAWY, z = this._zaczep;
+        const p = clamp01(this._t / N.CZAS_PIERSCIENIA);
+        const k = 1 + N.WYBRZUSZENIE * alfaPierscienia(this._t) * this._sila;
+        const R = promienPierscienia(this._t, this._promienMax());
+        if (k < 1.002 || R < 4 || typeof document === 'undefined' || !ctx.canvas) return;
+        const cw = ctx.canvas.width, ch = ctx.canvas.height;
+        if (!(cw > 0 && ch > 0)) return;
+        const m = typeof ctx.getTransform === 'function' ? ctx.getTransform() : null;
+        const dx = Number.isFinite(m?.e) ? m.e : 0, dy = Number.isFinite(m?.f) ? m.f : 0;
+        const cx = z.x + dx, cy = z.y + dy;
+        const Rz = R * (1 + N.NIEREGULARNOSC) + 8;
+        const x0 = Math.max(0, Math.floor(cx - Rz)), y0 = Math.max(0, Math.floor(cy - Rz));
+        const x1 = Math.min(cw, Math.ceil(cx + Rz)), y1 = Math.min(ch, Math.ceil(cy + Rz));
+        const bw = x1 - x0, bh = y1 - y0;
+        if (bw < 2 || bh < 2) return;
+        if (!this._plotnoSoczewki) {
+            this._plotnoSoczewki = document.createElement('canvas');
+            this._ctxSoczewki = this._plotnoSoczewki.getContext('2d');
+        }
+        if (this._plotnoSoczewki.width < bw || this._plotnoSoczewki.height < bh) {
+            this._plotnoSoczewki.width = Math.max(this._plotnoSoczewki.width, bw);
+            this._plotnoSoczewki.height = Math.max(this._plotnoSoczewki.height, bh);
+        }
+        this._ctxSoczewki.clearRect(0, 0, bw, bh);
+        this._ctxSoczewki.drawImage(ctx.canvas, x0, y0, bw, bh, 0, 0, bw, bh);
+
+        const grubosc = N.GRUBOSC_SOCZEWKI_OD + (N.GRUBOSC_SOCZEWKI_DO - N.GRUBOSC_SOCZEWKI_OD) * p;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        this._sciezkaCzola(ctx, R, this._t, dx, dy);
+        // Druga pętla (wewnętrzna krawędź) w TEJ SAMEJ ścieżce - evenodd wycina środek.
+        for (let i = 0; i <= N.SEGMENTOW; i++) {
+            const kat = (i / N.SEGMENTOW) * Math.PI * 2;
+            const r = promienCzola(R, this._ksztalt, kat, this._t) * (1 - grubosc);
+            const x = cx + Math.cos(kat) * r, y = cy + Math.sin(kat) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.clip('evenodd');
+        ctx.drawImage(this._plotnoSoczewki, 0, 0, bw, bh,
+                      cx + (x0 - cx) * k, cy + (y0 - cy) * k, bw * k, bh * k);
         ctx.restore();
     }
 
