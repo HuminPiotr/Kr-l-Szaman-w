@@ -19,7 +19,8 @@ import { WynikHud } from './wynikHud.js';
 import { Przebieg, decyzjaKlawisza } from './przebieg.js';
 import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js';
 import { swiezeModuly } from './swiezeModuly.js';
-import { wczytajManifest, Piesn } from './piesni.js';
+import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
+import { WlasnePiesni } from './wlasnePiesni.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -173,15 +174,56 @@ const ksiega = new Ksiega((() => { try { return window.localStorage; } catch { r
 const menu = new Menu({ ostatniNick: ksiega.ostatniNick() });
 let efektKroniki = null;   // {bog, korona} - odpalany w klatce, gdy istnieje `frame`
 const zetonStartu = new ZetonStartu();
+const wlasne = new WlasnePiesni({
+    indexedDB: (() => { try { return window.indexedDB ?? null; } catch { return null; } })(),
+    storage: (() => { try { return window.localStorage; } catch { return null; } })()
+});
+const BRAK_PIESNI = 'Ta pieśń nie chce zabrzmieć — spróbuj innego pliku.';
 const polanaUi = new PolanaUi(document, {
     menu, ksiega, losoweImie,
+    // Własne pieśni zwracają ciepłe zdanie zwrotne (pusty tekst = sukces bez komentarza).
+    naPlik: async (file) => {
+        try {
+            const u = utworZPliku(file);
+            if (!u) return 'To nie wygląda na plik dźwiękowy — spróbuj mp3, m4a albo wav.';
+            const url = URL.createObjectURL(file);
+            const probny = new Piesn({ ...u, url });
+            const { ok, dlugoscS } = await probny.zaladuj();
+            probny.zatrzymaj();
+            URL.revokeObjectURL(url);
+            if (!ok) return BRAK_PIESNI;
+            const z = await wlasne.dodajPlik({ ...u, dlugoscS }, file);
+            if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
+            menu.dodajPiesn(z);
+            return wlasne.trwala ? '' : 'Ta przeglądarka nie zapamięta pieśni po zamknięciu karty.';
+        } catch { return BRAK_PIESNI; }
+    },
+    naLinkYt: async (tekst) => {
+        try {
+            const id = wyciagnijIdYoutube(tekst);
+            if (!id) return 'To nie wygląda na link z YouTube.';
+            const probny = new PiesnYoutube(utworYoutube(id));
+            const { ok, dlugoscS } = await probny.zaladuj();
+            const tytul = probny.tytul;
+            probny.zatrzymaj();
+            if (!ok) return 'Ten film nie chce grać poza YouTube — spróbuj innego (albo sprawdź internet).';
+            const z = wlasne.dodajYt(utworYoutube(id, tytul, dlugoscS));
+            if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
+            menu.dodajPiesn(z);
+            return '';
+        } catch { return BRAK_PIESNI; }
+    },
+    naUsunPiesn: async (i) => {
+        const u = menu.piesni[i];
+        if (u && menu.usunPiesn(i)) await wlasne.usun(u.plik);
+    },
     onStart: (konf) => rozpalOgien(konf),
     onJeszczeRaz: () => dalejZKroniki(),
     onDoPolany: () => doPolany()
 });
 // Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
-wczytajManifest().then((lista) => {
-    menu.ustawPiesni(lista);
+Promise.all([wczytajManifest(), wlasne.wczytaj().catch(() => [])]).then(([lista, moje]) => {
+    menu.ustawPiesni([...lista, ...moje]);
     // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
     menu.zUrl(parsujKonfiguracje(window.location.search));
     polanaUi.render();
@@ -257,6 +299,7 @@ function odswiezWskaznikAudio() {
 }
 function przelaczDzwiek() {
     audioEngine.przelaczWyciszenie();
+    piesn?.wycisz?.(audioEngine.wyciszony);   // pieśń z YouTube nie przechodzi przez magistralę
     odswiezWskaznikAudio();
 }
 uiAudioWskaznik.addEventListener('click', przelaczDzwiek);
@@ -502,7 +545,7 @@ function przygotujPiesn() {
     piesn?.zatrzymaj();
     piesn = null;
     if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
-    piesn = new Piesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el) });
+    piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
 }
@@ -583,18 +626,17 @@ async function uruchomZKonfiguracji(konfig) {
     let konf = konfig;
     let utwor = null;
     if (konf.tryb === 'obrzed') {
-        const manifest = await wczytajManifest();
-        if (!zetonStartu.aktualny(zeton)) return;
-        utwor = manifest[konf.piesn] ?? null;
+        utwor = menu.piesni[konf.piesn] ?? null;   // manifest + własne (menu je już wczytało)
         if (!utwor) {
             // Brak pieśni nie jest błędem (§2) - Obrzęd zamienia się w próbę.
             konf = { ...konf, tryb: 'proba', dlugoscS: 90 };
             ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
             ostatniKomunikatDo = performance.now() + 5000;
         } else {
-            const probny = new Piesn(utwor);
-            const { ok, dlugoscS } = await probny.zaladuj();
-            probny.zatrzymaj();
+            // YouTube: długość zapisana przy dodaniu, bez ponownego ładowania odtwarzacza.
+            const probny = utwor.zrodlo === 'yt' ? null : new Piesn(utwor);
+            const { ok, dlugoscS } = probny ? await probny.zaladuj() : { ok: utwor.dlugoscS > 0, dlugoscS: utwor.dlugoscS };
+            probny?.zatrzymaj();
             if (!zetonStartu.aktualny(zeton)) return;
             // Długość z metadanych; niepoprawna -> awaryjna (tryb nadal obrzed, gra jak próba).
             konf = { ...konf, dlugoscS: ok ? dlugoscS : PIESN_AWARYJNA_S };
@@ -605,6 +647,7 @@ async function uruchomZKonfiguracji(konfig) {
             }
         }
     }
+    if (!zetonStartu.aktualny(zeton)) return;
     // utworRundy ustawiamy DOPIERO tu, po sprawdzeniach żetonu: moduł-wide zmienna nie może zdradzić
     // pieśni z przerwanego startu A rundzie B.
     utworRundy = utwor;

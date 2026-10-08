@@ -157,3 +157,24 @@ console.log('\nPIESN - GŁOŚNOŚĆ I MAGISTRALA:');
 }
 
 process.exit(ok ? 0 : 1);
+
+{
+    const { wyciagnijIdYoutube, utworZPliku, utworzPiesn, PiesnYoutube } = await import('../js/piesni.js');
+    console.log('\nWŁASNE PIEŚNI:');
+    const id = 'dQw4w9WgXcQ';
+    spr('linki YouTube (watch, youtu.be, shorts, music, goły ID)', [
+        `https://www.youtube.com/watch?v=${id}&t=3`, `youtu.be/${id}?si=x`, `https://youtube.com/shorts/${id}`,
+        `https://music.youtube.com/watch?v=${id}`, id].every(t => wyciagnijIdYoutube(t) === id));
+    spr('obce domeny i śmieci -> null', [`https://evil.com/?v=${id}`, 'x', '', null, 5].every(t => wyciagnijIdYoutube(t) === null));
+    spr('plik audio przechodzi, tytuł z nazwy', utworZPliku({ name: 'Moja pieśń.mp3', type: 'audio/mpeg' })?.tytul === 'Moja pieśń');
+    spr('plik tekstowy odrzucony', utworZPliku({ name: 'a.txt', type: 'text/plain' }) === null);
+    spr('klucz własnej pieśni ma prefiks wlasna:', utworZPliku({ name: 'a.mp3', type: 'audio/mpeg' }).plik === 'wlasna:a.mp3');
+    const a = atrapaAudio();
+    const p = new Piesn({ plik: 'wlasna:a.mp3', url: 'blob:x' }, { audioFabryka: () => a });
+    p.zaladuj(); a.emit('loadedmetadata');
+    spr('url wygrywa nad ścieżką z katalogu', a.src === 'blob:x');
+    spr('fabryka wybiera klasę po źródle', utworzPiesn({ zrodlo: 'yt', ytId: id }) instanceof PiesnYoutube && utworzPiesn({ plik: 'a' }) instanceof Piesn);
+    const yt = new PiesnYoutube({ ytId: id }, { limitMs: 50, kontener: () => null });
+    spr('YouTube bez API/kontenera -> ok:false, bez wyjątku', (await yt.zaladuj()).ok === false);
+    spr('YouTube: graj/zanik/zatrzymaj bez playera nie rzucają', (await yt.graj()) === false && (yt.zanik(1), yt.zatrzymaj(), true));
+}

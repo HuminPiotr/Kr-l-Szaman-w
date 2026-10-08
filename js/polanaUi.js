@@ -26,7 +26,7 @@ export class PolanaUi {
      * @param {Document} doc
      * @param {{menu, ksiega, losoweImie:()=>string, onStart:(konfig)=>void, onJeszczeRaz:()=>void, onDoPolany:()=>void}} deps
      */
-    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany }) {
+    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany, naPlik = async () => '', naLinkYt = async () => '', naUsunPiesn = () => {} }) {
         this.doc = doc;
         this.menu = menu;
         this.ksiega = ksiega;
@@ -34,6 +34,9 @@ export class PolanaUi {
         this.onStart = onStart;
         this.onJeszczeRaz = onJeszczeRaz;
         this.onDoPolany = onDoPolany;
+        this.naPlik = naPlik;
+        this.naLinkYt = naLinkYt;
+        this.naUsunPiesn = naUsunPiesn;
         this.zakladka = null;           // aktywny klucz tablicy w Księdze
         this.swiezy = null;             // {klucz, nick, wynik} - świeży wpis do podświetlenia
         this.potwierdzaWyczysc = false;
@@ -70,6 +73,39 @@ export class PolanaUi {
         });
         $('kronika-jeszcze').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onJeszczeRaz(); });
         $('kronika-polana').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onDoPolany(); });
+
+        // Własne pieśni: plik z dysku, upuszczenie, link YouTube. Komunikat zwrotny to ciepłe zdanie (§2).
+        const info = (t) => { $('wlasna-info').textContent = t || ''; };
+        const przyjmij = async (pliki) => {
+            const f = [...(pliki ?? [])];
+            if (!f.length) return;
+            info('Duchy słuchają…');
+            let t = '';
+            for (const plik of f.slice(0, 3)) t = await this.naPlik(plik);
+            info(t); this.render();
+        };
+        $('wlasna-wybierz').addEventListener('click', () => $('wlasna-plik').click());
+        $('wlasna-plik').addEventListener('change', (e) => { const p = [...e.target.files]; e.target.value = ''; przyjmij(p); });
+        const strefa = $('wlasna-strefa');
+        const nadKonfigiemObrzedu = () => menu.ekran === 'konfig' && menu.tryb === 'obrzed';
+        // Bez tego przeglądarka po upuszczeniu pliku obok strefy otwiera go zamiast gry.
+        this.doc.addEventListener('dragover', (e) => { e.preventDefault(); strefa.classList.toggle('nad-strefa', nadKonfigiemObrzedu()); });
+        this.doc.addEventListener('dragleave', (e) => { if (!e.relatedTarget) strefa.classList.remove('nad-strefa'); });
+        this.doc.addEventListener('drop', (e) => {
+            e.preventDefault();
+            strefa.classList.remove('nad-strefa');
+            if (nadKonfigiemObrzedu()) przyjmij(e.dataTransfer?.files);
+        });
+        const dodajYt = async () => {
+            const wartosc = $('wlasna-yt').value;
+            if (!wartosc.trim()) return;
+            info('Duchy słuchają…');
+            const t = await this.naLinkYt(wartosc);
+            if (!t) $('wlasna-yt').value = '';
+            info(t); this.render();
+        };
+        $('wlasna-yt-dodaj').addEventListener('click', dodajYt);
+        $('wlasna-yt').addEventListener('keydown', (e) => { if (e.key === 'Enter') dodajYt(); });
 
         // Klawiatura: strzałki chodzą po kamieniach, Esc cofa o krok (Polana i Kronika/gra - w main.js).
         this.doc.addEventListener('keydown', (e) => {
@@ -184,9 +220,17 @@ export class PolanaUi {
 
         const piesni = $('konfig-piesni'); piesni.replaceChildren();
         menu.piesni.forEach((p, i) => {
-            const b = pigulka(doc, p.dlugoscS > 0 ? `${p.tytul} (${formatCzasu(p.dlugoscS)})` : p.tytul, i === menu.piesn);
+            const ikona = p.zrodlo === 'yt' ? '▶ ' : p.zrodlo === 'plik' ? '♪ ' : '';
+            const b = pigulka(doc, ikona + (p.dlugoscS > 0 ? `${p.tytul} (${formatCzasu(p.dlugoscS)})` : p.tytul), i === menu.piesn);
             b.addEventListener('click', () => { menu.ustaw('piesn', i); this.render(); });
-            piesni.appendChild(b);
+            if (p.zrodlo !== 'plik' && p.zrodlo !== 'yt') { piesni.appendChild(b); return; }
+            const x = pigulka(doc, '×', false);
+            x.className = 'piesn-usun';
+            x.setAttribute('aria-label', `Usuń pieśń ${p.tytul}`);
+            x.addEventListener('click', async () => { await this.naUsunPiesn(i); this.render(); });
+            const w = doc.createElement('span'); w.className = 'piesn-wlasna';
+            w.append(b, x);
+            piesni.appendChild(w);
         });
         const czasy = $('konfig-czasy'); czasy.replaceChildren();
         for (const c of PROBA_DLUGOSCI) {
