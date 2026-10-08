@@ -999,9 +999,10 @@ function klatka(now) {
     grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
-    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
+    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa }, dt);
     punkty.reakcja('przewodzenie', reakcjeKlatki.przewodzenie, now);
     punkty.reakcja('burzaWMgle', reakcjeKlatki.burzaWMgle, now);
+    punkty.reakcja('rozdarcie', reakcjeKlatki.rozdarcie, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w

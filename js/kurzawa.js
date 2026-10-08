@@ -69,7 +69,12 @@ export const NASTAWY = {
     BARWA_KURZU: [200, 172, 125],  // piaskowa ochra - kłęby mgiełki
     BARWA_ZIARNA: [225, 205, 165], // jasny piasek
     BARWA_LINII: [215, 195, 160],  // blady beż
-    BARWA_PYLU: [150, 118, 82]     // ciemna ziemia - grudki
+    BARWA_PYLU: [150, 118, 82],    // ciemna ziemia - grudki
+    // Reakcja z Grzmotem (js/reakcjeTechnik.js): pasy chwilowo rozrywa na boki.
+    SZARPNIECIE_ROZSZERZ: 0.6,     // promień pasów rośnie do (1 + to) przy pełnej sile
+    SZARPNIECIE_NAROST: 0.08,      // s
+    SZARPNIECIE_POWROT: 0.8,       // s - powrót do zwykłej orbity
+    SZARPNIECIE_BLADNIE: 0.4       // ułamek alfy tracony w szczycie szarpnięcia
 };
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
@@ -81,7 +86,19 @@ export function obwiednia(t) {
 }
 
 /**
- * Pas podmuchu `i` - czysta funkcja.
+ * Obwiednia szarpnięcia 0..1 w chwili `wiek` od szarpnij(): szybki narost, liniowy powrót.
+ * Czysta funkcja.
+ */
+export function obwiedniaSzarpniecia(wiek) {
+    const N = NASTAWY;
+    if (!Number.isFinite(wiek) || wiek < 0) return 0;
+    if (wiek < N.SZARPNIECIE_NAROST) return wiek / N.SZARPNIECIE_NAROST;
+    return clamp01(1 - (wiek - N.SZARPNIECIE_NAROST) / N.SZARPNIECIE_POWROT);
+}
+
+/**
+ * Pas podmuchu `i` - czysta funkcja. `zaczep.mnoznikR` (opcjonalny, domyślnie 1)
+ * rozszerza orbitę - tak reakcje zaburzają Kurzawę bez ruszania jej zegara.
  * @returns {{cx, cy, R, strona:-1|1, katWejscia, kierunek:-1|1}}  px; strona -1 = wejście z lewej
  */
 export function geometriaPasa(i, zaczep, H) {
@@ -91,7 +108,7 @@ export function geometriaPasa(i, zaczep, H) {
     return {
         cx: zaczep.x,
         cy: Math.min(zaczep.y + sk * (N.PASY[i] ?? 0), H * N.DOL_EKRANU),
-        R: sk * N.PROMIEN,
+        R: sk * N.PROMIEN * (Number.isFinite(zaczep.mnoznikR) ? zaczep.mnoznikR : 1),
         strona,
         katWejscia: strona < 0 ? Math.PI : 0,   // skrajny punkt elipsy po swojej stronie
         kierunek: strona < 0 ? 1 : -1           // ruch w GÓRĘ z punktu wejścia - patrz nagłówek
@@ -182,16 +199,26 @@ export class Kurzawa {
         this._kotwica = new Kotwica(10);
         this._warstwa = new WarstwaZaSylwetka();
         this.zaczep = null;
+        this._szarpniecie = null;   // { wiek, sila } - reakcja z Grzmotem
     }
 
     get aktywny() { return this._trwa; }
 
     wyczyscCache() { wyczyscCacheAssetow(); }
 
+    /** Reakcja z Grzmotem: pasy rozrywa na boki, potem wracają. @returns {boolean} */
+    szarpnij(sila = 1) {
+        const s = clamp01(sila);
+        if (!this._trwa || s <= 0.01) return false;
+        this._szarpniecie = { wiek: 0, sila: s };
+        return true;
+    }
+
     zapal(sila = 1) {
         const s = clamp01(sila);
         if (s <= 0.01) return;
         const N = NASTAWY;
+        this._szarpniecie = null;
         this._sila = s;
         this._t = 0;
         this._trwa = true;
@@ -232,11 +259,19 @@ export class Kurzawa {
         if (this._t >= CZAS_TRWANIA) { this._trwa = false; return; }
 
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
-        this.zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
+        const zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
+        let szarp = 0;
+        if (this._szarpniecie) {
+            this._szarpniecie.wiek += krok;
+            szarp = obwiedniaSzarpniecia(this._szarpniecie.wiek) * this._szarpniecie.sila;
+            if (this._szarpniecie.wiek >= NASTAWY.SZARPNIECIE_NAROST + NASTAWY.SZARPNIECIE_POWROT) this._szarpniecie = null;
+        }
+        // KOPIA, nie mutacja - stan Kotwicy jest jej własnością.
+        this.zaczep = { ...zaczep, mnoznikR: 1 + NASTAWY.SZARPNIECIE_ROZSZERZ * szarp };
         if (!ctx) return;   // guard PO zegarze i zaczepie - patrz kolowrot.js
 
-        const alfa = obwiednia(this._t) * this._sila;
+        const alfa = obwiednia(this._t) * this._sila * (1 - NASTAWY.SZARPNIECIE_BLADNIE * szarp);
         if (alfa < 0.01) return;
         const N = NASTAWY;
         const ogony = [], mgly = [];

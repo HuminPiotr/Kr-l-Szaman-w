@@ -9,6 +9,8 @@
  *    ODSTEP_PRZEWODZENIA łuk wypuszcza odnogę do kręgu, a kręgi się elektryzują.
  *  - BURZA W MGLE: Mgła Mokoszy + (Łuk Peruna albo piorun Gromu w Ziemię).
  *    Co 60-150 ms mgła błyska od źródła wyładowania.
+ *  - ROZDARCIE: Grzmot (jedna klatka wybuchu) + Mgła Mokoszy (dziura,
+ *    mgla.rozepchnij) i/lub Kurzawa (szarpnięcie pasów). 1 jednostka na pole.
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -42,16 +44,16 @@ export class ReakcjeTechnik {
     }
 
     /**
-     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun}} t  instancje technik
+     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun } = t ?? {};
+        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa } = t ?? {};
 
         // --- Przewodzenie ---
         const geom = luk?.aktywny && kregi?.aktywny ? kregi.geometria?.() : null;
@@ -83,6 +85,14 @@ export class ReakcjeTechnik {
             }
         } else {
             this._doBlysku = 0;
+        }
+
+        // --- Rozdarcie --- (wybuch żyje jedną klatkę - patrz js/grzmot.js)
+        const wybuch = grzmot?.wybuch;
+        if (punktOk(wybuch)) {
+            const s = Number.isFinite(wybuch.sila) ? wybuch.sila : 1;
+            if (mgla?.aktywny && mgla.rozepchnij?.(wybuch, s)) wynik.rozdarcie++;
+            if (kurzawa?.aktywny && kurzawa.szarpnij?.(s)) wynik.rozdarcie++;
         }
         return wynik;
     }

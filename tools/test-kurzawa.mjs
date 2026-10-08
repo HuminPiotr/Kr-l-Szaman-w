@@ -103,5 +103,23 @@ spr('rysowanie bez assetów i bez document nie rzuca', rzucil === false);
 przepusc(kz, klatka(), CZAS_TRWANIA);
 spr('gaśnie po CZAS_TRWANIA', kz.aktywny === false);
 
+console.log('\nSZARPNIĘCIE (reakcja z Grzmotem):');
+{
+    const { obwiedniaSzarpniecia } = await import('../js/kurzawa.js');
+    spr('obwiednia: 0 na starcie, 1 w szczycie, 0 po powrocie, NaN -> 0',
+        obwiedniaSzarpniecia(0) === 0 && blisko(obwiedniaSzarpniecia(NASTAWY.SZARPNIECIE_NAROST), 1)
+        && obwiedniaSzarpniecia(NASTAWY.SZARPNIECIE_NAROST + NASTAWY.SZARPNIECIE_POWROT) === 0 && obwiedniaSzarpniecia(NaN) === 0);
+    spr('mnoznikR rozszerza orbitę pasa', geometriaPasa(0, { ...ZACZEP, mnoznikR: 1.5 }, H).R === pasy[0].R * 1.5);
+    const ks = new Kurzawa();
+    spr('nieaktywna: szarpnij() false', ks.szarpnij(1) === false);
+    ks.zapal(1);
+    przepusc(ks, klatka(), 1);
+    spr('aktywna: szarpnij() true', ks.szarpnij(1) === true);
+    przepusc(ks, klatka(), NASTAWY.SZARPNIECIE_NAROST);
+    spr(`w szczycie pasy szersze (mnoznikR ${ks.zaczep.mnoznikR.toFixed(2)})`, ks.zaczep.mnoznikR > 1.4);
+    przepusc(ks, klatka(), NASTAWY.SZARPNIECIE_POWROT + 0.1);
+    spr('po powrocie zwykła orbita', ks.zaczep.mnoznikR === 1);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

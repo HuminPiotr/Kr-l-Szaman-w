@@ -80,5 +80,27 @@ console.log('\nODPORNOŚĆ:');
     spr('nowa instancja bezczynna', r._doPrzewodzenia === 0 && r._doBlysku === 0);
 }
 
+console.log('\nROZDARCIE (Grzmot w polu):');
+{
+    const pola = ({ mgla = false, kurzawa = false, wybuch = { x: 960, y: 550, skala: 200, sila: 1 } } = {}) => {
+        const log = [];
+        return { log, t: {
+            grzmot: { wybuch },
+            mglaMokoszy: { aktywny: mgla, rozepchnij: (z, s) => { log.push(['mgla.rozepchnij', z, s]); return true; }, rozblysk: () => true },
+            kurzawa: { aktywny: kurzawa, szarpnij: (s) => { log.push(['kurzawa.szarpnij', s]); return true; } }
+        } };
+    };
+    const a = pola({ mgla: true });
+    spr('Grzmot + Mgła: dziura od punktu wybuchu, 1 jednostka',
+        new ReakcjeTechnik().klatka(a.t, DT).rozdarcie === 1 && a.log.length === 1 && a.log[0][0] === 'mgla.rozepchnij' && a.log[0][1].x === 960);
+    const b = pola({ kurzawa: true });
+    spr('Grzmot + Kurzawa: szarpnięcie, 1 jednostka', new ReakcjeTechnik().klatka(b.t, DT).rozdarcie === 1 && b.log[0][0] === 'kurzawa.szarpnij');
+    spr('Grzmot w obu polach: 2 jednostki', new ReakcjeTechnik().klatka(pola({ mgla: true, kurzawa: true }).t, DT).rozdarcie === 2);
+    const c = pola();
+    spr('bez pola: zero i nic nie wołane', new ReakcjeTechnik().klatka(c.t, DT).rozdarcie === 0 && c.log.length === 0);
+    const d = pola({ mgla: true, kurzawa: true, wybuch: null });
+    spr('bez wybuchu (inna klatka): zero', new ReakcjeTechnik().klatka(d.t, DT).rozdarcie === 0 && d.log.length === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

@@ -29,6 +29,10 @@ export const NASTAWY = {
     BLYSK_ZYCIE: 0.12,             // s
     ZASIEG_BLYSKU: 4,              // skala * to - dalej od źródła błysk nie sięga
     BARWA_BLYSKU: [200, 225, 255],
+    // Reakcja z Grzmotem: dziura - kłęby odpychane promieniście od wybuchu.
+    ZASIEG_ROZEPCHNIECIA: 3,       // skala * to
+    ROZEPCHNIECIE: 6,              // skala/s prędkości kłębu przy samym źródle
+    OPOR_DOD: 2.0,                 // 1/s - dodatkowa prędkość wygasa, dziura się domyka
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
@@ -68,6 +72,32 @@ export class MglaMokoszy {
 
     wyczyscCache() { wyczyscCacheAssetow(); }
 
+    /**
+     * Reakcja z Grzmotem: kłęby w zasięgu dostają promienisty impuls (dziura).
+     * @returns {boolean}  czy trafiło choć jeden widoczny kłąb
+     */
+    rozepchnij(zrodlo, sila = 1) {
+        const s = clamp01(sila);
+        if (!this._trwa || s <= 0.01 || !zrodlo || !Number.isFinite(zrodlo.x) || !Number.isFinite(zrodlo.y)) return false;
+        const N = NASTAWY;
+        const sk = this._kotwica.stan?.skala ?? 230;
+        const R = sk * N.ZASIEG_ROZEPCHNIECIA;
+        let trafil = false;
+        for (const c of this._kleby) {
+            if (c.wiek < 0) continue;
+            const dx = c.x - zrodlo.x, dy = c.y - zrodlo.y;
+            const d = Math.hypot(dx, dy);
+            if (d >= R) continue;
+            const v = (1 - d / R) * s * N.ROZEPCHNIECIE * sk;
+            // Kłąb dokładnie w źródle - umowny kierunek w górę, nie NaN.
+            const ux = d > 1e-6 ? dx / d : 0, uy = d > 1e-6 ? dy / d : -1;
+            c.vxDod += ux * v;
+            c.vyDod += uy * v;
+            trafil = true;
+        }
+        return trafil;
+    }
+
     /** Reakcja Burza w mgle: mgła błyska od `zrodlo` (px). @returns {boolean} */
     rozblysk(zrodlo, sila = 1) {
         if (!this._trwa || !zrodlo || !Number.isFinite(zrodlo.x) || !Number.isFinite(zrodlo.y)) return false;
@@ -99,6 +129,7 @@ export class MglaMokoszy {
                 v0: kierunek * ((W + 2 * rozmiar) / N.CZAS_PRZEJAZDU) * (0.85 + Math.random() * 0.3),
                 wiek: -Math.random() * N.OPOZNIENIE_MAX,
                 rozmiar,
+                vxDod: 0, vyDod: 0,   // impulsy reakcji (rozepchnij) - wygasają oporem
                 obrot: Math.random() * Math.PI * 2,
                 vObrot: (Math.random() * 2 - 1) * 0.3,
                 wariant: Math.floor(Math.random() * MANIFEST.mgla.length)
@@ -119,7 +150,11 @@ export class MglaMokoszy {
         for (const c of this._kleby) {
             c.wiek += krok;
             if (c.wiek < 0) continue;
-            c.x += predkoscKlebu(c.x, zaczep.x, c.v0, zaczep.skala) * krok;
+            const opor = Math.exp(-NASTAWY.OPOR_DOD * krok);
+            c.vxDod *= opor;
+            c.vyDod *= opor;
+            c.x += (predkoscKlebu(c.x, zaczep.x, c.v0, zaczep.skala) + c.vxDod) * krok;
+            c.y += c.vyDod * krok;
             c.obrot += c.vObrot * krok;
         }
         if (this._blysk) {

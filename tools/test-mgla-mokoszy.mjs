@@ -32,6 +32,24 @@ spr('rysowanie (atrapa, bez assetów i document) nie rzuca', rzucil === false);
 przepusc(m, klatka(), CZAS_TRWANIA);
 spr('gaśnie po CZAS_TRWANIA', m.aktywny === false);
 
+console.log('\nDZIURA (reakcja z Grzmotem):');
+{
+    const md = new MglaMokoszy();
+    spr('nieaktywna: rozepchnij() false', md.rozepchnij({ x: 1, y: 1 }, 1) === false);
+    md.zapal(1);
+    przepusc(md, klatka(), 4);
+    const widoczne = md._kleby.filter(k => k.wiek >= 0);
+    const c = widoczne[0];
+    const zrodlo = { x: c.x - 50, y: c.y };   // kłąb na prawo od wybuchu
+    spr('rozepchnij() trafia kłąb w zasięgu', md.rozepchnij(zrodlo, 1) === true);
+    spr('kłąb dostaje impuls OD źródła (w prawo)', c.vxDod > 0);
+    const v0 = c.vxDod;
+    przepusc(md, klatka(), 1);
+    spr('impuls wygasa (dziura się domyka)', c.vxDod < v0 * 0.25);
+    spr('rozepchnij(NaN) false, pozycje skończone', md.rozepchnij({ x: NaN, y: 1 }, 1) === false && md._kleby.every(k => Number.isFinite(k.x) && Number.isFinite(k.y)));
+    spr('daleki wybuch nie trafia', md.rozepchnij({ x: -1e6, y: -1e6 }, 1) === false);
+}
+
 console.log('\nBŁYSK W MGLE (reakcja Burza w mgle):');
 {
     spr('jasność 1 przy źródle, maleje z odległością, 0 daleko',
