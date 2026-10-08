@@ -15,8 +15,8 @@
  * techniki się nie znają, a każdą da się wyjąć jednym commitem.
  *
  * Duch/energia, więc 'lighter' (inaczej niż materia Kurzawy/Zawieruchy).
- * Barwa celowo NIE pomarańcz Płonącego Palca - blada zieleń ze złotem,
- * tak jak maluje się błędne ogniki. Ogon kreską po węzłach (pamięć projektu
+ * Barwa celowo NIE pomarańcz Płonącego Palca - v1 blada zieleń ze złotem,
+ * v2 (życzenie właściciela) zimny błękit. Ogon kreską po węzłach (pamięć projektu
  * "efekt ciągły = kreska, nie sprite"); sam płomyk to tintowany flame_*.
  *
  * Zaczep z POZY (barki), nie dłoni - lekcja z Łuku Peruna. Pas narodzin
@@ -30,21 +30,24 @@ import { curl2 } from './szum.js';
 export const NASTAWY = {
     LICZBA: 5,
     CO_S: 0.08,                    // s między narodzinami kolejnych ogników
-    ZYCIE_OD: 2.0, ZYCIE_DO: 2.4,  // s
-    NAROST: 0.25, WYGASZENIE: 0.6, // s
+    // v2 (2026-10-08, właściciel: "powinny utrzymywać się dłużej"): życie x~2.2,
+    // a unoszenie i odpływ wolniejsze - inaczej przy dłuższym życiu uciekłyby z kadru;
+    // ogniki mają WISIEĆ wokół gracza, jak błędne ogniki nad mokradłem.
+    ZYCIE_OD: 4.5, ZYCIE_DO: 5.5,  // s (było 2.0-2.4)
+    NAROST: 0.25, WYGASZENIE: 1.2, // s (wygaszanie było 0.6 - proporcjonalnie do życia)
     PAS_OD: 1.0, PAS_DO: 1.8,      // skala * to pod barkami
     DOL_EKRANU: 0.92,
     MIN_WYSOKOSC_PASA: 0.35,       // skala * to
     ROZRZUT: 1.2,                  // skala * to - w poziomie od środka ciała
-    UNOSZENIE_OD: 0.6, UNOSZENIE_DO: 1.0,   // skala/s
-    ODPLYW: 0.35,                  // skala/s - na boki, od ciała
+    UNOSZENIE_OD: 0.35, UNOSZENIE_DO: 0.55, // skala/s (było 0.6-1.0)
+    ODPLYW: 0.2,                   // skala/s - na boki, od ciała (było 0.35)
     CHWIANIE: 0.5,                 // skala/s - amplituda dryfu curl2
     SKALA_SZUMU: 0.8,              // skala * to
-    AUREOLA: 0.45,                 // skala * to - promień aureoli
+    AUREOLA: 0.6,                  // skala * to - promień aureoli (v2: było 0.45)
     AUREOLA_W_MGLE: 2.5,           // mnożnik aureoli w Mgle (latarnia)
     ALFA_AUREOLI: 0.5,
-    PLOMYK: 0.25,                  // skala * to
-    RDZEN: 0.035,                  // skala * to
+    PLOMYK: 0.33,                  // skala * to (v2: było 0.25)
+    RDZEN: 0.045,                  // skala * to (v2: było 0.035)
     OGON_S: 0.3,
     KROK_OGONA: 0.03,              // s
     SZEROKOSC_OGONA: 0.06,         // skala * to
@@ -52,9 +55,11 @@ export const NASTAWY = {
     PROMIEN_ZARZEWIA: 0.15,        // skala * to - kontakt z dymem
     PROG_ZARZEWIA: 0.3,            // jasność, od której ognik pali dym
     PORWANIE_TAU: 0.4,             // s - jak szybko wir ściąga ognik na orbitę
-    BARWA_AUREOLI: [190, 235, 140],
-    BARWA_PLOMYKA: [210, 245, 150],
-    BARWA_RDZENIA: [255, 250, 210]
+    // v2: niebieskie (właściciel) - zimny błękit błędnych ogników, chłodniejszy od
+    // błękitu Peruna (Grzmot/Łuk), żeby się nie myliły.
+    BARWA_AUREOLI: [110, 175, 255],
+    BARWA_PLOMYKA: [150, 200, 255],
+    BARWA_RDZENIA: [230, 242, 255]
 };
 
 export const CZAS_TRWANIA = (NASTAWY.LICZBA - 1) * NASTAWY.CO_S + NASTAWY.ZYCIE_DO + 0.05;
@@ -189,14 +194,18 @@ export class BledneOgniki {
     _ruch(o, krok, orbita) {
         const N = NASTAWY, sk = this._sk;
         if (orbita && o.porwany) {
-            // Na orbicie: kąt względem środka elipsy, przesunięty z prędkością wiru,
-            // ognik płynnie ściągany na ten punkt (nie skacze).
-            const kat = Math.atan2((o.y - orbita.cy) / orbita.squash, o.x - orbita.cx)
-                + (orbita.kierunek < 0 ? -1 : 1) * orbita.predkosc * krok;
-            const cel = punktNaOrbicie(orbita, kat);
+            // Na orbicie, we współrzędnych elipsy (kąt, rho = 1 na orbicie). KĄT rośnie
+            // z PEŁNĄ prędkością wiru - ognik od razu krąży z Kurzawą; płynnie
+            // ściągana jest tylko ODLEGŁOŚĆ (rho -> 1), żeby nie skakał na orbitę.
+            // v1 ciągnęła lerpem cały punkt i ognik krążył ~25x wolniej niż wir -
+            // porwanie było ledwo widoczne (test na kamerze 2026-10-08).
+            const ex = (o.x - orbita.cx) / orbita.R, ey = (o.y - orbita.cy) / (orbita.R * orbita.squash);
+            const kat = Math.atan2(ey, ex) + (orbita.kierunek < 0 ? -1 : 1) * orbita.predkosc * krok;
             const a = 1 - Math.exp(-krok / N.PORWANIE_TAU);
-            o.x += (cel.x - o.x) * a;
-            o.y += (cel.y - o.y) * a;
+            const rho = Math.hypot(ex, ey);
+            const rhoNowe = rho + (1 - rho) * a;
+            o.x = orbita.cx + Math.cos(kat) * rhoNowe * orbita.R;
+            o.y = orbita.cy + Math.sin(kat) * rhoNowe * orbita.R * orbita.squash;
             return;
         }
         const dl = sk * N.SKALA_SZUMU;

@@ -57,7 +57,7 @@ export const BARWA_ZAPLONU = {
     bania: [245, 240, 232],         // ciepła biel pary
     grzmot: [170, 205, 255],        // błękit Peruna, jaśniejszy od Łuku
     zawierucha: [215, 175, 110],    // ochra pyłu, jak Kurzawa
-    bledneOgniki: [190, 235, 140]   // blada zieleń ze złotem - nie pomarańcz Płonącego Palca
+    bledneOgniki: [110, 175, 255]   // zimny błękit ogników (v2) - nie pomarańcz Płonącego Palca
 };
 
 /**

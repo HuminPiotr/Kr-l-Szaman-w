@@ -16,7 +16,7 @@ spr('pas narodzin pod barkami, nie niżej niż DOL_EKRANU', pas.gora > ZACZEP.y 
 const blisko = pasNarodzin({ x: 960, y: 900, skala: 400 }, H);
 spr('gracz blisko kamery - pas ściśnięty, ale niezerowy', blisko.dol - blisko.gora >= 400 * NASTAWY.MIN_WYSOKOSC_PASA - 1e-9);
 spr('obwiednia: 0 na końcach i dla NaN, pełna w środku',
-    obwiedniaOgnika(0, 2) === 0 && obwiedniaOgnika(2, 2) === 0 && obwiedniaOgnika(NaN, 2) === 0 && obwiedniaOgnika(1, 2) === 1);
+    obwiedniaOgnika(0, 5) === 0 && obwiedniaOgnika(5, 5) === 0 && obwiedniaOgnika(NaN, 5) === 0 && obwiedniaOgnika(2.5, 5) === 1);
 const mig = Array.from({ length: 200 }, (_, i) => migotanie(i * 0.01, 3));
 spr('migotanie w 0.5..1 i faktycznie migocze', mig.every(v => v >= 0.5 - 1e-9 && v <= 1 + 1e-9) && Math.max(...mig) - Math.min(...mig) > 0.2);
 const orb = { cx: 960, cy: 500, R: 300, squash: 0.28 };
@@ -38,8 +38,11 @@ const barkiY = 0.4 * H;
 spr('rodzą się w pasie ziemi - pod barkami, nie niżej niż DOL_EKRANU',
     zywe.every(g => g.y > barkiY && g.y <= H * NASTAWY.DOL_EKRANU + 5));
 const y0 = zywe.map(g => g.y);
-przepusc(o, klatka(), 0.8);
-spr('unoszą się (y maleje)', o._ogniki.every((g, i) => g.y < y0[i]));
+przepusc(o, klatka(), 1.5);
+// Średnia grupy, nie każdy z osobna: chwianie curl2 (do ~0.7 skali/s) chwilowo przeważa
+// najwolniejsze unoszenie (0.35) - pojedynczy ognik może się na moment obniżyć, i dobrze.
+const srednia = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+spr('unoszą się (średnia wysokość grupy rośnie, y maleje)', srednia(o._ogniki.map(g => g.y)) < srednia(y0) - 0.1 * 0.1 * W);
 spr('odpływają od środka ciała na boki', o._ogniki.every(g => g.kierunek !== 0));
 spr('punkty() - widoczne ogniki ze skalą i jasnością', o.punkty().length === NASTAWY.LICZBA && o.punkty().every(q => q.skala > 0 && q.jasnosc > 0 && q.jasnosc <= 1));
 const zr = o.zarzewia();
@@ -61,6 +64,18 @@ console.log('\nPORWANIE (Kurzawa) I MGŁA:');
     for (let i = 0; i < 40; i++) { g.porwij(orbita); g.updateAndDraw(null, kontekst(klatka()), DT); }
     const po = g.punkty().map(odlElipsy);
     spr('wir ściąga ogniki na orbitę (bliżej elipsy)', po.reduce((a, b) => a + b, 0) < przed.reduce((a, b) => a + b, 0) * 0.5);
+    {
+        // Porwany ognik KRĄŻY z prędkością wiru (v1 krążył ~25x wolniej - porwanie niewidoczne).
+        const q = g._ogniki.find(x => x.porwany && Number.isFinite(x.x));
+        const kat = (x) => Math.atan2((x.y - orbita.cy) / (orbita.R * orbita.squash), (x.x - orbita.cx) / orbita.R);
+        let suma = 0, poprz = kat(q);
+        for (let i = 0; i < 30; i++) {
+            g.porwij(orbita); g.updateAndDraw(null, kontekst(klatka()), DT);
+            let d = kat(q) - poprz; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+            suma += d; poprz = kat(q);
+        }
+        spr(`porwany ognik krąży z wirem (${suma.toFixed(2)} rad w 0.5 s ~ ${(orbita.predkosc * 0.5).toFixed(2)})`, Math.abs(suma - orbita.predkosc * 0.5) < 0.2);
+    }
     spr('zła orbita - 0, bez wyjątku', g.porwij({ cx: NaN }) === 0 && g.porwij(null) === 0);
     spr(`oznaczMgle() liczy wejścia raz (${NASTAWY.LICZBA}, potem 0)`, g.oznaczMgle() === NASTAWY.LICZBA && g.oznaczMgle() === 0);
     spr('wMgle ustawione do następnej klatki', g.wMgle === true);

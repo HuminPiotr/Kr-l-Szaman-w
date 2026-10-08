@@ -39,7 +39,7 @@ export const NASTAWY = {
     // Reakcja Latarnie: Błędne Ogniki ciepło podświetlają kłęby wokół siebie.
     ZASIEG_LATARNI: 2.5,           // skala * to
     ALFA_LATARNI: 0.6,
-    BARWA_LATARNI: [255, 225, 150],
+    BARWA_LATARNI: [150, 200, 255],   // barwa Błędnych Ogników (v2: niebieskie)
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
