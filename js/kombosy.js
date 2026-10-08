@@ -156,7 +156,16 @@ export const KOMBOSY = [
     // dym (js/reakcjeTechnik.js). Para perun->stribog nie jest prefiksem/
     // sufiksem żadnej trójki. Łańcuch: Grzmot + stribog = Podmuch Striboga.
     { id: 'grzmot', nazwa: 'Grzmot',
-      sekwencja: ['perun', 'stribog'], uzbraja: 'grzmot' }
+      sekwencja: ['perun', 'stribog'], uzbraja: 'grzmot' },
+
+    // ZAWIERUCHA (2026-10-08, ten sam spec): ziemia (Weles) oddaje pył
+    // wiatrowi (Stribog) - poryw w poprzek kadru, odwrotność Kurzawy
+    // (stribog->weles). Pierwsza dwójka OTWIERANA przez Welesa. Kanałowana
+    // lekko: okno 1.5 s na machnięcia ręką (js/machniecie.js), bez machnięcia
+    // poryw rusza sam. Para weles->stribog nie jest prefiksem/sufiksem żadnej
+    // trójki. Łańcuchy: Zawierucha + weles = Kurzawa, + mokosz = Mgła Mokoszy.
+    { id: 'zawierucha', nazwa: 'Zawierucha',
+      sekwencja: ['weles', 'stribog'], uzbraja: 'zawierucha' }
 ];
 
 export class KomboSilnik {

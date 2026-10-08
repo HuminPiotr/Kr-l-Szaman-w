@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -299,5 +299,14 @@ spr('...a dołożony stribog - Podmuch Striboga (łańcuch)', k30.dodaj('stribog
 const k31 = new KomboSilnik();
 k31.dodaj('perun', 0);
 spr('perun -> weles nadal nic (prefiks Kołowrotu)', k31.dodaj('weles', 500) === null);
+
+console.log('\nZAWIERUCHA (weles -> stribog):');
+const k32 = new KomboSilnik();
+k32.dodaj('weles', 0);
+spr('weles -> stribog odpala Zawieruchę', k32.dodaj('stribog', 500)?.id === 'zawierucha');
+spr('...a dołożony weles - Kurzawa (łańcuch)', k32.dodaj('weles', 1000)?.id === 'kurzawa');
+const k33 = new KomboSilnik();
+k33.dodaj('weles', 0); k33.dodaj('stribog', 500);
+spr('Zawierucha + mokosz - Mgła Mokoszy (łańcuch)', k33.dodaj('mokosz', 1000)?.id === 'mglaMokoszy');
 
 process.exit(ok ? 0 : 1);

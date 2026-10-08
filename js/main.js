@@ -53,6 +53,7 @@ import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
 import { Bania } from './bania.js';
 import { Grzmot } from './grzmot.js';
+import { Zawierucha } from './zawierucha.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
@@ -256,6 +257,7 @@ let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
 let bania = new Bania();
 let grzmot = new Grzmot();
+let zawierucha = new Zawierucha();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -536,7 +538,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -809,7 +811,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -916,11 +918,14 @@ function klatka(now) {
     // dzieli Fala, więc jego fala też rozdmucha dym - jedna fizyka fali.
     // Guard na dym.liczba: bez kłębów nie ma czego pchać, a 72 rzuty na czoło
     // co klatkę przez 0.7 s po każdym Aardzie/Gromie byłyby pracą na darmo.
-    if (dym.liczba > 0 && fala.czola.length) {
+    // Zawierucha dokłada głowy swoich smug - ten sam kontrakt punktów, ale
+    // ze słabą `sila` (js/zawierucha.js SILA_PCHNIECIA): znosi dym, nie rozwiewa.
+    if (dym.liczba > 0) {
         const podmuchy = [];
         for (const c of fala.czola) {
             podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
         }
+        if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
 
@@ -997,6 +1002,7 @@ function klatka(now) {
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
     bania.updateAndDraw(ctx, kontekstTechnik, dt);
     grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
+    zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
     const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa }, dt);
@@ -1099,6 +1105,7 @@ function klatka(now) {
         kurzawa: { aktywny: kurzawa.aktywny },
         bania: { aktywny: bania.aktywny },
         grzmot: { aktywny: grzmot.aktywny },
+        zawierucha: { aktywny: zawierucha.aktywny, ...zawierucha.diagnostyka },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do

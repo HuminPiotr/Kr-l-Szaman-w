@@ -190,6 +190,7 @@ const { LukPeruna, NASTAWY: NASTAWY_LUKPERUNA } = await import('./js/lukPeruna.j
 const { Kurzawa, NASTAWY: NASTAWY_KURZAWA } = await import('./js/kurzawa.js');
 const { Bania, NASTAWY: NASTAWY_BANIA } = await import('./js/bania.js');
 const { Grzmot, NASTAWY: NASTAWY_GRZMOTU } = await import('./js/grzmot.js');
+const { Zawierucha, NASTAWY: NASTAWY_ZAWIERUCHY } = await import('./js/zawierucha.js');
 const { ReakcjeTechnik } = await import('./js/reakcjeTechnik.js');
 
 zaladujFont();
@@ -221,6 +222,7 @@ const lukPeruna = new LukPeruna();
 const kurzawa = new Kurzawa();
 const bania = new Bania();
 const grzmot = new Grzmot();
+const zawierucha = new Zawierucha();
 const reakcjeTechnik = new ReakcjeTechnik();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
@@ -240,6 +242,7 @@ const MODULY_NASTAWY = [
     { etykieta: 'Kurzawa', plik: 'js/kurzawa.js', nastawy: NASTAWY_KURZAWA, instancja: kurzawa },
     { etykieta: 'Bania', plik: 'js/bania.js', nastawy: NASTAWY_BANIA, instancja: bania },
     { etykieta: 'Grzmot', plik: 'js/grzmot.js', nastawy: NASTAWY_GRZMOTU, instancja: grzmot },
+    { etykieta: 'Zawierucha', plik: 'js/zawierucha.js', nastawy: NASTAWY_ZAWIERUCHY, instancja: zawierucha },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
     { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
@@ -365,7 +368,7 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha
 };
 const worekPieczeci = { efekty, runy, aura };
 
@@ -412,9 +415,10 @@ function rysujKlatke(dt, frame) {
         for (let i = 0; i < ogien.czastki.length; i += 8) zarzewia.push({ x: ogien.czastki[i].x, y: ogien.czastki[i].y, r: 6 });
     }
     if (zarzewia.length) dym.podpal(zarzewia);
-    if (dym.liczba > 0 && fala.czola.length) {
+    if (dym.liczba > 0) {
         const podmuchy = [];
         for (const c of fala.czola) podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
+        if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
     dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
@@ -441,6 +445,7 @@ function rysujKlatke(dt, frame) {
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
     bania.updateAndDraw(ctx, kontekstTechnik, dt);
     grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
+    zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa }, dt);
 
     ctx.restore();
@@ -496,6 +501,8 @@ const SCENARIUSZE = {
     bania: () => odpalTechnike({ id: 'x', nazwa: 'Bania', uzbraja: 'bania', sekwencja: ['mokosz', 'swarog'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     grzmot: () => odpalTechnike({ id: 'x', nazwa: 'Grzmot', uzbraja: 'grzmot', sekwencja: ['perun', 'stribog'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    zawierucha: () => odpalTechnike({ id: 'x', nazwa: 'Zawierucha', uzbraja: 'zawierucha', sekwencja: ['weles', 'stribog'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
@@ -579,6 +586,7 @@ const TECHNIKI = [
     { uzbraja: 'mglaMokoszy', nazwa: 'Mgła Mokoszy', sekwencja: ['stribog', 'mokosz'] },
     { uzbraja: 'bania', nazwa: 'Bania', sekwencja: ['mokosz', 'swarog'] },
     { uzbraja: 'grzmot', nazwa: 'Grzmot', sekwencja: ['perun', 'stribog'] },
+    { uzbraja: 'zawierucha', nazwa: 'Zawierucha', sekwencja: ['weles', 'stribog'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {

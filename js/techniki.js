@@ -55,7 +55,8 @@ export const BARWA_ZAPLONU = {
     kregiMokoszy: [90, 200, 255],   // turkusowy błękit Mokoszy
     mglaMokoszy: [200, 228, 235],   // chłodna perła mgły
     bania: [245, 240, 232],         // ciepła biel pary
-    grzmot: [170, 205, 255]         // błękit Peruna, jaśniejszy od Łuku
+    grzmot: [170, 205, 255],        // błękit Peruna, jaśniejszy od Łuku
+    zawierucha: [215, 175, 110]     // ochra pyłu, jak Kurzawa
 };
 
 /**
@@ -88,7 +89,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -189,6 +190,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         const zaczep = zaczepKlatki(frame, W, H);
         s.fala.wystrzel(zaczep, { x: 0, y: 0, z: -1 }, NASTAWY_GRZMOTU.SILA_FALI, BARWA_ZAPLONU.grzmot);
         s.grzmot.zapal(zaczep, 1.0);
+    } else if (technika.uzbraja === 'zawierucha') {
+        // Siła STAŁA (combo jest gratis). Otwiera okno na machnięcia - porywy
+        // i ich kierunek moduł liczy SAM co klatkę (js/zawierucha.js).
+        s.zawierucha.zapal(1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,
