@@ -50,6 +50,20 @@ console.log('\nDZIURA (reakcja z Grzmotem):');
     spr('daleki wybuch nie trafia', md.rozepchnij({ x: -1e6, y: -1e6 }, 1) === false);
 }
 
+console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
+{
+    const mz = new MglaMokoszy();
+    spr('nieaktywna: znies() false', mz.znies(1, 1, 500) === false);
+    mz.zapal(1);
+    przepusc(mz, klatka(), 4);
+    const c = mz._kleby.find(k => k.wiek >= 0);
+    const v0 = c.vxDod;
+    spr('znies(-1) trafia kłąb na wysokości pasa', mz.znies(-1, 1, c.y) === true);
+    spr('kłąb dostaje impuls w stronę wiatru', c.vxDod < v0);
+    spr('pas daleko w pionie - nie sięga', mz.znies(1, 1, c.y + 1e6) === false);
+    spr('zły kierunek - false', mz.znies(0, 1, c.y) === false && mz.znies(NaN, 1, c.y) === false);
+}
+
 console.log('\nBŁYSK W MGLE (reakcja Burza w mgle):');
 {
     spr('jasność 1 przy źródle, maleje z odległością, 0 daleko',

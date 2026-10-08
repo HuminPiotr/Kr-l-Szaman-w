@@ -33,6 +33,9 @@ export const NASTAWY = {
     ZASIEG_ROZEPCHNIECIA: 3,       // skala * to
     ROZEPCHNIECIE: 6,              // skala/s prędkości kłębu przy samym źródle
     OPOR_DOD: 2.0,                 // 1/s - dodatkowa prędkość wygasa, dziura się domyka
+    // Reakcja z Zawieruchą: mgła odpływa z wiatrem - słabiej niż dziura Grzmotu.
+    ZNIESIENIE: 2.5,               // skala/s prędkości kłębu na wysokości pasa porywu
+    ZASIEG_PIONOWY_ZNIESIENIA: 2.5, // skala * to - dalej od pasa w pionie wiatr nie sięga
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
@@ -93,6 +96,28 @@ export class MglaMokoszy {
             const ux = d > 1e-6 ? dx / d : 0, uy = d > 1e-6 ? dy / d : -1;
             c.vxDod += ux * v;
             c.vyDod += uy * v;
+            trafil = true;
+        }
+        return trafil;
+    }
+
+    /**
+     * Reakcja z Zawieruchą: poziomy impuls w stronę wiatru, najmocniejszy na
+     * wysokości pasa porywu `yPasa` (px).
+     * @returns {boolean}  czy trafiło choć jeden widoczny kłąb
+     */
+    znies(kierunek, sila = 1, yPasa = NaN) {
+        const s = clamp01(sila);
+        if (!this._trwa || s <= 0.01 || (kierunek !== 1 && kierunek !== -1)) return false;
+        const N = NASTAWY;
+        const sk = this._kotwica.stan?.skala ?? 230;
+        const zasieg = sk * N.ZASIEG_PIONOWY_ZNIESIENIA;
+        let trafil = false;
+        for (const c of this._kleby) {
+            if (c.wiek < 0) continue;
+            const waga = Number.isFinite(yPasa) ? 1 - Math.abs(c.y - yPasa) / zasieg : 1;
+            if (waga <= 0) continue;
+            c.vxDod += kierunek * waga * s * N.ZNIESIENIE * sk;
             trafil = true;
         }
         return trafil;

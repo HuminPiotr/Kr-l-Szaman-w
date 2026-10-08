@@ -121,5 +121,19 @@ console.log('\nSZARPNIĘCIE (reakcja z Grzmotem):');
     spr('po powrocie zwykła orbita', ks.zaczep.mnoznikR === 1);
 }
 
+console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
+{
+    spr('przesuniecie przesuwa środek pasa', geometriaPasa(0, { ...ZACZEP, przesuniecie: 50 }, H).cx === pasy[0].cx + 50);
+    const kn = new Kurzawa();
+    spr('nieaktywna: znies() false', kn.znies(1, 1) === false);
+    kn.zapal(1);
+    przepusc(kn, klatka(), 1);
+    spr('aktywna: znies(-1) true, zły kierunek false', kn.znies(-1, 1) === true && kn.znies(0, 1) === false);
+    przepusc(kn, klatka(), NASTAWY.ZNIESIENIE_NAROST);
+    spr(`w szczycie pasy zniesione w lewo (${kn.zaczep.przesuniecie.toFixed(0)} px)`, kn.zaczep.przesuniecie < -0.8 * NASTAWY.ZNIESIENIE_PRZESUN * kn.zaczep.skala);
+    przepusc(kn, klatka(), NASTAWY.ZNIESIENIE_POWROT + 0.1);
+    spr('po powrocie bez przesunięcia', kn.zaczep.przesuniecie === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

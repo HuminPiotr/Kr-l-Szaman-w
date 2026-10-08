@@ -69,7 +69,10 @@ export const REAKCJE = {
     burzaWMgle: { nazwa: 'Burza w mgle', punkty: 10, pelneDo: 12, przerwaMs: 1500 },
     // Grzmot trafia w Mgłę (dziura) i/lub Kurzawę (szarpnięcie) - 1 jednostka na pole.
     // ZGADNIĘTE: Grzmot w obu polach ~60 pkt, mniej niż jedna technika.
-    rozdarcie: { nazwa: 'Rozdarcie', punkty: 30, pelneDo: 2, przerwaMs: 1500 }
+    rozdarcie: { nazwa: 'Rozdarcie', punkty: 30, pelneDo: 2, przerwaMs: 1500 },
+    // Poryw Zawieruchy znosi Mgłę i/lub Kurzawę - 1 jednostka na pole na poryw.
+    // ZGADNIĘTE: 3 porywy w obu polach ~60 pkt, jak Grzmot.
+    zawianie: { nazwa: 'Zawianie', punkty: 10, pelneDo: 3, przerwaMs: 2000 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

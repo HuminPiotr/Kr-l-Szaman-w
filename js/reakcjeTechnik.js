@@ -11,6 +11,8 @@
  *    Co 60-150 ms mgła błyska od źródła wyładowania.
  *  - ROZDARCIE: Grzmot (jedna klatka wybuchu) + Mgła Mokoszy (dziura,
  *    mgla.rozepchnij) i/lub Kurzawa (szarpnięcie pasów). 1 jednostka na pole.
+ *  - ZAWIANIE: każdy nowy poryw Zawieruchy znosi Mgłę i/lub pasy Kurzawy
+ *    w swoją stronę. 1 jednostka na pole na poryw.
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -44,16 +46,16 @@ export class ReakcjeTechnik {
     }
 
     /**
-     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa}} t  instancje technik
+     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa } = t ?? {};
+        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha } = t ?? {};
 
         // --- Przewodzenie ---
         const geom = luk?.aktywny && kregi?.aktywny ? kregi.geometria?.() : null;
@@ -93,6 +95,13 @@ export class ReakcjeTechnik {
             const s = Number.isFinite(wybuch.sila) ? wybuch.sila : 1;
             if (mgla?.aktywny && mgla.rozepchnij?.(wybuch, s)) wynik.rozdarcie++;
             if (kurzawa?.aktywny && kurzawa.szarpnij?.(s)) wynik.rozdarcie++;
+        }
+
+        // --- Zawianie --- (porywySwieze żyją jedną klatkę - patrz js/zawierucha.js)
+        for (const p of Array.isArray(zawierucha?.porywySwieze) ? zawierucha.porywySwieze : []) {
+            if (p?.kierunek !== 1 && p?.kierunek !== -1) continue;
+            if (mgla?.aktywny && mgla.znies?.(p.kierunek, 1, p.yPasa)) wynik.zawianie++;
+            if (kurzawa?.aktywny && kurzawa.znies?.(p.kierunek, 1)) wynik.zawianie++;
         }
         return wynik;
     }

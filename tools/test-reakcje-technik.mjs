@@ -102,5 +102,26 @@ console.log('\nROZDARCIE (Grzmot w polu):');
     spr('bez wybuchu (inna klatka): zero', new ReakcjeTechnik().klatka(d.t, DT).rozdarcie === 0 && d.log.length === 0);
 }
 
+console.log('\nZAWIANIE (poryw Zawieruchy w polu):');
+{
+    const pola = ({ mgla = false, kurzawa = false, porywy = [{ kierunek: 1, yPasa: 700 }] } = {}) => {
+        const log = [];
+        return { log, t: {
+            zawierucha: { porywySwieze: porywy },
+            mglaMokoszy: { aktywny: mgla, znies: (k, s, y) => { log.push(['mgla.znies', k, y]); return true; }, rozblysk: () => true },
+            kurzawa: { aktywny: kurzawa, znies: (k) => { log.push(['kurzawa.znies', k]); return true; } }
+        } };
+    };
+    const a = pola({ mgla: true });
+    spr('poryw + Mgła: znosi w stronę porywu na wysokości pasa, 1 jednostka',
+        new ReakcjeTechnik().klatka(a.t, DT).zawianie === 1 && a.log[0][1] === 1 && a.log[0][2] === 700);
+    const b = pola({ mgla: true, kurzawa: true, porywy: [{ kierunek: -1, yPasa: 700 }, { kierunek: 1, yPasa: 700 }] });
+    spr('2 porywy w obu polach: 4 jednostki', new ReakcjeTechnik().klatka(b.t, DT).zawianie === 4);
+    const c = pola({ porywy: [{ kierunek: 1 }] });
+    spr('bez pola: zero', new ReakcjeTechnik().klatka(c.t, DT).zawianie === 0 && c.log.length === 0);
+    const d = pola({ mgla: true, porywy: [{ kierunek: NaN }, null] });
+    spr('zepsuty poryw: zero, bez wyjątku', new ReakcjeTechnik().klatka(d.t, DT).zawianie === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

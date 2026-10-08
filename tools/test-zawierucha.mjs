@@ -85,6 +85,7 @@ console.log('\nSAMOCZYNNY PORYW:');
         if (z.porywySwieze.length) swiezy = z.porywySwieze[0];
     }
     spr('bez machnięcia - po oknie jeden poryw', z._wypuszczone === 1 && !!swiezy);
+    spr('poryw zna wysokość pasa (pod reakcje)', Number.isFinite(swiezy.yPasa) && swiezy.yPasa > H * 0.4);
     const k1 = swiezy.kierunek;
     z.zapal(1);
     przepusc(z, klatka(), NASTAWY.OKNO_S + 0.1);

@@ -150,8 +150,10 @@ export class Zawierucha {
 
     _wypusc(kierunek) {
         const N = NASTAWY;
+        const pas = pasPorywu(this._zaczep, this._H);
         const poryw = {
             kierunek, wiek: 0,
+            yPasa: (pas.gora + pas.dol) / 2,   // dla reakcji - która część Mgły dostaje wiatr
             smugi: Array.from({ length: N.SMUG }, (_, i) => ({
                 u: (i + 0.5) / N.SMUG + (Math.random() - 0.5) / N.SMUG,
                 opoznienie: Math.random() * N.OPOZNIENIE_MAX,
