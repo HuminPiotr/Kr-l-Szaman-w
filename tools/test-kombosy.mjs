@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -308,5 +308,16 @@ spr('...a dołożony weles - Kurzawa (łańcuch)', k32.dodaj('weles', 1000)?.id 
 const k33 = new KomboSilnik();
 k33.dodaj('weles', 0); k33.dodaj('stribog', 500);
 spr('Zawierucha + mokosz - Mgła Mokoszy (łańcuch)', k33.dodaj('mokosz', 1000)?.id === 'mglaMokoszy');
+
+console.log('\nBŁĘDNE OGNIKI (weles -> swarog):');
+const k34 = new KomboSilnik();
+k34.dodaj('weles', 0);
+spr('weles -> swarog odpala Błędne Ogniki', k34.dodaj('swarog', 500)?.id === 'bledneOgniki');
+spr('...a dołożony perun - Grom w Ogniu (łańcuch)', k34.dodaj('perun', 1000)?.id === 'gromWOgniu');
+const k35 = new KomboSilnik();
+k35.dodaj('weles', 0);
+spr('weles, swarog -> Ogniki', k35.dodaj('swarog', 500)?.id === 'bledneOgniki');
+k35.dodaj('stribog', 1000);
+spr('...stribog, swarog -> Okadzenie (łańcuch)', k35.dodaj('swarog', 1500)?.id === 'dym');
 
 process.exit(ok ? 0 : 1);

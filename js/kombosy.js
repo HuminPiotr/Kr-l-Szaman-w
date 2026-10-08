@@ -165,7 +165,16 @@ export const KOMBOSY = [
     // poryw rusza sam. Para weles->stribog nie jest prefiksem/sufiksem żadnej
     // trójki. Łańcuchy: Zawierucha + weles = Kurzawa, + mokosz = Mgła Mokoszy.
     { id: 'zawierucha', nazwa: 'Zawierucha',
-      sekwencja: ['weles', 'stribog'], uzbraja: 'zawierucha' }
+      sekwencja: ['weles', 'stribog'], uzbraja: 'zawierucha' },
+
+    // BŁĘDNE OGNIKI (2026-10-08, ten sam spec): Weles - władca zaświatów
+    // i pasterz dusz - wypuszcza duszyczki z ziemi, Swaróg je rozpala.
+    // Kończy się ogniem (najsłabiej rozpoznawanym) - świadomy wybór
+    // właściciela gry. Para weles->swarog nie jest prefiksem/sufiksem żadnej
+    // trójki. Łańcuchy: + perun = Grom w Ogniu; + stribog + swarog =
+    // Okadzenie, którego dym ogniki od razu podpalą.
+    { id: 'bledneOgniki', nazwa: 'Błędne Ogniki',
+      sekwencja: ['weles', 'swarog'], uzbraja: 'bledneOgniki' }
 ];
 
 export class KomboSilnik {

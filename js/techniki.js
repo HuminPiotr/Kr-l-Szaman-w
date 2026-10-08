@@ -56,7 +56,8 @@ export const BARWA_ZAPLONU = {
     mglaMokoszy: [200, 228, 235],   // chłodna perła mgły
     bania: [245, 240, 232],         // ciepła biel pary
     grzmot: [170, 205, 255],        // błękit Peruna, jaśniejszy od Łuku
-    zawierucha: [215, 175, 110]     // ochra pyłu, jak Kurzawa
+    zawierucha: [215, 175, 110],    // ochra pyłu, jak Kurzawa
+    bledneOgniki: [190, 235, 140]   // blada zieleń ze złotem - nie pomarańcz Płonącego Palca
 };
 
 /**
@@ -89,7 +90,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -193,6 +194,11 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Siła STAŁA (combo jest gratis). Otwiera okno na machnięcia - porywy
         // i ich kierunek moduł liczy SAM co klatkę (js/zawierucha.js).
         s.zawierucha.zapal(1.0);
+    } else if (technika.uzbraja === 'bledneOgniki') {
+        // Natychmiastowa, siła STAŁA (combo jest gratis). Zaczep (barki) moduł
+        // liczy SAM co klatkę - js/bledneOgniki.js. Dym podpala przez zarzewia
+        // w main.js, Mgłę i Kurzawę - przez js/reakcjeTechnik.js.
+        s.bledneOgniki.zapal(1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,
