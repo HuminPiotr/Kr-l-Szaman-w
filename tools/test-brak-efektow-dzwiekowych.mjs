@@ -6,7 +6,9 @@
  * Skanuje źródła w js/ i szuka śladów syntezy dźwięku albo starego interfejsu efektów. Wyjątki:
  *   - js/audioEngine.js: cienka magistrala (kompresor, gain, wyciszenie, pieśń przez MediaElementSource),
  *   - js/debugHud.js: osobny AudioContext narzędzia deweloperskiego (sygnały sesji nagraniowej Z/1-8),
- *     to nie jest dźwięk GRY - patrz nagłówek tamtego pliku.
+ *     to nie jest dźwięk GRY - patrz nagłówek tamtego pliku,
+ *   - js/dzwiekGrzmotu.js: JEDYNY efekt dźwiękowy gry (2026-10-08, życzenie właściciela) - Grzmot.
+ *     Dostaje wyjątek wyłącznie jako ten jeden plik; main.js nadal nie może syntezować ani wołać starych efektów.
  * Nowy dźwięk w grze = świadoma zmiana tej decyzji, a nie przypadkowy powrót efektu.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -26,7 +28,7 @@ function pliki(dir) {
 }
 
 const korzen = new URL('../js/', import.meta.url).pathname;
-const WYJATKI = new Set(['audioEngine.js', 'debugHud.js']);
+const WYJATKI = new Set(['audioEngine.js', 'debugHud.js', 'dzwiekGrzmotu.js']);
 const ZAKAZANE = [
     ['createOscillator', 'synteza: oscylator'],
     ['createBufferSource', 'synteza: źródło buforowe (szum, wybuchy)'],
@@ -49,6 +51,15 @@ for (const f of pliki(korzen)) {
     const kod = tekst.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const trafienia = ZAKAZANE.filter(([fragment]) => kod.includes(fragment));
     spr(`${nazwa}: bez śladów efektów dźwiękowych${trafienia.length ? ' (znaleziono: ' + trafienia.map(t => `${t[0]} = ${t[1]}`).join('; ') + ')' : ''}`, trafienia.length === 0);
+}
+
+console.log('\nWYJĄTEK GRZMOTU:');
+{
+    const dzw = readFileSync(new URL('../js/dzwiekGrzmotu.js', import.meta.url), 'utf8');
+    const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+    spr('dźwięk Grzmotu istnieje i idzie przez magistralę gry (wyjscie), nie własny AudioContext', dzw.includes('mag.wyjscie') && !dzw.includes('new AudioContext'));
+    spr('jedyny wyjątek: tylko dzwiekGrzmotu.js poza silnikiem i narzędziem', [...WYJATKI].sort().join() === 'audioEngine.js,debugHud.js,dzwiekGrzmotu.js');
+    spr('main.js woła dźwięk wyłącznie dla Grzmotu', main.includes("technika.uzbraja === 'grzmot') zagrajGrzmot("));
 }
 
 console.log('\nSILNIK:');

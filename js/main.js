@@ -54,6 +54,7 @@ import { Kurzawa } from './kurzawa.js';
 import { Bania } from './bania.js';
 import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
+import { zagrajGrzmot } from './dzwiekGrzmotu.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
@@ -813,6 +814,7 @@ function klatka(now) {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
                 podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha
             });
+            if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
@@ -926,6 +928,7 @@ function klatka(now) {
             podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
         }
         if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
+        if (grzmot.aktywny) podmuchy.push(...grzmot.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
 
@@ -1002,6 +1005,7 @@ function klatka(now) {
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
     bania.updateAndDraw(ctx, kontekstTechnik, dt);
     grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
+    for (const sila of grzmot.dudnienia) ekran.uderz(sila);   // przetaczające się uderzenia po pierwszym
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.

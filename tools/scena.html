@@ -419,6 +419,7 @@ function rysujKlatke(dt, frame) {
         const podmuchy = [];
         for (const c of fala.czola) podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
         if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
+        if (grzmot.aktywny) podmuchy.push(...grzmot.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
     dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
@@ -445,6 +446,7 @@ function rysujKlatke(dt, frame) {
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
     bania.updateAndDraw(ctx, kontekstTechnik, dt);
     grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
+    for (const sila of grzmot.dudnienia) ekran.uderz(sila);
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha }, dt);
 

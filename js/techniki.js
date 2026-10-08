@@ -18,7 +18,7 @@ import { TABELA as EFEKTY_TABELA, srodekDloni } from './efekty.js';
 import { pekniecieZiemi } from './iskry.js';
 import { kregSylwetki, BARWA_MGLA as BARWA_KOLOWROTU } from './kolowrot.js';
 import { BOGOWIE } from './jaja.js';
-import { zaczepKlatki, NASTAWY as NASTAWY_GRZMOTU } from './grzmot.js';
+import { zaczepKlatki } from './grzmot.js';
 
 // Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
 // PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
@@ -183,13 +183,12 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // pary (poza) moduł liczy SAM przy każdym buchnięciu - js/bania.js.
         s.bania.zapal(1.0);
     } else if (technika.uzbraja === 'grzmot') {
-        // Natychmiastowa, siła STAŁA (combo jest gratis). Efekt to wspólna
-        // Fala z osią KU KAMERZE - pierścień w płaszczyźnie ekranu wokół
-        // klatki piersiowej. Dym rozdmuchuje istniejący PULL fala.czola ->
-        // dym.pchnij w main.js; grzmot.wybuch czytają reakcje (Mgła, Kurzawa).
-        const zaczep = zaczepKlatki(frame, W, H);
-        s.fala.wystrzel(zaczep, { x: 0, y: 0, z: -1 }, NASTAWY_GRZMOTU.SILA_FALI, BARWA_ZAPLONU.grzmot);
-        s.grzmot.zapal(zaczep, 1.0);
+        // Natychmiastowa, siła STAŁA (combo jest gratis). Grzmot rysuje się sam
+        // (błysk, pierścień od klatki piersiowej, iglice, dudnienie) - NIE
+        // używa Fali Aarda. Dym pcha js/grzmot.js punktyPchniecia() w main.js;
+        // grzmot.wybuch czytają reakcje (Mgła, Kurzawa). Dźwięk: main.js
+        // (audioEngine tu nie sięga - stanowisko VFX nie ma audio).
+        s.grzmot.zapal(zaczepKlatki(frame, W, H), 1.0);
     } else if (technika.uzbraja === 'zawierucha') {
         // Siła STAŁA (combo jest gratis). Otwiera okno na machnięcia - porywy
         // i ich kierunek moduł liczy SAM co klatkę (js/zawierucha.js).

@@ -63,7 +63,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
 | `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
 | `js/aura.js` | maska sylwetki → poświata |
-| `js/audioEngine.js` | CIENKA magistrala audio, bez syntezy: `masterGain` → kompresor → `destination`, wyciszenie (klawisz M, trwałe w `localStorage`) i `podlaczPiesn`. **Gra nie ma efektów dźwiękowych (decyzja 2026-10-01) - jedyny dźwięk to pieśni rund** (`js/piesni.js`). `tools/test-brak-efektow-dzwiekowych.mjs` pilnuje, żeby synteza i stary interfejs (`graj*`/`play*SFX`/`ustaw*`) nie wróciły; wyjątek: osobny AudioContext w `debugHud.js` (sygnały sesji nagraniowej dewelopera) |
+| `js/audioEngine.js` | CIENKA magistrala audio, bez syntezy: `masterGain` → kompresor → `destination`, wyciszenie (klawisz M, trwałe w `localStorage`) i `podlaczPiesn`. **Gra nie ma efektów dźwiękowych (decyzja 2026-10-01) - jedyny dźwięk to pieśni rund** (`js/piesni.js`) **i JEDEN świadomy wyjątek: Grzmot (2026-10-08, życzenie właściciela) - `js/dzwiekGrzmotu.js`, synteza trzasku i dudnienia przez `audioEngine.magistrala()`, wyciszany klawiszem M**. `tools/test-brak-efektow-dzwiekowych.mjs` pilnuje, żeby synteza i stary interfejs (`graj*`/`play*SFX`/`ustaw*`) nie wróciły; wyjątek: osobny AudioContext w `debugHud.js` (sygnały sesji nagraniowej dewelopera) |
 | `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu, `N` = zrzuć ślad runy do konsoli) |
 | `js/znaki/registry.js` | rejestr znaków; `score(frame)` → 0..1, nigdy boolean |
 | `js/znaki/dlon.js` | wspólne narzędzia geometrii dłoni (skala, wyprostowanie, zwinięcie w pięść) |

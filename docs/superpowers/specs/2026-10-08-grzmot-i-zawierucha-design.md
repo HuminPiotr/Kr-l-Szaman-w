@@ -19,6 +19,21 @@ Odrzucone w tej rozmowie: Zapłon (perun→swarog), Żar Welesa (weles→swarog)
   **Kurzawa** — `szarpnij()`: pasy chwilowo rozszerzają się i bledną, wracają w ~0,8 s.
 - Reakcja punktowa „Rozdarcie": 1 jednostka na trafione pole (Mgła, Kurzawa) na Grzmot.
 
+### Grzmot v2 (2026-10-08, po pierwszym teście: "ma przypominać grzmot, fala okręgiem we wszystkie strony")
+
+Fala Aarda z osią ku kamerze czytała się jak dmuchnięcie. Grzmot rysuje się teraz sam
+(`js/grzmot.js`): **błysk** całego kadru (`lighter`, ~0,1 s plato) → **pierścień** płaski w płaszczyźnie
+ekranu rosnący ze środka tułowia aż za róg kadru w 0,65 s (ease-out) + **echo** słabsze o 0,12 s →
+kilka **iglic** (zygzaków) migoczących na krawędzi → **dudnienie**: słabnące uderzenia ekranu
+(0,5 / 0,35 / 0,2 po 0,15 / 0,30 / 0,45 s) po pierwszym ze wspólnej warstwy techniki.
+Dym pchany promieniście z pierścienia (`punktyPchniecia`, 40 punktów). Reakcje (Rozdarcie) bez zmian.
+
+**Dźwięk — świadomy wyjątek od decyzji z 2026-10-01 (gra bez efektów dźwiękowych):**
+`js/dzwiekGrzmotu.js`, synteza trzasku (HP 1,8 kHz, 80 ms) i dudnienia (LP 700→80 Hz, 2,2 s, garby
+głośności) z szumu brązowego, przez `audioEngine.magistrala()` — klawisz M wycisza. Strażnik
+`tools/test-brak-efektow-dzwiekowych.mjs` ma ten jeden plik na liście wyjątków; GEMINI.md zaktualizowany.
+Stanowisko `tools/scena.html` nie ma audio, więc dźwięku tam nie ma.
+
 ## Zawierucha (weles → stribog)
 
 - Odwrotność Kurzawy (stribog→weles owija wiatr wokół ciała) — tu wiatr idzie **liniowo
