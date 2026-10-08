@@ -59,3 +59,23 @@ Wolne pary po tej partii: perun→swarog, perun→mokosz, stribog→perun, weles
 
 `PROG_PREDKOSCI` (~5 szerokości barków/s) i `PRZERWA_REKI_S` w `js/machniecie.js`; siła fali
 Grzmotu 0,7; `sila` pchnięcia dymu Zawieruchy 0,25; punkty reakcji Rozdarcie 30 / Zawianie 10.
+
+## Błędne Ogniki (weles → swarog) — trzecia dwójka partii
+
+Odrzucone wcześniej: Zapłon (perun→swarog), Kulisty Piorun, Iskrzenie, Widmo. Właściciel wybrał
+Błędne Ogniki, ale **z pieczęcią ognia**. Mit: Weles — władca zaświatów i pasterz dusz; błędne
+ogniki to w podaniach dusze wychodzące z ziemi nad mokradłami i cmentarzami. Ziemia→ogień:
+„zaświaty wypuszczają duszyczki, ogień je rozpala". Koszt świadomie przyjęty: ogień na końcu
+(najsłabiej rozpoznawany), ziemia na początku pewna.
+
+- 5 ogników falą (co 0,08 s) z pasa „ziemi" (jak Zawierucha: barki + 1,0..1,8 skali, ≤ 0,92 H),
+  unoszą się wolno, chwieją polem curl2, odpływają na boki, migoczą; życie ~2,2 s, całość ~2,6 s.
+- Wygląd (`lighter`, duch/energia): aureola blado zielono-złota, mały tintowany płomyk `flame_*`,
+  jasny rdzeń, krótki ogon kreską. Barwa inna niż pomarańcz Płonącego Palca.
+- Bez wstrząsu, błysku kadru i dźwięku (dwójka skromna; dźwięk ma tylko Grzmot).
+- Pola: **dym** — ogniki to zarzewia (`dym.podpal`) → Pożoga (istniejąca reakcja);
+  **Mgła** — latarnie: aureola ×2,5, kłęby wokół ciepło podświetlone (`mgla.podswietl`), reakcja
+  „Latarnie"; **Kurzawa** — wir porywa ogniki na orbitę (`kurzawa.orbita()` → `ogniki.porwij`),
+  reakcja „Wir ogników". Po 1 jednostce na ognik na pole (punkty 12, ZGADNIĘTE).
+- Łańcuchy: + perun = Grom w Ogniu; + stribog + swarog = Okadzenie (którego dym ogniki podpalą).
+- Wolne pary po tej partii: perun→swarog, perun→mokosz, stribog→perun.
