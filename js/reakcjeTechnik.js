@@ -13,6 +13,8 @@
  *    mgla.rozepchnij) i/lub Kurzawa (szarpnięcie pasów). 1 jednostka na pole.
  *  - ZAWIANIE: każdy nowy poryw Zawieruchy znosi Mgłę i/lub pasy Kurzawy
  *    w swoją stronę. 1 jednostka na pole na poryw.
+ *  - LATARNIE: Błędne Ogniki w Mgle - kłęby wokół nich ciepło się podświetlają,
+ *    a ich aureole rosną. 1 jednostka na ognik (pierwsze wejście).
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -46,16 +48,16 @@ export class ReakcjeTechnik {
     }
 
     /**
-     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha}} t  instancje technik
+     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha } = t ?? {};
+        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki } = t ?? {};
 
         // --- Przewodzenie ---
         const geom = luk?.aktywny && kregi?.aktywny ? kregi.geometria?.() : null;
@@ -102,6 +104,15 @@ export class ReakcjeTechnik {
             if (p?.kierunek !== 1 && p?.kierunek !== -1) continue;
             if (mgla?.aktywny && mgla.znies?.(p.kierunek, 1, p.yPasa)) wynik.zawianie++;
             if (kurzawa?.aktywny && kurzawa.znies?.(p.kierunek, 1)) wynik.zawianie++;
+        }
+
+        // --- Latarnie --- (ogniki zużyją wMgle w następnej klatce - js/bledneOgniki.js)
+        if (ogniki?.aktywny && mgla?.aktywny) {
+            const punkty = ogniki.punkty?.() ?? [];
+            if (punkty.length && mgla.podswietl?.(punkty)) {
+                const nowe = ogniki.oznaczMgle?.();
+                if (Number.isFinite(nowe) && nowe > 0) wynik.latarnie += nowe;
+            }
         }
         return wynik;
     }

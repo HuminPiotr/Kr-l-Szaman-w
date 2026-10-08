@@ -1015,11 +1015,12 @@ function klatka(now) {
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
-    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha }, dt);
+    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki }, dt);
     punkty.reakcja('przewodzenie', reakcjeKlatki.przewodzenie, now);
     punkty.reakcja('burzaWMgle', reakcjeKlatki.burzaWMgle, now);
     punkty.reakcja('rozdarcie', reakcjeKlatki.rozdarcie, now);
     punkty.reakcja('zawianie', reakcjeKlatki.zawianie, now);
+    punkty.reakcja('latarnie', reakcjeKlatki.latarnie, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w

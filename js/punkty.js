@@ -72,7 +72,9 @@ export const REAKCJE = {
     rozdarcie: { nazwa: 'Rozdarcie', punkty: 30, pelneDo: 2, przerwaMs: 1500 },
     // Poryw Zawieruchy znosi Mgłę i/lub Kurzawę - 1 jednostka na pole na poryw.
     // ZGADNIĘTE: 3 porywy w obu polach ~60 pkt, jak Grzmot.
-    zawianie: { nazwa: 'Zawianie', punkty: 10, pelneDo: 3, przerwaMs: 2000 }
+    zawianie: { nazwa: 'Zawianie', punkty: 10, pelneDo: 3, przerwaMs: 2000 },
+    // Błędny ognik po raz pierwszy w Mgle Mokoszy - latarnia we mgle. ZGADNIĘTE: 5 ogników ~60 pkt.
+    latarnie: { nazwa: 'Latarnie', punkty: 12, pelneDo: 5, przerwaMs: 3000 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

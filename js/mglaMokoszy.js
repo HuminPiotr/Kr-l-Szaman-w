@@ -36,6 +36,10 @@ export const NASTAWY = {
     // Reakcja z Zawieruchą: mgła odpływa z wiatrem - słabiej niż dziura Grzmotu.
     ZNIESIENIE: 2.5,               // skala/s prędkości kłębu na wysokości pasa porywu
     ZASIEG_PIONOWY_ZNIESIENIA: 2.5, // skala * to - dalej od pasa w pionie wiatr nie sięga
+    // Reakcja Latarnie: Błędne Ogniki ciepło podświetlają kłęby wokół siebie.
+    ZASIEG_LATARNI: 2.5,           // skala * to
+    ALFA_LATARNI: 0.6,
+    BARWA_LATARNI: [255, 225, 150],
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
@@ -67,6 +71,7 @@ export class MglaMokoszy {
         this._kleby = [];
         this._doNarodzin = false;
         this._blysk = null;   // { x, y, sila, wiek } - reakcja Burza w mgle
+        this._latarnie = null;   // [{x, y, jasnosc}] - reakcja Latarnie, ważne do najbliższego rysowania
         this._kotwica = new Kotwica(8);
         this._warstwa = new WarstwaZaSylwetka();
     }
@@ -99,6 +104,20 @@ export class MglaMokoszy {
             trafil = true;
         }
         return trafil;
+    }
+
+    /**
+     * Reakcja Latarnie: punkty światła (Błędne Ogniki) podświetlają kłęby
+     * w następnym rysowaniu - potem lista znika, więc trzeba ją podawać co klatkę.
+     * @param {{x, y, jasnosc}[]} punkty  px
+     * @returns {boolean}  czy przyjęto choć jeden punkt
+     */
+    podswietl(punkty) {
+        if (!this._trwa || !Array.isArray(punkty)) return false;
+        const dobre = punkty.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+            .map(p => ({ x: p.x, y: p.y, jasnosc: clamp01(Number.isFinite(p.jasnosc) ? p.jasnosc : 1) }));
+        this._latarnie = dobre.length ? dobre : null;
+        return dobre.length > 0;
     }
 
     /**
@@ -212,8 +231,21 @@ export class MglaMokoszy {
                     warstwa.globalCompositeOperation = 'source-over';
                 }
             }
+            if (this._latarnie) {
+                // Latarnie: ciepła poświata kłębu, suma od wszystkich ogników w zasięgu.
+                const zasieg = zaczep.skala * NASTAWY.ZASIEG_LATARNI;
+                let jas = 0;
+                for (const l of this._latarnie) jas += l.jasnosc * Math.max(0, 1 - Math.hypot(c.x - l.x, c.y - l.y) / zasieg);
+                if (jas > 0.01) {
+                    warstwa.globalCompositeOperation = 'lighter';
+                    warstwa.globalAlpha = clamp01(Math.min(1, jas) * NASTAWY.ALFA_LATARNI * this._sila);
+                    warstwa.drawImage(wypalTintowany(img, NASTAWY.BARWA_LATARNI, 256), -c.rozmiar / 2, -c.rozmiar / 2, c.rozmiar, c.rozmiar);
+                    warstwa.globalCompositeOperation = 'source-over';
+                }
+            }
             warstwa.restore();
         }
+        this._latarnie = null;
         this._warstwa.zakoncz(ctx, k.maska, k.maskaSzer, k.maskaWys, k.fit);
     }
 }

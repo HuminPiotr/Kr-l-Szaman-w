@@ -64,6 +64,22 @@ console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
     spr('zły kierunek - false', mz.znies(0, 1, c.y) === false && mz.znies(NaN, 1, c.y) === false);
 }
 
+console.log('\nLATARNIE (reakcja z Błędnymi Ognikami):');
+{
+    const ml = new MglaMokoszy();
+    spr('nieaktywna: podswietl() false', ml.podswietl([{ x: 1, y: 1, jasnosc: 1 }]) === false);
+    ml.zapal(1);
+    przepusc(ml, klatka(), 1);
+    spr('aktywna: podswietl() przyjmuje dobre punkty, pomija zepsute',
+        ml.podswietl([{ x: 500, y: 500, jasnosc: 1 }, { x: NaN, y: 1 }, null]) === true && ml._latarnie.length === 1);
+    spr('same zepsute punkty - false', ml.podswietl([{ x: NaN, y: 1 }]) === false);
+    ml.podswietl([{ x: 500, y: 500, jasnosc: 2 }]);
+    spr('jasność przycięta do 1', ml._latarnie[0].jasnosc === 1);
+    let rzucil = false;
+    try { ml.updateAndDraw(atrapaCtx(), kontekst(klatka()), 1 / 60); } catch (e) { rzucil = e; }
+    spr('rysowanie z latarniami nie rzuca', rzucil === false);
+}
+
 console.log('\nBŁYSK W MGLE (reakcja Burza w mgle):');
 {
     spr('jasność 1 przy źródle, maleje z odległością, 0 daleko',

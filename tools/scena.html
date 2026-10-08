@@ -453,7 +453,7 @@ function rysujKlatke(dt, frame) {
     for (const sila of grzmot.dudnienia) ekran.uderz(sila);
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
-    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha }, dt);
+    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki }, dt);
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);
