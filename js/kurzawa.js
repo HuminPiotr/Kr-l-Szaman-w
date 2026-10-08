@@ -205,6 +205,19 @@ export class Kurzawa {
         this.zaczep = null;
         this._szarpniecie = null;   // { wiek, sila } - reakcja z Grzmotem
         this._zniesienie = null;    // { wiek, kierunek, sila } - reakcja z Zawieruchą
+        this._H = null;             // wysokość płótna z ostatniej klatki - dla orbita()
+    }
+
+    /**
+     * Orbita pasa na wysokości piersi (pas 2) - dla reakcji Wir ogników
+     * (js/reakcjeTechnik.js porywa nią Błędne Ogniki). Uwzględnia zaburzenia
+     * z reakcji (mnoznikR, przesuniecie), bo czyta bieżący this.zaczep.
+     * @returns {{cx, cy, R, squash, kierunek, predkosc}|null}  null, gdy nieaktywna
+     */
+    orbita() {
+        if (!this._trwa || !this.zaczep || !Number.isFinite(this._H)) return null;
+        const g = geometriaPasa(2, this.zaczep, this._H);
+        return { cx: g.cx, cy: g.cy, R: g.R, squash: NASTAWY.SQUASH, kierunek: g.kierunek, predkosc: NASTAWY.PREDKOSC_KATOWA };
     }
 
     get aktywny() { return this._trwa; }
@@ -273,6 +286,7 @@ export class Kurzawa {
         if (this._t >= CZAS_TRWANIA) { this._trwa = false; return; }
 
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
+        this._H = H;
         const zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
         let szarp = 0;

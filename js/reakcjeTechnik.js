@@ -15,6 +15,8 @@
  *    w swoją stronę. 1 jednostka na pole na poryw.
  *  - LATARNIE: Błędne Ogniki w Mgle - kłęby wokół nich ciepło się podświetlają,
  *    a ich aureole rosną. 1 jednostka na ognik (pierwsze wejście).
+ *  - WIR OGNIKÓW: Kurzawa porywa Błędne Ogniki na orbitę swojego pasa.
+ *    1 jednostka na ognik (pierwsze porwanie).
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -51,11 +53,11 @@ export class ReakcjeTechnik {
      * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
         const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki } = t ?? {};
 
@@ -113,6 +115,13 @@ export class ReakcjeTechnik {
                 const nowe = ogniki.oznaczMgle?.();
                 if (Number.isFinite(nowe) && nowe > 0) wynik.latarnie += nowe;
             }
+        }
+
+        // --- Wir ogników --- (porwanie zużyte w następnej klatce ogników)
+        if (ogniki?.aktywny && kurzawa?.aktywny) {
+            const orbita = kurzawa.orbita?.();
+            const nowe = orbita ? ogniki.porwij?.(orbita) : 0;
+            if (Number.isFinite(nowe) && nowe > 0) wynik.wirOgnikow += nowe;
         }
         return wynik;
     }

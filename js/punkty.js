@@ -74,7 +74,9 @@ export const REAKCJE = {
     // ZGADNIĘTE: 3 porywy w obu polach ~60 pkt, jak Grzmot.
     zawianie: { nazwa: 'Zawianie', punkty: 10, pelneDo: 3, przerwaMs: 2000 },
     // Błędny ognik po raz pierwszy w Mgle Mokoszy - latarnia we mgle. ZGADNIĘTE: 5 ogników ~60 pkt.
-    latarnie: { nazwa: 'Latarnie', punkty: 12, pelneDo: 5, przerwaMs: 3000 }
+    latarnie: { nazwa: 'Latarnie', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
+    // Błędny ognik porwany przez wir Kurzawy na orbitę. ZGADNIĘTE: 5 ogników ~60 pkt.
+    wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

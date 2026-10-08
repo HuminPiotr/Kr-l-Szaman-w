@@ -146,5 +146,28 @@ console.log('\nLATARNIE (Błędne Ogniki w Mgle):');
     spr('bez ogników: zero', new ReakcjeTechnik().klatka(c.t, DT).latarnie === 0 && c.log.length === 0);
 }
 
+console.log('\nWIR OGNIKÓW (Kurzawa porywa Błędne Ogniki):');
+{
+    const ORB = { cx: 960, cy: 600, R: 280, squash: 0.28, kierunek: 1, predkosc: 3.6 };
+    const zestaw = ({ kurzawa = true, ogniki = true, orbita = ORB } = {}) => {
+        const log = [];
+        let nowe = 4;
+        return { log, t: {
+            bledneOgniki: { aktywny: ogniki, punkty: () => [], oznaczMgle: () => 0,
+                            porwij: (o) => { log.push(['ogniki.porwij', o]); const n = nowe; nowe = 0; return n; } },
+            kurzawa: { aktywny: kurzawa, orbita: () => orbita }
+        } };
+    };
+    const a = zestaw();
+    const r = new ReakcjeTechnik();
+    const w1 = r.klatka(a.t, DT), w2 = r.klatka(a.t, DT);
+    spr('Ogniki + Kurzawa: porwanie orbitą Kurzawy', a.log[0]?.[0] === 'ogniki.porwij' && a.log[0][1] === ORB);
+    spr('jednostki tylko za pierwsze porwanie (4, potem 0)', w1.wirOgnikow === 4 && w2.wirOgnikow === 0);
+    const b = zestaw({ kurzawa: false });
+    spr('bez Kurzawy: zero i nic nie wołane', new ReakcjeTechnik().klatka(b.t, DT).wirOgnikow === 0 && b.log.length === 0);
+    const c = zestaw({ orbita: null });
+    spr('Kurzawa bez orbity: zero, porwij nie wołane', new ReakcjeTechnik().klatka(c.t, DT).wirOgnikow === 0 && c.log.length === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

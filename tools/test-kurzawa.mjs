@@ -135,5 +135,20 @@ console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
     spr('po powrocie bez przesunięcia', kn.zaczep.przesuniecie === 0);
 }
 
+console.log('\nORBITA (reakcja Wir ogników):');
+{
+    const ko = new Kurzawa();
+    spr('przed zapal() orbita null', ko.orbita() === null);
+    ko.zapal(1);
+    przepusc(ko, klatka(), 0.5);
+    const o = ko.orbita();
+    spr('po zapal() skończona, środek pod barkami', !!o && [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite) && Math.abs(o.cx - ko.zaczep.x) < 1e-6 && o.cy > ko.zaczep.y);
+    ko.znies(1, 1);
+    przepusc(ko, klatka(), NASTAWY.ZNIESIENIE_NAROST);
+    spr('uwzględnia przesunięcie z reakcji (Zawierucha)', ko.orbita().cx > ko.zaczep.x + 1);
+    przepusc(ko, klatka(), CZAS_TRWANIA);
+    spr('po wygaśnięciu null', ko.orbita() === null);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);
