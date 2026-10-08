@@ -18,6 +18,7 @@ import { TABELA as EFEKTY_TABELA, srodekDloni } from './efekty.js';
 import { pekniecieZiemi } from './iskry.js';
 import { kregSylwetki, BARWA_MGLA as BARWA_KOLOWROTU } from './kolowrot.js';
 import { BOGOWIE } from './jaja.js';
+import { zaczepKlatki, NASTAWY as NASTAWY_GRZMOTU } from './grzmot.js';
 
 // Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
 // PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
@@ -53,7 +54,8 @@ export const BARWA_ZAPLONU = {
     lukPeruna: [150, 200, 255],   // błękit-biel Peruna
     kregiMokoszy: [90, 200, 255],   // turkusowy błękit Mokoszy
     mglaMokoszy: [200, 228, 235],   // chłodna perła mgły
-    bania: [245, 240, 232]          // ciepła biel pary
+    bania: [245, 240, 232],         // ciepła biel pary
+    grzmot: [170, 205, 255]         // błękit Peruna, jaśniejszy od Łuku
 };
 
 /**
@@ -86,7 +88,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -179,6 +181,14 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Źródła
         // pary (poza) moduł liczy SAM przy każdym buchnięciu - js/bania.js.
         s.bania.zapal(1.0);
+    } else if (technika.uzbraja === 'grzmot') {
+        // Natychmiastowa, siła STAŁA (combo jest gratis). Efekt to wspólna
+        // Fala z osią KU KAMERZE - pierścień w płaszczyźnie ekranu wokół
+        // klatki piersiowej. Dym rozdmuchuje istniejący PULL fala.czola ->
+        // dym.pchnij w main.js; grzmot.wybuch czytają reakcje (Mgła, Kurzawa).
+        const zaczep = zaczepKlatki(frame, W, H);
+        s.fala.wystrzel(zaczep, { x: 0, y: 0, z: -1 }, NASTAWY_GRZMOTU.SILA_FALI, BARWA_ZAPLONU.grzmot);
+        s.grzmot.zapal(zaczep, 1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,

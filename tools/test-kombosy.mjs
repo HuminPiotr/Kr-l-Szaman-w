@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -290,5 +290,14 @@ spr('...a dołożony swarog - Bania', k28.dodaj('swarog', 1500)?.id === 'bania')
 const k29 = new KomboSilnik();
 k29.dodaj('swarog', 0); k29.dodaj('mokosz', 500);
 spr('Tęcza nie koliduje (swarog->mokosz to jej prefiks, nie Bania)', k29.dodaj('stribog', 1000)?.id === 'tecza');
+
+console.log('\nGRZMOT (perun -> stribog):');
+const k30 = new KomboSilnik();
+k30.dodaj('perun', 0);
+spr('perun -> stribog odpala Grzmot', k30.dodaj('stribog', 500)?.id === 'grzmot');
+spr('...a dołożony stribog - Podmuch Striboga (łańcuch)', k30.dodaj('stribog', 1000)?.id === 'aard');
+const k31 = new KomboSilnik();
+k31.dodaj('perun', 0);
+spr('perun -> weles nadal nic (prefiks Kołowrotu)', k31.dodaj('weles', 500) === null);
 
 process.exit(ok ? 0 : 1);

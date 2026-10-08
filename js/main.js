@@ -52,6 +52,7 @@ import { KregiMokoszy } from './kregiMokoszy.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
 import { Bania } from './bania.js';
+import { Grzmot } from './grzmot.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
@@ -254,6 +255,7 @@ let kregiMokoszy = new KregiMokoszy();
 let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
 let bania = new Bania();
+let grzmot = new Grzmot();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -534,7 +536,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -807,7 +809,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot
             });
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
@@ -994,6 +996,7 @@ function klatka(now) {
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
     bania.updateAndDraw(ctx, kontekstTechnik, dt);
+    grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
     const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
@@ -1094,6 +1097,7 @@ function klatka(now) {
         lukPeruna: { aktywny: lukPeruna.aktywny },
         kurzawa: { aktywny: kurzawa.aktywny },
         bania: { aktywny: bania.aktywny },
+        grzmot: { aktywny: grzmot.aktywny },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do

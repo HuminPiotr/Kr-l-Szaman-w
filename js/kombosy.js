@@ -147,7 +147,16 @@ export const KOMBOSY = [
     // zaczyna się swarog->mokosz, odwrotnie). Łańcuch: Kołowrót kończy się
     // na mokosz, więc dołożony po nim swarog odpala Banię.
     { id: 'bania', nazwa: 'Bania',
-      sekwencja: ['mokosz', 'swarog'], uzbraja: 'bania' }
+      sekwencja: ['mokosz', 'swarog'], uzbraja: 'bania' },
+
+    // GRZMOT (2026-10-08, spec 2026-10-08-grzmot-i-zawierucha-design.md):
+    // błyskawica (Perun) rozdziera powietrze (Stribog) - fala uderzeniowa
+    // z klatki piersiowej. Pierwsza dwójka OTWIERANA przez Peruna. Dwójka
+    // "działająca na pole": dziura w Mgle, szarpnięcie Kurzawy, rozrzucony
+    // dym (js/reakcjeTechnik.js). Para perun->stribog nie jest prefiksem/
+    // sufiksem żadnej trójki. Łańcuch: Grzmot + stribog = Podmuch Striboga.
+    { id: 'grzmot', nazwa: 'Grzmot',
+      sekwencja: ['perun', 'stribog'], uzbraja: 'grzmot' }
 ];
 
 export class KomboSilnik {
