@@ -47,7 +47,7 @@ export const BARWA_ZAPLONU = {
     // tą samą barwą.
     kolowrot: BARWA_KOLOWROTU,
     // Jasna, chłodna szarość - dym jeszcze nie płonie w chwili uzbrojenia
-    // combo (patrz efekty.js TABELA.dym - ten sam powód, ta sama barwa).
+    // combo (samą aktywację niesie fala ciepła - js/ekran.js falaCiepla()).
     dym: [210, 210, 220],
     kamiennaTarcza: [170, 120, 230],  // fiolet-kamień Welesa
     kurzawa: [215, 175, 110],          // piaskowa ochra pyłu
@@ -159,6 +159,8 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Trzecia technika KANAŁOWANA (jak 'ogien'/'aard') - uzbraja,
         // nie odpala natychmiast. Gest aktywacji: js/dmuchanie.js.
         s.dmuchanie.uzbrój(now);
+        // Aktywacja: drgające powietrze od dołu kadru (js/ekran.js, fala ciepła).
+        s.ekran.falaCiepla();
     } else if (technika.uzbraja === 'kamiennaTarcza') {
         // Natychmiastowa jak Kołowrót, siła STAŁA (combo jest gratis). Zaczep
         // (barki) moduł liczy SAM co klatkę - patrz js/sledzenie.js.

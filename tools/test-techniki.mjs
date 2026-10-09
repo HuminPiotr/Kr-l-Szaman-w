@@ -105,7 +105,7 @@ testTechnika('ogien', ['swarog', 'perun'], ['plonacyPalec.uzbrój'], 'Grom w Ogn
 
 testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Striboga');
 
-testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
+testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój', 'ekran.falaCiepla'], 'Okadzenie');
 
 testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
 
