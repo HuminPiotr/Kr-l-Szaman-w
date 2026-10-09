@@ -81,7 +81,9 @@ export const REAKCJE = {
     // Błędny ognik po raz pierwszy w Mgle Mokoszy - latarnia we mgle. ZGADNIĘTE: 5 ogników ~60 pkt.
     latarnie: { nazwa: 'Latarnie', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
     // Błędny ognik porwany przez wir Kurzawy na orbitę. ZGADNIĘTE: 5 ogników ~60 pkt.
-    wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 }
+    wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
+    // Tęcza zapalona w trakcie Dodoli - 1 jednostka na zapalenie. ZGADNIĘTE: ~1/3 Tęczy (440).
+    teczaPoDeszczu: { nazwa: 'Tęcza po deszczu', punkty: 150, pelneDo: 1, przerwaMs: 1500 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

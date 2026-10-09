@@ -107,4 +107,20 @@ console.log('\nODPORNOŚĆ:');
     spr('mżawka bez ciała: natężenie z podłogi', d.natezenie > 0 && d.natezenie < 0.2);
 }
 
+console.log('\nTĘCZA W KROPLACH:');
+{
+    const d = new Dodola();
+    spr('zabarw() bez deszczu = false', d.zabarw(100) === false);
+    d.zapal();
+    spr('zabarw() w deszczu = true', d.zabarw(100) === true);
+    spr('zabarw(NaN) = false', d.zabarw(NaN) === false);
+    d.wymusJakosc = 1;
+    for (let i = 0; i < 60; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    d.zabarw(400);
+    let rzucil = false;
+    try { d.updateAndDraw(atrapaCtx(), kontekstZMaska(maskaPasa()), DT); } catch (e) { rzucil = e; }
+    spr('rysowanie kropel w barwach tęczy nie rzuca', !rzucil);
+    spr('barwa ważna tylko do najbliższego rysowania', d._barwaTeczy === null);
+}
+
 process.exit(ok ? 0 : 1);

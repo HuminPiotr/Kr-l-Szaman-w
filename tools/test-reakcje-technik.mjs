@@ -169,5 +169,29 @@ console.log('\nWIR OGNIKÓW (Kurzawa porywa Błędne Ogniki):');
     spr('Kurzawa bez orbity: zero, porwij nie wołane', new ReakcjeTechnik().klatka(c.t, DT).wirOgnikow === 0 && c.log.length === 0);
 }
 
+console.log('\nTĘCZA PO DESZCZU:');
+{
+    const zab = [];
+    const tecza = { aktywna: false, pozostaloS: 0, barwaHue: 120 };
+    const dodola = { pada: true, zabarw: (h) => { zab.push(h); return true; } };
+    const r = new ReakcjeTechnik();
+    const t = { tecza, dodola };
+    spr('bez tęczy - nic', r.klatka(t, DT).teczaPoDeszczu === 0 && zab.length === 0);
+    tecza.aktywna = true; tecza.pozostaloS = 30;
+    spr('zapalenie tęczy w deszczu = 1 jednostka', r.klatka(t, DT).teczaPoDeszczu === 1);
+    let suma = 0;
+    for (let i = 0; i < 120; i++) { tecza.pozostaloS -= DT; suma += r.klatka(t, DT).teczaPoDeszczu; }
+    spr('trwanie tęczy nie dokłada jednostek', suma === 0);
+    spr('przez wspólne trwanie krople są barwione co klatkę', zab.length === 121 && zab.every(h => h === 120));
+    tecza.pozostaloS = 30;
+    spr('ponowne zapalenie (restart licznika) = kolejna jednostka', r.klatka(t, DT).teczaPoDeszczu === 1);
+    const r2 = new ReakcjeTechnik();
+    const sucho = { tecza: { aktywna: false, pozostaloS: 0, barwaHue: 0 }, dodola: { pada: false, zabarw: () => { throw new Error('nie wolno'); } } };
+    r2.klatka(sucho, DT);
+    sucho.tecza.aktywna = true; sucho.tecza.pozostaloS = 30;
+    spr('tęcza bez deszczu - nic i bez barwienia', r2.klatka(sucho, DT).teczaPoDeszczu === 0);
+    spr('brak tęczy/dodoli w worku nie rzuca', r2.klatka({}, DT).teczaPoDeszczu === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

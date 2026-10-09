@@ -107,6 +107,14 @@ export class Dodola {
         this._kotwica = new Kotwica(8);
         this._warstwa = new WarstwaZaSylwetka();
         this.rozpryskiKlatki = 0;     // diagnostyka
+        this._barwaTeczy = null;      // reakcja Tęcza po deszczu - ważna do najbliższego rysowania
+    }
+
+    /** Reakcja Tęcza po deszczu: krople mienią się barwami tęczy (podawać co klatkę). */
+    zabarw(hue) {
+        if (!this.pada || !Number.isFinite(hue)) return false;
+        this._barwaTeczy = ((hue % 360) + 360) % 360;
+        return true;
     }
 
     get natezenie() { return this.zaklinanie.natezenie; }
@@ -250,17 +258,20 @@ export class Dodola {
             ctx.restore();
         }
 
+        const hue = this._barwaTeczy;
+        this._barwaTeczy = null;
+        const kreski = (c, krople) => hue === null ? rysujKreski(c, krople, r, g, b) : rysujKreskiTeczy(c, krople, hue, W);
         // Tył: krople za sylwetką - ciało je przesłania (wycięcie maską).
         const tyl = this._krople.filter(c => c.tyl);
         if (tyl.length) {
             const warstwa = this._warstwa.zacznij(W, H);
             if (warstwa) {
-                rysujKreski(warstwa, tyl, r, g, b);
+                kreski(warstwa, tyl);
                 this._warstwa.zakoncz(ctx, k?.maska, k?.maskaSzer, k?.maskaWys, k?.fit);
             }
         }
         // Przód: reszta kropel i wszystkie rozpryski.
-        rysujKreski(ctx, this._krople.filter(c => !c.tyl), r, g, b);
+        kreski(ctx, this._krople.filter(c => !c.tyl));
         if (this._kropelki.length) {
             ctx.save();
             ctx.globalCompositeOperation = 'source-over';
@@ -278,6 +289,36 @@ export class Dodola {
             ctx.restore();
         }
     }
+}
+
+/**
+ * Krople w barwach tęczy (reakcja Tęcza po deszczu): pasy barwy w poprzek
+ * kadru, przesuwane z obrotem barwy Tęczy (tecza.barwaHue). Wsadowo - jedna
+ * ścieżka na pas. Jasne i mało nasycone: to nadal woda, nie neon.
+ */
+function rysujKreskiTeczy(c, krople, hue, W) {
+    if (!krople.length) return;
+    const PASY = 7;
+    const pasy = Array.from({ length: PASY }, () => []);
+    for (const k of krople) pasy[Math.max(0, Math.min(PASY - 1, Math.floor((k.x / W) * PASY)))].push(k);
+    c.save();
+    c.globalCompositeOperation = 'source-over';
+    c.lineCap = 'round';
+    c.globalAlpha = NASTAWY.ALFA_DO;
+    for (let i = 0; i < PASY; i++) {
+        const pas = pasy[i];
+        if (!pas.length) continue;
+        c.strokeStyle = `hsl(${(hue + i * (360 / PASY)) % 360}, 70%, 78%)`;
+        c.lineWidth = pas[0].grubosc;
+        c.beginPath();
+        for (const k of pas) {
+            const v = Math.hypot(k.vx, k.vy) || 1;
+            c.moveTo(k.x, k.y);
+            c.lineTo(k.x - (k.vx / v) * k.dl, k.y - (k.vy / v) * k.dl);
+        }
+        c.stroke();
+    }
+    c.restore();
 }
 
 /** Kreski kropel wsadowo: jedna ścieżka na kubeł alfy, nie stroke() na kroplę. */

@@ -17,6 +17,9 @@
  *    a ich aureole rosną. 1 jednostka na ognik (pierwsze wejście).
  *  - WIR OGNIKÓW: Kurzawa porywa Błędne Ogniki na orbitę swojego pasa.
  *    1 jednostka na ognik (pierwsze porwanie).
+ *  - TĘCZA PO DESZCZU: Tęcza zapalona, kiedy pada Dodola - 1 jednostka na
+ *    zapalenie (zbocze: tęcza nieaktywna albo licznik zrestartowany), a przez
+ *    cały czas wspólnego trwania krople mienią się barwami tęczy.
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -47,19 +50,20 @@ export class ReakcjeTechnik {
     constructor() {
         this._doPrzewodzenia = 0;
         this._doBlysku = 0;
+        this._teczaPozostalo = 0;   // do wykrycia zapalenia Tęczy (zbocze)
     }
 
     /**
-     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki}} t  instancje technik
+     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number, teczaPoDeszczu:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0, teczaPoDeszczu: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki } = t ?? {};
+        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki, tecza, dodola } = t ?? {};
 
         // --- Przewodzenie ---
         const geom = luk?.aktywny && kregi?.aktywny ? kregi.geometria?.() : null;
@@ -122,6 +126,16 @@ export class ReakcjeTechnik {
             const orbita = kurzawa.orbita?.();
             const nowe = orbita ? ogniki.porwij?.(orbita) : 0;
             if (Number.isFinite(nowe) && nowe > 0) wynik.wirOgnikow += nowe;
+        }
+
+        // --- Tęcza po deszczu --- (zapalenie = tęcza aktywna i licznik nie maleje, tylko skoczył w górę)
+        const teczaTrwa = !!tecza?.aktywna;
+        const pozostalo = teczaTrwa && Number.isFinite(tecza.pozostaloS) ? tecza.pozostaloS : 0;
+        const zapalona = teczaTrwa && pozostalo > this._teczaPozostalo + 1e-6;
+        this._teczaPozostalo = pozostalo;
+        if (dodola?.pada && teczaTrwa) {
+            dodola.zabarw?.(tecza.barwaHue);
+            if (zapalona) wynik.teczaPoDeszczu = 1;
         }
         return wynik;
     }
