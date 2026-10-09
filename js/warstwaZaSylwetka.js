@@ -48,8 +48,10 @@ export class WarstwaZaSylwetka {
      * @param {number} szer
      * @param {number} wys
      * @param {{offsetX,offsetY,scaledW,scaledH}|null} fit
+     * @param {GlobalCompositeOperation} [tryb]  jak nałożyć warstwę na scenę -
+     *        'lighter' dla efektów świetlnych (Błędne Ogniki), domyślnie zwykłe krycie
      */
-    zakoncz(ctx, maska, szer, wys, fit) {
+    zakoncz(ctx, maska, szer, wys, fit, tryb = 'source-over') {
         if (!ctx || !this._ctx) return;
         if (maska && szer > 0 && wys > 0 && fit && maska.length >= szer * wys) {
             this._wypelnijMaske(maska, szer, wys);
@@ -59,7 +61,7 @@ export class WarstwaZaSylwetka {
             this._ctx.globalCompositeOperation = 'source-over';
         }
         ctx.save();
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalCompositeOperation = tryb;
         ctx.globalAlpha = 1;
         ctx.drawImage(this._plotno, 0, 0);
         ctx.restore();

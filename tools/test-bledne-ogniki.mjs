@@ -2,7 +2,7 @@
  * Błędne Ogniki - narodziny z pasa ziemi, unoszenie, wygasanie, zarzewia, porwanie, Mgła; bez document.
  *   node tools/test-bledne-ogniki.mjs
  */
-import { BledneOgniki, pasNarodzin, obwiedniaOgnika, migotanie, punktNaOrbicie, NASTAWY, CZAS_TRWANIA } from '../js/bledneOgniki.js';
+import { BledneOgniki, pasNarodzin, obwiedniaOgnika, migotanie, punktNaOrbicie, ognikZaCialem, NASTAWY, CZAS_TRWANIA } from '../js/bledneOgniki.js';
 import { klatka, kontekst, przepusc, atrapaCtx, W, H } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -19,9 +19,16 @@ spr('obwiednia: 0 na końcach i dla NaN, pełna w środku',
     obwiedniaOgnika(0, 5) === 0 && obwiedniaOgnika(5, 5) === 0 && obwiedniaOgnika(NaN, 5) === 0 && obwiedniaOgnika(2.5, 5) === 1);
 const mig = Array.from({ length: 200 }, (_, i) => migotanie(i * 0.01, 3));
 spr('migotanie w 0.5..1 i faktycznie migocze', mig.every(v => v >= 0.5 - 1e-9 && v <= 1 + 1e-9) && Math.max(...mig) - Math.min(...mig) > 0.2);
-const orb = { cx: 960, cy: 500, R: 300, squash: 0.28 };
+const orb = { cx: 960, cy: 500, R: 300, squash: 0.28, kierunek: 1, predkosc: 3 };
 const p = punktNaOrbicie(orb, Math.PI / 2);
 spr('punkt na orbicie leży na elipsie', Math.abs(p.x - 960) < 1e-9 && Math.abs(p.y - (500 + 300 * 0.28)) < 1e-9);
+// Głębia jak w Kurzawie: tylna połowa elipsy (sin(kąt) < 0, nad środkiem) idzie ZA ciało.
+spr('porwany ognik nad środkiem orbity - za ciałem', ognikZaCialem({ porwany: true, x: 960, y: 480 }, orb) === true);
+spr('porwany ognik pod środkiem orbity - przed ciałem', ognikZaCialem({ porwany: true, x: 960, y: 520 }, orb) === false);
+spr('nieporwany / brak orbity / NaN - zawsze przed ciałem',
+    ognikZaCialem({ porwany: false, x: 960, y: 480 }, orb) === false
+    && ognikZaCialem({ porwany: true, x: 960, y: 480 }, null) === false
+    && ognikZaCialem({ porwany: true, x: 960, y: NaN }, orb) === false);
 
 console.log('\nCYKL ŻYCIA:');
 const o = new BledneOgniki();
@@ -81,6 +88,14 @@ console.log('\nPORWANIE (Kurzawa) I MGŁA:');
     spr('wMgle ustawione do następnej klatki', g.wMgle === true);
     g.updateAndDraw(null, kontekst(klatka()), DT);
     spr('...i zużyte w niej (nie wisi)', g.wMgle === false);
+    // Bez document (Node) warstwy za sylwetką nie ma - tylne ogniki rysują się na scenie, nie znikają.
+    const rysowane = [];
+    const ctx = atrapaCtx();
+    ctx.arc = (x, y) => rysowane.push(y);
+    g.porwij(orbita);
+    g.updateAndDraw(ctx, kontekst(klatka()), DT);
+    const wGrze = g._ogniki.filter(x => x.porwany && g._jasnosc(x) >= 0.01).length;
+    spr(`bez warstwy wszystkie porwane ogniki narysowane (${wGrze})`, rysowane.length >= wGrze * 2);
 }
 
 console.log('\nODPORNOŚĆ:');

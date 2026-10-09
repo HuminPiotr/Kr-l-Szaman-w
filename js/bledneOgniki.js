@@ -26,6 +26,7 @@
 import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { curl2 } from './szum.js';
+import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 
 export const NASTAWY = {
     LICZBA: 5,
@@ -94,6 +95,16 @@ export function punktNaOrbicie(orbita, kat) {
     return { x: orbita.cx + Math.cos(kat) * orbita.R, y: orbita.cy + Math.sin(kat) * orbita.R * orbita.squash };
 }
 
+/**
+ * Czy porwany ognik leży na TYLNEJ połowie orbity wiru (sin(kąt) < 0, nad
+ * środkiem elipsy) - wtedy rysuje się ZA sylwetką, jak pył Kurzawy. Bez tego
+ * spłaszczona elipsa w całości przed ciałem czyta się jak kółko "przed
+ * ekranem", nie wokół gracza (test na kamerze 2026-10-09). Czysta funkcja.
+ */
+export function ognikZaCialem(o, orbita) {
+    return !!o?.porwany && orbitaOk(orbita) && Number.isFinite(o.y) && o.y < orbita.cy;
+}
+
 const orbitaOk = (o) => !!o && [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite) && o.R > 0 && o.squash > 0;
 
 export class BledneOgniki {
@@ -105,6 +116,7 @@ export class BledneOgniki {
         this._kotwica = new Kotwica(10);
         this._sk = 230;
         this._orbita = null;   // ustawiane przez reakcje w klatce N, zużywane w N+1
+        this._warstwa = new WarstwaZaSylwetka();
         this.wMgle = false;    // j.w.
     }
 
@@ -243,16 +255,27 @@ export class BledneOgniki {
                 o.doWezla += N.KROK_OGONA;
             }
         }
-        if (ctx) this._rysuj(ctx, wMgle);
+        if (!ctx) return;
+        // Najpierw TYŁ wiru (za ciałem), potem reszta - kolejność rysowania = głębia.
+        // Bez warstwy (Node, złe wymiary) wszystko idzie na scenę - ognik nie znika.
+        const zaCialem = (o) => ognikZaCialem(o, orbita);
+        const tyl = this._ogniki.some(zaCialem) ? this._warstwa.zacznij(W, H) : null;
+        if (tyl) {
+            this._rysuj(tyl, wMgle, zaCialem);
+            // 'lighter' - inaczej tylne ogniki straciłyby blask na tle sceny.
+            this._warstwa.zakoncz(ctx, k?.maska, k?.maskaSzer, k?.maskaWys, k?.fit, 'lighter');
+        }
+        this._rysuj(ctx, wMgle, tyl ? (o) => !zaCialem(o) : () => true);
     }
 
-    _rysuj(ctx, wMgle) {
+    _rysuj(ctx, wMgle, ktore) {
         const N = NASTAWY, sk = this._sk;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         for (const o of this._ogniki) {
+            if (!ktore(o)) continue;
             const j = this._jasnosc(o);
             if (j < 0.01 || !punktOk(o)) continue;
 
