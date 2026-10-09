@@ -14,10 +14,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { odtworzKlatke } from '../js/nagrywanie/zapis.js';
-import { FalowanieRamion } from '../js/ruchy/falowanieRamion.js';
+import { FalowanieRamion, jakoscFali } from '../js/ruchy/falowanieRamion.js';
 
 const KATALOG = join(dirname(fileURLToPath(import.meta.url)), 'probki');
-const POLA = ['rozpostarcie', 'amplituda', 'zgiecie', 'opoznienie', 'korelacja', 'gladkosc'];
+const POLA = ['rozpostarcie', 'amplituda', 'zgiecie', 'opoznienie', 'korelacja', 'jakosc'];
 
 // --- statystyka ---
 const kwantyl = (a, q) => {
@@ -31,7 +31,7 @@ function przepusc(klatki) {
     const wyniki = [];
     for (const k of klatki) {
         const r = m.update(k.pose?.worldLandmarks ?? null, k.dt);
-        if (r.laczne) wyniki.push(r.laczne);
+        if (r.laczne) wyniki.push({ ...r.laczne, jakosc: jakoscFali(r.laczne) });
     }
     return wyniki;
 }
