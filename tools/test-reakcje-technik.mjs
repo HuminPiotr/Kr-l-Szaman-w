@@ -193,5 +193,25 @@ console.log('\nTĘCZA PO DESZCZU:');
     spr('brak tęczy/dodoli w worku nie rzuca', r2.klatka({}, DT).teczaPoDeszczu === 0);
 }
 
+console.log('\nBURZA W DESZCZU:');
+{
+    const bl = [];
+    const dodola = { pada: true, rozblysk: (z, s) => { bl.push([z, s]); return true; } };
+    const luk = { aktywny: true, srodek: () => ({ x: 960, y: 500 }), wyladowanieDo: () => true };
+    const r = new ReakcjeTechnik();
+    let suma = 0;
+    for (let i = 0; i < 60; i++) suma += r.klatka({ lukPeruna: luk, dodola }, DT, () => 0.5).burzaWDeszczu;
+    spr(`Łuk w deszczu błyska rytmicznie (${suma} w 1 s, ~7-17)`, suma >= 6 && suma <= 17);
+    spr('błysk od środka Łuku, siła SILA_BLYSKU_LUK', bl.every(([z, s]) => z.x === 960 && s === NASTAWY.SILA_BLYSKU_LUK));
+    const r2 = new ReakcjeTechnik();
+    const piorun = { aktywny: true, punktUderzenia: { x: 900, y: 950 } };
+    spr('piorun Gromu w deszczu błyska', r2.klatka({ piorun, dodola }, DT).burzaWDeszczu === 1);
+    const r3 = new ReakcjeTechnik();
+    const grzmot = { wybuch: { x: 800, y: 600, sila: 0.7 } };
+    spr('wybuch Grzmotu w deszczu = 1 błysk', r3.klatka({ grzmot, dodola }, DT).burzaWDeszczu === 1);
+    const sucho = { pada: false, rozblysk: () => { throw new Error('nie wolno'); } };
+    spr('bez deszczu - nic', new ReakcjeTechnik().klatka({ lukPeruna: luk, piorun, grzmot, dodola: sucho }, DT).burzaWDeszczu === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

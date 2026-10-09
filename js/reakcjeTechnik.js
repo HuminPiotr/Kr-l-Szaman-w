@@ -20,6 +20,9 @@
  *  - TĘCZA PO DESZCZU: Tęcza zapalona, kiedy pada Dodola - 1 jednostka na
  *    zapalenie (zbocze: tęcza nieaktywna albo licznik zrestartowany), a przez
  *    cały czas wspólnego trwania krople mienią się barwami tęczy.
+ *  - BURZA W DESZCZU: Dodola + (Łuk Peruna albo piorun Gromu w Ziemię) - ten
+ *    sam rytm błysków co Burza w mgle; Grzmot błyska raz, w klatce wybuchu.
+ *    Krople w zasięgu wyładowania zapalają się jego światłem.
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -51,17 +54,18 @@ export class ReakcjeTechnik {
         this._doPrzewodzenia = 0;
         this._doBlysku = 0;
         this._teczaPozostalo = 0;   // do wykrycia zapalenia Tęczy (zbocze)
+        this._doBlyskuDeszczu = 0;
     }
 
     /**
      * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number, teczaPoDeszczu:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number, teczaPoDeszczu:number, burzaWDeszczu:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0, teczaPoDeszczu: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0, teczaPoDeszczu: 0, burzaWDeszczu: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
         const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki, tecza, dodola } = t ?? {};
 
@@ -136,6 +140,23 @@ export class ReakcjeTechnik {
         if (dodola?.pada && teczaTrwa) {
             dodola.zabarw?.(tecza.barwaHue);
             if (zapalona) wynik.teczaPoDeszczu = 1;
+        }
+
+        // --- Burza w deszczu --- (jak Burza w mgle; Grzmot - jedna klatka wybuchu)
+        if (dodola?.pada && (zLuku || piorun?.aktywny)) {
+            this._doBlyskuDeszczu -= krok;
+            if (this._doBlyskuDeszczu <= 0) {
+                const zrodlo = zLuku ? luk.srodek?.() : piorun.punktUderzenia;
+                if (punktOk(zrodlo) && dodola.rozblysk?.(zrodlo, zLuku ? N.SILA_BLYSKU_LUK : N.SILA_BLYSKU_GROM)) {
+                    wynik.burzaWDeszczu = 1;
+                }
+                this._doBlyskuDeszczu = N.BLYSK_ODSTEP_MIN + los() * (N.BLYSK_ODSTEP_MAX - N.BLYSK_ODSTEP_MIN);
+            }
+        } else {
+            this._doBlyskuDeszczu = 0;
+        }
+        if (dodola?.pada && punktOk(wybuch) && !wynik.burzaWDeszczu) {
+            if (dodola.rozblysk?.(wybuch, Number.isFinite(wybuch.sila) ? wybuch.sila : 1)) wynik.burzaWDeszczu = 1;
         }
         return wynik;
     }

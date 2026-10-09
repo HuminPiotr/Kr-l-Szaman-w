@@ -49,6 +49,10 @@ export const NASTAWY = {
     SMUGA_KROPELKI_S: 0.035,
     DOL_KADRU: 0.985,                  // H × to - tu pluska ułamek kropel
     UDZIAL_PLUSKOW_DOLU: 0.3,
+    // Reakcja Burza w deszczu: krople w zasięgu wyładowania zapalają się jego światłem.
+    BLYSK_ZYCIE: 0.12,                 // s
+    ZASIEG_BLYSKU: 5,                  // skala × to
+    BARWA_BLYSKU: [225, 235, 255],
     PRZYCIEMNIENIE: 0.16,              // alfa przy pełnej ulewie (∝ natężenie²)
     BARWA_PRZYCIEMNIENIA: [15, 25, 40]
 };
@@ -108,6 +112,14 @@ export class Dodola {
         this._warstwa = new WarstwaZaSylwetka();
         this.rozpryskiKlatki = 0;     // diagnostyka
         this._barwaTeczy = null;      // reakcja Tęcza po deszczu - ważna do najbliższego rysowania
+        this._blysk = null;           // { x, y, sila, wiek } - reakcja Burza w deszczu
+    }
+
+    /** Reakcja Burza w deszczu: krople błyskają od `zrodlo` (px). @returns {boolean} */
+    rozblysk(zrodlo, sila = 1) {
+        if (!this.pada || !zrodlo || !Number.isFinite(zrodlo.x) || !Number.isFinite(zrodlo.y)) return false;
+        this._blysk = { x: zrodlo.x, y: zrodlo.y, sila: clamp01(sila), wiek: 0 };
+        return true;
     }
 
     /** Reakcja Tęcza po deszczu: krople mienią się barwami tęczy (podawać co klatkę). */
@@ -155,6 +167,10 @@ export class Dodola {
         this._dosyp(n, krok, W, H, sk);
         this.rozpryskiKlatki = this._spadaj(k, krok, W, H, sk, n);
         this._kropelkiKrok(krok, sk);
+        if (this._blysk) {
+            this._blysk.wiek += krok;
+            if (this._blysk.wiek >= N.BLYSK_ZYCIE) this._blysk = null;
+        }
 
         if (!ctx) return;
         this._rysuj(ctx, k, W, H, sk, n);
@@ -247,6 +263,39 @@ export class Dodola {
         this._kropelki = zostaja;
     }
 
+    /**
+     * Burza w deszczu: krople w zasięgu błysku jeszcze raz, jasno i addytywnie
+     * (to jest światło, nie materia), słabnąc z odległością i wiekiem błysku.
+     */
+    _rysujBlysk(ctx, sk) {
+        const N = NASTAWY, b = this._blysk;
+        const R = sk * N.ZASIEG_BLYSKU;
+        const u = (1 - b.wiek / N.BLYSK_ZYCIE) * b.sila;
+        if (u <= 0.01) return;
+        const [r, g, bl] = N.BARWA_BLYSKU;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgb(${r},${g},${bl})`;
+        const KUBLY = 3;
+        for (let i = 0; i < KUBLY; i++) {
+            ctx.globalAlpha = clamp01(u * (i + 1) / KUBLY);
+            ctx.beginPath();
+            let jest = false;
+            for (const c of this._krople) {
+                const blisko = 1 - Math.hypot(c.x - b.x, c.y - b.y) / R;
+                if (blisko <= 0 || Math.min(KUBLY - 1, Math.floor(blisko * KUBLY)) !== i) continue;
+                const v = Math.hypot(c.vx, c.vy) || 1;
+                ctx.lineWidth = c.grubosc * 1.3;
+                ctx.moveTo(c.x, c.y);
+                ctx.lineTo(c.x - (c.vx / v) * c.dl, c.y - (c.vy / v) * c.dl);
+                jest = true;
+            }
+            if (jest) ctx.stroke();
+        }
+        ctx.restore();
+    }
+
     _rysuj(ctx, k, W, H, sk, n) {
         const N = NASTAWY;
         const [r, g, b] = N.BARWA;
@@ -272,6 +321,7 @@ export class Dodola {
         }
         // Przód: reszta kropel i wszystkie rozpryski.
         kreski(ctx, this._krople.filter(c => !c.tyl));
+        if (this._blysk) this._rysujBlysk(ctx, sk);
         if (this._kropelki.length) {
             ctx.save();
             ctx.globalCompositeOperation = 'source-over';

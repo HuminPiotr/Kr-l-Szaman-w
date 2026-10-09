@@ -123,4 +123,20 @@ console.log('\nTĘCZA W KROPLACH:');
     spr('barwa ważna tylko do najbliższego rysowania', d._barwaTeczy === null);
 }
 
+console.log('\nBURZA W DESZCZU (błysk kropel):');
+{
+    const d = new Dodola();
+    spr('rozblysk() bez deszczu = false', d.rozblysk({ x: 1, y: 1 }) === false);
+    d.zapal();
+    d.wymusJakosc = 1;
+    for (let i = 0; i < 60; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    spr('rozblysk() w deszczu = true', d.rozblysk({ x: 960, y: 400 }, 1) === true);
+    spr('rozblysk(NaN) = false', d.rozblysk({ x: NaN, y: 1 }) === false);
+    let rzucil = false;
+    try { d.updateAndDraw(atrapaCtx(), kontekst(klatka()), DT); } catch (e) { rzucil = e; }
+    spr('rysowanie błysku nie rzuca', !rzucil);
+    for (let i = 0; i < 12; i++) d.updateAndDraw(null, kontekst(klatka()), DT);
+    spr('błysk gaśnie po BLYSK_ZYCIE', d._blysk === null);
+}
+
 process.exit(ok ? 0 : 1);

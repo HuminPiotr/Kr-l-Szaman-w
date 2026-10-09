@@ -83,7 +83,10 @@ export const REAKCJE = {
     // Błędny ognik porwany przez wir Kurzawy na orbitę. ZGADNIĘTE: 5 ogników ~60 pkt.
     wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
     // Tęcza zapalona w trakcie Dodoli - 1 jednostka na zapalenie. ZGADNIĘTE: ~1/3 Tęczy (440).
-    teczaPoDeszczu: { nazwa: 'Tęcza po deszczu', punkty: 150, pelneDo: 1, przerwaMs: 1500 }
+    teczaPoDeszczu: { nazwa: 'Tęcza po deszczu', punkty: 150, pelneDo: 1, przerwaMs: 1500 },
+    // Błysk kropel Dodoli od Łuku / pioruna Gromu (co 60-150 ms) albo Grzmotu (raz).
+    // Ta sama skala co Burza w mgle: Łuk w deszczu ~5 s ~200 pkt.
+    burzaWDeszczu: { nazwa: 'Burza w deszczu', punkty: 10, pelneDo: 12, przerwaMs: 1500 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs

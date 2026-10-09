@@ -1032,6 +1032,7 @@ function klatka(now) {
     punkty.reakcja('latarnie', reakcjeKlatki.latarnie, now);
     punkty.reakcja('wirOgnikow', reakcjeKlatki.wirOgnikow, now);
     punkty.reakcja('teczaPoDeszczu', reakcjeKlatki.teczaPoDeszczu, now);
+    punkty.reakcja('burzaWDeszczu', reakcjeKlatki.burzaWDeszczu, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
