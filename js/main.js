@@ -1055,6 +1055,7 @@ function klatka(now) {
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
     punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
+    punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
     rundaHud.update(widokRundy(przebieg));
 
