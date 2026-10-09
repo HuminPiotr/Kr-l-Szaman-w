@@ -525,6 +525,13 @@ const SCENARIUSZE = {
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     bledneOgniki: () => odpalTechnike({ id: 'x', nazwa: 'Błędne Ogniki', uzbraja: 'bledneOgniki', sekwencja: ['weles', 'swarog'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    // ?scenariusz=dodola&jakosc=0.2 - jakość fali do zrzutu (mżawka/ulewa), domyślnie suwak.
+    dodola: () => {
+        const j = parseFloat(params.get('jakosc'));
+        if (Number.isFinite(j)) dodola.wymusJakosc = j;
+        odpalTechnike({ id: 'x', nazwa: 'Dodola', uzbraja: 'dodola', sekwencja: ['mokosz', 'mokosz', 'stribog'] },
+                      zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik);
+    },
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
                        SCENARIUSZE.okadzenie(); SCENARIUSZE.palec(); },
