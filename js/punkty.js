@@ -35,7 +35,7 @@ export const PREMIA_SPLECENIA = 0.5;      // +50% wartości drugiej techniki (Ta
 // Zaklinanie (Dodola, 2026-10-09): strumień punktów za natężenie, jak taniec.
 // KWADRAT natężenia celowo - wężowa fala (natężenie ~0.8-1) ma się opłacać
 // wyraźnie bardziej niż machanie skrzydłem (~0.2): 30 vs ~1 pkt/s.
-// ZGADNIĘTE: pełna ulewa przez sufit 20 s = 600 pkt, ~1.75× wartości Dodoli (340).
+// ZGADNIĘTE: pełna ulewa przez sufit 40 s (js/zaklinanie.js MAX_S) = 1200 pkt, ~3.5× wartości Dodoli (340).
 export const PUNKTY_ULEWY_NA_S = 30;
 
 // Przycięcie dt tańca. Po powrocie na uśpioną kartę dt bywa sekundami -

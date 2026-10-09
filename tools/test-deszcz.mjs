@@ -46,8 +46,8 @@ console.log('\nCYKL DESZCZU:');
     const ulewa = d.diagnostyka.krople;
     spr(`ulewa po 4 s dobrej fali: dużo kropel (${ulewa}), nie więcej niż KROPLI_MAX`, ulewa > 300 && ulewa <= N.KROPLI_MAX);
     d.wymusJakosc = 0;
-    for (let i = 0; i < 240; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
-    spr(`zła fala przez 4 s -> mżawka: mało kropel (${d.diagnostyka.krople})`, d.diagnostyka.krople < 60);
+    for (let i = 0; i < 600; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    spr(`zła fala przez 10 s -> mżawka: mało kropel (${d.diagnostyka.krople})`, d.diagnostyka.krople < 60);
     let rzucil = false;
     try { d.updateAndDraw(atrapaCtx(), kontekstZMaska(maskaPasa()), DT); } catch (e) { rzucil = e; }
     spr('rysowanie (atrapa ctx, z maską) nie rzuca', !rzucil);

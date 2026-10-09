@@ -24,13 +24,14 @@ export const NASTAWY = {
     GLUCHE_S: 1.0,            // wyjście z pieczęci powietrza + rozgrzanie okna miary
     PODLOGA: 0.08,            // mżawka - nigdy zero
     NAROST_TAU_S: 1.5,
-    OPADANIE_TAU_S: 2.5,
+    OPADANIE_TAU_S: 4.0,      // było 2.5 (2026-10-09: "deszcz kończy się za szybko")
     PROG_PODTRZYMANIA: 0.15,  // jakość poniżej = gracz nie zaklina
-    GWARANCJA_S: 3.0,         // tyle trwa zawsze, zanim zacznie się liczyć cisza
-    CISZA_S: 3.0,
-    MAX_S: 20.0,
-    CICHNIECIE_S: 3.0,
-    POBOR_NA_S: 0.02,         // ułamek paska mocy na sekundę przy pełnej ulewie (×0.3 przy mżawce)
+    GWARANCJA_S: 6.0,         // tyle trwa zawsze, zanim zacznie się liczyć cisza (było 3)
+    CISZA_S: 6.0,             // było 3 - czas na złożenie pieczęci do reakcji bez falowania
+    MAX_S: 40.0,              // było 20
+    CICHNIECIE_S: 5.0,        // było 3 - deszcz wolniej ustaje
+    POBOR_NA_S: 0.012,        // ułamek paska/s przy pełnej ulewie (×0.3 przy mżawce); było 0.02 - przy dwa razy
+                              // dłuższym suficie moc nie może kończyć deszczu wcześniej niż gracz
     MAX_DT: 0.1
 };
 
