@@ -93,9 +93,9 @@ export const NASTAWY = {
     MARGINES_PX: 8,          // zapas wokół prostokąta kopii - skala rozpycha piksele poza obrys
 
     // --- fala ciepła (aktywacja Okadzenia) - ZGADNIĘTE, do strojenia na kamerze ---
-    CIEPLO_CZAS: 1.5,             // s
-    CIEPLO_WYS_H: 0.55,           // wysokość pasa, ułamek H
-    CIEPLO_AMPLITUDA_H: 0.006,    // maks. przesunięcie paska w bok, ułamek H (~6 px przy 1080)
+    CIEPLO_CZAS: 2.0,             // s (v2: 1.5 - za krótko, ledwo widać)
+    CIEPLO_WYS_H: 0.6,            // wysokość pasa, ułamek H
+    CIEPLO_AMPLITUDA_H: 0.011,    // maks. przesunięcie paska w bok, ułamek H (~12 px przy 1080; v1 0.006 - za słabe na kamerze)
     CIEPLO_PASEK_PX: 3,           // wysokość paska refrakcji
     CIEPLO_FALA_1_H: 0.09, CIEPLO_TEMPO_1_HZ: 1.6,   // długa fala (ułamek H) i jej tempo
     CIEPLO_FALA_2_H: 0.04, CIEPLO_TEMPO_2_HZ: 2.7,   // krótka - łamie regularność
@@ -149,7 +149,7 @@ export function obwiedniaCiepla(p) {
 
 /**
  * Przesunięcie w bok paska na wysokości `y` px OD DOLNEJ KRAWĘDZI, w pasie
- * wysokim na `wys` px. Waga (1-u)^2: maksimum przy krawędzi, zero na górnej
+ * wysokim na `wys` px. Waga (1-u)^1.5: maksimum przy krawędzi, zero na górnej
  * granicy pasa. Faza k*y - ω*t, więc grzbiety fal wędrują w górę. Czysta
  * funkcja; śmieci -> 0.
  *
@@ -158,7 +158,7 @@ export function obwiedniaCiepla(p) {
 export function przesuniecieCiepla(y, wys, t, H) {
     if (![y, wys, t, H].every(Number.isFinite) || wys <= 0 || H <= 0 || y < 0 || y >= wys) return 0;
     const u = y / wys;
-    const waga = (1 - u) * (1 - u);
+    const waga = Math.pow(1 - u, 1.5);   // v2: było ^2 - środek pasa ledwo drgał
     const k1 = 2 * Math.PI / (H * NASTAWY.CIEPLO_FALA_1_H);
     const k2 = 2 * Math.PI / (H * NASTAWY.CIEPLO_FALA_2_H);
     const fala = 0.65 * Math.sin(k1 * y - 2 * Math.PI * NASTAWY.CIEPLO_TEMPO_1_HZ * t)
