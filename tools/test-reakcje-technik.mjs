@@ -213,5 +213,34 @@ console.log('\nBURZA W DESZCZU:');
     spr('bez deszczu - nic', new ReakcjeTechnik().klatka({ lukPeruna: luk, piorun, grzmot, dodola: sucho }, DT).burzaWDeszczu === 0);
 }
 
+console.log('\nSYK (deszcz gasi Płonący Palec):');
+{
+    const syki = [];
+    const dodola = { pada: true, natezenie: 0.8, syk: (g) => { syki.push(g); return true; } };
+    const palec = { stan: 'PLONIE', przygaszenie: 0, zgasDeszczem() { const g = { x: 0.5, y: 0.3 }; this.stan = 'BEZCZYNNY'; return g; } };
+    const r = new ReakcjeTechnik();
+    let suma = 0;
+    for (let i = 0; i < 30; i++) suma += r.klatka({ dodola, plonacyPalec: palec }, DT).syk;
+    spr(`po 0.5 s płomień przygasa (${palec.przygaszenie.toFixed(2)}), jeszcze płonie`, palec.stan === 'PLONIE' && palec.przygaszenie > 0.4 && suma === 0);
+    for (let i = 0; i < 40; i++) suma += r.klatka({ dodola, plonacyPalec: palec }, DT).syk;
+    spr('po CZAS_GASZENIA gaśnie: 1 jednostka Syku', suma === 1 && palec.stan === 'BEZCZYNNY');
+    spr('obłoczek pary tam, gdzie płonął', syki.length === 1 && syki[0].x === 0.5);
+    spr('po zgaszeniu przygaszenie wraca do 0', palec.przygaszenie === 0);
+
+    const mzawka = { pada: true, natezenie: 0.1, syk: () => true };
+    const p2 = { stan: 'PLONIE', przygaszenie: 0, zgasDeszczem: () => { throw new Error('nie wolno'); } };
+    const r2 = new ReakcjeTechnik();
+    for (let i = 0; i < 120; i++) r2.klatka({ dodola: mzawka, plonacyPalec: p2 }, DT);
+    spr('mżawka (poniżej PROG_GASZENIA) palca nie rusza', p2.stan === 'PLONIE' && p2.przygaszenie === 0);
+
+    const p3 = { stan: 'PLONIE', przygaszenie: 0.7, zgasDeszczem: () => { throw new Error('nie wolno'); } };
+    new ReakcjeTechnik().klatka({ dodola: { pada: false, natezenie: 1 }, plonacyPalec: p3 }, DT);
+    spr('bez deszczu przygaszenie zerowane', p3.przygaszenie === 0);
+    const ogniki = { aktywny: true, punkty: () => [{ x: 1, y: 1 }], zgasDeszczem: () => { throw new Error('ogniki nie gasną'); } };
+    let rzucil = false;
+    try { for (let i = 0; i < 90; i++) new ReakcjeTechnik().klatka({ dodola, bledneOgniki: ogniki }, DT); } catch { rzucil = true; }
+    spr('Błędnych Ogników deszcz nie gasi (decyzja właściciela)', !rzucil);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

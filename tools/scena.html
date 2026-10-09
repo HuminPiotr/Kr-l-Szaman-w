@@ -465,7 +465,7 @@ function rysujKlatke(dt, frame) {
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
     dodola.update(frame, undefined, dt);   // moc nieokreślona = bez limitu (stanowisko)
     dodola.updateAndDraw(ctx, kontekstTechnik, dt);
-    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola }, dt);
+    reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola, plonacyPalec }, dt);
 
     ctx.restore();
     ekran.dokoncz(ctx, canvas.width, canvas.height, dt);

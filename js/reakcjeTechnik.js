@@ -23,6 +23,9 @@
  *  - BURZA W DESZCZU: Dodola + (Łuk Peruna albo piorun Gromu w Ziemię) - ten
  *    sam rytm błysków co Burza w mgle; Grzmot błyska raz, w klatce wybuchu.
  *    Krople w zasięgu wyładowania zapalają się jego światłem.
+ *  - SYK: deszcz Dodoli (od PROG_GASZENIA natężenia) przygasza Płonący Palec
+ *    przez CZAS_GASZENIA, potem go gasi z obłoczkiem pary. TYLKO palec - Błędne
+ *    Ogniki i płonący dym deszcz omija (decyzja właściciela gry).
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do
  * punkty.reakcja() z literalnymi id (strażnik w tools/test-punkty.mjs).
@@ -32,7 +35,9 @@
 export const NASTAWY = {
     ODSTEP_PRZEWODZENIA: 0.3,               // s
     BLYSK_ODSTEP_MIN: 0.06, BLYSK_ODSTEP_MAX: 0.15,   // s
-    SILA_BLYSKU_LUK: 0.8, SILA_BLYSKU_GROM: 1.0
+    SILA_BLYSKU_LUK: 0.8, SILA_BLYSKU_GROM: 1.0,
+    PROG_GASZENIA: 0.3,     // natężenie deszczu, od którego palec gaśnie (mżawka go oszczędza)
+    CZAS_GASZENIA: 1.0      // s przygasania przed zgaszeniem
 };
 
 const punktOk = (p) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -55,19 +60,20 @@ export class ReakcjeTechnik {
         this._doBlysku = 0;
         this._teczaPozostalo = 0;   // do wykrycia zapalenia Tęczy (zbocze)
         this._doBlyskuDeszczu = 0;
+        this._deszczNaPalcu = 0;
     }
 
     /**
-     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola}} t  instancje technik
+     * @param {{lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola, plonacyPalec}} t  instancje technik
      * @param {number} dt  s
      * @param {() => number} [los]  wstrzykiwany do testów
-     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number, teczaPoDeszczu:number, burzaWDeszczu:number}}
+     * @returns {{przewodzenie:number, burzaWMgle:number, rozdarcie:number, zawianie:number, latarnie:number, wirOgnikow:number, teczaPoDeszczu:number, burzaWDeszczu:number, syk:number}}
      */
     klatka(t, dt, los = Math.random) {
         const N = NASTAWY;
-        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0, teczaPoDeszczu: 0, burzaWDeszczu: 0 };
+        const wynik = { przewodzenie: 0, burzaWMgle: 0, rozdarcie: 0, zawianie: 0, latarnie: 0, wirOgnikow: 0, teczaPoDeszczu: 0, burzaWDeszczu: 0, syk: 0 };
         const krok = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki, tecza, dodola } = t ?? {};
+        const { lukPeruna: luk, kregiMokoszy: kregi, mglaMokoszy: mgla, piorun, grzmot, kurzawa, zawierucha, bledneOgniki: ogniki, tecza, dodola, plonacyPalec: palec } = t ?? {};
 
         // --- Przewodzenie ---
         const geom = luk?.aktywny && kregi?.aktywny ? kregi.geometria?.() : null;
@@ -157,6 +163,25 @@ export class ReakcjeTechnik {
         }
         if (dodola?.pada && punktOk(wybuch) && !wynik.burzaWDeszczu) {
             if (dodola.rozblysk?.(wybuch, Number.isFinite(wybuch.sila) ? wybuch.sila : 1)) wynik.burzaWDeszczu = 1;
+        }
+
+        // --- Syk --- (przygaszenie czyta palec w następnej klatce - js/plonacyPalec.js)
+        const leje = !!dodola?.pada && Number.isFinite(dodola.natezenie) && dodola.natezenie >= N.PROG_GASZENIA;
+        if (palec && leje && palec.stan === 'PLONIE') {
+            this._deszczNaPalcu += krok;
+            palec.przygaszenie = Math.min(1, this._deszczNaPalcu / N.CZAS_GASZENIA);
+            if (this._deszczNaPalcu >= N.CZAS_GASZENIA) {
+                const gdzie = palec.zgasDeszczem?.();
+                if (gdzie) {
+                    dodola.syk?.(gdzie);
+                    wynik.syk = 1;
+                }
+                this._deszczNaPalcu = 0;
+                palec.przygaszenie = 0;
+            }
+        } else {
+            this._deszczNaPalcu = 0;
+            if (palec) palec.przygaszenie = 0;
         }
         return wynik;
     }

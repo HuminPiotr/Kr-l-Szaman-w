@@ -336,4 +336,22 @@ t8c.uzbrój();
 spr('brak dłoni nie wywraca',
     t8c.update({ hands: [], pose: null, width: 1920, height: 1080, dt: DT, now: 0 }, 1.0, DT) === 0);
 
+console.log('\nDESZCZ DODOLI (reakcja Syk):');
+{
+    const pp = new PlonacyPalec();
+    spr('zgasDeszczem() gdy nie płonie = null, stan bez zmian', pp.zgasDeszczem() === null && pp.stan === 'BEZCZYNNY');
+    const pusta = { hands: [], pose: null, width: 1920, height: 1080, dt: DT, now: 0 };
+    const plonacy = (przyg) => {
+        const q = new PlonacyPalec();
+        q.stan = 'PLONIE'; q.zaczep = { x: 0.5, y: 0.3 }; q._utrzymanie = 1; q.przygaszenie = przyg;
+        q.update(pusta, 1.0, DT);
+        return q;
+    };
+    const bez = plonacy(0), z = plonacy(1);
+    spr(`przygaszenie zmniejsza płomień (${bez.sila.toFixed(2)} -> ${z.sila.toFixed(2)})`, bez.stan === 'PLONIE' && z.sila < bez.sila * 0.5 && z.sila > 0);
+    spr('przygaszenie NaN = bez zmian', plonacy(NaN).sila === bez.sila);
+    const g = z.zgasDeszczem();
+    spr('zgasDeszczem() zwraca miejsce i gasi jak gest', g && g.x === 0.5 && z.stan === 'BEZCZYNNY' && z.sila === 0 && z.zaczep === null);
+}
+
 process.exit(ok ? 0 : 1);

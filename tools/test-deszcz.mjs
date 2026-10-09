@@ -139,4 +139,16 @@ console.log('\nBURZA W DESZCZU (błysk kropel):');
     spr('błysk gaśnie po BLYSK_ZYCIE', d._blysk === null);
 }
 
+console.log('\nSYK (obłoczek pary):');
+{
+    const d = new Dodola();
+    spr('syk(null/NaN) = false', d.syk(null) === false && d.syk({ x: NaN, y: 0 }) === false);
+    spr('syk() działa także po deszczu (palec gaśnie na końcu)', d.syk({ x: 0.5, y: 0.3 }) === true && d.aktywny);
+    let rzucil = false;
+    try { for (let i = 0; i < 10; i++) d.updateAndDraw(atrapaCtx(), kontekst(klatka()), DT); } catch (e) { rzucil = e; }
+    spr('rysowanie pary nie rzuca', !rzucil);
+    for (let i = 0; i < 90; i++) d.updateAndDraw(null, kontekst(klatka()), DT);
+    spr('para znika po PARA_ZYCIE', d._para.length === 0 && !d.aktywny);
+}
+
 process.exit(ok ? 0 : 1);

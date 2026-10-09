@@ -25,6 +25,7 @@ import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 import { Zaklinanie } from './zaklinanie.js';
 import { FalowanieRamion, jakoscFali } from './ruchy/falowanieRamion.js';
+import { MANIFEST, obraz, wypalTintowany } from './assety.js';
 
 export const NASTAWY = {
     KROPLI_MIN: 12, KROPLI_MAX: 420,   // liczba ∝ natężenie^WYKLADNIK
@@ -53,6 +54,13 @@ export const NASTAWY = {
     BLYSK_ZYCIE: 0.12,                 // s
     ZASIEG_BLYSKU: 5,                  // skala × to
     BARWA_BLYSKU: [225, 235, 255],
+    // Reakcja Syk: obłoczek pary w miejscu zgaszonego Płonącego Palca (tekstury mgły, source-over).
+    PARA_KLEBOW: 6,
+    PARA_ZYCIE: 1.1,                   // s
+    PARA_ROZMIAR_OD: 0.35, PARA_ROZMIAR_DO: 1.1,   // skala × to - kłąb rośnie
+    PARA_WZNOSZENIE: 0.9,              // skala/s
+    PARA_ALFA: 0.55,
+    BARWA_PARY: [236, 238, 240],
     PRZYCIEMNIENIE: 0.16,              // alfa przy pełnej ulewie (∝ natężenie²)
     BARWA_PRZYCIEMNIENIA: [15, 25, 40]
 };
@@ -113,6 +121,27 @@ export class Dodola {
         this.rozpryskiKlatki = 0;     // diagnostyka
         this._barwaTeczy = null;      // reakcja Tęcza po deszczu - ważna do najbliższego rysowania
         this._blysk = null;           // { x, y, sila, wiek } - reakcja Burza w deszczu
+        this._para = [];              // kłęby pary - reakcja Syk
+        this._W = 1920; this._H = 1080;
+    }
+
+    /**
+     * Reakcja Syk: obłoczek pary tam, gdzie deszcz zgasił Płonący Palec.
+     * @param {{x, y}} gdzie  ZNORMALIZOWANE (jak plonacyPalec.zaczep)
+     * @returns {boolean}
+     */
+    syk(gdzie) {
+        if (!gdzie || !Number.isFinite(gdzie.x) || !Number.isFinite(gdzie.y)) return false;
+        const N = NASTAWY;
+        const x = gdzie.x * this._W, y = gdzie.y * this._H;
+        for (let i = 0; i < N.PARA_KLEBOW; i++) {
+            this._para.push({
+                x: x + (Math.random() * 2 - 1) * 6, y: y + (Math.random() * 2 - 1) * 6,
+                dryf: (Math.random() * 2 - 1) * 0.35, wiek: -i * 0.04,
+                obrot: Math.random() * Math.PI * 2, wariant: Math.floor(Math.random() * MANIFEST.mgla.length)
+            });
+        }
+        return true;
     }
 
     /** Reakcja Burza w deszczu: krople błyskają od `zrodlo` (px). @returns {boolean} */
@@ -132,7 +161,9 @@ export class Dodola {
     get natezenie() { return this.zaklinanie.natezenie; }
 
     /** Pada albo jeszcze dopadają ostatnie krople. */
-    get aktywny() { return this.zaklinanie.aktywny || this._krople.length > 0 || this._kropelki.length > 0; }
+    get aktywny() {
+        return this.zaklinanie.aktywny || this._krople.length > 0 || this._kropelki.length > 0 || this._para.length > 0;
+    }
     /** Gracz jest w stanie zaklinania (do reakcji i punktów). */
     get pada() { return this.zaklinanie.aktywny; }
 
@@ -159,6 +190,7 @@ export class Dodola {
         const N = NASTAWY;
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
+        this._W = W; this._H = H;
         const zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
         const sk = zaczep.skala;
@@ -171,6 +203,11 @@ export class Dodola {
             this._blysk.wiek += krok;
             if (this._blysk.wiek >= N.BLYSK_ZYCIE) this._blysk = null;
         }
+        for (const p of this._para) {
+            p.wiek += krok;
+            if (p.wiek > 0) { p.y -= N.PARA_WZNOSZENIE * sk * krok; p.x += p.dryf * sk * krok; }
+        }
+        this._para = this._para.filter(p => p.wiek < N.PARA_ZYCIE);
 
         if (!ctx) return;
         this._rysuj(ctx, k, W, H, sk, n);
@@ -296,6 +333,26 @@ export class Dodola {
         ctx.restore();
     }
 
+    _rysujPare(ctx, sk) {
+        const N = NASTAWY;
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        for (const p of this._para) {
+            if (p.wiek <= 0) continue;
+            const img = obraz(MANIFEST.mgla[p.wariant]);
+            if (!img) continue;
+            const u = p.wiek / N.PARA_ZYCIE;
+            const r = sk * lerp(N.PARA_ROZMIAR_OD, N.PARA_ROZMIAR_DO, u);
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.obrot + u * 0.6);
+            ctx.globalAlpha = clamp01(N.PARA_ALFA * Math.min(1, p.wiek / 0.12) * (1 - u));
+            ctx.drawImage(wypalTintowany(img, N.BARWA_PARY, 256), -r / 2, -r / 2, r, r);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
     _rysuj(ctx, k, W, H, sk, n) {
         const N = NASTAWY;
         const [r, g, b] = N.BARWA;
@@ -322,6 +379,7 @@ export class Dodola {
         // Przód: reszta kropel i wszystkie rozpryski.
         kreski(ctx, this._krople.filter(c => !c.tyl));
         if (this._blysk) this._rysujBlysk(ctx, sk);
+        if (this._para.length) this._rysujPare(ctx, sk);
         if (this._kropelki.length) {
             ctx.save();
             ctx.globalCompositeOperation = 'source-over';

@@ -180,6 +180,21 @@ export class PlonacyPalec {
         this._czasNiewidzenia = 0; // ile trwa brak JAKIEJKOLWIEK dłoni [s]
         this._utrzymanie = 0;      // wygładzone wyprostowanie płonącego palca
         this.barkiNiepewne = false; // diagnostyka: czy poza dała pewne barki
+        // 0..1 - deszcz Dodoli przygasza płomień (ustawia js/reakcjeTechnik.js
+        // co klatkę; 0 = bez deszczu). Działa na siłę, nie na stan.
+        this.przygaszenie = 0;
+    }
+
+    /**
+     * Reakcja Syk (js/reakcjeTechnik.js): deszcz gasi płomień. Ta sama droga
+     * co zgaszenie gestem - ponowne zapalenie wymaga combo Grom w Ogniu.
+     * @returns {{x, y}|null}  gdzie płonął (znormalizowane) albo null, gdy nie płonął
+     */
+    zgasDeszczem() {
+        if (this.stan !== 'PLONIE') return null;
+        const gdzie = this.zaczep ? { ...this.zaczep } : null;
+        this._zgas();
+        return gdzie;
     }
 
     /** Kombos złożony - technika uzbrojona. Bez licznika ważności. */
@@ -277,6 +292,8 @@ export class PlonacyPalec {
         // Siła słabnie razem z resztką mocy - płomień dopala się, zamiast
         // zniknąć w jednej klatce.
         this.sila = Math.max(0.25, Math.min(1, moc * 3));
+        const p = Number.isFinite(this.przygaszenie) ? Math.max(0, Math.min(1, this.przygaszenie)) : 0;
+        this.sila *= 1 - 0.75 * p;
 
         return Math.min(moc, KOSZT_NA_SEKUNDE * krok);
     }
