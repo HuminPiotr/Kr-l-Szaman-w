@@ -110,6 +110,11 @@ details[open] > summary { border-bottom: 1px solid var(--linia); }
         <input type="range" id="s-kolysanie" min="0" max="1" step="0.01" value="0.5">
     </label>
     <div class="checkbox-wiersz"><input type="checkbox" id="chk-poza" checked><label for="chk-poza">Poza widoczna (frame.pose)</label></div>
+
+    <h2>Dodola (deszcz)</h2>
+    <label class="suwak">Jakość fali (zamiast ramion) <span class="wart" id="w-deszcz">0.5</span>
+        <input type="range" id="s-deszcz" min="0" max="1" step="0.01" value="0.5">
+    </label>
 </div>
 
 <div id="srodek">
@@ -192,6 +197,7 @@ const { Bania, NASTAWY: NASTAWY_BANIA } = await import('./js/bania.js');
 const { Grzmot, NASTAWY: NASTAWY_GRZMOTU } = await import('./js/grzmot.js');
 const { Zawierucha, NASTAWY: NASTAWY_ZAWIERUCHY } = await import('./js/zawierucha.js');
 const { BledneOgniki, NASTAWY: NASTAWY_OGNIKOW } = await import('./js/bledneOgniki.js');
+const { Dodola, NASTAWY: NASTAWY_DESZCZU } = await import('./js/deszcz.js');
 const { ReakcjeTechnik } = await import('./js/reakcjeTechnik.js');
 
 zaladujFont();
@@ -225,6 +231,9 @@ const bania = new Bania();
 const grzmot = new Grzmot();
 const zawierucha = new Zawierucha();
 const bledneOgniki = new BledneOgniki();
+const dodola = new Dodola();
+// Stanowisko nie ma worldLandmarks - jakość fali z suwaka, nie z falowania ramion.
+dodola.wymusJakosc = 0.5;
 const reakcjeTechnik = new ReakcjeTechnik();
 const kombosy = new KomboSilnik();
 const sekwencja = new PasekSekwencji(null, null);
@@ -246,6 +255,7 @@ const MODULY_NASTAWY = [
     { etykieta: 'Grzmot', plik: 'js/grzmot.js', nastawy: NASTAWY_GRZMOTU, instancja: grzmot },
     { etykieta: 'Zawierucha', plik: 'js/zawierucha.js', nastawy: NASTAWY_ZAWIERUCHY, instancja: zawierucha },
     { etykieta: 'Błędne Ogniki', plik: 'js/bledneOgniki.js', nastawy: NASTAWY_OGNIKOW, instancja: bledneOgniki },
+    { etykieta: 'Dodola (deszcz)', plik: 'js/deszcz.js', nastawy: NASTAWY_DESZCZU, instancja: dodola },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
     { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
@@ -371,7 +381,7 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola
 };
 const worekPieczeci = { efekty, runy, aura };
 
@@ -453,6 +463,8 @@ function rysujKlatke(dt, frame) {
     for (const sila of grzmot.dudnienia) ekran.uderz(sila);
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
+    dodola.update(frame, undefined, dt);   // moc nieokreślona = bez limitu (stanowisko)
+    dodola.updateAndDraw(ctx, kontekstTechnik, dt);
     reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki }, dt);
 
     ctx.restore();
@@ -597,6 +609,7 @@ const TECHNIKI = [
     { uzbraja: 'grzmot', nazwa: 'Grzmot', sekwencja: ['perun', 'stribog'] },
     { uzbraja: 'zawierucha', nazwa: 'Zawierucha', sekwencja: ['weles', 'stribog'] },
     { uzbraja: 'bledneOgniki', nazwa: 'Błędne Ogniki', sekwencja: ['weles', 'swarog'] },
+    { uzbraja: 'dodola', nazwa: 'Dodola (deszcz)', sekwencja: ['mokosz', 'mokosz', 'stribog'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {
@@ -624,6 +637,10 @@ document.getElementById('chk-poza').onchange = (e) => { stan.pozaWidoczna = e.ta
 document.getElementById('s-kolysanie').oninput = (e) => {
     stan.kolysanie = parseFloat(e.target.value);
     document.getElementById('w-kolysanie').textContent = stan.kolysanie.toFixed(2);
+};
+document.getElementById('s-deszcz').oninput = (e) => {
+    dodola.wymusJakosc = parseFloat(e.target.value);
+    document.getElementById('w-deszcz').textContent = dodola.wymusJakosc.toFixed(2);
 };
 document.getElementById('btn-play-pauza').onclick = (e) => {
     stan.live = !stan.live;

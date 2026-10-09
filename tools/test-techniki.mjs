@@ -47,6 +47,7 @@ function zrobWorek(log) {
         lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
         bania: szpieg('bania'),
+        dodola: szpieg('dodola'),
     };
 }
 
@@ -118,6 +119,8 @@ testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna
 testTechnika('bania', ['mokosz', 'swarog'], ['bania.zapal'], 'Bania');
 
 testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
+
+testTechnika('dodola', ['mokosz', 'mokosz', 'stribog'], ['dodola.zapal'], 'Dodola');
 
 // --- 3. Zaplon dostaje właściwą barwę per technika ---
 console.log('\nBARWA ZAPŁONU PER TECHNIKA:');

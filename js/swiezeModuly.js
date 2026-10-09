@@ -43,13 +43,14 @@ import { Bania } from './bania.js';
 import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
+import { Dodola } from './deszcz.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
     'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'reakcjeTechnik'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'reakcjeTechnik'
 ];
 
 /**
@@ -88,6 +89,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         grzmot: new Grzmot(),
         zawierucha: new Zawierucha(),
         bledneOgniki: new BledneOgniki(),
+        dodola: new Dodola(),
         reakcjeTechnik: new ReakcjeTechnik()
     };
 }

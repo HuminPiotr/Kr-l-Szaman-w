@@ -379,6 +379,19 @@ export class DebugHud {
         }
 
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
+        // Dodola: natężenie deszczu i składniki miary falowania - stąd stroić
+        // NASTAWY w js/ruchy/falowanieRamion.js i js/zaklinanie.js.
+        const dd = stats.dodola;
+        if (dd && dd.stan && dd.stan !== 'BEZCZYNNY') {
+            lines.push(`deszcz ${dd.stan}  ${this._num(dd.natezenie)}   ${this._bar(dd.natezenie)}`);
+            lines.push(`      jakość ${this._num(dd.jakosc)}   ${this._bar(dd.jakosc)}`);
+            const s = dd.skladniki;
+            lines.push(s
+                ? `      rozp ${this._num(s.rozpostarcie)} ampl ${this._num(s.amplituda)} kor ${this._num(s.korelacja)} zgięcie ${this._num(s.zgiecie)} opóźn ${this._num(s.opoznienie)}`
+                : '      (miara: brak ramion w kadrze albo okno się zbiera)');
+        } else if (dd?.powodKonca) {
+            lines.push(`deszcz — ostatni koniec: ${dd.powodKonca}`);
+        }
         // Wyniki postaw i stan pierścienia. Progi w pieczecie.js są ZGADNIĘTE
         // i stroi się je właśnie stąd - liczba "0.62" przy konkretnej pozycji
         // ciała jest jedynym sposobem, żeby ustawić PROG_POSTAWY sensownie.

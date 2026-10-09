@@ -54,6 +54,17 @@ export const KOMBOSY = [
     // routuje tę gałąź osobno.
     { id: 'tecza', nazwa: 'Wstęga Mokoszy',
       sekwencja: ['swarog', 'mokosz', 'stribog'], uzbraja: 'tecza' },
+    // WARIANTY TĘCZY Z PRZYTRZYMANĄ WODĄ (2026-10-09, Dodola). Trzymana dłużej
+    // miska składa się ponownie (js/pieczecie.js - pierścień zeruje się i
+    // zaczyna od nowa), a ogon mokosz->mokosz->stribog to Dodola. Bez tych
+    // wpisów Tęcza z odrobinę za długo trzymaną wodą dawałaby deszcz. Zasada:
+    // ogień na początku -> Tęcza, bez ognia -> deszcz. MUSZĄ stać przed Dodolą
+    // (_dopasuj bierze pierwszy pasujący); `wariant` zwalnia je ze strażnika
+    // prefiksów/sufiksów w test-kombosy.mjs, który pilnuje za to kolejności.
+    { id: 'tecza', nazwa: 'Wstęga Mokoszy', wariant: true,
+      sekwencja: ['swarog', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza' },
+    { id: 'tecza', nazwa: 'Wstęga Mokoszy', wariant: true,
+      sekwencja: ['swarog', 'mokosz', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza' },
 
     // Ogień -> błyskawica. Nazwa mówi to, co robi sekwencja.
     { id: 'gromWOgniu', nazwa: 'Grom w Ogniu',
@@ -174,7 +185,16 @@ export const KOMBOSY = [
     // trójki. Łańcuchy: + perun = Grom w Ogniu; + stribog + swarog =
     // Okadzenie, którego dym ogniki od razu podpalą.
     { id: 'bledneOgniki', nazwa: 'Błędne Ogniki',
-      sekwencja: ['weles', 'swarog'], uzbraja: 'bledneOgniki' }
+      sekwencja: ['weles', 'swarog'], uzbraja: 'bledneOgniki' },
+
+    // DODOLA (2026-10-09, spec 2026-10-09-dodola-zaklinanie-design.md):
+    // nabierasz wody do miski (woda trzymana dłużej = druga woda), wiatr ją
+    // unosi - pierwsza technika ZAKLINANIA: natężenie deszczu steruje jakość
+    // falowania rozpostartych ramion (js/deszcz.js). Para mokosz->mokosz nie
+    // jest żadną dwójką, mokosz->stribog też - po drodze nic nie odpala.
+    // Kolizja z Tęczą rozwiązana wariantami wyżej.
+    { id: 'dodola', nazwa: 'Dodola',
+      sekwencja: ['mokosz', 'mokosz', 'stribog'], uzbraja: 'dodola' }
 ];
 
 export class KomboSilnik {

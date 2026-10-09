@@ -95,8 +95,13 @@ export function pierwszeTrafienie(x0, y0, x1, y1, maska, szer, wys, fit) {
 
 export class Dodola {
     constructor() {
-        this.zaklinanie = new Zaklinanie({ miara: new FalowanieRamion(), jakosc: jakoscFali });
-        this.wymusNatezenie = null;   // tylko stanowisko VFX (tools/scena.html) - suwak zamiast fali
+        // wymusJakosc: tylko stanowisko VFX (tools/scena.html) - suwak udaje jakość
+        // fali, a natężenie narasta/opada z prawdziwej obwiedni zaklinania.
+        this.wymusJakosc = null;
+        this.zaklinanie = new Zaklinanie({
+            miara: new FalowanieRamion(),
+            jakosc: (m) => (Number.isFinite(this.wymusJakosc) ? this.wymusJakosc : jakoscFali(m))
+        });
         this._krople = [];
         this._kropelki = [];
         this._kotwica = new Kotwica(8);
@@ -104,12 +109,7 @@ export class Dodola {
         this.rozpryskiKlatki = 0;     // diagnostyka
     }
 
-    get natezenie() {
-        if (this.wymusNatezenie !== null && Number.isFinite(this.wymusNatezenie)) {
-            return this.zaklinanie.aktywny ? clamp01(this.wymusNatezenie) : 0;
-        }
-        return this.zaklinanie.natezenie;
-    }
+    get natezenie() { return this.zaklinanie.natezenie; }
 
     /** Pada albo jeszcze dopadają ostatnie krople. */
     get aktywny() { return this.zaklinanie.aktywny || this._krople.length > 0 || this._kropelki.length > 0; }

@@ -41,13 +41,13 @@ console.log('\nCYKL DESZCZU:');
     d.updateAndDraw(atrapaCtx(), kontekst(klatka()), DT);
     spr('bez zapalenia: nieaktywny, zero kropel', !d.aktywny && d.diagnostyka.krople === 0);
     d.zapal();
-    d.wymusNatezenie = 1;
-    for (let i = 0; i < 60; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    d.wymusJakosc = 1;
+    for (let i = 0; i < 240; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
     const ulewa = d.diagnostyka.krople;
-    spr(`ulewa po 1 s: dużo kropel (${ulewa}), nie więcej niż KROPLI_MAX`, ulewa > 300 && ulewa <= N.KROPLI_MAX);
-    d.wymusNatezenie = 0.1;
-    for (let i = 0; i < 120; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
-    spr(`mżawka: mało kropel (${d.diagnostyka.krople})`, d.diagnostyka.krople < 60);
+    spr(`ulewa po 4 s dobrej fali: dużo kropel (${ulewa}), nie więcej niż KROPLI_MAX`, ulewa > 300 && ulewa <= N.KROPLI_MAX);
+    d.wymusJakosc = 0;
+    for (let i = 0; i < 240; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    spr(`zła fala przez 4 s -> mżawka: mało kropel (${d.diagnostyka.krople})`, d.diagnostyka.krople < 60);
     let rzucil = false;
     try { d.updateAndDraw(atrapaCtx(), kontekstZMaska(maskaPasa()), DT); } catch (e) { rzucil = e; }
     spr('rysowanie (atrapa ctx, z maską) nie rzuca', !rzucil);
@@ -57,7 +57,7 @@ console.log('\nROZPRYSKI NA CIELE:');
 {
     const d = new Dodola();
     d.zapal();
-    d.wymusNatezenie = 1;
+    d.wymusJakosc = 1;
     const k = kontekstZMaska(maskaPasa());
     let rozpryskow = 0, maxNaKlatke = 0, ponizejPasa = 0;
     for (let i = 0; i < 180; i++) {
@@ -83,12 +83,12 @@ console.log('\nKONIEC:');
 {
     const d = new Dodola();
     d.zapal();
-    d.wymusNatezenie = 1;
-    for (let i = 0; i < 60; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
+    d.wymusJakosc = 1;
+    for (let i = 0; i < 240; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
     d.zaklinanie.stan = 'BEZCZYNNY';
-    for (let i = 0; i < 120; i++) d.updateAndDraw(null, kontekst(klatka()), DT);
+    for (let i = 0; i < 120; i++) { d.update(klatka(), 1, DT); d.updateAndDraw(null, kontekst(klatka()), DT); }
     spr('po końcu zaklinania krople dopadają i znikają', !d.aktywny && d.diagnostyka.krople === 0);
-    spr('wymuszone natężenie przy bezczynnym = 0', d.natezenie === 0);
+    spr('natężenie przy bezczynnym = 0', d.natezenie === 0);
 }
 
 console.log('\nODPORNOŚĆ:');
