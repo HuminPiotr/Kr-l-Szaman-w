@@ -111,7 +111,8 @@ const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
  *                   (w grze - zero zamiast NaN; w teście - czerwony strażnik)
  */
 export function wartoscTechniki(kombo) {
-    const s = kombo?.sekwencja;
+    // Warianty (Tęcza z przytrzymaną wodą, js/kombosy.js) płacą jak wpis bazowy.
+    const s = kombo?.sekwencjaPunktow ?? kombo?.sekwencja;
     if (!Array.isArray(s) || !s.length) return 0;
     let suma = 0;
     for (const id of s) {

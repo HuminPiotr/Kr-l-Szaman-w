@@ -351,7 +351,8 @@ console.log('\nDESZCZ DODOLI (reakcja Syk):');
     spr(`przygaszenie zmniejsza płomień (${bez.sila.toFixed(2)} -> ${z.sila.toFixed(2)})`, bez.stan === 'PLONIE' && z.sila < bez.sila * 0.5 && z.sila > 0);
     spr('przygaszenie NaN = bez zmian', plonacy(NaN).sila === bez.sila);
     const g = z.zgasDeszczem();
-    spr('zgasDeszczem() zwraca miejsce i gasi jak gest', g && g.x === 0.5 && z.stan === 'BEZCZYNNY' && z.sila === 0 && z.zaczep === null);
+    spr('zgasDeszczem() zwraca miejsce i gasi płomień', g && g.x === 0.5 && z.sila === 0 && z.zaczep === null);
+    spr('...ale technika zostaje uzbrojona (GOTOWY) - zapalenie zwykłym gestem', z.stan === 'GOTOWY');
 }
 
 process.exit(ok ? 0 : 1);

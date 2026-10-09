@@ -186,14 +186,18 @@ export class PlonacyPalec {
     }
 
     /**
-     * Reakcja Syk (js/reakcjeTechnik.js): deszcz gasi płomień. Ta sama droga
-     * co zgaszenie gestem - ponowne zapalenie wymaga combo Grom w Ogniu.
+     * Reakcja Syk (js/reakcjeTechnik.js): deszcz gasi płomień, ale technika
+     * zostaje UZBROJONA (GOTOWY) - po deszczu gracz zapala palec ponownie
+     * zwykłym gestem, bez powtarzania combo (spec Dodoli, decyzja właściciela).
+     * Zapalenie w trakcie ulewy znów zgaśnie; Syk ma serię (js/punkty.js),
+     * więc to nie jest farma punktów.
      * @returns {{x, y}|null}  gdzie płonął (znormalizowane) albo null, gdy nie płonął
      */
     zgasDeszczem() {
         if (this.stan !== 'PLONIE') return null;
         const gdzie = this.zaczep ? { ...this.zaczep } : null;
         this._zgas();
+        this.stan = 'GOTOWY';
         return gdzie;
     }
 

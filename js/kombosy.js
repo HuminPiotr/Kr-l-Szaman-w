@@ -61,10 +61,14 @@ export const KOMBOSY = [
     // ogień na początku -> Tęcza, bez ognia -> deszcz. MUSZĄ stać przed Dodolą
     // (_dopasuj bierze pierwszy pasujący); `wariant` zwalnia je ze strażnika
     // prefiksów/sufiksów w test-kombosy.mjs, który pilnuje za to kolejności.
+    // `sekwencjaPunktow`: wariant jest WART tyle co zwykła Tęcza (js/punkty.js
+    // wartoscTechniki) - przytrzymana miska nie może płacić więcej.
     { id: 'tecza', nazwa: 'Wstęga Mokoszy', wariant: true,
-      sekwencja: ['swarog', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza' },
+      sekwencja: ['swarog', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza',
+      sekwencjaPunktow: ['swarog', 'mokosz', 'stribog'] },
     { id: 'tecza', nazwa: 'Wstęga Mokoszy', wariant: true,
-      sekwencja: ['swarog', 'mokosz', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza' },
+      sekwencja: ['swarog', 'mokosz', 'mokosz', 'mokosz', 'stribog'], uzbraja: 'tecza',
+      sekwencjaPunktow: ['swarog', 'mokosz', 'stribog'] },
 
     // Ogień -> błyskawica. Nazwa mówi to, co robi sekwencja.
     { id: 'gromWOgniu', nazwa: 'Grom w Ogniu',

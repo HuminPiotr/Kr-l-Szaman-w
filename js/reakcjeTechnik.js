@@ -24,7 +24,8 @@
  *    sam rytm błysków co Burza w mgle; Grzmot błyska raz, w klatce wybuchu.
  *    Krople w zasięgu wyładowania zapalają się jego światłem.
  *  - SYK: deszcz Dodoli (od PROG_GASZENIA natężenia) przygasza Płonący Palec
- *    przez CZAS_GASZENIA, potem go gasi z obłoczkiem pary. TYLKO palec - Błędne
+ *    przez CZAS_GASZENIA, potem go gasi z obłoczkiem pary (palec zostaje uzbrojony -
+ *    po deszczu zapala się zwykłym gestem). TYLKO palec - Błędne
  *    Ogniki i płonący dym deszcz omija (decyzja właściciela gry).
  *
  * klatka() zwraca JEDNOSTKI reakcji z tej klatki; main.js przekazuje je do

@@ -32,6 +32,8 @@ console.log('\nWARTOŚCI Z SPECU:');
 spr(`Kołowrót = 320 (${wartoscTechniki(kombo('kolowrot'))})`, wartoscTechniki(kombo('kolowrot')) === 320);
 spr(`Okadzenie = 460 (${wartoscTechniki(kombo('dym'))})`, wartoscTechniki(kombo('dym')) === 460);
 spr(`Grom w Ogniu = 280 (${wartoscTechniki(kombo('gromWOgniu'))})`, wartoscTechniki(kombo('gromWOgniu')) === 280);
+spr('warianty (Tęcza z przytrzymaną wodą) warte tyle co technika bazowa',
+    KOMBOSY.filter(k => k.wariant).every(w => wartoscTechniki(w) === wartoscTechniki(KOMBOSY.find(k => k.id === w.id && !k.wariant))));
 
 console.log('\nTANIEC:');
 const t = new Punktacja();
