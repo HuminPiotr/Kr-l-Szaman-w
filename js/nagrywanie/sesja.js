@@ -74,6 +74,45 @@ export const SCENARIUSZ = [
     }
 ];
 
+// Scenariusz pod miarę falistości (zaklinanie deszczu, 2026-10-09) - klawisz F.
+// Trzy jakości TEGO SAMEGO ruchu w tej samej postawie plus dwie próbki
+// negatywne. Miara ma rozdzielić wężowe od sztywnego i niedbałego - bez
+// nagrań nie wiadomo, czy szum MediaPipe w ogóle na to pozwala.
+export const SCENARIUSZ_FALOWANIE = [
+    {
+        nr: 1, id: 'falowanie-wezowe', nazwa: 'FALA WĘŻOWA',
+        opis: 'Ramiona rozpostarte na boki. Fala płynie od barku przez łokieć do palców - miękko, jak wąż',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej i szerzej', 'szybciej, drobniejsza fala']
+    },
+    {
+        nr: 2, id: 'falowanie-sztywne', nazwa: 'SKRZYDŁA',
+        opis: 'Ramiona rozpostarte, proste jak skrzydła. Machaj góra-dół CAŁYM ramieniem, łokcie zablokowane',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolno i szeroko', 'szybko']
+    },
+    {
+        nr: 3, id: 'falowanie-niedbale', nazwa: 'BYLE JAK',
+        opis: 'Ramiona mniej więcej na boki. Ruszaj nimi niedbale - drobno, nierówno, z szarpnięciami',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['niedbale', 'szarpane zrywy', 'ledwo ruszaj']
+    },
+    {
+        nr: 4, id: 'rozpostarte-bez-ruchu', nazwa: 'BEZ RUCHU',
+        opis: 'Ramiona rozpostarte na boki i NIERUCHOME - próbka negatywna',
+        powtorzenia: 1, czasS: 8,
+        wskazowki: ['trzymaj spokojnie']
+    },
+    {
+        // NIE 'taniec': test-rozdzielnosc.mjs bierze etykietę z NAJŚWIEŻSZEGO
+        // pliku, więc ten plik po cichu podmieniłby mu próbkę tańca.
+        nr: 5, id: 'taniec-falowanie', nazwa: 'TANIEC',
+        opis: 'Tańcz swobodnie, jak zwykle - próbka negatywna',
+        powtorzenia: 1, czasS: 30,
+        wskazowki: ['tak, jak tańczysz normalnie']
+    }
+];
+
 export class SesjaNagraniowa {
     constructor({ scenariusz = SCENARIUSZ } = {}) {
         this.scenariusz = scenariusz;
