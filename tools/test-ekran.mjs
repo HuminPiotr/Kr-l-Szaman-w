@@ -9,7 +9,7 @@
  * czas PRZED guardem, więc zegar da się napędzić bez document, którego
  * nie ma w Node. Ten sam wzorzec co tools/test-zaplon.mjs / test-aura-impuls.mjs.
  */
-import { Ekran, obwiedniaUderzenia, obwiedniaFali, NASTAWY } from '../js/ekran.js';
+import { Ekran, obwiedniaUderzenia, obwiedniaFali, obwiedniaCiepla, przesuniecieCiepla, NASTAWY } from '../js/ekran.js';
 
 let ok = true;
 const spr = (o, w) => { console.log(`  ${w ? '✓' : '✗'} ${o}`); if (!w) ok = false; };
@@ -141,6 +141,55 @@ console.log('\nNASTAWY (mutowalność dla stanowiska):');
     NASTAWY.CZAS_TRWANIA = domyslnyCzas;
 
     spr('wyczyscCache() istnieje i nie rzuca (no-op)', (e9.wyczyscCache(), true));
+}
+
+// --- FALA CIEPŁA (Okadzenie) - refrakcja od dołu kadru, bez koloru ---
+console.log('\nFALA CIEPŁA - obwiednia (funkcja czysta):');
+{
+    const o0 = obwiedniaCiepla(0), oSz = obwiedniaCiepla(0.25), o1 = obwiedniaCiepla(1);
+    spr(`p=0: pas jeszcze płaski, drganie zero (${o0.wys.toFixed(2)}, ${o0.sila.toFixed(2)})`, o0.wys < 0.05 && o0.sila < 0.05);
+    spr(`p=0.25: pas wysoko, drganie mocne (${oSz.wys.toFixed(2)}, ${oSz.sila.toFixed(2)})`, oSz.wys > 0.6 && oSz.sila > 0.6);
+    spr(`p=1: drganie wygasło (${o1.sila.toFixed(3)})`, o1.sila < 0.01);
+    spr('wys i sila w 0..1 na całej siatce', Array.from({ length: 101 }, (_, i) => obwiedniaCiepla(i / 100))
+        .every(o => o.wys >= 0 && o.wys <= 1 && o.sila >= 0 && o.sila <= 1));
+    const n = obwiedniaCiepla(NaN);
+    spr('NaN -> skończone wartości', Number.isFinite(n.wys) && Number.isFinite(n.sila));
+}
+
+console.log('\nFALA CIEPŁA - przesunięcie paska (funkcja czysta):');
+{
+    const H = 1080, wys = 600;
+    const maxNa = (y) => Math.max(...Array.from({ length: 200 }, (_, i) => Math.abs(przesuniecieCiepla(y, wys, i * 0.013, H))));
+    spr('na górnej granicy pasa i powyżej - zero', maxNa(wys) === 0 && maxNa(wys + 50) === 0);
+    const dol = maxNa(0), srodek = maxNa(wys * 0.5), gora = maxNa(wys * 0.9);
+    spr(`najmocniej przy dolnej krawędzi, słabnie ku górze (${dol.toFixed(1)} > ${srodek.toFixed(1)} > ${gora.toFixed(1)} px)`,
+        dol > srodek && srodek > gora && dol > 0);
+    spr(`amplituda w granicach NASTAWY (${dol.toFixed(1)} <= ${(NASTAWY.CIEPLO_AMPLITUDA_H * H).toFixed(1)} px)`,
+        dol <= NASTAWY.CIEPLO_AMPLITUDA_H * H + 1e-9);
+    spr('zmienia się w czasie (falowanie, nie stały skos)',
+        Math.abs(przesuniecieCiepla(40, wys, 0, H) - przesuniecieCiepla(40, wys, 0.2, H)) > 0.1);
+    spr('śmieci -> 0, bez NaN', przesuniecieCiepla(NaN, wys, 0, H) === 0 && przesuniecieCiepla(10, 0, 0, H) === 0
+        && przesuniecieCiepla(10, wys, NaN, H) === 0);
+}
+
+console.log('\nFALA CIEPŁA (stan):');
+{
+    const e = new Ekran();
+    spr('świeży Ekran - fala ciepła nieaktywna', e.cieploAktywne === false);
+    e.falaCiepla();
+    spr('falaCiepla() uruchamia', e.cieploAktywne === true);
+    przepusc(e, NASTAWY.CIEPLO_CZAS * 0.5);
+    spr('w połowie czasu dalej trwa', e.cieploAktywne === true);
+    e.falaCiepla();
+    przepusc(e, NASTAWY.CIEPLO_CZAS * 0.7);
+    spr('ponowne wywołanie restartuje zegar', e.cieploAktywne === true);
+    przepusc(e, NASTAWY.CIEPLO_CZAS * 0.4);
+    spr('po CIEPLO_CZAS wygasa', e.cieploAktywne === false);
+    const e2 = new Ekran();
+    e2.falaCiepla();
+    e2.dokoncz(null, 1920, 1080, DT);
+    e2.dokoncz({}, NaN, 1080, DT);
+    spr('dokoncz() z falą ciepła i ctx=null / NaN W nie wywala wyjątku', true);
 }
 
 process.exit(ok ? 0 : 1);

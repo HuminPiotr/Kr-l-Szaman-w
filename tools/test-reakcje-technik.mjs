@@ -80,5 +80,94 @@ console.log('\nODPORNOŚĆ:');
     spr('nowa instancja bezczynna', r._doPrzewodzenia === 0 && r._doBlysku === 0);
 }
 
+console.log('\nROZDARCIE (Grzmot w polu):');
+{
+    const pola = ({ mgla = false, kurzawa = false, wybuch = { x: 960, y: 550, skala: 200, sila: 1 } } = {}) => {
+        const log = [];
+        return { log, t: {
+            grzmot: { wybuch },
+            mglaMokoszy: { aktywny: mgla, rozepchnij: (z, s) => { log.push(['mgla.rozepchnij', z, s]); return true; }, rozblysk: () => true },
+            kurzawa: { aktywny: kurzawa, szarpnij: (s) => { log.push(['kurzawa.szarpnij', s]); return true; } }
+        } };
+    };
+    const a = pola({ mgla: true });
+    spr('Grzmot + Mgła: dziura od punktu wybuchu, 1 jednostka',
+        new ReakcjeTechnik().klatka(a.t, DT).rozdarcie === 1 && a.log.length === 1 && a.log[0][0] === 'mgla.rozepchnij' && a.log[0][1].x === 960);
+    const b = pola({ kurzawa: true });
+    spr('Grzmot + Kurzawa: szarpnięcie, 1 jednostka', new ReakcjeTechnik().klatka(b.t, DT).rozdarcie === 1 && b.log[0][0] === 'kurzawa.szarpnij');
+    spr('Grzmot w obu polach: 2 jednostki', new ReakcjeTechnik().klatka(pola({ mgla: true, kurzawa: true }).t, DT).rozdarcie === 2);
+    const c = pola();
+    spr('bez pola: zero i nic nie wołane', new ReakcjeTechnik().klatka(c.t, DT).rozdarcie === 0 && c.log.length === 0);
+    const d = pola({ mgla: true, kurzawa: true, wybuch: null });
+    spr('bez wybuchu (inna klatka): zero', new ReakcjeTechnik().klatka(d.t, DT).rozdarcie === 0 && d.log.length === 0);
+}
+
+console.log('\nZAWIANIE (poryw Zawieruchy w polu):');
+{
+    const pola = ({ mgla = false, kurzawa = false, porywy = [{ kierunek: 1, yPasa: 700 }] } = {}) => {
+        const log = [];
+        return { log, t: {
+            zawierucha: { porywySwieze: porywy },
+            mglaMokoszy: { aktywny: mgla, znies: (k, s, y) => { log.push(['mgla.znies', k, y]); return true; }, rozblysk: () => true },
+            kurzawa: { aktywny: kurzawa, znies: (k) => { log.push(['kurzawa.znies', k]); return true; } }
+        } };
+    };
+    const a = pola({ mgla: true });
+    spr('poryw + Mgła: znosi w stronę porywu na wysokości pasa, 1 jednostka',
+        new ReakcjeTechnik().klatka(a.t, DT).zawianie === 1 && a.log[0][1] === 1 && a.log[0][2] === 700);
+    const b = pola({ mgla: true, kurzawa: true, porywy: [{ kierunek: -1, yPasa: 700 }, { kierunek: 1, yPasa: 700 }] });
+    spr('2 porywy w obu polach: 4 jednostki', new ReakcjeTechnik().klatka(b.t, DT).zawianie === 4);
+    const c = pola({ porywy: [{ kierunek: 1 }] });
+    spr('bez pola: zero', new ReakcjeTechnik().klatka(c.t, DT).zawianie === 0 && c.log.length === 0);
+    const d = pola({ mgla: true, porywy: [{ kierunek: NaN }, null] });
+    spr('zepsuty poryw: zero, bez wyjątku', new ReakcjeTechnik().klatka(d.t, DT).zawianie === 0);
+}
+
+console.log('\nLATARNIE (Błędne Ogniki w Mgle):');
+{
+    const zestaw = ({ mgla = false, ogniki = true, nowe = 3 } = {}) => {
+        const log = [];
+        let doOznaczenia = nowe;
+        return { log, t: {
+            bledneOgniki: { aktywny: ogniki, punkty: () => [{ x: 900, y: 600, skala: 200, jasnosc: 0.8 }],
+                            oznaczMgle: () => { log.push(['ogniki.oznaczMgle']); const n = doOznaczenia; doOznaczenia = 0; return n; } },
+            mglaMokoszy: { aktywny: mgla, podswietl: (p) => { log.push(['mgla.podswietl', p]); return true; }, rozblysk: () => true }
+        } };
+    };
+    const a = zestaw({ mgla: true });
+    const r = new ReakcjeTechnik();
+    const w1 = r.klatka(a.t, DT), w2 = r.klatka(a.t, DT);
+    spr('Ogniki + Mgła: podświetlenie od punktów ogników', a.log.some(l => l[0] === 'mgla.podswietl' && l[1][0].x === 900));
+    spr('jednostki tylko za pierwsze wejście (3, potem 0)', w1.latarnie === 3 && w2.latarnie === 0);
+    spr('podświetlenie trwa co klatkę (nie tylko przy pierwszym wejściu)', a.log.filter(l => l[0] === 'mgla.podswietl').length === 2);
+    const b = zestaw();
+    spr('bez Mgły: zero i nic nie wołane', new ReakcjeTechnik().klatka(b.t, DT).latarnie === 0 && b.log.length === 0);
+    const c = zestaw({ mgla: true, ogniki: false });
+    spr('bez ogników: zero', new ReakcjeTechnik().klatka(c.t, DT).latarnie === 0 && c.log.length === 0);
+}
+
+console.log('\nWIR OGNIKÓW (Kurzawa porywa Błędne Ogniki):');
+{
+    const ORB = { cx: 960, cy: 600, R: 280, squash: 0.28, kierunek: 1, predkosc: 3.6 };
+    const zestaw = ({ kurzawa = true, ogniki = true, orbita = ORB } = {}) => {
+        const log = [];
+        let nowe = 4;
+        return { log, t: {
+            bledneOgniki: { aktywny: ogniki, punkty: () => [], oznaczMgle: () => 0,
+                            porwij: (o) => { log.push(['ogniki.porwij', o]); const n = nowe; nowe = 0; return n; } },
+            kurzawa: { aktywny: kurzawa, orbita: () => orbita }
+        } };
+    };
+    const a = zestaw();
+    const r = new ReakcjeTechnik();
+    const w1 = r.klatka(a.t, DT), w2 = r.klatka(a.t, DT);
+    spr('Ogniki + Kurzawa: porwanie orbitą Kurzawy', a.log[0]?.[0] === 'ogniki.porwij' && a.log[0][1] === ORB);
+    spr('jednostki tylko za pierwsze porwanie (4, potem 0)', w1.wirOgnikow === 4 && w2.wirOgnikow === 0);
+    const b = zestaw({ kurzawa: false });
+    spr('bez Kurzawy: zero i nic nie wołane', new ReakcjeTechnik().klatka(b.t, DT).wirOgnikow === 0 && b.log.length === 0);
+    const c = zestaw({ orbita: null });
+    spr('Kurzawa bez orbity: zero, porwij nie wołane', new ReakcjeTechnik().klatka(c.t, DT).wirOgnikow === 0 && c.log.length === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

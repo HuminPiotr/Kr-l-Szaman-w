@@ -52,6 +52,18 @@
  * OSOBNY od zegara wstrząsu - main.js woła uderz() i falaPowietrza()
  * obok siebie przy wystrzale, ale wstrząs gaśnie w 0.45 s, a czoło
  * potrzebuje 0.6 s, żeby dolecieć do brzegu kadru.
+ *
+ * ====================== FALA CIEPŁA: DRGAJĄCE POWIETRZE OD DOŁU ======================
+ * Aktywacja Okadzenia (2026-10-09, życzenie: "realistyczna fala ciepła").
+ * Prawdziwe drgające powietrze NIE MA BARWY - widać je tylko dlatego, że
+ * obraz za nim faluje (asfalt w upał, powietrze nad ogniskiem). Dawny szary
+ * gradient od dołu (efekty.js 'mglaIMrok') czytał się jak mgła, więc
+ * zastępuje go CZYSTA refrakcja: pas od dolnej krawędzi kopiowany na płótno
+ * pomocnicze i rysowany z powrotem POZIOMYMI PASKAMI, każdy przesunięty
+ * w bok o sumę dwóch sinusów (przesuniecieCiepla), których fazy biegną
+ * w czasie tak, że fale płyną W GÓRĘ. Najmocniej przy krawędzi, zero na
+ * górnej granicy pasa - bez widocznego brzegu. Bramkowane czasem jak
+ * soczewka Aarda: koszt tylko przez CIEPLO_CZAS.
  */
 
 import { punktyCzola } from './fala.js';
@@ -79,6 +91,14 @@ export const NASTAWY = {
     GRUBOSC_OD: 0.45, GRUBOSC_DO: 0.18,  // ułamek promienia czoła: soczewka cienieje w locie
     PUNKTOW_CZOLA: 48,
     MARGINES_PX: 8,          // zapas wokół prostokąta kopii - skala rozpycha piksele poza obrys
+
+    // --- fala ciepła (aktywacja Okadzenia) - ZGADNIĘTE, do strojenia na kamerze ---
+    CIEPLO_CZAS: 2.0,             // s (v2: 1.5 - za krótko, ledwo widać)
+    CIEPLO_WYS_H: 0.6,            // wysokość pasa, ułamek H
+    CIEPLO_AMPLITUDA_H: 0.011,    // maks. przesunięcie paska w bok, ułamek H (~12 px przy 1080; v1 0.006 - za słabe na kamerze)
+    CIEPLO_PASEK_PX: 3,           // wysokość paska refrakcji
+    CIEPLO_FALA_1_H: 0.09, CIEPLO_TEMPO_1_HZ: 1.6,   // długa fala (ułamek H) i jej tempo
+    CIEPLO_FALA_2_H: 0.04, CIEPLO_TEMPO_2_HZ: 2.7,   // krótka - łamie regularność
 };
 
 /**
@@ -110,6 +130,42 @@ export function obwiedniaFali(p) {
     return Math.pow(1 - t, 1.6);
 }
 
+/**
+ * Obwiednia fali ciepła: pas szybko wznosi się do pełnej wysokości (wys),
+ * drganie (sila) narasta w ułamku sekundy i gaśnie powoli - "powietrze się
+ * uspokaja". Czysta funkcja.
+ *
+ * @param {number} p  0..1 (t / NASTAWY.CIEPLO_CZAS)
+ * @returns {{wys:number, sila:number}} oba 0..1
+ */
+export function obwiedniaCiepla(p) {
+    const t = Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 1;
+    const wys = 1 - Math.pow(1 - Math.min(1, t / 0.3), 2);
+    const sila = t < 0.12
+        ? Math.sin((t / 0.12) * Math.PI / 2)
+        : Math.pow((1 - t) / 0.88, 1.4);
+    return { wys, sila };
+}
+
+/**
+ * Przesunięcie w bok paska na wysokości `y` px OD DOLNEJ KRAWĘDZI, w pasie
+ * wysokim na `wys` px. Waga (1-u)^1.5: maksimum przy krawędzi, zero na górnej
+ * granicy pasa. Faza k*y - ω*t, więc grzbiety fal wędrują w górę. Czysta
+ * funkcja; śmieci -> 0.
+ *
+ * @returns {number} px (|wynik| <= CIEPLO_AMPLITUDA_H * H)
+ */
+export function przesuniecieCiepla(y, wys, t, H) {
+    if (![y, wys, t, H].every(Number.isFinite) || wys <= 0 || H <= 0 || y < 0 || y >= wys) return 0;
+    const u = y / wys;
+    const waga = Math.pow(1 - u, 1.5);   // v2: było ^2 - środek pasa ledwo drgał
+    const k1 = 2 * Math.PI / (H * NASTAWY.CIEPLO_FALA_1_H);
+    const k2 = 2 * Math.PI / (H * NASTAWY.CIEPLO_FALA_2_H);
+    const fala = 0.65 * Math.sin(k1 * y - 2 * Math.PI * NASTAWY.CIEPLO_TEMPO_1_HZ * t)
+               + 0.35 * Math.sin(k2 * y - 2 * Math.PI * NASTAWY.CIEPLO_TEMPO_2_HZ * t + 1.3);
+    return NASTAWY.CIEPLO_AMPLITUDA_H * H * waga * fala;
+}
+
 export class Ekran {
     constructor() {
         this._t = 0;
@@ -120,6 +176,11 @@ export class Ekran {
         this._fala = null;
         this._falaPlotno = null;
         this._falaCtx = null;
+
+        // Fala ciepła (Okadzenie) - null, gdy nie trwa. Własny zegar.
+        this._cieplo = null;
+        this._cieploPlotno = null;
+        this._cieploCtx = null;
 
         // Ziarno losowe wstrząsu - JEDNO na całe uderzenie (przeliczane co
         // klatkę z fazą t, nie losowane co klatkę), inaczej przesunięcie
@@ -187,6 +248,17 @@ export class Ekran {
         };
     }
 
+    /** Czy fala ciepła jeszcze drga - bramka kosztu w dokoncz(). */
+    get cieploAktywne() { return this._cieplo !== null; }
+
+    /**
+     * Fala ciepła od dolnej krawędzi (aktywacja Okadzenia). Ponowne
+     * wywołanie w trakcie RESTARTUJE - ten sam wzorzec co uderz().
+     */
+    falaCiepla() {
+        this._cieplo = { t: 0 };
+    }
+
     /**
      * Wywołać PRZED rysowaniem sceny (po narysowaniu wideo w układzie
      * nieprzesuniętym - patrz nagłówek pliku). Musi być sparowane z
@@ -241,12 +313,17 @@ export class Ekran {
             this._fala.t += krok;
             if (this._fala.t >= NASTAWY.CZAS_FALI) this._fala = null;
         }
+        if (this._cieplo) {
+            this._cieplo.t += krok;
+            if (this._cieplo.t >= NASTAWY.CIEPLO_CZAS) this._cieplo = null;
+        }
 
         const wymiaryOk = Number.isFinite(W) && Number.isFinite(H) && W > 0 && H > 0;
 
         // --- FALA POWIETRZA: PRZED winietą i bloomem - to zniekształcenie
         // sceny, a winieta/bloom mają leżeć na wierzchu wszystkiego. Własna
         // bramka (this._fala), niezależna od siły wstrząsu.
+        if (ctx && wymiaryOk && this._cieplo) this._falaCiepla(ctx, W, H);
         if (ctx && wymiaryOk && this._fala) this._falaPowietrza(ctx, W, H);
 
         const s = this.sila;
@@ -266,6 +343,41 @@ export class Ekran {
 
         // --- BLOOM: BRAMKOWANY przez s>0, downscale -> blur -> upscale 'lighter' ---
         this._bloom(ctx, W, H, s);
+    }
+
+    _falaCiepla(ctx, W, H) {
+        const t = this._cieplo.t;
+        const o = obwiedniaCiepla(t / NASTAWY.CIEPLO_CZAS);
+        if (o.sila < 0.01) return;   // niewidoczne - nie płać za kopię płótna
+        const wys = Math.min(H, Math.round(H * NASTAWY.CIEPLO_WYS_H * o.wys));
+        if (wys < 2) return;
+        const y0 = H - wys;
+        const w = Math.round(W);
+
+        if (!this._cieploPlotno) {
+            this._cieploPlotno = document.createElement('canvas');
+            this._cieploCtx = this._cieploPlotno.getContext('2d');
+        }
+        // Rośnie do potrzeb, nigdy nie maleje (jak płótno soczewki Aarda).
+        if (this._cieploPlotno.width < w || this._cieploPlotno.height < wys) {
+            this._cieploPlotno.width = Math.max(this._cieploPlotno.width, w);
+            this._cieploPlotno.height = Math.max(this._cieploPlotno.height, wys);
+        }
+        this._cieploCtx.clearRect(0, 0, w, wys);
+        this._cieploCtx.drawImage(ctx.canvas, 0, y0, w, wys, 0, 0, w, wys);
+
+        const pasek = Math.max(1, NASTAWY.CIEPLO_PASEK_PX);
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        for (let yy = 0; yy < wys; yy += pasek) {
+            const h = Math.min(pasek, wys - yy);
+            const odDolu = wys - yy - h / 2;
+            const dx = przesuniecieCiepla(odDolu, wys, t, H) * o.sila;
+            if (Math.abs(dx) < 0.05) continue;   // pasek prawie w miejscu - kopia już tam leży
+            ctx.drawImage(this._cieploPlotno, 0, yy, w, h, dx, y0 + yy, w, h);
+        }
+        ctx.restore();
     }
 
     _falaPowietrza(ctx, W, H) {

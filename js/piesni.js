@@ -102,7 +102,7 @@ export class Piesn {
                 audio.addEventListener('error', naBlad);
                 audio.addEventListener('ended', () => this._koniecPiesni());
                 audio.preload = 'auto';
-                audio.src = sciezkaPliku(this.utwor.plik);
+                audio.src = this.utwor.url ?? sciezkaPliku(this.utwor.plik);
                 audio.load?.();
             } catch {
                 zakoncz({ ok: false, dlugoscS: 0 });
@@ -146,4 +146,161 @@ export class Piesn {
         this._uchwyt = null;
         this._naKoniec = null;
     }
+}
+
+const ID_YT = /^[A-Za-z0-9_-]{11}$/;
+
+/** Link (watch, youtu.be, shorts, embed, music) albo gołe ID -> ID filmu; null = nie wygląda na YouTube. */
+export function wyciagnijIdYoutube(tekst) {
+    const t = typeof tekst === 'string' ? tekst.trim() : '';
+    if (!t) return null;
+    if (ID_YT.test(t)) return t;
+    let u;
+    try { u = new URL(/^https?:\/\//i.test(t) ? t : 'https://' + t); } catch { return null; }
+    const host = u.hostname.replace(/^(www\.|m\.|music\.)/, '');
+    let id = null;
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+        const m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?]+)/);
+        id = m ? m[1] : u.searchParams.get('v');
+    }
+    return id && ID_YT.test(id) ? id : null;
+}
+
+/** Plik własny gracza (File) -> utwór; null = to nie jest dźwięk. Bez url - ten dodaje pamięć. */
+export function utworZPliku(file) {
+    if (!file || typeof file.name !== 'string' || !file.name) return null;
+    const typ = typeof file.type === 'string' ? file.type : '';
+    const rozszerzenie = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|webm|mp4|weba)$/i.test(file.name);
+    if (!/^(audio|video)\//.test(typ) && !rozszerzenie) return null;
+    return {
+        plik: 'wlasna:' + file.name.slice(0, 80),
+        tytul: file.name.replace(/\.[^.]+$/, '').slice(0, 80),
+        autor: 'Własna pieśń gracza', licencja: '', dlugoscS: 0, zrodlo: 'plik'
+    };
+}
+
+export function utworYoutube(ytId, tytul = '', dlugoscS = 0) {
+    return {
+        plik: 'yt:' + ytId, ytId, tytul: tytul || 'Pieśń z YouTube',
+        autor: 'YouTube', licencja: '', dlugoscS: dlugoscS > 0 ? dlugoscS : 0, zrodlo: 'yt'
+    };
+}
+
+let obietnicaApiYt = null;
+/** Skrypt IFrame API wczytujemy raz na sesję; błąd sieci = null (nigdy odrzucenie). */
+function wczytajApiYoutube(limitMs) {
+    if (globalThis.YT?.Player) return Promise.resolve(globalThis.YT);
+    obietnicaApiYt ??= new Promise((resolve) => {
+        const timer = setTimeout(() => { obietnicaApiYt = null; resolve(null); }, limitMs);
+        const poprzedni = globalThis.onYouTubeIframeAPIReady;
+        globalThis.onYouTubeIframeAPIReady = () => { clearTimeout(timer); try { poprzedni?.(); } catch { /* cudzy callback */ } resolve(globalThis.YT ?? null); };
+        try {
+            const s = document.createElement('script');
+            s.src = 'https://www.youtube.com/iframe_api';
+            s.onerror = () => { clearTimeout(timer); obietnicaApiYt = null; resolve(null); };
+            document.head.appendChild(s);
+        } catch { clearTimeout(timer); obietnicaApiYt = null; resolve(null); }
+    });
+    return obietnicaApiYt;
+}
+
+/**
+ * Pieśń z YouTube - ten sam interfejs co Piesn. Odtwarzacz jest WIDOCZNY w rogu
+ * (regulamin YouTube); dźwięk nie przechodzi przez magistralę audio gry, więc
+ * wyciszenie (M) i zanik idą przez setVolume. Nigdy nie rzuca ani nie odrzuca.
+ */
+export class PiesnYoutube {
+    constructor(utwor, { limitMs = LIMIT_ZALADOWANIA_MS, kontener = () => document.getElementById('yt-piesn'), wyciszona = () => false } = {}) {
+        this.utwor = utwor;
+        this._limitMs = limitMs;
+        this._kontener = kontener;
+        this._wyciszona = wyciszona;
+        this._gracz = null;
+        this._naKoniec = null;
+        this._zaladowana = false;
+        this._zanik = null;
+        this.tytul = '';
+    }
+
+    async zaladuj() {
+        try {
+            const YT = await wczytajApiYoutube(this._limitMs);
+            const kont = this._kontener();
+            if (!YT?.Player || !kont) return { ok: false, dlugoscS: 0 };
+            return await new Promise((resolve) => {
+                let koniec = false;
+                const zakoncz = (w) => { if (koniec) return; koniec = true; clearTimeout(timer); resolve(w); };
+                const timer = setTimeout(() => zakoncz({ ok: false, dlugoscS: 0 }), this._limitMs);
+                const cel = kont.ownerDocument.createElement('div');
+                kont.replaceChildren(cel);
+                try {
+                    this._gracz = new YT.Player(cel, {
+                        videoId: this.utwor.ytId, width: 200, height: 200,
+                        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin },
+                        events: {
+                            onReady: (e) => {
+                                try {
+                                    const d = e.target.getDuration();
+                                    this.tytul = e.target.getVideoData?.().title ?? '';
+                                    if (Number.isFinite(d) && d > 0) { this._zaladowana = true; zakoncz({ ok: true, dlugoscS: d }); }
+                                    else zakoncz({ ok: false, dlugoscS: 0 });
+                                } catch { zakoncz({ ok: false, dlugoscS: 0 }); }
+                            },
+                            onError: () => zakoncz({ ok: false, dlugoscS: 0 }),
+                            onStateChange: (e) => { if (e.data === 0) this._koniecPiesni(); }
+                        }
+                    });
+                } catch { zakoncz({ ok: false, dlugoscS: 0 }); }
+            });
+        } catch {
+            return { ok: false, dlugoscS: 0 };
+        }
+    }
+
+    async graj() {
+        if (!this._gracz || !this._zaladowana) return false;
+        try {
+            this._gracz.setVolume(this._wyciszona() ? 0 : 100);
+            this._kontener()?.classList.remove('hidden');
+            this._gracz.playVideo();
+            return true;
+        } catch { return false; }
+    }
+
+    wycisz(tak) { try { this._gracz?.setVolume(tak ? 0 : 100); } catch { /* gracz zniknął */ } }
+
+    naKoniec(cb) { this._naKoniec = typeof cb === 'function' ? cb : null; }
+
+    _koniecPiesni() {
+        const cb = this._naKoniec;
+        this._naKoniec = null;
+        cb?.();
+    }
+
+    zanik(sekundy) {
+        const t = Number.isFinite(sekundy) && sekundy > 0 ? sekundy : 0;
+        clearInterval(this._zanik);
+        if (!this._gracz) return;
+        if (t === 0) { this.wycisz(true); return; }
+        const kroki = 10; let i = 0;
+        this._zanik = setInterval(() => {
+            i++;
+            try { this._gracz.setVolume(Math.round(100 * (1 - i / kroki))); } catch { /* gracz zniknął */ }
+            if (i >= kroki) clearInterval(this._zanik);
+        }, (t * 1000) / kroki);
+    }
+
+    zatrzymaj() {
+        clearInterval(this._zanik);
+        try { this._gracz?.destroy(); } catch { /* już zniszczony */ }
+        this._gracz = null;
+        this._naKoniec = null;
+        try { const k = this._kontener(); k?.replaceChildren(); k?.classList.add('hidden'); } catch { /* brak DOM */ }
+    }
+}
+
+/** Fabryka: właściwa klasa pieśni dla źródła utworu. */
+export function utworzPiesn(utwor, opcje = {}) {
+    return utwor?.zrodlo === 'yt' ? new PiesnYoutube(utwor, opcje.yt) : new Piesn(utwor, opcje);
 }

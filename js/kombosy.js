@@ -139,7 +139,42 @@ export const KOMBOSY = [
     // kadr, gracz wynurza się z niej. Para stribog->mokosz nie koliduje
     // z Tęczą (ta kończy się mokosz->stribog, odwrotnie).
     { id: 'mglaMokoszy', nazwa: 'Mgła Mokoszy',
-      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' }
+      sekwencja: ['stribog', 'mokosz'], uzbraja: 'mglaMokoszy' },
+
+    // BANIA (2026-10-06): woda (Mokosz) na rozgrzane ciało (Swaróg) - para
+    // bucha z głowy, barków i łokci. Dwójka, więc skromna i krótka (~1.4 s).
+    // Para mokosz->swarog nie jest prefiksem/sufiksem żadnej trójki (Tęcza
+    // zaczyna się swarog->mokosz, odwrotnie). Łańcuch: Kołowrót kończy się
+    // na mokosz, więc dołożony po nim swarog odpala Banię.
+    { id: 'bania', nazwa: 'Bania',
+      sekwencja: ['mokosz', 'swarog'], uzbraja: 'bania' },
+
+    // GRZMOT (2026-10-08, spec 2026-10-08-grzmot-i-zawierucha-design.md):
+    // błyskawica (Perun) rozdziera powietrze (Stribog) - fala uderzeniowa
+    // z klatki piersiowej. Pierwsza dwójka OTWIERANA przez Peruna. Dwójka
+    // "działająca na pole": dziura w Mgle, szarpnięcie Kurzawy, rozrzucony
+    // dym (js/reakcjeTechnik.js). Para perun->stribog nie jest prefiksem/
+    // sufiksem żadnej trójki. Łańcuch: Grzmot + stribog = Podmuch Striboga.
+    { id: 'grzmot', nazwa: 'Grzmot',
+      sekwencja: ['perun', 'stribog'], uzbraja: 'grzmot' },
+
+    // ZAWIERUCHA (2026-10-08, ten sam spec): ziemia (Weles) oddaje pył
+    // wiatrowi (Stribog) - poryw w poprzek kadru, odwrotność Kurzawy
+    // (stribog->weles). Pierwsza dwójka OTWIERANA przez Welesa. Kanałowana
+    // lekko: okno 1.5 s na machnięcia ręką (js/machniecie.js), bez machnięcia
+    // poryw rusza sam. Para weles->stribog nie jest prefiksem/sufiksem żadnej
+    // trójki. Łańcuchy: Zawierucha + weles = Kurzawa, + mokosz = Mgła Mokoszy.
+    { id: 'zawierucha', nazwa: 'Zawierucha',
+      sekwencja: ['weles', 'stribog'], uzbraja: 'zawierucha' },
+
+    // BŁĘDNE OGNIKI (2026-10-08, ten sam spec): Weles - władca zaświatów
+    // i pasterz dusz - wypuszcza duszyczki z ziemi, Swaróg je rozpala.
+    // Kończy się ogniem (najsłabiej rozpoznawanym) - świadomy wybór
+    // właściciela gry. Para weles->swarog nie jest prefiksem/sufiksem żadnej
+    // trójki. Łańcuchy: + perun = Grom w Ogniu; + stribog + swarog =
+    // Okadzenie, którego dym ogniki od razu podpalą.
+    { id: 'bledneOgniki', nazwa: 'Błędne Ogniki',
+      sekwencja: ['weles', 'swarog'], uzbraja: 'bledneOgniki' }
 ];
 
 export class KomboSilnik {

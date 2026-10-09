@@ -103,17 +103,9 @@ export const TABELA = {
     // przeciwbieżne pierścienie run + mgła + spiralne iskry) żyje
     // w js/kolowrot.js, nie tutaj - ten wiersz to tylko jednorazowy błysk.
     kolowrot:     { barwa: '42, 85%, 55%',  ksztalt: 'blyskIFala', czas: 1.5 },
-    // Błysk AKTYWACJI Okadzenia - technika KANAŁOWANA jak Płonący Palec/Aard
-    // (uzbraja, nie odpala natychmiast), więc dostaje ten sam skromny
-    // wzorzec co ich błyski uzbrojenia (TABELA.aard), nie pełny blyskIFala
-    // zarezerwowany dla technik NATYCHMIASTOWYCH (tecza/gromWZiemie/
-    // kolowrot). Kształt 'mglaIMrok' - PIERWSZY realny konsument tego
-    // wiersza (dotąd tylko zdefiniowany w rysuj(), bez żadnego wywołującego)
-    // - pasuje tematycznie: mgła wznosząca się od dołu kadru, zapowiedź
-    // dymu, który zaraz zacznie unosić się naprawdę (js/dym.js). Chłodna,
-    // jasna szarość - ŚWIADOMIE nie pomarańcz/fiolet/bursztyn jak inne
-    // błyski technik: dym jeszcze nie płonie.
-    dym:          { barwa: '210, 15%, 82%', ksztalt: 'mglaIMrok', czas: 1.1 },
+    // Okadzenie CELOWO bez wiersza (2026-10-09): szara mgła od dołu kadru
+    // ('mglaIMrok') czytała się jak para. Aktywację rysuje teraz js/ekran.js
+    // falaCiepla() - czysta refrakcja, drgające powietrze bez barwy.
     // Błysk AKTYWACJI Kamiennej Tarczy (weles×3). Trwała treść (orbita
     // odłamków) żyje w js/kamiennaTarcza.js.
     kamiennaTarcza: { barwa: '270, 45%, 55%', ksztalt: 'blyskIFala', czas: 1.3 },
@@ -125,6 +117,8 @@ export const TABELA = {
     kregiMokoszy: { barwa: '195, 100%, 60%', ksztalt: 'blyskIFala', czas: 1.3 },
     // Błysk AKTYWACJI Mgła Mokoszy. Trwała treść żyje w js/mglaMokoszy.js.
     mglaMokoszy: { barwa: '190, 30%, 85%', ksztalt: 'blyskIFala', czas: 1.3 }
+    // Bania CELOWO bez wiersza (2026-10-06, życzenie właściciela): okrąg
+    // aktywacji odstawał od smug pary, a odpal() bez wpisu nic nie rysuje.
 };
 
 export class Efekty {
@@ -250,18 +244,6 @@ function rysuj(ctx, def, p, alfa, lm, W, H, zaczep) {
             ctx.beginPath();
             ctx.ellipse(s.x, s.y, r, r * 0.32, 0, 0, Math.PI * 2);
             ctx.stroke();
-            break;
-        }
-        case 'mglaIMrok': {
-            // Mgła wznosząca się od dołu kadru. Rysowana przez 'lighter',
-            // więc mrok robimy niskim, ciemnym fioletem, nie czernią -
-            // czerń w tym trybie jest niewidoczna.
-            const wys = H * (0.15 + 0.5 * Math.sin(p * Math.PI));
-            const g = ctx.createLinearGradient(0, H, 0, H - wys);
-            g.addColorStop(0, kolor(alfa * 0.55));
-            g.addColorStop(1, kolor(0));
-            ctx.fillStyle = g;
-            ctx.fillRect(0, H - wys, W, wys);
             break;
         }
     }

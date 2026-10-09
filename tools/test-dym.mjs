@@ -30,7 +30,7 @@ globalThis.document = {
     }
 };
 
-const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki,
+const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki, jasnoscZaru,
         NAROST_S, ZANIK_S, KOLUMNA_S, SKALA_KOLUMNY, TAU_ROZROSTU_S,
         CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK, WYLOT_W_S,
         WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
@@ -472,6 +472,33 @@ console.log('\nROZWIANIE - kłąb liczy się RAZ W ŻYCIU:');
     for (let i = 0; i < 10; i++) { d.emituj(USTA, W_PRAWO, 1, 1, DT, W, H); d.updateAndDraw(null, W, H, DT); }
     d.pchnij(fala()); d.updateAndDraw(null, W, H, DT);
     spr(`świeże kłęby liczą się (${d.ostatnioRozwiane})`, d.ostatnioRozwiane > 0);
+}
+
+console.log('\nŻAR - tlące się drobinki (dym łatwopalny, nie para):');
+{
+    spr('barwa dymu ciemniejsza niż para Bani/Mgły (suma RGB < 450)',
+        NASTAWY.BARWA_DYMU.reduce((s, v) => s + v, 0) < 450);
+
+    const zar = (nadpisz = {}) => ({ zar: true, stan: 'DYM', wiekGry: 10, zycieGry: 30, faza: 0, ...nadpisz });
+    spr('kłąb bez żaru -> 0', jasnoscZaru({ ...zar(), zar: false }, 0) === 0);
+    spr('żar w kolumnie (przy ustach) jeszcze nie świeci',
+        jasnoscZaru(zar({ wiekGry: KOLUMNA_S * 0.5 }), 0) === 0);
+    const plateau = [0, 0.3, 0.7, 1.1, 1.9].map(t => jasnoscZaru(zar(), t));
+    spr(`na plateau puls w [ZAR_ALFA_MIN, ZAR_ALFA_MAX] (${plateau.map(a => a.toFixed(2)).join(' ')})`,
+        plateau.every(a => a >= NASTAWY.ZAR_ALFA_MIN - 1e-9 && a <= NASTAWY.ZAR_ALFA_MAX + 1e-9));
+    spr('...i faktycznie pulsuje', Math.max(...plateau) - Math.min(...plateau) > 0.05);
+    spr('przy końcu życia gaśnie z kłębem',
+        jasnoscZaru(zar({ wiekGry: 30 }), 0) === 0
+        && jasnoscZaru(zar({ wiekGry: 29.5 }), 0) < NASTAWY.ZAR_ALFA_MIN);
+    spr('zapalony kłąb nie ma już żaru (rysuje go ogień)',
+        jasnoscZaru(zar({ stan: 'ZAPLON' }), 0) === 0 && jasnoscZaru(zar({ stan: 'WYBUCH' }), 0) === 0);
+    spr('śmieciowe pola -> 0, bez NaN', jasnoscZaru({ zar: true, stan: 'DYM', wiekGry: NaN }, NaN) === 0);
+
+    const d = new Dym();
+    dmuchaj(d, 3);
+    const n = wszystkie(d).length, zZarem = wszystkie(d).filter(c => c.zar).length;
+    spr(`mniej więcej co ZAR_CO_ILE-ty kłąb tli się (${zZarem}/${n})`,
+        zZarem > 0 && zZarem < n / NASTAWY.ZAR_CO_ILE * 2.5);
 }
 
 process.exit(ok ? 0 : 1);

@@ -13,6 +13,9 @@
 //   * AudioContext tworzymy w geście użytkownika (kliknięcie "Rozpal ogień" w main.js,
 //     przed jakimkolwiek await) - inaczej przeglądarka może odmówić.
 //
+// WYJĄTEK (2026-10-08): Grzmot (js/dzwiekGrzmotu.js) - jedyny efekt dźwiękowy gry, przez
+// magistrala() poniżej; świadomie dopisany do strażnika.
+//
 // Osobny AudioContext ma jeszcze js/debugHud.js (sygnały sesji nagraniowej) - to narzędzie
 // dewelopera, nie dźwięk gry.
 export class AudioEngine {
@@ -53,6 +56,17 @@ export class AudioEngine {
         } catch (err) {
             console.error("Audio Engine error:", err);
         }
+    }
+
+    /**
+     * Magistrala dla JEDNEGO wyjątkowego efektu dźwiękowego gry - Grzmotu
+     * (js/dzwiekGrzmotu.js). null przed init(). Cała synteza zostaje w tamtym
+     * module; silnik niczego nie syntezuje.
+     * @returns {{ctx: AudioContext, wyjscie: AudioNode}|null}
+     */
+    magistrala() {
+        if (!this.initialized || !this.audioCtx || !this.masterGain) return null;
+        return { ctx: this.audioCtx, wyjscie: this.masterGain };
     }
 
     /** Wznawia zawieszony AudioContext - wołać w handlerze gestu użytkownika. */

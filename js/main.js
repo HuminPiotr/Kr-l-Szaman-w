@@ -19,7 +19,8 @@ import { WynikHud } from './wynikHud.js';
 import { Przebieg, decyzjaKlawisza } from './przebieg.js';
 import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js';
 import { swiezeModuly } from './swiezeModuly.js';
-import { wczytajManifest, Piesn } from './piesni.js';
+import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
+import { WlasnePiesni } from './wlasnePiesni.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -50,6 +51,11 @@ import { MglaMokoszy } from './mglaMokoszy.js';
 import { KregiMokoszy } from './kregiMokoszy.js';
 import { LukPeruna } from './lukPeruna.js';
 import { Kurzawa } from './kurzawa.js';
+import { Bania } from './bania.js';
+import { Grzmot } from './grzmot.js';
+import { Zawierucha } from './zawierucha.js';
+import { BledneOgniki } from './bledneOgniki.js';
+import { zagrajGrzmot } from './dzwiekGrzmotu.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
 import { Histereza } from './histereza.js';
@@ -172,15 +178,56 @@ const ksiega = new Ksiega((() => { try { return window.localStorage; } catch { r
 const menu = new Menu({ ostatniNick: ksiega.ostatniNick() });
 let efektKroniki = null;   // {bog, korona} - odpalany w klatce, gdy istnieje `frame`
 const zetonStartu = new ZetonStartu();
+const wlasne = new WlasnePiesni({
+    indexedDB: (() => { try { return window.indexedDB ?? null; } catch { return null; } })(),
+    storage: (() => { try { return window.localStorage; } catch { return null; } })()
+});
+const BRAK_PIESNI = 'Ta pieśń nie chce zabrzmieć — spróbuj innego pliku.';
 const polanaUi = new PolanaUi(document, {
     menu, ksiega, losoweImie,
+    // Własne pieśni zwracają ciepłe zdanie zwrotne (pusty tekst = sukces bez komentarza).
+    naPlik: async (file) => {
+        try {
+            const u = utworZPliku(file);
+            if (!u) return 'To nie wygląda na plik dźwiękowy — spróbuj mp3, m4a albo wav.';
+            const url = URL.createObjectURL(file);
+            const probny = new Piesn({ ...u, url });
+            const { ok, dlugoscS } = await probny.zaladuj();
+            probny.zatrzymaj();
+            URL.revokeObjectURL(url);
+            if (!ok) return BRAK_PIESNI;
+            const z = await wlasne.dodajPlik({ ...u, dlugoscS }, file);
+            if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
+            menu.dodajPiesn(z);
+            return wlasne.trwala ? '' : 'Ta przeglądarka nie zapamięta pieśni po zamknięciu karty.';
+        } catch { return BRAK_PIESNI; }
+    },
+    naLinkYt: async (tekst) => {
+        try {
+            const id = wyciagnijIdYoutube(tekst);
+            if (!id) return 'To nie wygląda na link z YouTube.';
+            const probny = new PiesnYoutube(utworYoutube(id));
+            const { ok, dlugoscS } = await probny.zaladuj();
+            const tytul = probny.tytul;
+            probny.zatrzymaj();
+            if (!ok) return 'Ten film nie chce grać poza YouTube — spróbuj innego (albo sprawdź internet).';
+            const z = wlasne.dodajYt(utworYoutube(id, tytul, dlugoscS));
+            if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
+            menu.dodajPiesn(z);
+            return '';
+        } catch { return BRAK_PIESNI; }
+    },
+    naUsunPiesn: async (i) => {
+        const u = menu.piesni[i];
+        if (u && menu.usunPiesn(i)) await wlasne.usun(u.plik);
+    },
     onStart: (konf) => rozpalOgien(konf),
     onJeszczeRaz: () => dalejZKroniki(),
     onDoPolany: () => doPolany()
 });
 // Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
-wczytajManifest().then((lista) => {
-    menu.ustawPiesni(lista);
+Promise.all([wczytajManifest(), wlasne.wczytaj().catch(() => [])]).then(([lista, moje]) => {
+    menu.ustawPiesni([...lista, ...moje]);
     // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
     menu.zUrl(parsujKonfiguracje(window.location.search));
     polanaUi.render();
@@ -210,6 +257,10 @@ let mglaMokoszy = new MglaMokoszy();
 let kregiMokoszy = new KregiMokoszy();
 let lukPeruna = new LukPeruna();
 let kurzawa = new Kurzawa();
+let bania = new Bania();
+let grzmot = new Grzmot();
+let zawierucha = new Zawierucha();
+let bledneOgniki = new BledneOgniki();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -255,6 +306,7 @@ function odswiezWskaznikAudio() {
 }
 function przelaczDzwiek() {
     audioEngine.przelaczWyciszenie();
+    piesn?.wycisz?.(audioEngine.wyciszony);   // pieśń z YouTube nie przechodzi przez magistralę
     odswiezWskaznikAudio();
 }
 uiAudioWskaznik.addEventListener('click', przelaczDzwiek);
@@ -489,7 +541,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -500,7 +552,7 @@ function przygotujPiesn() {
     piesn?.zatrzymaj();
     piesn = null;
     if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
-    piesn = new Piesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el) });
+    piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
 }
@@ -581,18 +633,17 @@ async function uruchomZKonfiguracji(konfig) {
     let konf = konfig;
     let utwor = null;
     if (konf.tryb === 'obrzed') {
-        const manifest = await wczytajManifest();
-        if (!zetonStartu.aktualny(zeton)) return;
-        utwor = manifest[konf.piesn] ?? null;
+        utwor = menu.piesni[konf.piesn] ?? null;   // manifest + własne (menu je już wczytało)
         if (!utwor) {
             // Brak pieśni nie jest błędem (§2) - Obrzęd zamienia się w próbę.
             konf = { ...konf, tryb: 'proba', dlugoscS: 90 };
             ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
             ostatniKomunikatDo = performance.now() + 5000;
         } else {
-            const probny = new Piesn(utwor);
-            const { ok, dlugoscS } = await probny.zaladuj();
-            probny.zatrzymaj();
+            // YouTube: długość zapisana przy dodaniu, bez ponownego ładowania odtwarzacza.
+            const probny = utwor.zrodlo === 'yt' ? null : new Piesn(utwor);
+            const { ok, dlugoscS } = probny ? await probny.zaladuj() : { ok: utwor.dlugoscS > 0, dlugoscS: utwor.dlugoscS };
+            probny?.zatrzymaj();
             if (!zetonStartu.aktualny(zeton)) return;
             // Długość z metadanych; niepoprawna -> awaryjna (tryb nadal obrzed, gra jak próba).
             konf = { ...konf, dlugoscS: ok ? dlugoscS : PIESN_AWARYJNA_S };
@@ -603,6 +654,7 @@ async function uruchomZKonfiguracji(konfig) {
             }
         }
     }
+    if (!zetonStartu.aktualny(zeton)) return;
     // utworRundy ustawiamy DOPIERO tu, po sprawdzeniach żetonu: moduł-wide zmienna nie może zdradzić
     // pieśni z przerwanego startu A rundzie B.
     utworRundy = utwor;
@@ -762,8 +814,9 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki
             });
+            if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
@@ -860,6 +913,9 @@ function klatka(now) {
             zarzewia.push({ x: c.x, y: c.y, r: 6 });
         }
     }
+    // Błędne Ogniki (js/bledneOgniki.js) - druga technika ognia: każdy jasny
+    // ognik to zarzewie, więc przelatując przez chmurę Okadzenia, podpala ją.
+    if (bledneOgniki.aktywny) zarzewia.push(...bledneOgniki.zarzewia());
     if (zarzewia.length) dym.podpal(zarzewia);
 
     // Aard rozdmuchuje dym: czoła fali z POPRZEDNIEJ klatki (fala.czola -
@@ -869,11 +925,15 @@ function klatka(now) {
     // dzieli Fala, więc jego fala też rozdmucha dym - jedna fizyka fali.
     // Guard na dym.liczba: bez kłębów nie ma czego pchać, a 72 rzuty na czoło
     // co klatkę przez 0.7 s po każdym Aardzie/Gromie byłyby pracą na darmo.
-    if (dym.liczba > 0 && fala.czola.length) {
+    // Zawierucha dokłada głowy swoich smug - ten sam kontrakt punktów, ale
+    // ze słabą `sila` (js/zawierucha.js SILA_PCHNIECIA): znosi dym, nie rozwiewa.
+    if (dym.liczba > 0) {
         const podmuchy = [];
         for (const c of fala.czola) {
             podmuchy.push(...pchniecieCzola(c.zaczep, c.kierunek, c.sila, c.wiek, dt, 24));
         }
+        if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
+        if (grzmot.aktywny) podmuchy.push(...grzmot.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
     }
 
@@ -948,11 +1008,20 @@ function klatka(now) {
     kregiMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
     lukPeruna.updateAndDraw(ctx, kontekstTechnik, dt);
     kurzawa.updateAndDraw(ctx, kontekstTechnik, dt);
+    bania.updateAndDraw(ctx, kontekstTechnik, dt);
+    grzmot.updateAndDraw(ctx, kontekstTechnik, dt);
+    for (const sila of grzmot.dudnienia) ekran.uderz(sila);   // przetaczające się uderzenia po pierwszym
+    zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
+    bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
-    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun }, dt);
+    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki }, dt);
     punkty.reakcja('przewodzenie', reakcjeKlatki.przewodzenie, now);
     punkty.reakcja('burzaWMgle', reakcjeKlatki.burzaWMgle, now);
+    punkty.reakcja('rozdarcie', reakcjeKlatki.rozdarcie, now);
+    punkty.reakcja('zawianie', reakcjeKlatki.zawianie, now);
+    punkty.reakcja('latarnie', reakcjeKlatki.latarnie, now);
+    punkty.reakcja('wirOgnikow', reakcjeKlatki.wirOgnikow, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
@@ -1047,6 +1116,10 @@ function klatka(now) {
         kregiMokoszy: { aktywny: kregiMokoszy.aktywny },
         lukPeruna: { aktywny: lukPeruna.aktywny },
         kurzawa: { aktywny: kurzawa.aktywny },
+        bania: { aktywny: bania.aktywny },
+        grzmot: { aktywny: grzmot.aktywny },
+        zawierucha: { aktywny: zawierucha.aktywny, ...zawierucha.diagnostyka },
+        bledneOgniki: { aktywny: bledneOgniki.aktywny, widocznych: bledneOgniki.punkty().length },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do

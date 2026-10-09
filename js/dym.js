@@ -146,7 +146,22 @@ export const NASTAWY = {
     // --- Rysowanie ---
     DZIELNIK_PLOTNA: 2,               // płótno biblioteki w połowie rozdzielczości
     KLAB_SPRITE_PX: 128,
-    BARWA_DYMU: [205, 205, 214],      // jasna, chłodna szarość - wypalona w _maszyna przy budowie, patrz wyczyscCache()
+    // Przydymiona, ciepła szarość (żywica, sadza) - ma się czytać jako PALIWO,
+    // nie jako para: Bania [245,240,232] i Mgła [200,228,235] są jasne (2026-10-09).
+    // Wypalona w _maszyna przy budowie, patrz wyczyscCache().
+    BARWA_DYMU: [135, 128, 120],
+
+    // --- Żar (2026-10-09): tlące się drobinki w chmurze - "to się pali" ---
+    // Co ZAR_CO_ILE-ty kłąb niesie drobinkę: jedzie z nim (zero nowej fizyki),
+    // świeci po fazie kolumny, gaśnie z kłębem i przy zapłonie. Wolne, małe
+    // i przygaszone - nie mylą się z iskrami ani (niebieskimi) Błędnymi Ognikami.
+    ZAR_CO_ILE: 10,
+    BARWA_ZARU: [255, 120, 40],
+    ZAR_PROMIEN_PX: 5,                // na płótnie gry
+    ZAR_ALFA_MIN: 0.15, ZAR_ALFA_MAX: 0.5,
+    ZAR_PULS_HZ: 0.6,
+    ZAR_NAROST_S: 0.6,                // rozjarzanie po wyjściu z kolumny
+    ZAR_MAX: 80,                      // sufit rysowanych drobinek na klatkę
     BARWA_ZAPLONU_STOPNIE: [
         [130, 100, 75],
         [225, 155, 75],
@@ -285,6 +300,12 @@ export class Dym {
         c.rozprzestrzenil = false;
         c.rozwiany = false;
         c.faza = Math.random() * Math.PI * 2;
+        c.zar = Math.random() < 1 / Math.max(1, NASTAWY.ZAR_CO_ILE);
+        // Przesunięcie żaru od środka kłębu (ułamek promienia) - bez niego
+        // drobinki siedziałyby dokładnie w środkach i układały się w siatkę.
+        const katZaru = Math.random() * Math.PI * 2, odlZaru = Math.random() * 0.35;
+        c.zarDx = Math.cos(katZaru) * odlZaru;
+        c.zarDy = Math.sin(katZaru) * odlZaru;
         Object.assign(c, warianty());
     }
 
@@ -635,6 +656,26 @@ export class Dym {
         const mnoznik = NASTAWY.DZIELNIK_PLOTNA;   // z płótna biblioteki na płótno gry
         ctx.globalCompositeOperation = 'lighter';
 
+        // Żar: tlące się drobinki w niepodpalonym dymie (NASTAWY.ZAR_*).
+        const iskierka = obraz(MANIFEST.rozblysk);
+        if (iskierka) {
+            const sprite = wypalTintowany(iskierka, NASTAWY.BARWA_ZARU, 32);
+            const r = NASTAWY.ZAR_PROMIEN_PX;
+            let narysowanych = 0;
+            for (const c of this._czastki) {
+                if (narysowanych >= NASTAWY.ZAR_MAX) break;
+                const a = jasnoscZaru(c, this._t);
+                if (a <= 0) continue;
+                const pr = promienCzastki(c);
+                const x = (c.x + (c.zarDx ?? 0) * pr) * mnoznik;
+                const y = (c.y + (c.zarDy ?? 0) * pr) * mnoznik;
+                ctx.globalAlpha = a;
+                ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2);
+                narysowanych++;
+            }
+            ctx.globalAlpha = 1;
+        }
+
         // Płonące: ta sama tekstura mgły, tyle że w ciepłym tincie.
         for (const c of this._czastki) {
             if (c.stan !== 'ZAPLON') continue;
@@ -719,6 +760,27 @@ export function skalaCzastki(wiekGry, finalScale) {
     if (w <= KOLUMNA_S) return Math.min(SKALA_KOLUMNY, cel);
     const p = 1 - Math.exp(-(w - KOLUMNA_S) / TAU_ROZROSTU_S);
     return Math.min(cel, SKALA_KOLUMNY + (cel - SKALA_KOLUMNY) * p);
+}
+
+/**
+ * Krycie tlącej się drobinki 0..ZAR_ALFA_MAX. Zero, gdy kłąb nie niesie żaru,
+ * jest jeszcze w kolumnie (nie świeci w ustach) albo już płonie (wtedy rysuje
+ * go ogień). Puls ZAR_ALFA_MIN..MAX, rozjarzanie po kolumnie, gaśnięcie przez
+ * ostatnie ZANIK_S życia - razem z kłębem. Czysta funkcja, jak wiekBiblioteki().
+ *
+ * @param {object} c  cząstka (zar, stan, wiekGry, zycieGry, faza)
+ * @param {number} t  zegar pulsu (s)
+ */
+export function jasnoscZaru(c, t) {
+    if (!c?.zar || c.stan !== 'DYM') return 0;
+    const w = c.wiekGry, zycie = Number.isFinite(c.zycieGry) && c.zycieGry > 0 ? c.zycieGry : ZYCIE_MIN_S;
+    if (!Number.isFinite(w) || w <= KOLUMNA_S || w >= zycie) return 0;
+    const czas = Number.isFinite(t) ? t : 0;
+    const faza = Number.isFinite(c.faza) ? c.faza : 0;
+    const puls = 0.5 + 0.5 * Math.sin(2 * Math.PI * NASTAWY.ZAR_PULS_HZ * czas + faza);
+    const narost = Math.min(1, (w - KOLUMNA_S) / NASTAWY.ZAR_NAROST_S);
+    const zanik = Math.min(1, (zycie - w) / ZANIK_S);
+    return (NASTAWY.ZAR_ALFA_MIN + (NASTAWY.ZAR_ALFA_MAX - NASTAWY.ZAR_ALFA_MIN) * puls) * narost * zanik;
 }
 
 /** Promień cząstki biblioteki (jej `scale` jest w jednostkach sprite'a 20 px). */

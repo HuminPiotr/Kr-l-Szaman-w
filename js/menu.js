@@ -52,6 +52,25 @@ export class Menu {
         if (this.piesn >= this.piesni.length) this.piesn = 0;
     }
 
+    /** Własna pieśń gracza: dopisana (albo podmieniona o tym samym `plik`) i od razu wybrana. */
+    dodajPiesn(utwor) {
+        if (!utwor || typeof utwor.plik !== 'string') return false;
+        const i = this.piesni.findIndex(p => p.plik === utwor.plik);
+        if (i >= 0) this.piesni[i] = utwor; else this.piesni.push(utwor);
+        this.piesn = i >= 0 ? i : this.piesni.length - 1;
+        return true;
+    }
+
+    /** Usuwa tylko pieśni własne (zrodlo 'plik'/'yt'); wybór zostaje na tej samej pieśni albo schodzi na 0. */
+    usunPiesn(i) {
+        const u = this.piesni[i];
+        if (!u || (u.zrodlo !== 'plik' && u.zrodlo !== 'yt')) return false;
+        this.piesni.splice(i, 1);
+        if (this.piesn > i) this.piesn--;
+        else if (this.piesn === i) this.piesn = 0;
+        return true;
+    }
+
     dostepne(kamien) {
         if (!KAMIENIE.includes(kamien)) return false;
         return kamien !== 'obrzed' || this.piesni.length > 0;

@@ -46,6 +46,7 @@ function zrobWorek(log) {
         kregiMokoszy: szpieg('kregiMokoszy'),
         lukPeruna: szpieg('lukPeruna'),
         kurzawa: szpieg('kurzawa'),
+        bania: szpieg('bania'),
     };
 }
 
@@ -104,7 +105,7 @@ testTechnika('ogien', ['swarog', 'perun'], ['plonacyPalec.uzbrój'], 'Grom w Ogn
 
 testTechnika('aard', ['stribog', 'stribog'], ['podmuch.uzbrój'], 'Podmuch Striboga');
 
-testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój'], 'Okadzenie');
+testTechnika('dym', ['swarog', 'stribog', 'swarog'], ['dmuchanie.uzbrój', 'ekran.falaCiepla'], 'Okadzenie');
 
 testTechnika('kamiennaTarcza', ['weles', 'weles', 'weles'], ['kamiennaTarcza.zapal'], 'Kamienna Tarcza');
 
@@ -113,6 +114,8 @@ testTechnika('mglaMokoszy', ['stribog', 'mokosz'], ['mglaMokoszy.zapal'], 'Mgła
 testTechnika('kregiMokoszy', ['mokosz', 'weles'], ['kregiMokoszy.zapal'], 'Kręgi Mokoszy');
 
 testTechnika('lukPeruna', ['mokosz', 'perun'], ['lukPeruna.zapal'], 'Łuk Peruna');
+
+testTechnika('bania', ['mokosz', 'swarog'], ['bania.zapal'], 'Bania');
 
 testTechnika('kurzawa', ['stribog', 'weles'], ['kurzawa.zapal'], 'Kurzawa');
 
@@ -166,7 +169,7 @@ console.log('\nWOREK STANOWISKA VFX (tools/scena.html):');
     const html = readFileSync(new URL('./scena.html', import.meta.url), 'utf8');
     const worek = html.match(/const worekTechnik = \{([^}]*)\}/)?.[1] ?? '';
     const wBworku = new Set(worek.split(',').map(x => x.trim()).filter(Boolean));
-    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy']) {
+    for (const id of ['kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania']) {
         spr(`worekTechnik w scena.html zawiera '${id}'`, wBworku.has(id));
     }
 }

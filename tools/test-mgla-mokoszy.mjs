@@ -32,6 +32,54 @@ spr('rysowanie (atrapa, bez assetów i document) nie rzuca', rzucil === false);
 przepusc(m, klatka(), CZAS_TRWANIA);
 spr('gaśnie po CZAS_TRWANIA', m.aktywny === false);
 
+console.log('\nDZIURA (reakcja z Grzmotem):');
+{
+    const md = new MglaMokoszy();
+    spr('nieaktywna: rozepchnij() false', md.rozepchnij({ x: 1, y: 1 }, 1) === false);
+    md.zapal(1);
+    przepusc(md, klatka(), 4);
+    const widoczne = md._kleby.filter(k => k.wiek >= 0);
+    const c = widoczne[0];
+    const zrodlo = { x: c.x - 50, y: c.y };   // kłąb na prawo od wybuchu
+    spr('rozepchnij() trafia kłąb w zasięgu', md.rozepchnij(zrodlo, 1) === true);
+    spr('kłąb dostaje impuls OD źródła (w prawo)', c.vxDod > 0);
+    const v0 = c.vxDod;
+    przepusc(md, klatka(), 1);
+    spr('impuls wygasa (dziura się domyka)', c.vxDod < v0 * 0.25);
+    spr('rozepchnij(NaN) false, pozycje skończone', md.rozepchnij({ x: NaN, y: 1 }, 1) === false && md._kleby.every(k => Number.isFinite(k.x) && Number.isFinite(k.y)));
+    spr('daleki wybuch nie trafia', md.rozepchnij({ x: -1e6, y: -1e6 }, 1) === false);
+}
+
+console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
+{
+    const mz = new MglaMokoszy();
+    spr('nieaktywna: znies() false', mz.znies(1, 1, 500) === false);
+    mz.zapal(1);
+    przepusc(mz, klatka(), 4);
+    const c = mz._kleby.find(k => k.wiek >= 0);
+    const v0 = c.vxDod;
+    spr('znies(-1) trafia kłąb na wysokości pasa', mz.znies(-1, 1, c.y) === true);
+    spr('kłąb dostaje impuls w stronę wiatru', c.vxDod < v0);
+    spr('pas daleko w pionie - nie sięga', mz.znies(1, 1, c.y + 1e6) === false);
+    spr('zły kierunek - false', mz.znies(0, 1, c.y) === false && mz.znies(NaN, 1, c.y) === false);
+}
+
+console.log('\nLATARNIE (reakcja z Błędnymi Ognikami):');
+{
+    const ml = new MglaMokoszy();
+    spr('nieaktywna: podswietl() false', ml.podswietl([{ x: 1, y: 1, jasnosc: 1 }]) === false);
+    ml.zapal(1);
+    przepusc(ml, klatka(), 1);
+    spr('aktywna: podswietl() przyjmuje dobre punkty, pomija zepsute',
+        ml.podswietl([{ x: 500, y: 500, jasnosc: 1 }, { x: NaN, y: 1 }, null]) === true && ml._latarnie.length === 1);
+    spr('same zepsute punkty - false', ml.podswietl([{ x: NaN, y: 1 }]) === false);
+    ml.podswietl([{ x: 500, y: 500, jasnosc: 2 }]);
+    spr('jasność przycięta do 1', ml._latarnie[0].jasnosc === 1);
+    let rzucil = false;
+    try { ml.updateAndDraw(atrapaCtx(), kontekst(klatka()), 1 / 60); } catch (e) { rzucil = e; }
+    spr('rysowanie z latarniami nie rzuca', rzucil === false);
+}
+
 console.log('\nBŁYSK W MGLE (reakcja Burza w mgle):');
 {
     spr('jasność 1 przy źródle, maleje z odległością, 0 daleko',

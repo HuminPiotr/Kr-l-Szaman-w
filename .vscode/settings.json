@@ -1,3 +1,7 @@
 {
-  "liveServer.settings.port": 5501
+  "liveServer.settings.port": 5501,
+  // Bez automatycznego przeładowania: każdy zapis pliku (agent przy kodzie,
+  // dokumenty, testy) robił window.location.reload() i wyrzucał z rundy na
+  // Polanę (2026-10-09). Nowy kod wczytuje się ręcznie - Cmd+R.
+  "liveServer.settings.ignoreFiles": ["**"]
 }

@@ -103,5 +103,52 @@ spr('rysowanie bez assetów i bez document nie rzuca', rzucil === false);
 przepusc(kz, klatka(), CZAS_TRWANIA);
 spr('gaśnie po CZAS_TRWANIA', kz.aktywny === false);
 
+console.log('\nSZARPNIĘCIE (reakcja z Grzmotem):');
+{
+    const { obwiedniaSzarpniecia } = await import('../js/kurzawa.js');
+    spr('obwiednia: 0 na starcie, 1 w szczycie, 0 po powrocie, NaN -> 0',
+        obwiedniaSzarpniecia(0) === 0 && blisko(obwiedniaSzarpniecia(NASTAWY.SZARPNIECIE_NAROST), 1)
+        && obwiedniaSzarpniecia(NASTAWY.SZARPNIECIE_NAROST + NASTAWY.SZARPNIECIE_POWROT) === 0 && obwiedniaSzarpniecia(NaN) === 0);
+    spr('mnoznikR rozszerza orbitę pasa', geometriaPasa(0, { ...ZACZEP, mnoznikR: 1.5 }, H).R === pasy[0].R * 1.5);
+    const ks = new Kurzawa();
+    spr('nieaktywna: szarpnij() false', ks.szarpnij(1) === false);
+    ks.zapal(1);
+    przepusc(ks, klatka(), 1);
+    spr('aktywna: szarpnij() true', ks.szarpnij(1) === true);
+    przepusc(ks, klatka(), NASTAWY.SZARPNIECIE_NAROST);
+    spr(`w szczycie pasy szersze (mnoznikR ${ks.zaczep.mnoznikR.toFixed(2)})`, ks.zaczep.mnoznikR > 1.4);
+    przepusc(ks, klatka(), NASTAWY.SZARPNIECIE_POWROT + 0.1);
+    spr('po powrocie zwykła orbita', ks.zaczep.mnoznikR === 1);
+}
+
+console.log('\nZNIESIENIE (reakcja z Zawieruchą):');
+{
+    spr('przesuniecie przesuwa środek pasa', geometriaPasa(0, { ...ZACZEP, przesuniecie: 50 }, H).cx === pasy[0].cx + 50);
+    const kn = new Kurzawa();
+    spr('nieaktywna: znies() false', kn.znies(1, 1) === false);
+    kn.zapal(1);
+    przepusc(kn, klatka(), 1);
+    spr('aktywna: znies(-1) true, zły kierunek false', kn.znies(-1, 1) === true && kn.znies(0, 1) === false);
+    przepusc(kn, klatka(), NASTAWY.ZNIESIENIE_NAROST);
+    spr(`w szczycie pasy zniesione w lewo (${kn.zaczep.przesuniecie.toFixed(0)} px)`, kn.zaczep.przesuniecie < -0.8 * NASTAWY.ZNIESIENIE_PRZESUN * kn.zaczep.skala);
+    przepusc(kn, klatka(), NASTAWY.ZNIESIENIE_POWROT + 0.1);
+    spr('po powrocie bez przesunięcia', kn.zaczep.przesuniecie === 0);
+}
+
+console.log('\nORBITA (reakcja Wir ogników):');
+{
+    const ko = new Kurzawa();
+    spr('przed zapal() orbita null', ko.orbita() === null);
+    ko.zapal(1);
+    przepusc(ko, klatka(), 0.5);
+    const o = ko.orbita();
+    spr('po zapal() skończona, środek pod barkami', !!o && [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite) && Math.abs(o.cx - ko.zaczep.x) < 1e-6 && o.cy > ko.zaczep.y);
+    ko.znies(1, 1);
+    przepusc(ko, klatka(), NASTAWY.ZNIESIENIE_NAROST);
+    spr('uwzględnia przesunięcie z reakcji (Zawierucha)', ko.orbita().cx > ko.zaczep.x + 1);
+    przepusc(ko, klatka(), CZAS_TRWANIA);
+    spr('po wygaśnięciu null', ko.orbita() === null);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

@@ -98,6 +98,16 @@
               role="radiogroup"
               aria-label="Pieśń"
             ></div>
+            <div id="wlasna-strefa" class="strefa">
+              <span>Przynieś własną pieśń — upuść tu plik dźwiękowy albo</span>
+              <button type="button" id="wlasna-wybierz" class="drugi">wybierz z dysku</button>
+              <input id="wlasna-plik" type="file" accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.flac,.opus,.aac" class="hidden" />
+            </div>
+            <div class="nick-wiersz">
+              <input id="wlasna-yt" type="text" placeholder="…albo link z YouTube" autocomplete="off" aria-label="Link z YouTube" />
+              <button type="button" id="wlasna-yt-dodaj" class="drugi">Przywołaj</button>
+            </div>
+            <p id="wlasna-info" aria-live="polite"></p>
           </div>
           <div id="konfig-czas" class="grupa hidden">
             <div class="etykieta">Czas próby</div>
@@ -281,6 +291,7 @@
     <canvas id="output-canvas"></canvas>
 
     <!-- Inicjujemy aplikację -->
+    <div id="yt-piesn" class="hidden" aria-label="Odtwarzacz YouTube"></div>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>

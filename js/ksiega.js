@@ -49,7 +49,8 @@ export function nazwaTablicy(klucz, piesni = []) {
     if (baza.startsWith('obrzed:')) {
         const plik = baza.slice(7);
         const u = piesni.find(p => p.plik === plik);
-        return `Obrzęd: ${u?.tytul ?? plik.replace(/\.[^.]+$/, '')}${zew}`;
+        const reszta = plik.startsWith('yt:') ? 'pieśń z YouTube' : plik.replace(/^wlasna:/, '').replace(/\.[^.]+$/, '');
+        return `Obrzęd: ${u?.tytul ?? reszta}${zew}`;
     }
     return klucz;
 }

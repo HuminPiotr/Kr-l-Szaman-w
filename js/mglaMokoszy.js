@@ -29,6 +29,17 @@ export const NASTAWY = {
     BLYSK_ZYCIE: 0.12,             // s
     ZASIEG_BLYSKU: 4,              // skala * to - dalej od źródła błysk nie sięga
     BARWA_BLYSKU: [200, 225, 255],
+    // Reakcja z Grzmotem: dziura - kłęby odpychane promieniście od wybuchu.
+    ZASIEG_ROZEPCHNIECIA: 3,       // skala * to
+    ROZEPCHNIECIE: 6,              // skala/s prędkości kłębu przy samym źródle
+    OPOR_DOD: 2.0,                 // 1/s - dodatkowa prędkość wygasa, dziura się domyka
+    // Reakcja z Zawieruchą: mgła odpływa z wiatrem - słabiej niż dziura Grzmotu.
+    ZNIESIENIE: 2.5,               // skala/s prędkości kłębu na wysokości pasa porywu
+    ZASIEG_PIONOWY_ZNIESIENIA: 2.5, // skala * to - dalej od pasa w pionie wiatr nie sięga
+    // Reakcja Latarnie: Błędne Ogniki ciepło podświetlają kłęby wokół siebie.
+    ZASIEG_LATARNI: 2.5,           // skala * to
+    ALFA_LATARNI: 0.6,
+    BARWA_LATARNI: [150, 200, 255],   // barwa Błędnych Ogników (v2: niebieskie)
     NAROST: 0.3, WYGASZENIE: 1.6,       // s
     BARWA: [200, 228, 235]     // chłodna perła z nutą turkusu
 };
@@ -60,6 +71,7 @@ export class MglaMokoszy {
         this._kleby = [];
         this._doNarodzin = false;
         this._blysk = null;   // { x, y, sila, wiek } - reakcja Burza w mgle
+        this._latarnie = null;   // [{x, y, jasnosc}] - reakcja Latarnie, ważne do najbliższego rysowania
         this._kotwica = new Kotwica(8);
         this._warstwa = new WarstwaZaSylwetka();
     }
@@ -67,6 +79,68 @@ export class MglaMokoszy {
     get aktywny() { return this._trwa; }
 
     wyczyscCache() { wyczyscCacheAssetow(); }
+
+    /**
+     * Reakcja z Grzmotem: kłęby w zasięgu dostają promienisty impuls (dziura).
+     * @returns {boolean}  czy trafiło choć jeden widoczny kłąb
+     */
+    rozepchnij(zrodlo, sila = 1) {
+        const s = clamp01(sila);
+        if (!this._trwa || s <= 0.01 || !zrodlo || !Number.isFinite(zrodlo.x) || !Number.isFinite(zrodlo.y)) return false;
+        const N = NASTAWY;
+        const sk = this._kotwica.stan?.skala ?? 230;
+        const R = sk * N.ZASIEG_ROZEPCHNIECIA;
+        let trafil = false;
+        for (const c of this._kleby) {
+            if (c.wiek < 0) continue;
+            const dx = c.x - zrodlo.x, dy = c.y - zrodlo.y;
+            const d = Math.hypot(dx, dy);
+            if (d >= R) continue;
+            const v = (1 - d / R) * s * N.ROZEPCHNIECIE * sk;
+            // Kłąb dokładnie w źródle - umowny kierunek w górę, nie NaN.
+            const ux = d > 1e-6 ? dx / d : 0, uy = d > 1e-6 ? dy / d : -1;
+            c.vxDod += ux * v;
+            c.vyDod += uy * v;
+            trafil = true;
+        }
+        return trafil;
+    }
+
+    /**
+     * Reakcja Latarnie: punkty światła (Błędne Ogniki) podświetlają kłęby
+     * w następnym rysowaniu - potem lista znika, więc trzeba ją podawać co klatkę.
+     * @param {{x, y, jasnosc}[]} punkty  px
+     * @returns {boolean}  czy przyjęto choć jeden punkt
+     */
+    podswietl(punkty) {
+        if (!this._trwa || !Array.isArray(punkty)) return false;
+        const dobre = punkty.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+            .map(p => ({ x: p.x, y: p.y, jasnosc: clamp01(Number.isFinite(p.jasnosc) ? p.jasnosc : 1) }));
+        this._latarnie = dobre.length ? dobre : null;
+        return dobre.length > 0;
+    }
+
+    /**
+     * Reakcja z Zawieruchą: poziomy impuls w stronę wiatru, najmocniejszy na
+     * wysokości pasa porywu `yPasa` (px).
+     * @returns {boolean}  czy trafiło choć jeden widoczny kłąb
+     */
+    znies(kierunek, sila = 1, yPasa = NaN) {
+        const s = clamp01(sila);
+        if (!this._trwa || s <= 0.01 || (kierunek !== 1 && kierunek !== -1)) return false;
+        const N = NASTAWY;
+        const sk = this._kotwica.stan?.skala ?? 230;
+        const zasieg = sk * N.ZASIEG_PIONOWY_ZNIESIENIA;
+        let trafil = false;
+        for (const c of this._kleby) {
+            if (c.wiek < 0) continue;
+            const waga = Number.isFinite(yPasa) ? 1 - Math.abs(c.y - yPasa) / zasieg : 1;
+            if (waga <= 0) continue;
+            c.vxDod += kierunek * waga * s * N.ZNIESIENIE * sk;
+            trafil = true;
+        }
+        return trafil;
+    }
 
     /** Reakcja Burza w mgle: mgła błyska od `zrodlo` (px). @returns {boolean} */
     rozblysk(zrodlo, sila = 1) {
@@ -99,6 +173,7 @@ export class MglaMokoszy {
                 v0: kierunek * ((W + 2 * rozmiar) / N.CZAS_PRZEJAZDU) * (0.85 + Math.random() * 0.3),
                 wiek: -Math.random() * N.OPOZNIENIE_MAX,
                 rozmiar,
+                vxDod: 0, vyDod: 0,   // impulsy reakcji (rozepchnij) - wygasają oporem
                 obrot: Math.random() * Math.PI * 2,
                 vObrot: (Math.random() * 2 - 1) * 0.3,
                 wariant: Math.floor(Math.random() * MANIFEST.mgla.length)
@@ -119,7 +194,11 @@ export class MglaMokoszy {
         for (const c of this._kleby) {
             c.wiek += krok;
             if (c.wiek < 0) continue;
-            c.x += predkoscKlebu(c.x, zaczep.x, c.v0, zaczep.skala) * krok;
+            const opor = Math.exp(-NASTAWY.OPOR_DOD * krok);
+            c.vxDod *= opor;
+            c.vyDod *= opor;
+            c.x += (predkoscKlebu(c.x, zaczep.x, c.v0, zaczep.skala) + c.vxDod) * krok;
+            c.y += c.vyDod * krok;
             c.obrot += c.vObrot * krok;
         }
         if (this._blysk) {
@@ -152,8 +231,21 @@ export class MglaMokoszy {
                     warstwa.globalCompositeOperation = 'source-over';
                 }
             }
+            if (this._latarnie) {
+                // Latarnie: ciepła poświata kłębu, suma od wszystkich ogników w zasięgu.
+                const zasieg = zaczep.skala * NASTAWY.ZASIEG_LATARNI;
+                let jas = 0;
+                for (const l of this._latarnie) jas += l.jasnosc * Math.max(0, 1 - Math.hypot(c.x - l.x, c.y - l.y) / zasieg);
+                if (jas > 0.01) {
+                    warstwa.globalCompositeOperation = 'lighter';
+                    warstwa.globalAlpha = clamp01(Math.min(1, jas) * NASTAWY.ALFA_LATARNI * this._sila);
+                    warstwa.drawImage(wypalTintowany(img, NASTAWY.BARWA_LATARNI, 256), -c.rozmiar / 2, -c.rozmiar / 2, c.rozmiar, c.rozmiar);
+                    warstwa.globalCompositeOperation = 'source-over';
+                }
+            }
             warstwa.restore();
         }
+        this._latarnie = null;
         this._warstwa.zakoncz(ctx, k.maska, k.maskaSzer, k.maskaWys, k.fit);
     }
 }
