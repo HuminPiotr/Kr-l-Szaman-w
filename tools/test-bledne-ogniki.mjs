@@ -118,5 +118,24 @@ console.log('\nODPORNOŚĆ:');
     spr('bez pozy pozycje skończone', g2._ogniki.every(q => Number.isFinite(q.x) && Number.isFinite(q.y)));
 }
 
+console.log('\nPRZEDŁUŻENIE WIRU:');
+{
+    const g = new BledneOgniki();
+    spr('nieaktywne: przedluzWir() false', g.przedluzWir(4) === false && g.pozostaloS === 0);
+    g.zapal(1);
+    przepusc(g, klatka(), CZAS_TRWANIA - 1);
+    spr('przedluzWir(NaN) - false, nie zużywa', g.przedluzWir(NaN) === false);
+    spr('przedluzWir(4) - true', g.przedluzWir(4) === true);
+    spr('drugi raz w tym samym rzuceniu - false', g.przedluzWir(10) === false);
+    przepusc(g, klatka(), 2);
+    spr('świecą po bazowym CZAS_TRWANIA', g.aktywny && g._t > CZAS_TRWANIA && g.punkty().length === NASTAWY.LICZBA);
+    przepusc(g, klatka(), 1.9);
+    spr('tuż przed końcem jeszcze są', g.aktywny);
+    przepusc(g, klatka(), 0.2);
+    spr('gasną wszystkie razem, na nowym końcu', !g.aktywny && g.punkty().length === 0);
+    g.zapal(1);
+    spr('ponowny zapal() - znów można przedłużyć, bazowa długość', Math.abs(g.pozostaloS - CZAS_TRWANIA) < 1e-6 && g.przedluzWir(4) === true);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

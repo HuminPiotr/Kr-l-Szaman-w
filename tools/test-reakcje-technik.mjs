@@ -242,5 +242,30 @@ console.log('\nSYK (deszcz gasi Płonący Palec):');
     spr('Błędnych Ogników deszcz nie gasi (decyzja właściciela)', !rzucil);
 }
 
+console.log('\nWIR OGNIKÓW - PRZEDŁUŻENIE:');
+{
+    const blisko = (a, b) => Math.abs(a - b) < 1e-9;
+    const log = [];
+    let raz = true, nowe = [2, 3];   // ogniki widoczne stopniowo - porwanie w dwóch klatkach
+    const t = {
+        bledneOgniki: { aktywny: true, pozostaloS: 1.5, punkty: () => [], oznaczMgle: () => 0,
+                        porwij: () => nowe.shift() ?? 0,
+                        przedluzWir: (s) => { log.push(['ogniki', s]); const b = raz; raz = false; return b; } },
+        kurzawa: { aktywny: true, pozostaloS: 2.5, orbita: () => ({ cx: 0, cy: 0, R: 1, squash: 1, kierunek: 1, predkosc: 1 }),
+                   przedluz: (s) => { log.push(['kurzawa', s]); return true; } }
+    };
+    const r = new ReakcjeTechnik();
+    r.klatka(t, DT); r.klatka(t, DT); r.klatka(t, DT);
+    const kur = log.filter(([k]) => k === 'kurzawa');
+    spr('wspólny koniec: dłuższa z technik + PRZEDLUZENIE_WIRU', blisko(log[0]?.[1], 2.5 + NASTAWY.PRZEDLUZENIE_WIRU));
+    spr('Kurzawa przedłużona raz, z zapasem po ognikach',
+        kur.length === 1 && blisko(kur[0][1], 2.5 + NASTAWY.PRZEDLUZENIE_WIRU + NASTAWY.ZAPAS_KURZAWY));
+    const stare = { bledneOgniki: { aktywny: true, punkty: () => [], oznaczMgle: () => 0, porwij: () => 3 },
+                    kurzawa: { aktywny: true, orbita: () => ({}) } };
+    let rzucil = false;
+    try { new ReakcjeTechnik().klatka(stare, DT); } catch (e) { rzucil = e; }
+    spr('techniki bez API przedłużenia - nie rzuca', rzucil === false);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

@@ -16,7 +16,9 @@
  *  - LATARNIE: Błędne Ogniki w Mgle - kłęby wokół nich ciepło się podświetlają,
  *    a ich aureole rosną. 1 jednostka na ognik (pierwsze wejście).
  *  - WIR OGNIKÓW: Kurzawa porywa Błędne Ogniki na orbitę swojego pasa.
- *    1 jednostka na ognik (pierwsze porwanie).
+ *    1 jednostka na ognik (pierwsze porwanie). Przy pierwszym porwaniu w danym
+ *    rzuceniu ogników cały wir trwa dłużej: obie techniki kończą się razem,
+ *    PRZEDLUZENIE_WIRU po tej z nich, która trwałaby dłużej.
  *  - TĘCZA PO DESZCZU: Tęcza zapalona, kiedy pada Dodola - 1 jednostka na
  *    zapalenie (zbocze: tęcza nieaktywna albo licznik zrestartowany), a przez
  *    cały czas wspólnego trwania krople mienią się barwami tęczy.
@@ -38,7 +40,9 @@ export const NASTAWY = {
     BLYSK_ODSTEP_MIN: 0.06, BLYSK_ODSTEP_MAX: 0.15,   // s
     SILA_BLYSKU_LUK: 0.8, SILA_BLYSKU_GROM: 1.0,
     PROG_GASZENIA: 0.3,     // natężenie deszczu, od którego palec gaśnie (mżawka go oszczędza)
-    CZAS_GASZENIA: 1.0      // s przygasania przed zgaszeniem
+    CZAS_GASZENIA: 1.0,     // s przygasania przed zgaszeniem
+    PRZEDLUZENIE_WIRU: 4.0, // s - o ile Wir ogników wydłuża połączone Ogniki + Kurzawę
+    ZAPAS_KURZAWY: 0.1      // s - Kurzawa gaśnie chwilę PO ognikach, żeby nie spadły z orbity
 };
 
 const punktOk = (p) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -136,7 +140,13 @@ export class ReakcjeTechnik {
         if (ogniki?.aktywny && kurzawa?.aktywny) {
             const orbita = kurzawa.orbita?.();
             const nowe = orbita ? ogniki.porwij?.(orbita) : 0;
-            if (Number.isFinite(nowe) && nowe > 0) wynik.wirOgnikow += nowe;
+            if (Number.isFinite(nowe) && nowe > 0) {
+                wynik.wirOgnikow += nowe;
+                // Wspólny koniec: ogniki krążą tylko dopóki Kurzawa ma orbitę.
+                const pozostalo = Math.max(ogniki.pozostaloS ?? 0, kurzawa.pozostaloS ?? 0);
+                const doKonca = (Number.isFinite(pozostalo) ? pozostalo : 0) + NASTAWY.PRZEDLUZENIE_WIRU;
+                if (ogniki.przedluzWir?.(doKonca)) kurzawa.przedluz?.(doKonca + NASTAWY.ZAPAS_KURZAWY);
+            }
         }
 
         // --- Tęcza po deszczu --- (zapalenie = tęcza aktywna i licznik nie maleje, tylko skoczył w górę)
