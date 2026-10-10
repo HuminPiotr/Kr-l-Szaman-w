@@ -67,6 +67,15 @@ export const REAKCJE = {
     pozoga: { nazwa: 'Pożoga', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
     rozwianie: { nazwa: 'Rozwianie', punkty: 2, pelneDo: 30, przerwaMs: 10000 },
+    // Kłąb dymu wciągnięty w pasy Kurzawy PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioZawirowane).
+    // Skala i przerwa jak Rozwianie (ta sama farma: chmura dokarmiana + Kurzawa co chwilę) -
+    // mniej niż Pożoga, zgodnie z życzeniem właściciela (2026-10-10).
+    wirDymu: { nazwa: 'Dymny wir', punkty: 2, pelneDo: 30, przerwaMs: 10000 },
+    // Wybuch kłębu, który w ciągu WIR_PAMIEC_S krążył w wirze - płonąca trąba.
+    // PREMIA ponad Pożogę (ta liczy się dalej). ZMIERZONE 2026-10-10 (tools/pomiar-reakcji.mjs,
+    // Kurzawa 5-9 s na ciele, zapłon po 2 s): ~100-140 kłębów z wiru -> +~350-420 pkt,
+    // czyli podpalona trąba ~1.5× zwykłej Pożogi; sam Dymny wir ~135-170.
+    ognistyWir: { nazwa: 'Ognisty wir', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Łuk Peruna wypuszcza odnogę do kręgu Kręgów Mokoszy (js/reakcjeTechnik.js), co 0.3 s.
     // Typowe nałożenie ~4.5 s = ~15 wyładowań = ~200 pkt (jak jedna prosta technika).
     przewodzenie: { nazwa: 'Przewodzenie', punkty: 15, pelneDo: 10, przerwaMs: 1500 },

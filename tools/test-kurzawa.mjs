@@ -169,5 +169,18 @@ console.log('\nPRZEDŁUŻENIE (reakcja Wir ogników):');
     spr('ponowny zapal() wraca do bazowej długości', blisko(kp.pozostaloS, CZAS_TRWANIA));
 }
 
+console.log('\nORBITY (reakcja Dymny wir):');
+{
+    const ko = new Kurzawa();
+    spr('nieaktywna: []', Array.isArray(ko.orbity()) && ko.orbity().length === 0);
+    ko.zapal(1);
+    przepusc(ko, klatka(), 0.2);
+    const ob = ko.orbity();
+    spr(`wszystkie pasy (${ob.length}), naprzemienne kierunki, skończone`,
+        ob.length === NASTAWY.PASY.length && ob.every((o, i) => o.kierunek === (i % 2 ? -1 : 1))
+        && ob.every(o => [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite)));
+    spr('pas 2 zgodny z orbita()', JSON.stringify(ob[2]) === JSON.stringify(ko.orbita()));
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

@@ -224,6 +224,19 @@ export class Kurzawa {
         return { cx: g.cx, cy: g.cy, R: g.R, squash: NASTAWY.SQUASH, kierunek: g.kierunek, predkosc: NASTAWY.PREDKOSC_KATOWA };
     }
 
+    /**
+     * Orbity WSZYSTKICH pasów (od najniższego) - dla reakcji Dymny wir
+     * (main.js -> dym.zawiruj): każdy kłąb kręci się z najbliższym pasem.
+     * @returns {Array<{cx, cy, R, squash, kierunek, predkosc}>}  [] gdy nieaktywna
+     */
+    orbity() {
+        if (!this._trwa || !this.zaczep || !Number.isFinite(this._H)) return [];
+        return NASTAWY.PASY.map((_, i) => {
+            const g = geometriaPasa(i, this.zaczep, this._H);
+            return { cx: g.cx, cy: g.cy, R: g.R, squash: NASTAWY.SQUASH, kierunek: g.kierunek, predkosc: NASTAWY.PREDKOSC_KATOWA };
+        });
+    }
+
     get aktywny() { return this._trwa; }
 
     /** Sekundy do końca (0, gdy nieaktywna). */

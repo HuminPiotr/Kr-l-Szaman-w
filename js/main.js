@@ -937,12 +937,17 @@ function klatka(now) {
         if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
         if (grzmot.aktywny) podmuchy.push(...grzmot.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
+        // Dymny wir: pasy Kurzawy (z poprzedniej klatki, jak czoła wyżej)
+        // wciągają dym. Bez Kurzawy lista pusta - dym się rozpływa.
+        if (kurzawa.aktywny) dym.zawiruj(kurzawa.orbity());
     }
 
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
     // Reakcje - premie za łączenie technik (rejestr REAKCJE w js/punkty.js).
     punkty.reakcja('pozoga', wybuchyDymu, now);
     punkty.reakcja('rozwianie', dym.ostatnioRozwiane, now);
+    punkty.reakcja('wirDymu', dym.ostatnioZawirowane, now);
+    punkty.reakcja('ognistyWir', dym.ostatnioWybuchyWiru, now);
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
     }
