@@ -169,5 +169,103 @@ console.log('\nWIR OGNIKÓW (Kurzawa porywa Błędne Ogniki):');
     spr('Kurzawa bez orbity: zero, porwij nie wołane', new ReakcjeTechnik().klatka(c.t, DT).wirOgnikow === 0 && c.log.length === 0);
 }
 
+console.log('\nTĘCZA PO DESZCZU:');
+{
+    const zab = [];
+    const tecza = { aktywna: false, pozostaloS: 0, barwaHue: 120 };
+    const dodola = { pada: true, zabarw: (h) => { zab.push(h); return true; } };
+    const r = new ReakcjeTechnik();
+    const t = { tecza, dodola };
+    spr('bez tęczy - nic', r.klatka(t, DT).teczaPoDeszczu === 0 && zab.length === 0);
+    tecza.aktywna = true; tecza.pozostaloS = 30;
+    spr('zapalenie tęczy w deszczu = 1 jednostka', r.klatka(t, DT).teczaPoDeszczu === 1);
+    let suma = 0;
+    for (let i = 0; i < 120; i++) { tecza.pozostaloS -= DT; suma += r.klatka(t, DT).teczaPoDeszczu; }
+    spr('trwanie tęczy nie dokłada jednostek', suma === 0);
+    spr('przez wspólne trwanie krople są barwione co klatkę', zab.length === 121 && zab.every(h => h === 120));
+    tecza.pozostaloS = 30;
+    spr('ponowne zapalenie (restart licznika) = kolejna jednostka', r.klatka(t, DT).teczaPoDeszczu === 1);
+    const r2 = new ReakcjeTechnik();
+    const sucho = { tecza: { aktywna: false, pozostaloS: 0, barwaHue: 0 }, dodola: { pada: false, zabarw: () => { throw new Error('nie wolno'); } } };
+    r2.klatka(sucho, DT);
+    sucho.tecza.aktywna = true; sucho.tecza.pozostaloS = 30;
+    spr('tęcza bez deszczu - nic i bez barwienia', r2.klatka(sucho, DT).teczaPoDeszczu === 0);
+    spr('brak tęczy/dodoli w worku nie rzuca', r2.klatka({}, DT).teczaPoDeszczu === 0);
+}
+
+console.log('\nBURZA W DESZCZU:');
+{
+    const bl = [];
+    const dodola = { pada: true, rozblysk: (z, s) => { bl.push([z, s]); return true; } };
+    const luk = { aktywny: true, srodek: () => ({ x: 960, y: 500 }), wyladowanieDo: () => true };
+    const r = new ReakcjeTechnik();
+    let suma = 0;
+    for (let i = 0; i < 60; i++) suma += r.klatka({ lukPeruna: luk, dodola }, DT, () => 0.5).burzaWDeszczu;
+    spr(`Łuk w deszczu błyska rytmicznie (${suma} w 1 s, ~7-17)`, suma >= 6 && suma <= 17);
+    spr('błysk od środka Łuku, siła SILA_BLYSKU_LUK', bl.every(([z, s]) => z.x === 960 && s === NASTAWY.SILA_BLYSKU_LUK));
+    const r2 = new ReakcjeTechnik();
+    const piorun = { aktywny: true, punktUderzenia: { x: 900, y: 950 } };
+    spr('piorun Gromu w deszczu błyska', r2.klatka({ piorun, dodola }, DT).burzaWDeszczu === 1);
+    const r3 = new ReakcjeTechnik();
+    const grzmot = { wybuch: { x: 800, y: 600, sila: 0.7 } };
+    spr('wybuch Grzmotu w deszczu = 1 błysk', r3.klatka({ grzmot, dodola }, DT).burzaWDeszczu === 1);
+    const sucho = { pada: false, rozblysk: () => { throw new Error('nie wolno'); } };
+    spr('bez deszczu - nic', new ReakcjeTechnik().klatka({ lukPeruna: luk, piorun, grzmot, dodola: sucho }, DT).burzaWDeszczu === 0);
+}
+
+console.log('\nSYK (deszcz gasi Płonący Palec):');
+{
+    const syki = [];
+    const dodola = { pada: true, natezenie: 0.8, syk: (g) => { syki.push(g); return true; } };
+    const palec = { stan: 'PLONIE', przygaszenie: 0, zgasDeszczem() { const g = { x: 0.5, y: 0.3 }; this.stan = 'BEZCZYNNY'; return g; } };
+    const r = new ReakcjeTechnik();
+    let suma = 0;
+    for (let i = 0; i < 30; i++) suma += r.klatka({ dodola, plonacyPalec: palec }, DT).syk;
+    spr(`po 0.5 s płomień przygasa (${palec.przygaszenie.toFixed(2)}), jeszcze płonie`, palec.stan === 'PLONIE' && palec.przygaszenie > 0.4 && suma === 0);
+    for (let i = 0; i < 40; i++) suma += r.klatka({ dodola, plonacyPalec: palec }, DT).syk;
+    spr('po CZAS_GASZENIA gaśnie: 1 jednostka Syku', suma === 1 && palec.stan === 'BEZCZYNNY');
+    spr('obłoczek pary tam, gdzie płonął', syki.length === 1 && syki[0].x === 0.5);
+    spr('po zgaszeniu przygaszenie wraca do 0', palec.przygaszenie === 0);
+
+    const mzawka = { pada: true, natezenie: 0.1, syk: () => true };
+    const p2 = { stan: 'PLONIE', przygaszenie: 0, zgasDeszczem: () => { throw new Error('nie wolno'); } };
+    const r2 = new ReakcjeTechnik();
+    for (let i = 0; i < 120; i++) r2.klatka({ dodola: mzawka, plonacyPalec: p2 }, DT);
+    spr('mżawka (poniżej PROG_GASZENIA) palca nie rusza', p2.stan === 'PLONIE' && p2.przygaszenie === 0);
+
+    const p3 = { stan: 'PLONIE', przygaszenie: 0.7, zgasDeszczem: () => { throw new Error('nie wolno'); } };
+    new ReakcjeTechnik().klatka({ dodola: { pada: false, natezenie: 1 }, plonacyPalec: p3 }, DT);
+    spr('bez deszczu przygaszenie zerowane', p3.przygaszenie === 0);
+    const ogniki = { aktywny: true, punkty: () => [{ x: 1, y: 1 }], zgasDeszczem: () => { throw new Error('ogniki nie gasną'); } };
+    let rzucil = false;
+    try { for (let i = 0; i < 90; i++) new ReakcjeTechnik().klatka({ dodola, bledneOgniki: ogniki }, DT); } catch { rzucil = true; }
+    spr('Błędnych Ogników deszcz nie gasi (decyzja właściciela)', !rzucil);
+}
+
+console.log('\nWIR OGNIKÓW - PRZEDŁUŻENIE:');
+{
+    const blisko = (a, b) => Math.abs(a - b) < 1e-9;
+    const log = [];
+    let raz = true, nowe = [2, 3];   // ogniki widoczne stopniowo - porwanie w dwóch klatkach
+    const t = {
+        bledneOgniki: { aktywny: true, pozostaloS: 1.5, punkty: () => [], oznaczMgle: () => 0,
+                        porwij: () => nowe.shift() ?? 0,
+                        przedluzWir: (s) => { log.push(['ogniki', s]); const b = raz; raz = false; return b; } },
+        kurzawa: { aktywny: true, pozostaloS: 2.5, orbita: () => ({ cx: 0, cy: 0, R: 1, squash: 1, kierunek: 1, predkosc: 1 }),
+                   przedluz: (s) => { log.push(['kurzawa', s]); return true; } }
+    };
+    const r = new ReakcjeTechnik();
+    r.klatka(t, DT); r.klatka(t, DT); r.klatka(t, DT);
+    const kur = log.filter(([k]) => k === 'kurzawa');
+    spr('wspólny koniec: dłuższa z technik + PRZEDLUZENIE_WIRU', blisko(log[0]?.[1], 2.5 + NASTAWY.PRZEDLUZENIE_WIRU));
+    spr('Kurzawa przedłużona raz, z zapasem po ognikach',
+        kur.length === 1 && blisko(kur[0][1], 2.5 + NASTAWY.PRZEDLUZENIE_WIRU + NASTAWY.ZAPAS_KURZAWY));
+    const stare = { bledneOgniki: { aktywny: true, punkty: () => [], oznaczMgle: () => 0, porwij: () => 3 },
+                    kurzawa: { aktywny: true, orbita: () => ({}) } };
+    let rzucil = false;
+    try { new ReakcjeTechnik().klatka(stare, DT); } catch (e) { rzucil = e; }
+    spr('techniki bez API przedłużenia - nie rzuca', rzucil === false);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

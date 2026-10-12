@@ -150,5 +150,37 @@ console.log('\nORBITA (reakcja Wir ogników):');
     spr('po wygaśnięciu null', ko.orbita() === null);
 }
 
+console.log('\nPRZEDŁUŻENIE (reakcja Wir ogników):');
+{
+    spr('obwiednia z dłuższym końcem: żyje po CZAS_TRWANIA, 0 na nowym końcu',
+        obwiednia(CZAS_TRWANIA + 1, CZAS_TRWANIA + 3) > 0 && obwiednia(CZAS_TRWANIA + 3, CZAS_TRWANIA + 3) === 0);
+    const kp = new Kurzawa();
+    spr('nieaktywna: przedluz() false, pozostaloS 0', kp.przedluz(3) === false && kp.pozostaloS === 0);
+    kp.zapal(1);
+    przepusc(kp, klatka(), CZAS_TRWANIA - 0.5);
+    spr('przedluz(NaN / 0) - false', kp.przedluz(NaN) === false && kp.przedluz(0) === false);
+    spr('przedluz(4) - true, pozostaloS ~4', kp.przedluz(4) === true && blisko(kp.pozostaloS, 4));
+    spr('przedluz() nigdy nie skraca', kp.przedluz(1) === true && blisko(kp.pozostaloS, 4));
+    przepusc(kp, klatka(), 3.5);
+    spr('trwa po bazowym CZAS_TRWANIA', kp.aktywny === true && obwiednia(kp._t, kp._koniec) > 0);
+    przepusc(kp, klatka(), 0.6);
+    spr('gaśnie na nowym końcu', kp.aktywny === false);
+    kp.zapal(1); kp.przedluz(10); kp.zapal(1);
+    spr('ponowny zapal() wraca do bazowej długości', blisko(kp.pozostaloS, CZAS_TRWANIA));
+}
+
+console.log('\nORBITY (reakcja Dymny wir):');
+{
+    const ko = new Kurzawa();
+    spr('nieaktywna: []', Array.isArray(ko.orbity()) && ko.orbity().length === 0);
+    ko.zapal(1);
+    przepusc(ko, klatka(), 0.2);
+    const ob = ko.orbity();
+    spr(`wszystkie pasy (${ob.length}), naprzemienne kierunki, skończone`,
+        ob.length === NASTAWY.PASY.length && ob.every((o, i) => o.kierunek === (i % 2 ? -1 : 1))
+        && ob.every(o => [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite)));
+    spr('pas 2 zgodny z orbita()', JSON.stringify(ob[2]) === JSON.stringify(ko.orbita()));
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);

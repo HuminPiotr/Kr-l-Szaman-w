@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -138,9 +138,15 @@ const jestPrefiksem = (krotszy, dluzszy) =>
     dluzszy.length > krotszy.length && dluzszy.slice(0, krotszy.length).join() === krotszy.join();
 const jestSufiksemCalej = (krotszy, dluzszy) =>
     dluzszy.length > krotszy.length && dluzszy.slice(-krotszy.length).join() === krotszy.join();
-spr('żadna sekwencja nie jest prefiksem ani sufiksem innej',
-    KOMBOSY.every(a => KOMBOSY.every(b => a === b ||
+// Wyjątek: wpisy `wariant: true` (Tęcza z przytrzymaną wodą) CELOWO kończą się
+// sekwencją Dodoli - o wyniku decyduje kolejność w tabeli, pilnowana jawnie
+// w sekcji DODOLA niżej, zamiast "po cichu" przez _dopasuj().
+const zwykle = KOMBOSY.filter(k => !k.wariant);
+spr('żadna sekwencja nie jest prefiksem ani sufiksem innej (poza wariantami)',
+    zwykle.every(a => zwykle.every(b => a === b ||
         (!jestPrefiksem(a.sekwencja, b.sekwencja) && !jestSufiksemCalej(a.sekwencja, b.sekwencja)))));
+spr('warianty niosą id istniejącej techniki zwykłej',
+    KOMBOSY.filter(k => k.wariant).every(w => zwykle.some(z => z.id === w.id && z.uzbraja === w.uzbraja)));
 spr('żadne dwie techniki nie mają identycznej sekwencji',
     new Set(KOMBOSY.map(k => k.sekwencja.join())).size === KOMBOSY.length);
 
@@ -319,5 +325,29 @@ k35.dodaj('weles', 0);
 spr('weles, swarog -> Ogniki', k35.dodaj('swarog', 500)?.id === 'bledneOgniki');
 k35.dodaj('stribog', 1000);
 spr('...stribog, swarog -> Okadzenie (łańcuch)', k35.dodaj('swarog', 1500)?.id === 'dym');
+
+console.log('\nDODOLA (mokosz -> mokosz -> stribog) I WARIANTY TĘCZY:');
+const k36 = new KomboSilnik();
+spr('mokosz nic', k36.dodaj('mokosz', 0) === null);
+spr('mokosz, mokosz nic (żadna dwójka)', k36.dodaj('mokosz', 600) === null);
+spr('mokosz, mokosz, stribog -> Dodola', k36.dodaj('stribog', 1500)?.id === 'dodola');
+spr('...a dołożony stribog - Podmuch Striboga (łańcuch)', k36.dodaj('stribog', 2500)?.id === 'aard');
+const k37 = new KomboSilnik();
+k37.dodaj('swarog', 0); k37.dodaj('mokosz', 500); k37.dodaj('mokosz', 1100);
+spr('Tęcza z przytrzymaną wodą (sw, mo, mo, st) -> Tęcza, nie deszcz', k37.dodaj('stribog', 1800)?.id === 'tecza');
+const k38 = new KomboSilnik();
+k38.dodaj('swarog', 0); k38.dodaj('mokosz', 500); k38.dodaj('mokosz', 1100); k38.dodaj('mokosz', 1700);
+spr('Tęcza z trzema wodami (sw, mo, mo, mo, st) -> Tęcza', k38.dodaj('stribog', 2400)?.id === 'tecza');
+const k39 = new KomboSilnik();
+k39.dodaj('swarog', 0); k39.dodaj('mokosz', 500);
+spr('zwykła Tęcza dalej działa', k39.dodaj('stribog', 1000)?.id === 'tecza');
+const k40 = new KomboSilnik();
+k40.dodaj('stribog', 0);
+spr('stribog, mokosz -> Mgła (wcześniejsze powietrze gracza)', k40.dodaj('mokosz', 500)?.id === 'mglaMokoszy');
+k40.dodaj('mokosz', 1100);
+spr('...mokosz, stribog -> Dodola (Mgła, potem deszcz)', k40.dodaj('stribog', 1800)?.id === 'dodola');
+const iWariant = KOMBOSY.findIndex(k => k.wariant);
+const iDodola = KOMBOSY.findIndex(k => k.id === 'dodola');
+spr('warianty Tęczy stoją w tabeli PRZED Dodolą', iWariant >= 0 && KOMBOSY.every((k, i) => !k.wariant || i < iDodola));
 
 process.exit(ok ? 0 : 1);

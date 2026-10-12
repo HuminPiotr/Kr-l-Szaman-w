@@ -10,7 +10,8 @@
  *  - DYM Okadzenia: ogniki to zarzewia (zarzewia() -> main.js -> dym.podpal),
  *  - MGŁA Mokoszy: latarnie - aureola rośnie (oznaczMgle), kłęby wokół się
  *    ciepło podświetlają (mgla.podswietl),
- *  - KURZAWA: wir porywa ogniki na orbitę (porwij(kurzawa.orbita())).
+ *  - KURZAWA: wir porywa ogniki na orbitę (porwij(kurzawa.orbita())), a cały
+ *    wir - ogniki i Kurzawa - trwa dłużej (przedluzWir, raz na rzucenie).
  * Reakcje ustawiają stan w klatce N, ogniki go zużywają w klatce N+1 -
  * techniki się nie znają, a każdą da się wyjąć jednym commitem.
  *
@@ -110,6 +111,8 @@ const orbitaOk = (o) => !!o && [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Num
 export class BledneOgniki {
     constructor() {
         this._t = 0;
+        this._koniec = CZAS_TRWANIA;   // s od zapal() - przedluzWir() go odsuwa
+        this._przedluzone = false;     // Wir ogników wydłuża raz na rzucenie
         this._trwa = false;
         this._sila = 1;
         this._ogniki = [];
@@ -122,6 +125,22 @@ export class BledneOgniki {
 
     get aktywny() { return this._trwa; }
 
+    /** Sekundy do końca (0, gdy nieaktywne). */
+    get pozostaloS() { return this._trwa ? Math.max(0, this._koniec - this._t) : 0; }
+
+    /**
+     * Reakcja Wir ogników: wszystkie ogniki gasną RAZEM za `doKoncaS` sekund od
+     * teraz (ognik, który już przygasał, wraca do pełnego blasku). Raz na rzucenie.
+     * @returns {boolean}  czy przedłużono
+     */
+    przedluzWir(doKoncaS) {
+        if (!this._trwa || this._przedluzone || !Number.isFinite(doKoncaS) || doKoncaS <= 0) return false;
+        this._przedluzone = true;
+        for (const o of this._ogniki) o.zycie = Math.max(o.zycie, o.wiek + doKoncaS);
+        this._koniec = Math.max(this._koniec, this._t + doKoncaS + 0.05);
+        return true;
+    }
+
     wyczyscCache() {}
 
     zapal(sila = 1) {
@@ -130,6 +149,8 @@ export class BledneOgniki {
         const N = NASTAWY;
         this._sila = s;
         this._t = 0;
+        this._koniec = CZAS_TRWANIA;
+        this._przedluzone = false;
         this._trwa = true;
         // Ogniki rodzą się przy pierwszej klatce (dopiero updateAndDraw zna zaczep) -
         // tu tylko ich los: opóźnienie, życie, faza, wariant sprite'a.
@@ -234,7 +255,7 @@ export class BledneOgniki {
         const N = NASTAWY;
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         this._t += krok;
-        if (this._t >= CZAS_TRWANIA) { this._trwa = false; this._ogniki = []; return; }
+        if (this._t >= this._koniec) { this._trwa = false; this._ogniki = []; return; }
 
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
         const zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)

@@ -71,9 +71,37 @@ function farma() {
     return Math.round(p.rozbicie.reakcje);
 }
 
+// Dymny wir: Kurzawa (4 pasy) wyśrodkowana na ciele (usta), zapalona na chmurze;
+// trąbę podpalają ogniki po ZAPLON_S, Kurzawa puszcza po KURZAWA_S (5 s, ~9 s z Wirem ogników).
+function wir(sekundy, kurzawaS, zaplonS = 2) {
+    const d = chmura(sekundy), p = new Punktacja();
+    const sk = 190, orbity = [1.3, 0.7, 0.1, -0.5].map((dy, i) => ({ cx: USTA.x, cy: Math.min(USTA.y - 200 + dy * sk, H * 0.92),
+        R: sk * 1.45, squash: 0.28, kierunek: i % 2 ? -1 : 1, predkosc: 3.6 }));
+    let t = 0, wirPkt = 0;
+    for (let i = 0; i < 60 * 30; i++, t += DT * 1000) {
+        const ts = i * DT;
+        if (ts < kurzawaS) d.zawiruj(orbity);
+        if (Math.abs(ts - zaplonS) < DT / 2) {
+            const c = d._czastki.find(q => q.zawirowany && q.stan === 'DYM') ?? d._czastki[0];
+            d.podpal([{ x: c.x / POL, y: c.y / POL, r: 10 }]);
+        }
+        p.reakcja('pozoga', d.updateAndDraw(null, W, H, DT), t);
+        const przed = p.rozbicie.reakcje;
+        p.reakcja('wirDymu', d.ostatnioZawirowane, t);
+        wirPkt += p.rozbicie.reakcje - przed;
+        p.reakcja('ognistyWir', d.ostatnioWybuchyWiru, t);
+    }
+    return { wir: Math.round(wirPkt), razem: Math.round(p.rozbicie.reakcje - wirPkt),
+             zawirowane: p.momenty.serie.wirDymu ?? 0, wybuchyWiru: p.momenty.serie.ognistyWir ?? 0, wybuchy: p.momenty.serie.pozoga ?? 0 };
+}
+
 console.log(`Okadzenie = ${okadzenie} pkt; cel pełnej Pożogi ${Math.round(1.5 * okadzenie)}-${2 * okadzenie}`);
 for (const s of [2, 5, 15, 60]) {
     const a = pozoga(s), b = rozwianie(s);
     console.log(`dmuchanie ${String(s).padStart(2)} s: kłębów ${a.kleby} | Pożoga ×${a.wybuchy} = ${a.punkty} | Rozwianie = ${b.punkty}`);
 }
 console.log(`farma (chmura dokarmiana + fala co 3 s, 60 s): Rozwianie = ${farma()} pkt (cel ≤ ~1000)`);
+for (const s of [5, 15, 60]) for (const k of [5, 9]) {
+    const w = wir(s, k);
+    console.log(`chmura ${String(s).padStart(2)} s, Kurzawa ${k} s: Dymny wir (${w.zawirowane} kłębów) = ${w.wir} | trąba: wybuchów ${w.wybuchy}, z wiru ${w.wybuchyWiru} -> Pożoga + Ognisty wir = ${w.razem}`);
+}

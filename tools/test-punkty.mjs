@@ -6,7 +6,7 @@
  * Spec: docs/superpowers/specs/2026-10-01-punktacja-design.md
  */
 import {
-    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI
+    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S
 } from '../js/punkty.js';
 import { KOMBOSY } from '../js/kombosy.js';
 
@@ -32,6 +32,8 @@ console.log('\nWARTOŚCI Z SPECU:');
 spr(`Kołowrót = 320 (${wartoscTechniki(kombo('kolowrot'))})`, wartoscTechniki(kombo('kolowrot')) === 320);
 spr(`Okadzenie = 460 (${wartoscTechniki(kombo('dym'))})`, wartoscTechniki(kombo('dym')) === 460);
 spr(`Grom w Ogniu = 280 (${wartoscTechniki(kombo('gromWOgniu'))})`, wartoscTechniki(kombo('gromWOgniu')) === 280);
+spr('warianty (Tęcza z przytrzymaną wodą) warte tyle co technika bazowa',
+    KOMBOSY.filter(k => k.wariant).every(w => wartoscTechniki(w) === wartoscTechniki(KOMBOSY.find(k => k.id === w.id && !k.wariant))));
 
 console.log('\nTANIEC:');
 const t = new Punktacja();
@@ -47,6 +49,26 @@ const t4 = new Punktacja();
 t4.taniec(NaN, 1, 0.1); t4.taniec(1, Infinity, 0.1); t4.taniec(1, 1, NaN); t4.taniec(1, 1, -1);
 spr('NaN/Infinity/ujemne dt nie zatruwają wyniku', t4.wynik === 0);
 spr('rozbicie.taniec = wynik', t.rozbicie.taniec === t.wynik);
+
+console.log('\nZAKLINANIE (Dodola):');
+{
+    const u = new Punktacja();
+    for (let i = 0; i < 60; i++) u.zaklinanie(1, 1 / 60);
+    spr(`sekunda pełnej ulewy = PUNKTY_ULEWY_NA_S (${u.wynik.toFixed(2)})`, Math.abs(u.wynik - PUNKTY_ULEWY_NA_S) < 1e-6);
+    spr('trafia do warstwy technik', u.rozbicie.techniki === u.wynik && u.rozbicie.taniec === 0);
+    const m = new Punktacja(), s = new Punktacja();
+    for (let i = 0; i < 60; i++) { m.zaklinanie(0.9, 1 / 60); s.zaklinanie(0.2, 1 / 60); }
+    spr(`wąż (0.9) opłaca się >10× bardziej niż skrzydło (0.2): ${m.wynik.toFixed(1)} vs ${s.wynik.toFixed(1)}`, m.wynik > 10 * s.wynik);
+    const z = new Punktacja();
+    z.zaklinanie(NaN, 0.1); z.zaklinanie(1, NaN); z.zaklinanie(1, -1); z.zaklinanie(-3, 0.1); z.zaklinanie(0, 0.1);
+    spr('NaN/ujemne/zero nie punktują', z.wynik === 0);
+    const d = new Punktacja();
+    d.zaklinanie(1, 5);
+    spr('dt przycięte jak przy tańcu', Math.abs(d.wynik - PUNKTY_ULEWY_NA_S * 0.1) < 1e-6);
+    const n = new Punktacja();
+    n.aktywna = false; n.zaklinanie(1, 0.1);
+    spr('tryb swobodny (aktywna=false) nie punktuje', n.wynik === 0);
+}
 
 console.log('\nPIECZĘĆ:');
 const p = new Punktacja();

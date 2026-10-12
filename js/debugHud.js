@@ -11,7 +11,7 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
-import { SesjaNagraniowa, SCENARIUSZ } from './nagrywanie/sesja.js';
+import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE } from './nagrywanie/sesja.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
 import { czyPoleTekstowe } from './klawisze.js';
@@ -58,6 +58,8 @@ export class DebugHud {
             // tylko po to i zaraz musi odejść.
             if (e.key === 'z' || e.key === 'Z') this._startSesji(1);
             if (/^[1-8]$/.test(e.key)) this._startSesji(Number(e.key));
+            // F: scenariusz falowania ramion (miara falistości) - zawsze od kroku 1.
+            if (e.key === 'f' || e.key === 'F') this._startSesji(1, SCENARIUSZ_FALOWANIE);
             if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
     }
@@ -67,8 +69,9 @@ export class DebugHud {
         this.vMax = 0;
     }
 
-    _startSesji(odKroku) {
+    _startSesji(odKroku, scenariusz = SCENARIUSZ) {
         if (this.sesja.aktywna) return;      // drugie naciśnięcie nie restartuje
+        this.sesja = new SesjaNagraniowa({ scenariusz });
         this.zapis = new ZapisProbek();
         this.sesja.start(odKroku);
         this.ekranSesji.style.display = 'flex';
@@ -188,7 +191,7 @@ export class DebugHud {
         const szer = Math.round(s.postep * 100);
         const kolor = s.stan === 'nagrywanie' ? '#00ffcc' : '#ffb347';
         this.ekranSesji.innerHTML = `
-            <div style="font-size:15px;opacity:0.75">krok ${s.krok.nr}/${SCENARIUSZ.length}
+            <div style="font-size:15px;opacity:0.75">krok ${s.krok.nr}/${this.sesja.scenariusz.length}
                  · powtórzenie ${s.powtorzenie}/${s.krok.powtorzenia}</div>
             <div style="font-size:54px;color:${kolor}">${s.krok.nazwa}</div>
             <div style="max-width:70vw;font-size:24px;font-weight:400">${s.krok.opis}</div>
@@ -376,6 +379,19 @@ export class DebugHud {
         }
 
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
+        // Dodola: natężenie deszczu i składniki miary falowania - stąd stroić
+        // NASTAWY w js/ruchy/falowanieRamion.js i js/zaklinanie.js.
+        const dd = stats.dodola;
+        if (dd && dd.stan && dd.stan !== 'BEZCZYNNY') {
+            lines.push(`deszcz ${dd.stan}  ${this._num(dd.natezenie)}   ${this._bar(dd.natezenie)}`);
+            lines.push(`      jakość ${this._num(dd.jakosc)}   ${this._bar(dd.jakosc)}`);
+            const s = dd.skladniki;
+            lines.push(s
+                ? `      rozp ${this._num(s.rozpostarcie)} ampl ${this._num(s.amplituda)} kor ${this._num(s.korelacja)} zgięcie ${this._num(s.zgiecie)} opóźn ${this._num(s.opoznienie)}`
+                : '      (miara: brak ramion w kadrze albo okno się zbiera)');
+        } else if (dd?.powodKonca) {
+            lines.push(`deszcz — ostatni koniec: ${dd.powodKonca}`);
+        }
         // Wyniki postaw i stan pierścienia. Progi w pieczecie.js są ZGADNIĘTE
         // i stroi się je właśnie stąd - liczba "0.62" przy konkretnej pozycji
         // ciała jest jedynym sposobem, żeby ustawić PROG_POSTAWY sensownie.

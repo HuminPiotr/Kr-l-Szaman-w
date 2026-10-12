@@ -30,7 +30,7 @@ globalThis.document = {
     }
 };
 
-const { Dym, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki, jasnoscZaru,
+const { Dym, celWiru, wznoszenieCzynnik, promienCzastki, wiekBiblioteki, skalaCzastki, jasnoscZaru,
         NAROST_S, ZANIK_S, KOLUMNA_S, SKALA_KOLUMNY, TAU_ROZROSTU_S,
         CZASTEK_NA_S, ZYCIE_MIN_S, ZYCIE_MAX_S, MAX_CZASTEK, WYLOT_W_S,
         WYRAZISTOSC_PODLOGA, ROZGARNIJ_PROMIEN_W,
@@ -499,6 +499,63 @@ console.log('\nŻAR - tlące się drobinki (dym łatwopalny, nie para):');
     const n = wszystkie(d).length, zZarem = wszystkie(d).filter(c => c.zar).length;
     spr(`mniej więcej co ZAR_CO_ILE-ty kłąb tli się (${zZarem}/${n})`,
         zZarem > 0 && zZarem < n / NASTAWY.ZAR_CO_ILE * 2.5);
+}
+
+console.log('\nDYMNY WIR (Kurzawa wciąga dym):');
+{
+    // Pasy jak Kurzawa: kierunki naprzemiennie, środek na osi ust.
+    const orbity = [0.9, 0.5, 0.1].map((dy, i) => ({ cx: USTA.x, cy: USTA.y + dy * 190 - 100, R: 275, squash: 0.28,
+                                                       kierunek: i % 2 ? -1 : 1, predkosc: 3.6 }));
+    const o = orbity[1];
+    const naPrawo = celWiru(o.cx + o.R, o.cy, orbity);
+    spr('na prawym skraju pasa ruch pionowy, zgodnie z kierunkiem', naPrawo && Math.abs(naPrawo.vx) < 1e-6 && Math.sign(naPrawo.vy) === Math.sign(o.kierunek) && naPrawo.wplyw > 0);
+    const sasiad = celWiru(orbity[0].cx + orbity[0].R, orbity[0].cy, orbity);
+    spr('sąsiedni pas kręci przeciwnie', Math.sign(sasiad.vy) === -Math.sign(naPrawo.vy));
+    const wewnatrz = celWiru(o.cx + o.R * 0.3, o.cy, orbity);
+    spr('kłąb wewnątrz elipsy ściągany na zewnątrz, na pas', wewnatrz.vx > 0);
+    spr('daleko w bok / daleko nad pasami / brak orbit / NaN - null',
+        celWiru(o.cx + o.R * 5, o.cy, orbity) === null && celWiru(o.cx, o.cy - o.R * 5, orbity) === null
+        && celWiru(o.cx, o.cy, []) === null && celWiru(NaN, 0, orbity) === null && celWiru(0, 0, [{ cx: NaN }]) === null);
+
+    // Fizyka: chmura przed ustami, Kurzawa przez 2 s - kłęby krążą i liczą się raz.
+    const d = new Dym();
+    for (let i = 0; i < 60; i++) { d.emituj(USTA, W_PRAWO, 1, 1, 1 / 60, W, H); d.updateAndDraw(null, W, H, 1 / 60); }
+    spr('świeży Dym: ostatnioZawirowane = 0, ostatnioWybuchyWiru = 0', new Dym().ostatnioZawirowane === 0 && new Dym().ostatnioWybuchyWiru === 0);
+    let zawirowane = 0, klatkiZ = 0;
+    const katy0 = wszystkie(d).map(c => Math.atan2(c.y / POL - o.cy, c.x / POL - o.cx));
+    for (let i = 0; i < 120; i++) {
+        d.zawiruj(orbity); d.updateAndDraw(null, W, H, 1 / 60);
+        zawirowane += d.ostatnioZawirowane; if (d.ostatnioZawirowane) klatkiZ++;
+    }
+    spr(`kłęby wciągnięte w wir liczą się (${zawirowane} z ${d._czastki.length})`, zawirowane > 0 && zawirowane <= d._czastki.length);
+    spr('każdy kłąb liczy się raz w życiu', wszystkie(d).filter(c => c.zawirowany).length === zawirowane);
+    const obrot = wszystkie(d).filter(c => c.zawirowany).length;
+    spr(`zawirowane kłęby faktycznie się przemieściły względem osi ciała (${obrot})`,
+        wszystkie(d).some((c, i) => Math.abs(Math.atan2(c.y / POL - o.cy, c.x / POL - o.cx) - (katy0[i] ?? 0)) > 0.3));
+    d.updateAndDraw(null, W, H, 1 / 60);
+    spr('bez zawiruj() w klatce - nic nie liczy (lista jednorazowa)', d.ostatnioZawirowane === 0);
+    spr('zawiruj() z null / śmieciami nie wywala',
+        (() => { d.zawiruj(null); d.zawiruj([{ cx: NaN }, null]); d.updateAndDraw(null, W, H, 1 / 60);
+                 return wszystkie(d).every(c => Number.isFinite(c.x) && Number.isFinite(c.y)); })());
+
+    // Ognisty wir: podpalona trąba - wybuchy kłębów z wiru liczą się osobno.
+    const c0 = wszystkie(d).find(c => c.zawirowany);
+    let wybuchy = 0, wybuchyWiru = 0;
+    d.zawiruj(orbity);
+    d.podpal([{ x: c0.x / POL, y: c0.y / POL, r: 10 }]);
+    for (let i = 0; i < 600; i++) {
+        d.zawiruj(orbity);
+        wybuchy += d.updateAndDraw(null, W, H, 1 / 60);
+        wybuchyWiru += d.ostatnioWybuchyWiru;
+    }
+    spr(`płonąca trąba: wybuchy z wiru liczone (${wybuchyWiru} z ${wybuchy})`, wybuchyWiru > 0 && wybuchyWiru <= wybuchy);
+    const e = new Dym();
+    for (let i = 0; i < 60; i++) { e.emituj(USTA, W_PRAWO, 1, 1, 1 / 60, W, H); e.updateAndDraw(null, W, H, 1 / 60); }
+    const c1 = wszystkie(e)[0];
+    e.podpal([{ x: c1.x / POL, y: c1.y / POL, r: 10 }]);
+    let wyrWiru = 0, wyr = 0;
+    for (let i = 0; i < 600; i++) { wyr += e.updateAndDraw(null, W, H, 1 / 60); wyrWiru += e.ostatnioWybuchyWiru; }
+    spr(`zwykła Pożoga bez Kurzawy - zero Ognistego wiru (${wyr} wybuchów)`, wyr > 0 && wyrWiru === 0);
 }
 
 process.exit(ok ? 0 : 1);

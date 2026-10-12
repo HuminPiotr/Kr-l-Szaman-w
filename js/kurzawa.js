@@ -83,10 +83,13 @@ export const NASTAWY = {
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
 
-/** Alfa całości - narost NAROST, gaśnie przez ostatnie WYGASZENIE sekund. */
-export function obwiednia(t) {
-    if (!Number.isFinite(t) || t <= 0 || t >= CZAS_TRWANIA) return 0;
-    return Math.min(1, t / NASTAWY.NAROST) * Math.min(1, (CZAS_TRWANIA - t) / NASTAWY.WYGASZENIE);
+/**
+ * Alfa całości - narost NAROST, gaśnie przez ostatnie WYGASZENIE sekund przed
+ * `koniec` (domyślnie CZAS_TRWANIA; dłuższy po reakcji Wir ogników).
+ */
+export function obwiednia(t, koniec = CZAS_TRWANIA) {
+    if (!Number.isFinite(t) || !Number.isFinite(koniec) || t <= 0 || t >= koniec) return 0;
+    return Math.min(1, t / NASTAWY.NAROST) * Math.min(1, (koniec - t) / NASTAWY.WYGASZENIE);
 }
 
 /**
@@ -196,6 +199,7 @@ export function ziarnoNaTorze(z, t, zaczep, H) {
 export class Kurzawa {
     constructor() {
         this._t = 0;
+        this._koniec = CZAS_TRWANIA;   // s od zapal() - przedluz() go odsuwa
         this._trwa = false;
         this._sila = 0;
         this._pyl = [];
@@ -220,7 +224,34 @@ export class Kurzawa {
         return { cx: g.cx, cy: g.cy, R: g.R, squash: NASTAWY.SQUASH, kierunek: g.kierunek, predkosc: NASTAWY.PREDKOSC_KATOWA };
     }
 
+    /**
+     * Orbity WSZYSTKICH pasów (od najniższego) - dla reakcji Dymny wir
+     * (main.js -> dym.zawiruj): każdy kłąb kręci się z najbliższym pasem.
+     * @returns {Array<{cx, cy, R, squash, kierunek, predkosc}>}  [] gdy nieaktywna
+     */
+    orbity() {
+        if (!this._trwa || !this.zaczep || !Number.isFinite(this._H)) return [];
+        return NASTAWY.PASY.map((_, i) => {
+            const g = geometriaPasa(i, this.zaczep, this._H);
+            return { cx: g.cx, cy: g.cy, R: g.R, squash: NASTAWY.SQUASH, kierunek: g.kierunek, predkosc: NASTAWY.PREDKOSC_KATOWA };
+        });
+    }
+
     get aktywny() { return this._trwa; }
+
+    /** Sekundy do końca (0, gdy nieaktywna). */
+    get pozostaloS() { return this._trwa ? Math.max(0, this._koniec - this._t) : 0; }
+
+    /**
+     * Reakcja Wir ogników: Kurzawa trwa jeszcze co najmniej `doKoncaS` sekund
+     * od teraz (nigdy nie skraca). Po wygaszaniu - wraca do pełnej alfy.
+     * @returns {boolean}
+     */
+    przedluz(doKoncaS) {
+        if (!this._trwa || !Number.isFinite(doKoncaS) || doKoncaS <= 0) return false;
+        this._koniec = Math.max(this._koniec, this._t + doKoncaS);
+        return true;
+    }
 
     wyczyscCache() { wyczyscCacheAssetow(); }
 
@@ -248,6 +279,7 @@ export class Kurzawa {
         this._zniesienie = null;
         this._sila = s;
         this._t = 0;
+        this._koniec = CZAS_TRWANIA;
         this._trwa = true;
         this._kotwica.reset();
         // Grudki i ziarna przypisane do podmuchów, z opóźnieniem względem głowy (lecą w smudze).
@@ -283,7 +315,7 @@ export class Kurzawa {
         if (!this._trwa) return;
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
         this._t += krok;
-        if (this._t >= CZAS_TRWANIA) { this._trwa = false; return; }
+        if (this._t >= this._koniec) { this._trwa = false; return; }
 
         const W = k?.W ?? 1920, H = k?.H ?? 1080;
         this._H = H;
@@ -307,7 +339,7 @@ export class Kurzawa {
         this.zaczep = { ...zaczep, mnoznikR: 1 + NASTAWY.SZARPNIECIE_ROZSZERZ * szarp, przesuniecie };
         if (!ctx) return;   // guard PO zegarze i zaczepie - patrz kolowrot.js
 
-        const alfa = obwiednia(this._t) * this._sila * (1 - NASTAWY.SZARPNIECIE_BLADNIE * szarp);
+        const alfa = obwiednia(this._t, this._koniec) * this._sila * (1 - NASTAWY.SZARPNIECIE_BLADNIE * szarp);
         if (alfa < 0.01) return;
         const N = NASTAWY;
         const ogony = [], mgly = [];

@@ -139,6 +139,23 @@ export const NASTAWY = {
     PODMUCH_ROZRZEDZENIE_S: 6,        // s życia tracone na 1 s pełnego trafienia
     PODMUCH_MAX_V: 6000,              // px/s - czoło w kamerę rośnie na ekranie bardzo szybko
 
+    // --- Dymny wir (2026-10-10): Kurzawa wciąga dym w swoje pasy (zawiruj) ---
+    // Kłąb przy pasie dostaje prędkość STYCZNĄ do najbliższego pasa, w poziomie
+    // jest ściągany na jego elipsę, a w pionie WSPINA SIĘ (WIR_WZNOSZENIE) -
+    // przechodzi z pasa na pas, zmieniając kierunek, i wychodzi górą: trąba.
+    // Ściąganie w pionie na wysokość pasa (v1) robiło płaskie pierścienie -
+    // relaksacja vy zjadała wyporność (pomiar 2026-10-10: kłęby stały w miejscu).
+    // Po Kurzawie nic nie trzyma: rozpływa się sama.
+    // ZGADNIĘTE - do strojenia na kamerze.
+    WIR_ZASIEG_R: 1.6,                // |dx| od osi ciała, w promieniach pasa
+    WIR_ZASIEG_Y: 0.6,                // ponad najwyższy / pod najniższy pas, w promieniach pasa
+    WIR_TEMPO: 0.45,                  // ułamek prędkości kątowej Kurzawy - dym jest cięższy od pyłu
+    WIR_TAU_S: 0.35,                  // s - jak szybko kłąb przejmuje ruch wiru
+    WIR_SCIAGANIE_S: 1.0,             // s - jak szybko kłąb schodzi na elipsę pasa (w poziomie)
+    WIR_WZNOSZENIE: 0.25,             // promieni pasa na sekundę - wspinanie się trąby
+    WIR_PROG_PUNKTU: 0.2,             // wpływ, od którego kłąb liczy się jako zawirowany
+    WIR_PAMIEC_S: 1.5,                // s - wybuch tyle po wirze to jeszcze Ognisty wir
+
     ZAPLON_KONTAKT_MNOZNIK: 0.55,     // promień kontaktu = promień kłębu * to (kłąb bywa 300 px)
     FRONT_PROMIEN_MNOZNIK: 0.45,      // zarażanie sąsiadek
     R_WYBUCHU_MIN_W: 0.035, R_WYBUCHU_MAX_W: 0.07,
@@ -184,6 +201,9 @@ export class Dym {
         this._t = 0;                 // zegar pola przepływu
         this._dlonie = [];           // nadgarstki i łokcie z prędkościami (rozgarnij)
         this._podmuchy = [];         // punkty czoła fali Aarda z prędkościami (pchnij)
+        this._wiry = [];             // orbity pasów Kurzawy (zawiruj)
+        this.ostatnioZawirowane = 0; // kłęby wciągnięte w wir PO RAZ PIERWSZY W ŻYCIU w tej klatce (punkty: 'wirDymu')
+        this.ostatnioWybuchyWiru = 0; // wybuchy kłębów, które niedawno krążyły w wirze (punkty: 'ognistyWir')
         this._nowychWybuchow = 0;    // liczone w callbacku, zwracane z updateAndDraw
         this.ostatnioRozwiane = 0;   // kłęby pchnięte falą PO RAZ PIERWSZY W ŻYCIU w tej klatce (punkty: reakcja 'rozwianie')
         this._wybuchajacych = 0;
@@ -299,6 +319,8 @@ export class Dym {
         c.tWybuch = 0;
         c.rozprzestrzenil = false;
         c.rozwiany = false;
+        c.zawirowany = false;
+        c.tWiru = -Infinity;
         c.faza = Math.random() * Math.PI * 2;
         c.zar = Math.random() < 1 / Math.max(1, NASTAWY.ZAR_CO_ILE);
         // Przesunięcie żaru od środka kłębu (ułamek promienia) - bez niego
@@ -335,6 +357,18 @@ export class Dym {
     }
 
     /**
+     * Pasy Kurzawy wciągają dym w wir (reakcja Dymny wir). Ten sam kontrakt co
+     * pchnij(): USTAW listę, _fizyka konsumuje raz, updateAndDraw czyści -
+     * bez wywołania w kolejnej klatce wir puszcza i dym się rozpływa.
+     * Kręcone są dym i płonące kłęby (płonąca trąba).
+     *
+     * @param {Array<{cx, cy, R, squash, kierunek, predkosc}>} orbityPx  z kurzawa.orbity(), px gry
+     */
+    zawiruj(orbityPx) {
+        this._wiry = Array.isArray(orbityPx) ? orbityPx.filter(orbitaOk) : [];
+    }
+
+    /**
      * Podpal cząstki DYM w zasięgu zarzewi. Front (zarażanie sąsiadek) biegnie
      * w fizyce - tu wyłącznie PIERWSZY kontakt z zewnętrznym źródłem ognia.
      *
@@ -368,6 +402,8 @@ export class Dym {
      */
     updateAndDraw(ctx, W, H, dt) {
         this.ostatnioRozwiane = 0;   // PRZED guardem - pusta klatka też zeruje
+        this.ostatnioZawirowane = 0;
+        this.ostatnioWybuchyWiru = 0;
         const krok = Number.isFinite(dt) ? Math.max(0, Math.min(0.05, dt)) : 0;
         const maszyna = this._maszynaDla(W, H);
         if (!maszyna || krok <= 0) return 0;
@@ -378,6 +414,7 @@ export class Dym {
         maszyna.step(krok * 1000);
         this._dlonie = [];
         this._podmuchy = [];
+        this._wiry = [];
 
         if (ctx && this._plotno) {
             ctx.save();
@@ -474,6 +511,7 @@ export class Dym {
                     c.stan = 'WYBUCH';
                     c.tWybuch = 0;
                     this._nowychWybuchow++;
+                    if (this._t - c.tWiru < NASTAWY.WIR_PAMIEC_S) this.ostatnioWybuchyWiru++;
                 }
             }
 
@@ -569,6 +607,20 @@ export class Dym {
                 // klatce da bledszy, większy kłąb. Nie skok do końca życia -
                 // kilka klatek w czole to kilka sekund życia, nie cały zapas.
                 c.wiekGry += dt * NASTAWY.PODMUCH_ROZRZEDZENIE_S * wplyw;
+            }
+
+            // --- Dymny wir (Kurzawa): relaksacja prędkości do ruchu po pasie ---
+            if (this._wiry.length) {
+                const cel = celWiru(c.x / skalaDloni, c.y / skalaDloni, this._wiry);
+                if (cel) {
+                    const a = (1 - Math.exp(-dt / NASTAWY.WIR_TAU_S)) * cel.wplyw;
+                    c.vxGry += (cel.vx * skalaDloni / 1000 - c.vxGry) * a;
+                    c.vyGry += (cel.vy * skalaDloni / 1000 - c.vyGry) * a;
+                    if (cel.wplyw >= NASTAWY.WIR_PROG_PUNKTU) {
+                        c.tWiru = this._t;
+                        if (!c.zawirowany) { c.zawirowany = true; this.ostatnioZawirowane++; }
+                    }
+                }
             }
 
             if (!Number.isFinite(c.x) || !Number.isFinite(c.y)
@@ -802,6 +854,48 @@ export function wznoszenieCzynnik(y, H) {
 }
 
 /** Kierunek jednostkowy z fallbackiem "w górę". */
+const orbitaOk = (o) => !!o && [o.cx, o.cy, o.R, o.squash, o.predkosc].every(Number.isFinite)
+    && o.R > 0 && o.squash > 0;
+
+/**
+ * Docelowa prędkość kłębu w wirze Kurzawy - czysta funkcja, wszystko w px gry.
+ * Najbliższy w pionie pas daje kierunek obrotu (sąsiednie kręcą się
+ * przeciwnie); prędkość = styczna do elipsy pasa (WIR_TEMPO prędkości
+ * Kurzawy) + ściąganie na elipsę w poziomie (WIR_SCIAGANIE_S) + wspinanie
+ * w górę (WIR_WZNOSZENIE).
+ * @param {number} x
+ * @param {number} y
+ * @param {Array<{cx, cy, R, squash, kierunek, predkosc}>} orbity
+ * @returns {{vx, vy, wplyw:number}|null}  px/s; wplyw 0..1; null poza zasięgiem
+ */
+export function celWiru(x, y, orbity) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Array.isArray(orbity)) return null;
+    const N = NASTAWY;
+    let o = null, minCy = Infinity, maxCy = -Infinity;
+    for (const k of orbity) {
+        if (!orbitaOk(k)) continue;
+        if (!o || Math.abs(y - k.cy) < Math.abs(y - o.cy)) o = k;
+        minCy = Math.min(minCy, k.cy);
+        maxCy = Math.max(maxCy, k.cy);
+    }
+    if (!o) return null;
+    const R = o.R, dx = x - o.cx;
+    const poza = Math.max(0, minCy - y, y - maxCy) / (N.WIR_ZASIEG_Y * R);   // 0 między pasami
+    const wx = Math.min(1, 2 * (1 - Math.abs(dx) / (N.WIR_ZASIEG_R * R)));
+    const wy = Math.min(1, 2 * (1 - poza));
+    if (wx <= 0 || wy <= 0) return null;
+    const ex = dx / R, ey = (y - o.cy) / (R * o.squash);
+    const rho = Math.hypot(ex, ey), kat = Math.atan2(ey, ex);
+    const omega = (o.kierunek < 0 ? -1 : 1) * o.predkosc * N.WIR_TEMPO;
+    const sciag = (1 - rho) / N.WIR_SCIAGANIE_S;
+    const cos = Math.cos(kat), sin = Math.sin(kat);
+    return {
+        vx: -sin * R * rho * omega + cos * R * sciag,
+        vy: cos * rho * omega * R * o.squash - N.WIR_WZNOSZENIE * R,
+        wplyw: wx * wy
+    };
+}
+
 function kierunekJednostkowy(kierunek) {
     let kx = Number.isFinite(kierunek?.x) ? kierunek.x : 0;
     let ky = Number.isFinite(kierunek?.y) ? kierunek.y : -1;

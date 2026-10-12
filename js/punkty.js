@@ -32,6 +32,12 @@ export const BAZA_TECHNIKI = 100;
 export const SPADEK_POWTORZENIA = 0.25;   // ta sama technika pod rząd: -25% za każde powtórzenie
 export const PODLOGA_POWTORZENIA = 0.5;   // ...ale nigdy mniej niż połowa
 export const PREMIA_SPLECENIA = 0.5;      // +50% wartości drugiej techniki (Task 2)
+// Zaklinanie (Dodola, 2026-10-09): strumień punktów za natężenie, jak taniec.
+// KWADRAT natężenia celowo - wężowa fala (natężenie ~0.8-1) ma się opłacać
+// wyraźnie bardziej niż machanie skrzydłem (~0.2): 15 vs ~0.6 pkt/s.
+// ZGADNIĘTE: pełna ulewa przez sufit 40 s (js/zaklinanie.js MAX_S) = 600 pkt, ~1.75× wartości Dodoli (340).
+// Było 30 przy suficie 20 s - po wydłużeniu deszczu właściciel uznał 1200 za za dużo.
+export const PUNKTY_ULEWY_NA_S = 15;
 
 // Przycięcie dt tańca. Po powrocie na uśpioną kartę dt bywa sekundami -
 // bez sufitu jedna klatka dopisałaby gratis punkty za czas, w którym
@@ -61,6 +67,15 @@ export const REAKCJE = {
     pozoga: { nazwa: 'Pożoga', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Kłąb dymu pchnięty falą Aarda/Gromu PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioRozwiane).
     rozwianie: { nazwa: 'Rozwianie', punkty: 2, pelneDo: 30, przerwaMs: 10000 },
+    // Kłąb dymu wciągnięty w pasy Kurzawy PO RAZ PIERWSZY W ŻYCIU (dym.ostatnioZawirowane).
+    // Skala i przerwa jak Rozwianie (ta sama farma: chmura dokarmiana + Kurzawa co chwilę) -
+    // mniej niż Pożoga, zgodnie z życzeniem właściciela (2026-10-10).
+    wirDymu: { nazwa: 'Dymny wir', punkty: 2, pelneDo: 30, przerwaMs: 10000 },
+    // Wybuch kłębu, który w ciągu WIR_PAMIEC_S krążył w wirze - płonąca trąba.
+    // PREMIA ponad Pożogę (ta liczy się dalej). ZMIERZONE 2026-10-10 (tools/pomiar-reakcji.mjs,
+    // Kurzawa 5-9 s na ciele, zapłon po 2 s): ~100-140 kłębów z wiru -> +~350-420 pkt,
+    // czyli podpalona trąba ~1.5× zwykłej Pożogi; sam Dymny wir ~135-170.
+    ognistyWir: { nazwa: 'Ognisty wir', punkty: 5, pelneDo: 40, przerwaMs: 1500 },
     // Łuk Peruna wypuszcza odnogę do kręgu Kręgów Mokoszy (js/reakcjeTechnik.js), co 0.3 s.
     // Typowe nałożenie ~4.5 s = ~15 wyładowań = ~200 pkt (jak jedna prosta technika).
     przewodzenie: { nazwa: 'Przewodzenie', punkty: 15, pelneDo: 10, przerwaMs: 1500 },
@@ -76,7 +91,14 @@ export const REAKCJE = {
     // Błędny ognik po raz pierwszy w Mgle Mokoszy - latarnia we mgle. ZGADNIĘTE: 5 ogników ~60 pkt.
     latarnie: { nazwa: 'Latarnie', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
     // Błędny ognik porwany przez wir Kurzawy na orbitę. ZGADNIĘTE: 5 ogników ~60 pkt.
-    wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 }
+    wirOgnikow: { nazwa: 'Wir ogników', punkty: 12, pelneDo: 5, przerwaMs: 3000 },
+    // Tęcza zapalona w trakcie Dodoli - 1 jednostka na zapalenie. ZGADNIĘTE: ~1/3 Tęczy (440).
+    teczaPoDeszczu: { nazwa: 'Tęcza po deszczu', punkty: 150, pelneDo: 1, przerwaMs: 1500 },
+    // Błysk kropel Dodoli od Łuku / pioruna Gromu (co 60-150 ms) albo Grzmotu (raz).
+    // Ta sama skala co Burza w mgle: Łuk w deszczu ~5 s ~200 pkt.
+    burzaWDeszczu: { nazwa: 'Burza w deszczu', punkty: 10, pelneDo: 12, przerwaMs: 1500 },
+    // Deszcz Dodoli gasi Płonący Palec - 1 jednostka na zgaszenie. ZGADNIĘTE.
+    syk: { nazwa: 'Syk', punkty: 80, pelneDo: 1, przerwaMs: 1500 }
 };
 
 // Sufit jednostek na JEDNO wywołanie reakcja(). Fuzz w tools/test-punkty.mjs
@@ -99,7 +121,8 @@ const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
  *                   (w grze - zero zamiast NaN; w teście - czerwony strażnik)
  */
 export function wartoscTechniki(kombo) {
-    const s = kombo?.sekwencja;
+    // Warianty (Tęcza z przytrzymaną wodą, js/kombosy.js) płacą jak wpis bazowy.
+    const s = kombo?.sekwencjaPunktow ?? kombo?.sekwencja;
     if (!Array.isArray(s) || !s.length) return 0;
     let suma = 0;
     for (const id of s) {
@@ -149,6 +172,13 @@ export class Punktacja {
         if (!this.aktywna || !Number.isFinite(dt) || dt <= 0) return 0;
         return this._dodaj('taniec',
             PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * Math.min(dt, MAX_DT_TANCA_S));
+    }
+
+    /** Strumień za natężenie zaklinania (0..1) - warstwa technik, nie tańca. */
+    zaklinanie(natezenie, dt) {
+        if (!this.aktywna || !Number.isFinite(dt) || dt <= 0) return 0;
+        const n = clamp01(natezenie);
+        return this._dodaj('techniki', PUNKTY_ULEWY_NA_S * n * n * Math.min(dt, MAX_DT_TANCA_S));
     }
 
     pieczec(id, now, miejsce = null) {

@@ -55,6 +55,7 @@ import { Bania } from './bania.js';
 import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
+import { Dodola } from './deszcz.js';
 import { zagrajGrzmot } from './dzwiekGrzmotu.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 import { odpalPieczec, odpalTechnike, odpalJajo, BARWA_ZAPLONU } from './techniki.js';
@@ -261,6 +262,7 @@ let bania = new Bania();
 let grzmot = new Grzmot();
 let zawierucha = new Zawierucha();
 let bledneOgniki = new BledneOgniki();
+let dodola = new Dodola();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -541,7 +543,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -814,7 +816,7 @@ function klatka(now) {
             punkty.technika(technika, now, miejscePunktow);
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola
             });
             if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
@@ -935,12 +937,17 @@ function klatka(now) {
         if (zawierucha.aktywny) podmuchy.push(...zawierucha.punktyPchniecia());
         if (grzmot.aktywny) podmuchy.push(...grzmot.punktyPchniecia());
         if (podmuchy.length) dym.pchnij(podmuchy);
+        // Dymny wir: pasy Kurzawy (z poprzedniej klatki, jak czoła wyżej)
+        // wciągają dym. Bez Kurzawy lista pusta - dym się rozpływa.
+        if (kurzawa.aktywny) dym.zawiruj(kurzawa.orbity());
     }
 
     const wybuchyDymu = dym.updateAndDraw(ctx, canvas.width, canvas.height, dt);
     // Reakcje - premie za łączenie technik (rejestr REAKCJE w js/punkty.js).
     punkty.reakcja('pozoga', wybuchyDymu, now);
     punkty.reakcja('rozwianie', dym.ostatnioRozwiane, now);
+    punkty.reakcja('wirDymu', dym.ostatnioZawirowane, now);
+    punkty.reakcja('ognistyWir', dym.ostatnioWybuchyWiru, now);
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
     }
@@ -959,6 +966,11 @@ function klatka(now) {
     // this.moc sama.
     const pobor = plonacyPalec.update(frame, motionMeter.moc, dt);
     if (pobor > 0) motionMeter.zuzyj(pobor);
+
+    // Dodola (zaklinanie deszczu) - trzecia technika kanałowana, ten sam
+    // kontrakt poboru. Stan i natężenie z falowania ramion; rysuje się niżej.
+    const poborDeszczu = dodola.update(frame, motionMeter.moc, dt);
+    if (poborDeszczu > 0) motionMeter.zuzyj(poborDeszczu);
 
     ogien.updateAndDraw(
         ctx,
@@ -1013,15 +1025,20 @@ function klatka(now) {
     for (const sila of grzmot.dudnienia) ekran.uderz(sila);   // przetaczające się uderzenia po pierwszym
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
+    // Deszcz NA KOŃCU technik: pada przez wszystkie pola (Mgłę, Kurzawę, ogniki).
+    dodola.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
     // techniki w następnej klatce; tu tylko warunki i punkty.
-    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki }, dt);
+    const reakcjeKlatki = reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola, plonacyPalec }, dt);
     punkty.reakcja('przewodzenie', reakcjeKlatki.przewodzenie, now);
     punkty.reakcja('burzaWMgle', reakcjeKlatki.burzaWMgle, now);
     punkty.reakcja('rozdarcie', reakcjeKlatki.rozdarcie, now);
     punkty.reakcja('zawianie', reakcjeKlatki.zawianie, now);
     punkty.reakcja('latarnie', reakcjeKlatki.latarnie, now);
     punkty.reakcja('wirOgnikow', reakcjeKlatki.wirOgnikow, now);
+    punkty.reakcja('teczaPoDeszczu', reakcjeKlatki.teczaPoDeszczu, now);
+    punkty.reakcja('burzaWDeszczu', reakcjeKlatki.burzaWDeszczu, now);
+    punkty.reakcja('syk', reakcjeKlatki.syk, now);
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
@@ -1046,6 +1063,7 @@ function klatka(now) {
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
     punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
+    punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
     rundaHud.update(widokRundy(przebieg));
 
@@ -1120,6 +1138,7 @@ function klatka(now) {
         grzmot: { aktywny: grzmot.aktywny },
         zawierucha: { aktywny: zawierucha.aktywny, ...zawierucha.diagnostyka },
         bledneOgniki: { aktywny: bledneOgniki.aktywny, widocznych: bledneOgniki.punkty().length },
+        dodola: { aktywny: dodola.aktywny, ...dodola.diagnostyka },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
