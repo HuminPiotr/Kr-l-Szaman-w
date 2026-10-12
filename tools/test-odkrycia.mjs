@@ -184,4 +184,27 @@ console.log('\nOBEJRZANE I POSTĘP:');
         && nazwaOdkrycia('pieczec', 'swarog') === 'Swaróg' && nazwaOdkrycia('kamien', 'trojsplot') === 'Trójsplot' && nazwaOdkrycia('x', 'y') === '');
 }
 
+console.log('\nZAŚMIECONE PIEŚNI (review końcowy):');
+{
+    const smieci = Array.from({ length: 64 }, (_, i) => `smiec${i}.mp3`);
+    const pods = { wynik: 100, dlugoscS: 60, momenty: { serie: {}, techniki: {} }, kragKoniec: null, podium: null };
+    const o = nowa();
+    o.ustawManifest(['a.mp3', 'b.mp3']);
+    o.scal({ liczniki: { piesni: smieci } });
+    o.koniecRundy(pods, { piesn: 'a.mp3' });
+    const nowe = o.koniecRundy(pods, { piesn: 'b.mp3' });
+    spr('import 64 śmieci nie blokuje Pieśniarza', ma(nowe, 'kamien', 'piesniarz'));
+    spr('w liczniku zostają tylko pieśni z manifestu', JSON.stringify([...o.liczniki.piesni].sort()) === '["a.mp3","b.mp3"]');
+    const p = pamiec({ [KLUCZ_ODKRYC]: JSON.stringify({ liczniki: { piesni: smieci } }) });
+    const o2 = nowa(p);
+    o2.ustawManifest(['a.mp3', 'b.mp3']);
+    o2.koniecRundy(pods, { piesn: 'a.mp3' });
+    spr('zepsuty zapis też nie blokuje', o2.liczniki.piesni.includes('a.mp3'));
+    const o3 = nowa();
+    o3.ustawManifest(['a.mp3']);
+    o3.koniecRundy(pods, { piesn: 'a.mp3' });
+    o3.ustawManifest([]);
+    spr('pusty manifest (awaria wczytania) nie kasuje postępu', o3.liczniki.piesni.includes('a.mp3'));
+}
+
 process.exit(ok ? 0 : 1);

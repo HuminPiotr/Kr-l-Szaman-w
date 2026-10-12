@@ -233,6 +233,20 @@ export class Odkrycia {
 
     ustawManifest(pliki) {
         this.manifest = Array.isArray(pliki) ? pliki.filter(p => typeof p === 'string' && p.length > 0) : [];
+        this._przytnijPiesni();
+    }
+
+    /**
+     * Licznik pieśni trzyma TYLKO pieśni z manifestu. Bez tego cudzy plik (albo zepsuty zapis)
+     * z 64 śmieciami zapełniał limit i Pieśniarza nie dało się już zdobyć. Pusty manifest
+     * (awaria wczytania) niczego nie kasuje - postęp wraca, gdy manifest dotrze.
+     */
+    _przytnijPiesni() {
+        if (!this.manifest.length) return;
+        const zostaje = this.liczniki.piesni.filter(p => this.manifest.includes(p));
+        if (zostaje.length === this.liczniki.piesni.length) return;
+        this.liczniki.piesni = zostaje;
+        this._brudne = true;
     }
 
     /**
@@ -242,8 +256,7 @@ export class Odkrycia {
     koniecRundy(pods, { wynikKsiegi = null, piesn = null } = {}) {
         if (!pods || typeof pods !== 'object') return [];
         this.liczniki.rundy = Math.min(MAX_N, this.liczniki.rundy + 1);
-        if (typeof piesn === 'string' && this.manifest.includes(piesn)
-            && !this.liczniki.piesni.includes(piesn) && this.liczniki.piesni.length < MAX_PIESNI) {
+        if (typeof piesn === 'string' && this.manifest.includes(piesn) && !this.liczniki.piesni.includes(piesn)) {
             this.liczniki.piesni.push(piesn);
         }
         this._brudne = true;
@@ -295,7 +308,9 @@ export class Odkrycia {
             }
         }
         this.liczniki.rundy = Math.max(this.liczniki.rundy, d.liczniki.rundy);
-        this.liczniki.piesni = [...new Set([...this.liczniki.piesni, ...d.liczniki.piesni])].slice(0, MAX_PIESNI);
+        this.liczniki.piesni = [...new Set([...this.liczniki.piesni, ...d.liczniki.piesni])].slice(0, MAX_PIESNI * 2);
+        this._przytnijPiesni();
+        this.liczniki.piesni = this.liczniki.piesni.slice(0, MAX_PIESNI);
         this.liczniki.bogowie = [...new Set([...this.liczniki.bogowie, ...d.liczniki.bogowie])];
         for (const o of d.obejrzane) this.obejrzane.add(o);
         this._brudne = true;
