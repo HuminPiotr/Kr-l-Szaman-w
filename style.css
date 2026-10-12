@@ -544,6 +544,38 @@ body.ready-pulse #instruction-hud {
     color: var(--plomien);
     min-height: 1.4em;
 }
+
+/* Pamięć Plemienia: znak odkrycia rozpala się pod czasem rundy i gaśnie. */
+#odkrycia-hud {
+    position: absolute;
+    top: 4.6rem;
+    right: 14px;
+    z-index: 19;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.9rem 0.45rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(11, 8, 6, 0.6);
+    border: 1px solid rgba(217, 164, 65, 0.45);
+    color: var(--kosc);
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+#odkrycia-hud.widoczny { opacity: 1; transform: none; animation: znakOdkrycia 2.6s ease-out 1 forwards; }
+#odkrycia-hud .emblemat { width: 2.4rem; height: 2.4rem; color: var(--zloto); filter: drop-shadow(0 0 6px rgba(255, 179, 71, 0.85)); }
+.odkrycie-tekst { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+.odkrycie-rodzaj { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--plomien); }
+.odkrycie-nazwa { font-family: 'Bona Nova SC', serif; font-size: 1.05rem; }
+body.w-menu #odkrycia-hud { opacity: 0 !important; }
+@keyframes znakOdkrycia {
+    0% { opacity: 0; box-shadow: 0 0 0 rgba(255, 122, 26, 0); }
+    12% { opacity: 1; box-shadow: 0 0 28px rgba(255, 122, 26, 0.75); }
+    80% { opacity: 1; box-shadow: 0 0 10px rgba(255, 122, 26, 0.25); }
+    100% { opacity: 0; box-shadow: none; }
+}
 @keyframes lunaCzasu {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.75; }
@@ -829,6 +861,7 @@ body.w-menu #wynik-hud, body.w-menu #runda-hud { opacity: 0 !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    #odkrycia-hud, #odkrycia-hud.widoczny { transition: none; animation: none; transform: none; }
     .kamien, .kamien-runa, body.w-menu #output-canvas { transition: none; }
     .kamien:hover:not(:disabled), .kamien:focus-visible { transform: none; }
     #ksiega-lista li.swiezy { animation: none; }
