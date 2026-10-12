@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>Emblematy Zwoju — przegląd §7</title>
+  <link rel="stylesheet" href="../style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Bona+Nova&family=Noto+Sans+Runic&display=swap" rel="stylesheet" />
+  <style>
+    html, body { height: auto !important; min-height: 0; }
+    body { display: block !important; background: var(--wegiel); color: var(--kosc); padding: 1rem; overflow: auto; }
+    h1 { font-size: 1.1rem !important; margin-bottom: 1rem; }
+    .arkusz { width: 100%; }
+    .arkusz { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 1rem; }
+    figure { text-align: center; }
+    figure .emblemat { width: 6rem; height: 6rem; color: var(--zloto); }
+    figure.zweglona .emblemat { color: #160e09; filter: drop-shadow(0 0 1.5px rgba(255, 122, 26, .8)); }
+  </style>
+</head>
+<body>
+  <h1>Emblematy — sprawdź każdy pod §7 (bez swarzycy/kołowrotu)</h1>
+  <div class="arkusz" id="a"></div>
+  <script type="module">
+    import { rysujEmblemat } from '../js/emblematDom.js';
+    import { TECHNIKI, WEZLY } from '../js/katalog.js';
+    const a = document.getElementById('a');
+    const dodaj = (r, id, nazwa, zw) => {
+      const f = document.createElement('figure'); if (zw) f.className = 'zweglona';
+      const c = document.createElement('figcaption'); c.textContent = nazwa + (zw ? ' (zwęglony)' : '');
+      f.append(rysujEmblemat(document, r, id), c); a.appendChild(f);
+    };
+    for (const t of TECHNIKI) { dodaj('technika', t.id, t.nazwa, false); dodaj('technika', t.id, t.nazwa, true); }
+    for (const w of WEZLY) dodaj('wezel', w.id, w.nazwa, false);
+    dodaj('kamien', 'trojsplot', 'kamień', false); dodaj('sekret', 'x', 'sekret', false);
+  </script>
+</body>
+</html>

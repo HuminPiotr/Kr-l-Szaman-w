@@ -863,3 +863,9 @@ body.w-menu #wynik-hud, body.w-menu #runda-hud { opacity: 0 !important; }
     border-radius: 10px; overflow: hidden; box-shadow: 0 0 18px rgba(255, 122, 26, 0.35); }
 #yt-piesn.hidden { display: none; }
 #yt-piesn iframe { width: 100%; height: 100%; border: 0; }
+
+/* --- Pamięć Plemienia: emblematy SVG (2026-10-12) --- */
+.emblemat { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.emblemat .skladowa { stroke-width: 5; }
+.emblemat .nic { stroke-width: 1.5; stroke-dasharray: 3 4; opacity: 0.8; }
+.emblemat-runa { font-family: 'Noto Sans Runic', serif; font-size: 28px; fill: currentColor; stroke: none; }
