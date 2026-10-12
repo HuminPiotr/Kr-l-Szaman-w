@@ -133,6 +133,20 @@ export function wartoscTechniki(kombo) {
     return Math.round(BAZA_TECHNIKI * suma);
 }
 
+/**
+ * SPLECENIE - wspólna reguła dla punktów i Pamięci Plemienia (js/odkrycia.js).
+ * Ogon techniki to znaczniki czasu jej ostatnich N pieczęci; dwie techniki są
+ * splecione, gdy ich ogony dzielą pieczęć ("łańcuchy są celowe", kombosy.js).
+ * Jedna funkcja, żeby Trójsplot w Księdze znaczył dokładnie to, co premia tutaj.
+ */
+export function ogonPieczeci(historia, n) {
+    return new Set(historia.slice(-n).map(w => w.t));
+}
+
+export function ogonyNakladajaSie(ogon, poprzedni) {
+    return !!poprzedni && [...ogon].some(t => poprzedni.has(t));
+}
+
 export class Punktacja {
     constructor() {
         this.aktywna = true;
@@ -197,9 +211,8 @@ export class Punktacja {
 
         // OGON = ostatnie N pieczęci z WŁASNEJ historii (main.js woła pieczec()
         // przed technika()), identyfikowane znacznikiem czasu, nie pozycją.
-        const n = kombo.sekwencja.length;
-        const ogon = new Set(this._historia.slice(-n).map(w => w.t));
-        const nakladaSie = !!this._poprzedniOgon && [...ogon].some(t => this._poprzedniOgon.t.has(t));
+        const ogon = ogonPieczeci(this._historia, kombo.sekwencja.length);
+        const nakladaSie = ogonyNakladajaSie(ogon, this._poprzedniOgon?.t);
 
         // TRZYMANIE JEDNEJ POZY (final review, Important #1). Bufor kombosów nie
         // jest czyszczony, więc przy trzymanej pozie każdy kolejny stribog odpala

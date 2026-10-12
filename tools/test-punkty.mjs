@@ -6,7 +6,7 @@
  * Spec: docs/superpowers/specs/2026-10-01-punktacja-design.md
  */
 import {
-    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S
+    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie
 } from '../js/punkty.js';
 import { KOMBOSY } from '../js/kombosy.js';
 
@@ -256,6 +256,17 @@ console.log('\nSTRAŻNIK: reakcje wołane z main.js istnieją w REAKCJE:');
     const wolane = [...zrodlo.matchAll(/punkty\.reakcja\(\s*'(\w+)'/g)].map(m => m[1]);
     spr(`main.js woła reakcje (${wolane.join(', ')})`, wolane.length >= 2);
     for (const id of wolane) spr(`'${id}' jest w REAKCJE`, !!REAKCJE[id]);
+}
+
+console.log('\nWSPÓLNA REGUŁA SPLECENIA (Pamięć Plemienia też jej używa):');
+{
+    const h = [{ id: 'mokosz', t: 1 }, { id: 'swarog', t: 2 }, { id: 'mokosz', t: 3 }, { id: 'stribog', t: 4 }];
+    const ogon = ogonPieczeci(h, 3);
+    spr('ogon = 3 ostatnie znaczniki', ogon.size === 3 && ogon.has(2) && ogon.has(3) && ogon.has(4));
+    spr('nakłada się, gdy dzieli pieczęć', ogonyNakladajaSie(ogon, new Set([1, 2])) === true);
+    spr('nie nakłada się bez wspólnej', ogonyNakladajaSie(ogon, new Set([1])) === false);
+    spr('brak poprzedniego = brak nakładania', ogonyNakladajaSie(ogon, null) === false && ogonyNakladajaSie(ogon, undefined) === false);
+    spr('n większe niż historia = cała historia', ogonPieczeci(h, 10).size === 4);
 }
 
 process.exit(ok ? 0 : 1);
