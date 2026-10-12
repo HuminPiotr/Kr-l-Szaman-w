@@ -27,6 +27,8 @@ import { PolanaUi } from './polanaUi.js';
 import { Ksiega, kluczKsiegi } from './ksiega.js';
 import { zbudujKronike } from './kronika.js';
 import { bogZNicku } from './jaja.js';
+import { Odkrycia, nazwaOdkrycia } from './odkrycia.js';
+import { OdkryciaHud } from './odkryciaHud.js';
 import { losoweImie } from './imiona.js';
 import { czyPoleTekstowe } from './klawisze.js';
 import { ZetonStartu } from './zeton.js';
@@ -177,6 +179,20 @@ punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, ar
 // Księga na localStorage (try/catch w Ksiega - brak pamięci nie jest błędem).
 const ksiega = new Ksiega((() => { try { return window.localStorage; } catch { return null; } })());
 const menu = new Menu({ ostatniNick: ksiega.ostatniNick() });
+// PAMIĘĆ PLEMIENIA (2026-10-12, spec 2026-10-12-pamiec-plemienia-design.md): odkrycia
+// i Kamienie Pamięci. TRWAŁA MIĘDZY RUNDAMI - celowo `const` poza swiezeModuly.js.
+// Liczy się wszędzie, gdzie menu.graAktywna (także swobodny taniec) - NIE przez Punktację.
+const odkrycia = new Odkrycia((() => { try { return window.localStorage; } catch { return null; } })());
+const odkryciaHud = new OdkryciaHud(document.getElementById('odkrycia-hud'));
+let noweRundy = [];   // odkrycia od startu rundy - do "Nowe w Księdze" w Kronice
+function zanotuj(nowe) {
+    if (!nowe.length) return;
+    odkryciaHud.dodaj(nowe);
+    noweRundy.push(...nowe);
+}
+// Liczniki użyć zapisują się hurtem - schowanie karty to ostatnia pewna chwila.
+document.addEventListener('visibilitychange', () => { if (document.hidden) odkrycia.zapiszJesliTrzeba(); });
+window.addEventListener('pagehide', () => odkrycia.zapiszJesliTrzeba());
 let efektKroniki = null;   // {bog, korona} - odpalany w klatce, gdy istnieje `frame`
 const zetonStartu = new ZetonStartu();
 const wlasne = new WlasnePiesni({
@@ -185,7 +201,7 @@ const wlasne = new WlasnePiesni({
 });
 const BRAK_PIESNI = 'Ta pieśń nie chce zabrzmieć — spróbuj innego pliku.';
 const polanaUi = new PolanaUi(document, {
-    menu, ksiega, losoweImie,
+    menu, ksiega, losoweImie, odkrycia,
     // Własne pieśni zwracają ciepłe zdanie zwrotne (pusty tekst = sukces bez komentarza).
     naPlik: async (file) => {
         try {
@@ -228,6 +244,7 @@ const polanaUi = new PolanaUi(document, {
 });
 // Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
 Promise.all([wczytajManifest(), wlasne.wczytaj().catch(() => [])]).then(([lista, moje]) => {
+    odkrycia.ustawManifest(lista.map(u => u.plik));   // tylko pieśni plemienia - własne nie przesuwają celu
     menu.ustawPiesni([...lista, ...moje]);
     // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
     menu.zUrl(parsujKonfiguracje(window.location.search));
@@ -573,6 +590,8 @@ function doPolany() {
     zetonStartu.uniewaznij();   // oczekujący asynchroniczny start nie ma już prawa dokończyć
     zakonczPrzebieg();      // pieśń stop, moduły i punkty czyste
     efektKroniki = null;
+    noweRundy = [];
+    odkrycia.zapiszJesliTrzeba();
     menu.doPolany();
     polanaUi.render();
 }
@@ -582,6 +601,7 @@ function dalejZKroniki() {
     if (!przebieg || !przebieg.dalej(performance.now())) return;
     resetujModuly();
     punkty.reset();
+    noweRundy = [];
     przygotujPiesn();
     efektKroniki = null;
     menu.naGre();
@@ -595,7 +615,13 @@ function pokazKronike(pods) {
     const wk = klucz && nick ? ksiega.dodaj(klucz, nick, pods.wynik, Date.now()) : null;
     if (!pods.nick && nick) ksiega.zapamietajNick(nick);
     if (wk?.wpisano) polanaUi.pokazSwiezy(klucz, nick.slice(0, 16), Math.floor(pods.wynik));
-    menu.naKronike(zbudujKronike(pods, { wynikKsiegi: wk }));
+    // Pamięć Plemienia: nick-bóg i kamienie rundy (Esc tu nie dociera - liczy się tylko dokończona).
+    const piesnRundy = przebieg.konfig.tryb === 'obrzed' ? (utworRundy?.plik ?? null) : null;
+    const naKoniec = [...odkrycia.nick(nick), ...odkrycia.koniecRundy(pods, { wynikKsiegi: wk, piesn: piesnRundy })];
+    odkryciaHud.dodaj(naKoniec);
+    const nowe = [...noweRundy, ...naKoniec].map(o => ({ ...o, nazwa: nazwaOdkrycia(o.rodzaj, o.id) }));
+    noweRundy = [];
+    menu.naKronike(zbudujKronike(pods, { wynikKsiegi: wk, nowe }));
     polanaUi.render();
     efektKroniki = { bog: bogZNicku(nick), korona: !!wk?.nowyRekord };
 }
@@ -607,6 +633,7 @@ function obsluzZdarzeniaRundy(zdarzenia, now) {
             // Równy start: pasek mocy, dym i uzbrojone techniki z odliczania nie liczą się.
             resetujModuly();
             punkty.reset();
+            noweRundy = [];
             piesn?.graj().then((gra) => {
                 if (!gra && piesn) {
                     ostatniKomunikat = `Duchy zgubiły pieśń ${IKONA.ogien}`;
@@ -808,12 +835,14 @@ function klatka(now) {
         // historii pieczęci (js/punkty.js), więc ta pieczęć musi już w niej być.
         const miejscePunktow = srodekDloni(frame, canvas.width, canvas.height);
         punkty.pieczec(skl.zlozona.id, now, miejscePunktow);
+        zanotuj(odkrycia.pieczec(skl.zlozona.id, now));   // PO pieczęci, PRZED techniką - ogon splotu
         odpalPieczec(skl.zlozona.id, frame, canvas.width, canvas.height,
                      { efekty, runy, aura });
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
             punkty.technika(technika, now, miejscePunktow);
+            zanotuj(odkrycia.technika(technika, now));
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
                 podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola
@@ -948,6 +977,12 @@ function klatka(now) {
     punkty.reakcja('rozwianie', dym.ostatnioRozwiane, now);
     punkty.reakcja('wirDymu', dym.ostatnioZawirowane, now);
     punkty.reakcja('ognistyWir', dym.ostatnioWybuchyWiru, now);
+    if (menu.graAktywna) {
+        zanotuj(odkrycia.reakcja('pozoga', wybuchyDymu, now));
+        zanotuj(odkrycia.reakcja('rozwianie', dym.ostatnioRozwiane, now));
+        zanotuj(odkrycia.reakcja('wirDymu', dym.ostatnioZawirowane, now));
+        zanotuj(odkrycia.reakcja('ognistyWir', dym.ostatnioWybuchyWiru, now));
+    }
     if (wybuchyDymu > 0) {
         ekran.uderz(Math.min(1, 0.35 + 0.12 * wybuchyDymu));
     }
@@ -1039,6 +1074,8 @@ function klatka(now) {
     punkty.reakcja('teczaPoDeszczu', reakcjeKlatki.teczaPoDeszczu, now);
     punkty.reakcja('burzaWDeszczu', reakcjeKlatki.burzaWDeszczu, now);
     punkty.reakcja('syk', reakcjeKlatki.syk, now);
+    // Klucze reakcjeKlatki to id z REAKCJE (strażnik w tools/test-punkty.mjs), Odkrycia odrzucają nieznane.
+    if (menu.graAktywna) for (const [id, n] of Object.entries(reakcjeKlatki)) zanotuj(odkrycia.reakcja(id, n, now));
 
     // Koniec bloku wstrząsu ekranu - patrz ctx.save()/ekran.przesun() na
     // początku klatki. dokoncz() rysuje winietę i bramkowany bloom w
@@ -1065,6 +1102,7 @@ function klatka(now) {
     punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
     punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
+    odkryciaHud.update(now);
     rundaHud.update(widokRundy(przebieg));
 
     // Komunikaty mówią, co jest dostępne DALEJ, nigdy co gracz robi ŹLE.
