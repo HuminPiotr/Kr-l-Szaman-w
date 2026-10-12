@@ -204,4 +204,18 @@ console.log('\nwalidujKsiege:');
     })());
 }
 
+console.log('\nDODATKI W PLIKU (Pamięć Plemienia):');
+{
+    const k = new Ksiega(pamiec());
+    k.dodaj('proba:60', 'Ola', 100, 1);
+    const plik = JSON.parse(k.eksportuj({ odkrycia: { techniki: { aard: { n: 1, t: 1 } } }, tablice: 'podmiana', wersja: 9 }));
+    spr('eksport zawiera odkrycia', plik.odkrycia?.techniki?.aard?.n === 1);
+    spr('dodatki nie podmieniają tablic ani wersji', plik.wersja === 1 && Array.isArray(plik.tablice['proba:60']));
+    spr('eksport bez dodatków jak dawniej', JSON.parse(k.eksportuj()).odkrycia === undefined);
+    const k2 = new Ksiega(pamiec());
+    const w = k2.importuj(JSON.stringify(plik));
+    spr('import zwraca dane z odkryciami', w.ok && w.dane?.odkrycia?.techniki?.aard?.n === 1);
+    spr('nieudany import bez danych', k2.importuj('x').dane === undefined);
+}
+
 process.exit(ok ? 0 : 1);

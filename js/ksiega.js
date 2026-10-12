@@ -148,7 +148,14 @@ export class Ksiega {
     tablica(klucz) { return (this.tablice[klucz] ?? []).map(w => ({ ...w })); }
     klucze() { return Object.keys(this.tablice).sort(); }
 
-    eksportuj() { return JSON.stringify({ wersja: 1, tablice: this.tablice }, null, 2); }
+    /**
+     * @param {object} [dodatki]  inne części pliku Księgi (np. {odkrycia} z js/odkrycia.js);
+     *                            nie mogą podmienić `wersja` ani `tablice`
+     */
+    eksportuj(dodatki = {}) {
+        const { wersja: _w, tablice: _t, ...reszta } = dodatki && typeof dodatki === 'object' ? dodatki : {};
+        return JSON.stringify({ ...reszta, wersja: 1, tablice: this.tablice }, null, 2);
+    }
 
     /**
      * Import SCALA z istniejącą Księgą (nigdy nie nadpisuje). Ten sam plik wczytany
@@ -174,7 +181,8 @@ export class Ksiega {
             this.tablice[klucz] = polaczone;
         }
         this._zapisz();
-        return { ok: true, dodano };
+        // `dane` - surowy plik dla innych części Księgi (Pamięć Plemienia waliduje swoje pole sama).
+        return { ok: true, dodano, dane };
     }
 
     wyczysc() {
