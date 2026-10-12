@@ -55,6 +55,10 @@ export function przydomki(pods) {
     return PRZYDOMKI.filter(r => r.pasuje(pods)).slice(0, MAX_PRZYDOMKOW).map(r => r.nazwa);
 }
 
+// Pamięć Plemienia (2026-10-12): odkrycia tej rundy. Więcej niż kilka emblematów
+// zasłoniłoby tancerza, reszta to "i jeszcze N" - wszystko i tak czeka w Księdze.
+export const MAX_NOWYCH_W_KRONICE = 4;
+
 const WARSTWY = [['taniec', 'taniec'], ['pieczecie', 'pieczęcie'], ['techniki', 'techniki'], ['reakcje', 'reakcje']];
 
 function tekstMiejsca(wk) {
@@ -67,11 +71,13 @@ function tekstMiejsca(wk) {
 
 /**
  * @param {object} pods  z Przebieg.zapiszWynik()
- * @param {{wynikKsiegi?: {wpisano:boolean, miejsce:number|null, nowyRekord:boolean, pierwszyWpis:boolean}|null}} [opcje]
+ * @param {{wynikKsiegi?: {wpisano:boolean, miejsce:number|null, nowyRekord:boolean, pierwszyWpis:boolean}|null, nowe?: {rodzaj:string, id:string, nazwa:string}[]}} [opcje]
  */
 export function zbudujKronike(pods, opcje) {
     // `opcje` może być null (domyślna wartość parametru działa tylko dla undefined).
     const wynikKsiegi = opcje?.wynikKsiegi ?? null;
+    const nowe = (Array.isArray(opcje?.nowe) ? opcje.nowe : [])
+        .filter(o => o && typeof o.rodzaj === 'string' && typeof o.id === 'string' && typeof o.nazwa === 'string' && o.nazwa);
     const wynik = Math.floor(liczba(pods?.wynik));
     const linie = [];
     for (const [klucz, etykieta] of WARSTWY) {
@@ -97,6 +103,10 @@ export function zbudujKronike(pods, opcje) {
             ? pods.podium.map((w, i) => ({ miejsce: i + 1, nick: String(w.nick), wynik: Math.floor(liczba(w.wynik)) }))
             : null,
         miejsce: tekstMiejsca(wynikKsiegi),
+        noweWKsiedze: {
+            pozycje: nowe.slice(0, MAX_NOWYCH_W_KRONICE).map(({ rodzaj, id, nazwa }) => ({ rodzaj, id, nazwa })),
+            reszta: Math.max(0, nowe.length - MAX_NOWYCH_W_KRONICE)
+        },
         podpis
     };
 }

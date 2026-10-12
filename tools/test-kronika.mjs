@@ -2,7 +2,7 @@
  * Kronika obrzędu - tytuły, przydomki, teksty (czysta logika).
  *   node tools/test-kronika.mjs
  */
-import { PROGI_TYTULOW, punktyNaMinute, tytulZaWynik, PRZYDOMKI, przydomki, zbudujKronike } from '../js/kronika.js';
+import { PROGI_TYTULOW, punktyNaMinute, tytulZaWynik, PRZYDOMKI, przydomki, zbudujKronike, MAX_NOWYCH_W_KRONICE } from '../js/kronika.js';
 import { KOMBOSY } from '../js/kombosy.js';
 import { REAKCJE } from '../js/punkty.js';
 
@@ -108,6 +108,17 @@ console.log('\nKRONIKA:');
     spr('rozbicie/momenty null nie rzucają', zbudujKronike(pods({ rozbicie: null, momenty: null }), {}).wynik === '1000');
     spr('wynik NaN = 0', zbudujKronike(pods({ wynik: NaN }), {}).wynik === '0');
     spr('całkiem puste podsumowanie nie rzuca', zbudujKronike({}, {}).wynik === '0' && zbudujKronike(null, null).wynik === '0');
+}
+
+console.log('\nNOWE W KSIĘDZE:');
+{
+    const nowe = Array.from({ length: 6 }, (_, i) => ({ rodzaj: 'technika', id: `t${i}`, nazwa: `T${i}` }));
+    const k = zbudujKronike(pods(), { nowe });
+    spr(`najwyżej ${MAX_NOWYCH_W_KRONICE} pozycje`, k.noweWKsiedze.pozycje.length === MAX_NOWYCH_W_KRONICE);
+    spr('reszta policzona', k.noweWKsiedze.reszta === 6 - MAX_NOWYCH_W_KRONICE);
+    spr('kolejność zachowana', k.noweWKsiedze.pozycje[0].id === 't0');
+    spr('brak nowych = pusta lista, reszta 0', zbudujKronike(pods(), {}).noweWKsiedze.pozycje.length === 0 && zbudujKronike(pods(), null).noweWKsiedze.reszta === 0);
+    spr('śmieci w liście odpadają', zbudujKronike(pods(), { nowe: [null, { rodzaj: 'technika', id: 'a' }, { rodzaj: 'kamien', id: 'b', nazwa: 'B' }] }).noweWKsiedze.pozycje.length === 1);
 }
 
 process.exit(ok ? 0 : 1);
