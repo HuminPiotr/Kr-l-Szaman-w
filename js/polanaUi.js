@@ -8,6 +8,11 @@
 import { formatCzasu } from './rundaHud.js';
 import { nazwaTablicy } from './ksiega.js';
 import { PROBA_DLUGOSCI } from './tryby.js';
+import { ZwojUi } from './zwojUi.js';
+import { rysujEmblemat } from './emblematDom.js';
+
+// Dział Księgi -> rodzaj odkryć, którego "nowości" żarzą się na zakładce.
+const RODZAJ_DZIALU = { techniki: 'technika', wezly: 'wezel', kamienie: 'kamien' };
 
 const EKRAN_ID = { polana: 'polana', konfig: 'konfig', ksiega: 'ksiega-ekran', kronika: 'kronika' };
 const TYTULY = { obrzed: 'Obrzęd: taniec do pieśni', proba: 'Próba: taniec na czas', swobodny: 'Swobodny taniec' };
@@ -26,7 +31,7 @@ export class PolanaUi {
      * @param {Document} doc
      * @param {{menu, ksiega, losoweImie:()=>string, onStart:(konfig)=>void, onJeszczeRaz:()=>void, onDoPolany:()=>void}} deps
      */
-    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany, naPlik = async () => '', naLinkYt = async () => '', naUsunPiesn = () => {} }) {
+    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany, naPlik = async () => '', naLinkYt = async () => '', naUsunPiesn = () => {}, odkrycia = null }) {
         this.doc = doc;
         this.menu = menu;
         this.ksiega = ksiega;
@@ -37,6 +42,8 @@ export class PolanaUi {
         this.naPlik = naPlik;
         this.naLinkYt = naLinkYt;
         this.naUsunPiesn = naUsunPiesn;
+        this.odkrycia = odkrycia;
+        this.dzial = 'wyniki';           // Wyniki | Zwój Technik | Węzły Mocy | Kamienie Pamięci
         this.zakladka = null;           // aktywny klucz tablicy w Księdze
         this.swiezy = null;             // {klucz, nick, wynik} - świeży wpis do podświetlenia
         this.potwierdzaWyczysc = false;
@@ -45,6 +52,7 @@ export class PolanaUi {
         this.$ = $;
         this.root = $('menu');
         if (!this.root) return;         // strona bez menu (np. test) - cicho nic nie robi
+        this.zwoj = odkrycia ? new ZwojUi(doc, { odkrycia, onZmiana: () => this.render() }) : null;
         this._podepnij();
     }
 
@@ -69,8 +77,15 @@ export class PolanaUi {
         $('ksiega-wyczysc').addEventListener('click', () => { this.potwierdzaWyczysc = true; odswiez(); });
         $('ksiega-wyczysc-tak').addEventListener('click', () => {
             this.ksiega.wyczysc(); this.potwierdzaWyczysc = false; this.swiezy = null;
-            this.infoKsiegi = 'Księga jest czysta — zaczynacie od nowa.'; odswiez();
+            this.infoKsiegi = 'Wyniki wyczyszczone — odkrycia plemienia zostały.'; odswiez();
         });
+        for (const b of this.doc.querySelectorAll('#ksiega-dzialy [data-dzial]')) {
+            b.addEventListener('click', () => {
+                this.dzial = b.dataset.dzial;
+                if (this.zwoj) this.zwoj.otwarty = null;
+                odswiez();
+            });
+        }
         $('kronika-jeszcze').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onJeszczeRaz(); });
         $('kronika-polana').addEventListener('click', () => { if (this.menu.ekran === 'kronika') this.onDoPolany(); });
 
@@ -110,7 +125,9 @@ export class PolanaUi {
         // Klawiatura: strzałki chodzą po kamieniach, Esc cofa o krok (Polana i Kronika/gra - w main.js).
         this.doc.addEventListener('keydown', (e) => {
             if (this.root.classList.contains('hidden')) return;
-            if (e.key === 'Escape' && (menu.ekran === 'konfig' || menu.ekran === 'ksiega')) {
+            if (e.key === 'Escape' && menu.ekran === 'ksiega' && this.zwoj?.maSzczegol) {
+                this.zwoj.zamknij();   // Esc: szczegół -> siatka -> Polana
+            } else if (e.key === 'Escape' && (menu.ekran === 'konfig' || menu.ekran === 'ksiega')) {
                 this.potwierdzaWyczysc = false;
                 menu.wstecz(); odswiez();
             } else if (menu.ekran === 'polana' && ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) {
@@ -132,6 +149,7 @@ export class PolanaUi {
             this.zakladka = this.ksiega.klucze()[0] ?? null;
             this.potwierdzaWyczysc = false;
             this.infoKsiegi = '';
+            if (this.zwoj) this.zwoj.otwarty = null;
         }
     }
 
@@ -151,7 +169,8 @@ export class PolanaUi {
     }
 
     _eksport() {
-        const blob = new Blob([this.ksiega.eksportuj()], { type: 'application/json' });
+        const dodatki = this.odkrycia ? { odkrycia: this.odkrycia.eksportFragment() } : {};
+        const blob = new Blob([this.ksiega.eksportuj(dodatki)], { type: 'application/json' });
         const a = this.doc.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'ksiega-plemienia.json';
@@ -167,7 +186,11 @@ export class PolanaUi {
         r.onload = () => {
             const wynik = this.ksiega.importuj(String(r.result));
             if (wynik.ok) {
-                this.infoKsiegi = wynik.dodano > 0 ? `Dopisano ${wynik.dodano} wpisów do Księgi.` : 'Te wyniki już są w Księdze.';
+                const odk = wynik.dane?.odkrycia && this.odkrycia ? this.odkrycia.scal(wynik.dane.odkrycia).dodano : 0;
+                const czesci = [];
+                if (wynik.dodano > 0) czesci.push(`${wynik.dodano} wpisów`);
+                if (odk > 0) czesci.push(`${odk} odkryć`);
+                this.infoKsiegi = czesci.length ? `Dopisano do Księgi: ${czesci.join(' i ')}.` : 'To wszystko już jest w Księdze.';
                 this.zakladka = this.ksiega.klucze()[0] ?? null;
             } else {
                 this.infoKsiegi = wynik.powod === 'rozmiar'
@@ -264,6 +287,20 @@ export class PolanaUi {
     _renderKsiega() {
         const { doc, $, ksiega, menu } = this;
         const klucze = ksiega.klucze();
+        for (const b of doc.querySelectorAll('#ksiega-dzialy [data-dzial]')) {
+            const d = b.dataset.dzial;
+            b.setAttribute('aria-selected', String(d === this.dzial));
+            b.classList.toggle('ma-nowe', !!RODZAJ_DZIALU[d] && (this.odkrycia?.ileNowych(RODZAJ_DZIALU[d]) ?? 0) > 0);
+        }
+        $('ksiega-postep').classList.toggle('hidden', !this.zwoj);
+        $('ksiega-dzialy').classList.toggle('hidden', !this.zwoj);
+        $('dzial-wyniki').classList.toggle('hidden', this.dzial !== 'wyniki');
+        $('dzial-zwoj').classList.toggle('hidden', this.dzial === 'wyniki');
+        $('ksiega-wiecej').classList.toggle('hidden', this.dzial !== 'wyniki');
+        if (this.zwoj) {
+            this.zwoj.renderPostep();
+            if (this.dzial !== 'wyniki') this.zwoj.renderuj(this.dzial);
+        }
         if (!klucze.includes(this.zakladka)) this.zakladka = klucze[0] ?? null;
         const zak = $('ksiega-zakladki'); zak.replaceChildren();
         for (const k of klucze) {
@@ -282,8 +319,12 @@ export class PolanaUi {
             lista.appendChild(li);
         }
         let info = this.infoKsiegi;
-        if (!info && !klucze.length) info = 'Księga czeka na pierwszy wpis — zatańcz obrzęd.';
-        if (!info && !ksiega.trwala) info = 'Ta przeglądarka nie pozwala zapisać Księgi — wyniki przetrwają do zamknięcia karty.';
+        if (this.dzial === 'wyniki') {
+            if (!info && !klucze.length) info = 'Księga czeka na pierwszy wpis — zatańcz obrzęd.';
+            if (!info && !ksiega.trwala) info = 'Ta przeglądarka nie pozwala zapisać Księgi — wyniki przetrwają do zamknięcia karty.';
+        } else if (!info && this.odkrycia && !this.odkrycia.trwala) {
+            info = 'Ta przeglądarka nie zapamięta odkryć po zamknięciu karty.';
+        }
         $('ksiega-info').textContent = info;
         $('ksiega-wyczysc').classList.toggle('hidden', this.potwierdzaWyczysc);
         $('ksiega-wyczysc-tak').classList.toggle('hidden', !this.potwierdzaWyczysc);
@@ -299,6 +340,22 @@ export class PolanaUi {
         $('kronika-zdanie').textContent = k.szaman.zdanie;
         const prz = $('kronika-przydomki'); prz.replaceChildren();
         for (const p of k.przydomki) { const s = doc.createElement('span'); s.className = 'przydomek'; s.textContent = p; prz.appendChild(s); }
+        const nw = $('kronika-nowe'); nw.replaceChildren();
+        const nowe = k.noweWKsiedze;
+        if (nowe?.pozycje.length) {
+            const h = doc.createElement('div'); h.className = 'etykieta'; h.textContent = 'Nowe w Księdze';
+            nw.appendChild(h);
+            for (const p of nowe.pozycje) {
+                const s = doc.createElement('span'); s.className = 'nowe-pozycja';
+                const n = doc.createElement('span'); n.textContent = p.nazwa;
+                s.append(rysujEmblemat(doc, p.rodzaj, p.id), n);
+                nw.appendChild(s);
+            }
+            if (nowe.reszta > 0) {
+                const r = doc.createElement('span'); r.className = 'nowe-reszta'; r.textContent = `i jeszcze ${nowe.reszta}`;
+                nw.appendChild(r);
+            }
+        }
         const mi = $('kronika-miejsce'); mi.textContent = k.miejsce; mi.classList.toggle('rekord', /rekord/i.test(k.miejsce));
         const linie = $('kronika-linie'); linie.replaceChildren();
         for (const l of k.linie) { const d = doc.createElement('div'); d.textContent = l; linie.appendChild(d); }
