@@ -40,7 +40,7 @@ export const NASTAWY = {
     WYGASZENIE: 0.45,         // s na końcu życia
     GRZBIET_NAD_BARKAMI: -0.3, // skala * to - szczyt fali względem linii barków (minus = nad)
     MARGINES: 1.2,            // skala * to - koniec poza krawędzią
-    MARGINES_START: 0.1,      // skala * to - start TUŻ za krawędzią: gejzer wybija przy niej, widać go
+    MARGINES_START: -1.2,     // skala * to - czoło startuje W kadrze: słup (WZNIOS za czołem) wybija tuż przy krawędzi
     // GEJZER (VFX v2, prośba właściciela): u czoła woda wystrzeliwuje słupem
     // z dołu kadru, potem słup opada i zostaje z niego grzbiet płynącej fali.
     GEJZER_NAROST: 0.22,      // s - słup od dołu do szczytu

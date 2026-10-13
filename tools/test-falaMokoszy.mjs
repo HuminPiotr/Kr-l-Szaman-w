@@ -3,7 +3,8 @@
  * samoczynna fala, profil i przejazd; bez document.
  *   node tools/test-falaMokoszy.mjs
  */
-import { FalaMokoszy, NASTAWY, czoloFali, wysokoscFali, obwiedniaFali, profilFali, powierzchnia } from '../js/falaMokoszy.js';
+import { FalaMokoszy, NASTAWY, czoloFali, wysokoscFali, obwiedniaFali, profilFali, powierzchnia, wysokoscGejzeru, poziomWody, kolumnyWody, srodekGejzeru } from '../js/falaMokoszy.js';
+import { KOLUMN } from '../js/wodaShader.js';
 import { klatka, kontekst, atrapaCtx, W, H } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -31,9 +32,9 @@ function zamach(f, reka, odpoczynek = 0) {
 const stoj = (f, sek) => { for (let i = 0; i < Math.round(sek / DT); i++) f.updateAndDraw(null, kontekst(zRekami(0.75, 0.75)), DT); };
 
 console.log('CZYSTE FUNKCJE:');
-spr('fala z prawej startuje za prawą krawędzią i kończy za lewą',
-    czoloFali(0, 1, W, 190) > W && czoloFali(NASTAWY.CZAS_PRZEJAZDU, 1, W, 190) < 0);
-spr('fala z lewej - odwrotnie', czoloFali(0, -1, W, 190) < 0 && czoloFali(NASTAWY.CZAS_PRZEJAZDU, -1, W, 190) > W);
+spr('fala z prawej startuje przy prawej krawędzi i kończy za lewą',
+    czoloFali(0, 1, W, 190) > W * 0.8 && czoloFali(NASTAWY.CZAS_PRZEJAZDU, 1, W, 190) < 0);
+spr('fala z lewej - odwrotnie', czoloFali(0, -1, W, 190) < W * 0.2 && czoloFali(NASTAWY.CZAS_PRZEJAZDU, -1, W, 190) > W);
 spr('wysokość: 0 na końcach, NaN -> 0, wzbiera', wysokoscFali(0) === 0 && wysokoscFali(NASTAWY.ZYCIE_FALI) === 0
     && wysokoscFali(NaN) === 0 && wysokoscFali(NASTAWY.NAROST) > 0.9);
 spr('fala się łamie: pod koniec przejazdu niższa niż na początku',
@@ -47,6 +48,30 @@ spr('profil: przed czołem nic, szczyt 1, długi zanik', profilFali(-0.1) === 0 
     spr('fala z prawej płynie w lewo (kier -1), węzły od prawej krawędzi', pow.kier === -1 && pow.pkt[0].x > W);
     spr('powierzchnia skończona', pow.pkt.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)));
     spr('przed narodzinami - brak powierzchni', powierzchnia({ strona: 1, wiek: 0, faza: 0 }, ZACZEP, W, H) === null);
+}
+
+console.log('\nGEJZER:');
+spr('gejzer: 0 na starcie, pełny po narastaniu, opada do reszty, NaN -> 0',
+    wysokoscGejzeru(0) === 0 && wysokoscGejzeru(NASTAWY.GEJZER_NAROST) === 1
+    && Math.abs(wysokoscGejzeru(NASTAWY.GEJZER_OPADA_DO) - NASTAWY.GEJZER_RESZTA) < 1e-9 && wysokoscGejzeru(NaN) === 0);
+{
+    const f = { strona: 1, wiek: NASTAWY.GEJZER_NAROST, faza: 0 };
+    const xg = srodekGejzeru(f, W, ZACZEP.skala);
+    const slup = poziomWody(f, xg, ZACZEP, W, H);
+    spr(`słup gejzeru sięga nad głowę (${Math.round(slup.y)} px < barki ${ZACZEP.y})`, slup.y < ZACZEP.y - ZACZEP.skala * 0.8);
+    spr('słup widać w kadrze przy krawędzi źródłowej', xg > W * 0.75 && xg < W);
+    const pozniej = poziomWody({ ...f, wiek: NASTAWY.GEJZER_OPADA_DO }, srodekGejzeru({ ...f, wiek: NASTAWY.GEJZER_OPADA_DO }, W, ZACZEP.skala), ZACZEP, W, H);
+    spr('po opadnięciu słupa woda niższa niż w wystrzale', pozniej.y > slup.y);
+    // Bez wcięcia: od szczytu w stronę źródła powierzchnia tylko opada (y rośnie).
+    let ciagla = true, prev = -Infinity;
+    for (let x = xg; x <= W; x += 10) { const y = poziomWody(f, x, ZACZEP, W, H).y; if (y < prev - 2) ciagla = false; prev = y; }
+    spr('słup przechodzi w falę bez wcięcia (monotonnie od szczytu do krawędzi)', ciagla);
+}
+{
+    const kol = kolumnyWody([{ strona: 1, wiek: 0.5, faza: 0 }], ZACZEP, W, H, 1);
+    spr(`kolumny dla shadera: ${KOLUMN} × vec4`, kol.length === KOLUMN * 4 && [...kol].every(Number.isFinite));
+    spr('fala z prawej: woda po prawej, pusto po lewej', kol[(KOLUMN - 1) * 4 + 2] > 0 && kol[2] === 0 && kol[0] > 1);
+    spr('bez fal - same zera alfy', kolumnyWody([], ZACZEP, W, H).every((v, i) => i % 4 !== 2 || v === 0));
 }
 
 console.log('\nOKNO I ZAMACHY:');
