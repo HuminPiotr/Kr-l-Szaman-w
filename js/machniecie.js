@@ -22,6 +22,13 @@
  * PRZERWA_REKI_S po zdarzeniu ręki: połyka POWRÓT ręki po machnięciu
  * (inaczej szybki powrót byłby fałszywym machnięciem w przeciwną stronę).
  * Druga ręka nie czeka - lewa, prawa, lewa w szybkim tempie to 3 zdarzenia.
+ *
+ * OŚ 'gora' (Fala Mokoszy, spec 2026-10-13-fala-i-kruki-design.md): zamach
+ * od dołu do góry. Liczy się składowa PIONOWA w górę (vy < 0 na ekranie),
+ * a ruch musi ZACZĄĆ się poniżej linii barków - bez tego ręka uniesiona
+ * do pieczęci i opadająca z powrotem dawałaby zdarzenia przy samym
+ * ruszaniu się nad głową. Zdarzenie niesie `x` - strona fali to strona
+ * ekranu, po której jest ręka (odporne na lustro obrazu).
  */
 import { barkiKlatki } from './sledzenie.js';
 
@@ -34,22 +41,30 @@ export const NASTAWY = {
     OKNO_S: 0.12,              // s - bufor próbek (jak OKNO_MACHNIECIA_S w podmuch.js)
     MIN_PROBEK: 2,
     MAX_PROBEK: 6,
-    PROG_WIDOCZNOSCI: 0.5      // visibility nadgarstka poniżej = poza kadrem (zgadywany)
+    PROG_WIDOCZNOSCI: 0.5,     // visibility nadgarstka poniżej = poza kadrem (zgadywany)
+    // Oś 'gora' - ZGADNIĘTE, pole falaMokoszy.detektor na nakładce D.
+    PROG_PREDKOSCI_GORA: 4.0,  // szerokości barków / s w górę
+    START_PONIZEJ_BARKOW: 0.2  // najniższa próbka bufora co najmniej tyle * skala pod barkami
 };
 
 const REKI = [['L', 15], ['P', 16]];
 
 export class DetektorMachniec {
-    constructor() {
+    /** @param {{os?: 'poziom'|'gora'}} [opcje]  domyślnie poziom (Zawierucha) */
+    constructor({ os = 'poziom' } = {}) {
+        this._os = os;
         this._zegar = 0;
         this._bufory = { L: [], P: [] };
         this._licznik = { L: 0, P: 0 };
         this._przerwa = { L: 0, P: 0 };
-        this.diagnostyka = { predkosc: 0, prog: NASTAWY.PROG_PREDKOSCI };
+        this.diagnostyka = { predkosc: 0, prog: this._prog() };
     }
+
+    _prog() { return this._os === 'gora' ? NASTAWY.PROG_PREDKOSCI_GORA : NASTAWY.PROG_PREDKOSCI; }
 
     /**
      * @returns {{reka:'L'|'P', kierunek:-1|1, x:number, y:number}[]}  zdarzenia z tej klatki, px
+     *          (oś 'gora': kierunek zawsze -1 = w górę)
      */
     update(frame, W, H, dt) {
         const N = NASTAWY;
@@ -85,17 +100,24 @@ export class DetektorMachniec {
             if (!(czas > 1e-6)) continue;
             const vx = (b.x - a.x) / czas / barki.skala;
             const vy = (b.y - a.y) / czas / barki.skala;
-            najszybciej = Math.max(najszybciej, Math.abs(vx));
-
-            const spelnia = Math.abs(vx) >= N.PROG_PREDKOSCI && Math.abs(vx) >= N.KIERUNKOWOSC * Math.hypot(vx, vy);
+            let spelnia;
+            if (this._os === 'gora') {
+                najszybciej = Math.max(najszybciej, -vy);
+                const najnizej = Math.max(...buf.map(q => q.y));
+                spelnia = -vy >= N.PROG_PREDKOSCI_GORA && -vy >= N.KIERUNKOWOSC * Math.hypot(vx, vy)
+                    && najnizej >= barki.y + N.START_PONIZEJ_BARKOW * barki.skala;
+            } else {
+                najszybciej = Math.max(najszybciej, Math.abs(vx));
+                spelnia = Math.abs(vx) >= N.PROG_PREDKOSCI && Math.abs(vx) >= N.KIERUNKOWOSC * Math.hypot(vx, vy);
+            }
             this._licznik[reka] = spelnia ? this._licznik[reka] + 1 : 0;
             if (this._licznik[reka] >= N.POTWIERDZENIE && this._przerwa[reka] <= 0) {
-                zdarzenia.push({ reka, kierunek: vx > 0 ? 1 : -1, x, y });
+                zdarzenia.push({ reka, kierunek: this._os === 'gora' ? -1 : (vx > 0 ? 1 : -1), x, y });
                 this._przerwa[reka] = N.PRZERWA_REKI_S;
                 this._licznik[reka] = 0;
             }
         }
-        this.diagnostyka = { predkosc: najszybciej, prog: N.PROG_PREDKOSCI };
+        this.diagnostyka = { predkosc: najszybciej, prog: this._prog() };
         return zdarzenia;
     }
 }

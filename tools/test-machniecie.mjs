@@ -115,5 +115,57 @@ console.log('\nARTEFAKTY I ODPORNOŚĆ:');
     spr('nadgarstek z niską widocznością (zgadywany) -> nic', zd.length === 0 && !!f);
 }
 
+console.log('\nOŚ GÓRA (Fala Mokoszy):');
+/** Ruch ręki w pionie (v < 0 = w górę, szer. barków/s) od y0 przez `sek`. */
+function zamach(d, reka, v, sek, y0 = 0.75, x = reka === 'L' ? 0.4 : 0.6) {
+    const zd = [];
+    let y = y0;
+    for (let i = 0; i < Math.round(sek / DT); i++) {
+        y += v * SKALA * DT / H;
+        const f = reka === 'L' ? klatka([x, y], [0.6, 0.7]) : klatka([0.4, 0.7], [x, y]);
+        zd.push(...d.update(f, W, H, DT));
+    }
+    return { zd, y };
+}
+const stojG = (d, sek) => { for (let i = 0; i < Math.round(sek / DT); i++) d.update(klatka([0.4, 0.7], [0.6, 0.7]), W, H, DT); };
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    const { zd } = zamach(d, 'P', -8, 0.2);
+    spr(`szybki zamach w górę prawą -> jedno zdarzenie P (${zd.map(z => z.reka)})`, zd.length === 1 && zd[0].reka === 'P' && zd[0].kierunek === -1);
+    spr('zdarzenie ma x ręki w px', Math.abs(zd[0]?.x - 0.6 * W) < 1);
+    spr('diagnostyka - próg osi góra', d.diagnostyka.prog === NASTAWY.PROG_PREDKOSCI_GORA);
+}
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    spr('zamach w DÓŁ -> nic', zamach(d, 'L', 8, 0.2, 0.3).zd.length === 0);
+}
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    spr('wolne unoszenie ręki -> nic', zamach(d, 'P', -NASTAWY.PROG_PREDKOSCI_GORA * 0.5, 1).zd.length === 0);
+}
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    spr('szybki ruch w górę NAD barkami (ręce do pieczęci) -> nic', zamach(d, 'P', -8, 0.15, 0.3).zd.length === 0);
+}
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    const { zd } = machnij(d, 'P', 8, 0.2, 0.6, [0.4, 0.6]);
+    spr('szybkie machnięcie POZIOME w osi góra -> nic', zd.length === 0);
+}
+{
+    const d = new DetektorMachniec({ os: 'gora' }); stojG(d, 0.2);
+    const a = zamach(d, 'P', -8, 0.15);
+    const b = zamach(d, 'L', -8, 0.15);
+    spr(`prawa, potem od razu lewa -> 2 zdarzenia (${[...a.zd, ...b.zd].map(z => z.reka).join(' ')})`,
+        a.zd.length === 1 && b.zd.length === 1 && b.zd[0].reka === 'L');
+}
+{
+    const d = new DetektorMachniec(); stoj(d, 0.2);
+    const zd = [];
+    let y = 0.75;
+    for (let i = 0; i < 12; i++) { y -= 8 * SKALA * DT / H; zd.push(...d.update(klatka([0.4, 0.6], [0.6, y]), W, H, DT)); }
+    spr('oś domyślna (poziom) dalej ignoruje zamach w górę', zd.length === 0);
+}
+
 console.log(ok ? '\nWSZYSTKO OK ✓' : '\nSĄ BŁĘDY ✗');
 process.exit(ok ? 0 : 1);
