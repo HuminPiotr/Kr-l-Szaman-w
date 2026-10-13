@@ -3,7 +3,7 @@
  * do zasłonięcia kadru, stado wylatuje, cień, wygasanie; bez document.
  *   node tools/test-kruki.mjs
  */
-import { Kruki, NASTAWY, zaczepIglicy, postepNaEkran, rozpietoscNaEkran, obwiedniaCienia } from '../js/kruki.js';
+import { Kruki, NASTAWY, zaczepIglicy, postepNaEkran, rozpietoscNaEkran, obwiedniaCienia, rozmycieNaEkran, alfaKruka, konturKruka } from '../js/kruki.js';
 import { klatka, kontekst, przepusc, atrapaCtx, W, H } from './_klatka-techniki.mjs';
 
 let ok = true;
@@ -37,6 +37,19 @@ spr('kruk na ekran rośnie od małego do szerszego niż kadr',
 spr('cień: zero na końcach, NaN -> 0', obwiedniaCienia(0) === 0 && obwiedniaCienia(NASTAWY.CIEN_ZYCIE) === 0
     && obwiedniaCienia(NaN) === 0 && obwiedniaCienia(1) > 0.5);
 
+spr('rozmycie kruka na ekran rośnie z bliskością (0 -> max)', rozmycieNaEkran(0) === 0
+    && rozmycieNaEkran(NASTAWY.EKRAN_CZAS / 2) < rozmycieNaEkran(NASTAWY.EKRAN_CZAS) && rozmycieNaEkran(NASTAWY.EKRAN_CZAS) === NASTAWY.EKRAN_ROZMYCIE);
+spr('kruk ze stada: pełny w locie, rozpada się do zera na końcu życia',
+    alfaKruka(1) === 1 && alfaKruka(NASTAWY.ZYCIE_KRUKA - 0.05) < 0.1 && alfaKruka(NaN) === 0);
+{
+    const poziomo = konturKruka(0), gora = konturKruka(1), front = konturKruka(1, true);
+    const rozp = (k) => Math.max(...k.map(p => p.x)) - Math.min(...k.map(p => p.x));
+    spr('kontur symetryczny, rozpiętość 2 w poziomie', Math.abs(rozp(poziomo) - 2) < 1e-9
+        && Math.abs(Math.max(...poziomo.map(p => p.x)) + Math.min(...poziomo.map(p => p.x))) < 1e-9);
+    spr('uniesione skrzydła - skrót perspektywy (węższa sylwetka)', rozp(gora) < rozp(poziomo));
+    spr('widok na kamerę - końce skrzydeł idą w górę', Math.min(...front.map(p => p.y)) < Math.min(...gora.map(p => p.y)));
+}
+
 console.log('\nPRZEBIEG:');
 {
     const k = new Kruki();
@@ -49,9 +62,13 @@ console.log('\nPRZEBIEG:');
     spr(`całe stado wyleciało (${k._stado.filter(x => x.wylecial).length})`, k._stado.length > 0 && k._stado.every(x => x.wylecial));
     spr('kruki gubią pióra', k._piora.length > 0);
     spr('kruk na ekran wystartował z namiotu palców', k._naEkran && k._naEkran.x0 === 900 && k._naEkran.y0 === 150);
-    const yStada = k._stado.map(x => x.y);
     przepusc(k, zRekami(), 0.3);
-    spr('stado leci w górę', k._stado.every((x, i) => x.y < yStada[i] || !Number.isFinite(yStada[i])));
+    const zyja = k._stado;
+    const wKadrze = zyja.filter(x => x.x > 0 && x.x < W && x.y > 0 && x.y < H).length;
+    spr(`stado krąży nad graczem - większość w kadrze po ~2 s (${wKadrze}/${NASTAWY.LICZBA_STADA})`,
+        wKadrze >= NASTAWY.LICZBA_STADA * 0.6);
+    spr('stado nad barkami (średnio)', zyja.reduce((s, x) => s + x.y, 0) / Math.max(1, zyja.length) < 0.4 * H);
+    spr('kruki mają historię pozycji pod smugi ruchu', zyja.every(x => x.hist.length >= 10));
     przepusc(k, zRekami(), NASTAWY.EKRAN_CZAS);
     spr('kruk na ekran zasłonił kadr i rozsypał się w pióra', k._naEkran?.rozbity === true && k._piora.length >= NASTAWY.EKRAN_PIOR);
     przepusc(k, zRekami(), NASTAWY.CIEN_ZYCIE + NASTAWY.ZYCIE_PIORA + 1);
