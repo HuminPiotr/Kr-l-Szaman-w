@@ -25,6 +25,8 @@
 import { barkiKlatki, Kotwica } from './sledzenie.js';
 import { WarstwaZaSylwetka } from './warstwaZaSylwetka.js';
 import { DetektorMachniec } from './machniecie.js';
+import { WodaShader, KOLUMN } from './wodaShader.js';
+import { MANIFEST, losowyWariant, wypalTintowany } from './assety.js';
 
 // ZGADNIĘTE - strojenie na nakładce D (pole falaMokoszy) i w tools/scena.html.
 export const NASTAWY = {
@@ -37,7 +39,20 @@ export const NASTAWY = {
     LAMANIE_OD: 0.55,         // ułamek przejazdu - od tego miejsca grzbiet opada (fala się łamie)
     WYGASZENIE: 0.45,         // s na końcu życia
     GRZBIET_NAD_BARKAMI: -0.3, // skala * to - szczyt fali względem linii barków (minus = nad)
-    MARGINES: 1.2,            // skala * to - start/koniec poza krawędzią
+    MARGINES: 1.2,            // skala * to - koniec poza krawędzią
+    MARGINES_START: 0.1,      // skala * to - start TUŻ za krawędzią: gejzer wybija przy niej, widać go
+    // GEJZER (VFX v2, prośba właściciela): u czoła woda wystrzeliwuje słupem
+    // z dołu kadru, potem słup opada i zostaje z niego grzbiet płynącej fali.
+    GEJZER_NAROST: 0.22,      // s - słup od dołu do szczytu
+    GEJZER_TRWA: 0.4,         // s - do tej chwili słup stoi w pełni
+    GEJZER_OPADA_DO: 1.15,    // s - do tej chwili opada do GEJZER_RESZTA
+    GEJZER_RESZTA: 0.22,      // ułamek - spieniony garb, który płynie dalej z falą
+    GEJZER_NAD_BARKAMI: -1.15, // skala * to - szczyt słupa (nad głową)
+    GEJZER_SZER_PRZOD: 0.3,   // skala * to - strona ruchu (stroma)
+    GEJZER_SZER_TYL: 0.6,     // skala * to - strona źródła (łagodna, przechodzi w falę)
+    KROPEL_GEJZERU_NA_S: 220,
+    MGIELKI_NA_S: 16,
+    ZYCIE_MGIELKI: 1.1,
     WZNIOS: 0.8,              // skala * to - od czoła do szczytu (wklęsła ściana fali)
     OGON: 1.4,                // skala * to - zanik wody za grzbietem
     POZIOM_ZA: 0.22,          // ułamek wysokości - woda, która zostaje za grzbietem (falowanie, nie rampa)
@@ -50,7 +65,7 @@ export const NASTAWY = {
     KROPEL_NA_S: 40,          // z wargi grzbietu
     ZYCIE_KROPLI: 0.9,
     GRAWITACJA: 4.0,          // skala / s^2
-    PROMIEN_KROPLI: 0.035,    // skala * to
+    PROMIEN_KROPLI: 0.02,     // skala * to
     BARWA_GLEBI: [20, 70, 120],
     BARWA_GRZBIETU: [70, 165, 200],
     BARWA_PIANY: [225, 240, 245]
@@ -67,9 +82,19 @@ let ostatniaStrona = 1;
  * przychodzi (+1 prawa, -1 lewa); płynie w stronę przeciwną. Czysta funkcja.
  */
 export function czoloFali(wiek, strona, W, sk) {
-    const m = sk * NASTAWY.MARGINES;
+    const m = sk * NASTAWY.MARGINES, ms = sk * NASTAWY.MARGINES_START;
     const u = gladko(wiek / NASTAWY.CZAS_PRZEJAZDU);
-    return strona > 0 ? W + m - (W + 2 * m) * u : -m + (W + 2 * m) * u;
+    const x0 = strona > 0 ? W + ms : -ms, x1 = strona > 0 ? -m : W + m;
+    return x0 + (x1 - x0) * u;
+}
+
+/** Wysokość słupa gejzeru 0..1: wystrzał, chwila w pełni, opadanie do reszty. Czysta funkcja. */
+export function wysokoscGejzeru(wiek) {
+    const N = NASTAWY;
+    if (!Number.isFinite(wiek) || wiek <= 0 || wiek >= N.ZYCIE_FALI) return 0;
+    if (wiek < N.GEJZER_TRWA) return gladko(wiek / N.GEJZER_NAROST);
+    const u = gladko((wiek - N.GEJZER_TRWA) / (N.GEJZER_OPADA_DO - N.GEJZER_TRWA));
+    return 1 - (1 - N.GEJZER_RESZTA) * u;
 }
 
 /** Wysokość fali 0..1 (wzbieranie, łamanie po LAMANIE_OD przejazdu). Czysta funkcja. */
@@ -101,11 +126,18 @@ export function profilFali(u) {
     return N.POZIOM_ZA + (1 - N.POZIOM_ZA) * Math.exp(-(u - N.WZNIOS) / N.OGON);
 }
 
+/** Środek słupa gejzeru w px - NA grzbiecie fali, żeby słup wyrastał z niej, nie obok. Czysta funkcja. */
+export function srodekGejzeru(fala, W, sk) {
+    return czoloFali(fala.wiek, fala.strona, W, sk) + fala.strona * sk * NASTAWY.WZNIOS;
+}
+
 /**
- * Węzły powierzchni wody (od krawędzi źródłowej do czoła) + szczyt.
- * @returns {{pkt: {x, y}[], szczyt: {x, y}, podstawa: number}|null}
+ * Woda fali w kolumnie x: powierzchnia = wyżej z (profil fali, słup gejzeru).
+ * Słup jest asymetryczny - stromy od strony ruchu, łagodnie przechodzi
+ * w falę od strony źródła, więc wystrzał NIE odrywa się od flow.
+ * @returns {{y, piana, gejzer}|null}  y px; piana i gejzer 0..1; null = fala nie żyje
  */
-export function powierzchnia(fala, zaczep, W, H) {
+export function poziomWody(fala, x, zaczep, W, H) {
     const N = NASTAWY, sk = zaczep.skala;
     const h = wysokoscFali(fala.wiek);
     if (h <= 0) return null;
@@ -113,17 +145,70 @@ export function powierzchnia(fala, zaczep, W, H) {
     const kier = -fala.strona;                       // kierunek ruchu
     const podstawa = H + 4;
     const yGrzbietu = Math.min(zaczep.y + sk * N.GRZBIET_NAD_BARKAMI, H * 0.75);
-    const amp = (podstawa - yGrzbietu) * h;
+    const u = (xc - x) * kier / sk;
+    const drobne = Math.sin(x / (sk * 0.7) + fala.faza + fala.wiek * 5) * sk * N.FALOWANIE * h;
+    const yFali = podstawa - (podstawa - yGrzbietu) * h * profilFali(u) + drobne;
+    const dx = (x - srodekGejzeru(fala, W, sk)) * kier / sk;   // > 0 = przed słupem
+    const szer = dx > 0 ? N.GEJZER_SZER_PRZOD : N.GEJZER_SZER_TYL;
+    const ksztalt = Math.exp(-(dx / szer) * (dx / szer));
+    const g = wysokoscGejzeru(fala.wiek) * ksztalt;
+    const ySlupa = Math.max(H * 0.04, zaczep.y + sk * N.GEJZER_NAD_BARKAMI);
+    const yGejzeru = podstawa - (podstawa - ySlupa) * g;
+    // Miękka suma (smooth min) zamiast twardego min - bez wcięcia na styku słupa i fali.
+    const k = sk * 0.25;
+    const m = Math.min(yFali, yGejzeru);
+    const y = m - k * Math.log(Math.exp((m - yFali) / k) + Math.exp((m - yGejzeru) / k)) + k * Math.LN2 * Math.exp(-Math.abs(yFali - yGejzeru) / k);
+    return {
+        y,
+        piana: Math.max(u >= N.WZNIOS * 0.85 ? profilFali(u) : 0, g),
+        gejzer: g
+    };
+}
+
+/**
+ * Węzły powierzchni wody (od krawędzi źródłowej do czoła i trochę za nie) + szczyt.
+ * @returns {{pkt: {x, y, grzbiet}[], szczyt: {x, y}, podstawa: number, kier, h}|null}
+ */
+export function powierzchnia(fala, zaczep, W, H) {
+    const N = NASTAWY, sk = zaczep.skala;
+    const h = wysokoscFali(fala.wiek);
+    if (h <= 0) return null;
+    const xc = czoloFali(fala.wiek, fala.strona, W, sk);
+    const kier = -fala.strona;
     const xKonca = fala.strona > 0 ? W + sk * N.MARGINES : -sk * N.MARGINES;   // krawędź źródłowa
+    const xDo = xc + kier * sk * N.GEJZER_SZER_PRZOD * 2;                       // stopa słupa przed czołem
     const pkt = [];
+    let szczyt = null;
     for (let i = 0; i <= N.PUNKTOW; i++) {
-        const x = xKonca + (xc - xKonca) * (i / N.PUNKTOW);
-        const u = (xc - x) * kier / sk;
-        const drobne = Math.sin(x / (sk * 0.7) + fala.faza + fala.wiek * 5) * sk * N.FALOWANIE * h;
-        pkt.push({ x, y: podstawa - amp * profilFali(u) + drobne, grzbiet: u >= N.WZNIOS * 0.85 ? profilFali(u) : 0 });
+        const x = xKonca + (xDo - xKonca) * (i / N.PUNKTOW);
+        const w = poziomWody(fala, x, zaczep, W, H);
+        pkt.push({ x, y: w.y, grzbiet: w.piana });
+        if (!szczyt || w.y < szczyt.y) szczyt = { x, y: w.y };
     }
-    const xSzczytu = xc - kier * sk * N.WZNIOS;
-    return { pkt, szczyt: { x: xSzczytu, y: podstawa - amp }, podstawa, kier, h };
+    return { pkt, szczyt, podstawa: H + 4, kier, h };
+}
+
+/**
+ * Kolumny dla shadera: KOLUMN × [y 0..1, piana, alfa, gejzer]. Z kilku fal
+ * w kolumnie wygrywa najwyższa woda (min y); alfa i gejzer - maksimum.
+ * Czysta funkcja (poza zapisem do `wy`).
+ */
+export function kolumnyWody(fale, zaczep, W, H, sila = 1, wy = new Float32Array(KOLUMN * 4)) {
+    for (let i = 0; i < KOLUMN; i++) {
+        const x = (i / (KOLUMN - 1)) * W;
+        let y = 1.02, piana = 0, alfa = 0, gejzer = 0;
+        for (const f of fale) {
+            const w = poziomWody(f, x, zaczep, W, H);
+            if (!w || w.y >= H) continue;
+            const yn = w.y / H;
+            if (yn > 0.985) continue;            // woda przy samej krawędzi - bez paska na dole kadru
+            if (yn < y) { y = yn; piana = w.piana; }
+            alfa = Math.max(alfa, obwiedniaFali(f.wiek) * sila);
+            gejzer = Math.max(gejzer, w.gejzer);
+        }
+        wy[i * 4] = y; wy[i * 4 + 1] = piana; wy[i * 4 + 2] = alfa; wy[i * 4 + 3] = gejzer;
+    }
+    return wy;
 }
 
 export class FalaMokoszy {
@@ -134,6 +219,10 @@ export class FalaMokoszy {
         this._wypuszczone = 0;
         this._fale = [];
         this._krople = [];
+        this._mgielki = [];
+        this._czas = 0;
+        this._shader = new WodaShader();
+        this._kolumny = new Float32Array(KOLUMN * 4);
         this._detektor = new DetektorMachniec({ os: 'gora' });
         this._kotwica = new Kotwica(10);
         this._warstwa = new WarstwaZaSylwetka();
@@ -142,7 +231,7 @@ export class FalaMokoszy {
         this.faleSwieze = [];   // fale narodzone w tej klatce - pod przyszłe reakcje
     }
 
-    get aktywny() { return this._okno || this._fale.length > 0 || this._krople.length > 0; }
+    get aktywny() { return this._okno || this._fale.length > 0 || this._krople.length > 0 || this._mgielki.length > 0; }
     get okno() { return this._okno; }
     get diagnostyka() { return { okno: this._okno, fale: this._fale.length, wypuszczone: this._wypuszczone, ...this._detektor.diagnostyka }; }
 
@@ -181,6 +270,7 @@ export class FalaMokoszy {
         this._zaczep = this._kotwica.prowadz(barkiKlatki(k?.frame, W, H), krok)
             ?? { x: W * 0.5, y: H * 0.4, skala: W * 0.12 };
         const sk = this._zaczep.skala;
+        this._czas += krok;
 
         if (this._okno) {
             this._tOkna += krok;
@@ -213,11 +303,28 @@ export class FalaMokoszy {
                         Math.cos(kat) * v + pow.kier * sk * 1.5, Math.sin(kat) * v);
                 }
             }
-            // Warga grzbietu sypie kroplami.
+            // Grzbiet sypie kroplami; słup gejzeru tryska nimi w górę i łukiem
+            // W STRONĘ RUCHU fali (flow), a jego szczyt dymi mgiełką.
             const ile = N.KROPEL_NA_S * krok * pow.h;
             for (let i = 0; i < Math.floor(ile) + (Math.random() < ile % 1 ? 1 : 0); i++) {
-                this._kropla(pow.szczyt.x + pow.kier * sk * N.ZAWINIECIE * Math.random(), pow.szczyt.y,
+                this._kropla(pow.szczyt.x + pow.kier * sk * 0.3 * Math.random(), pow.szczyt.y,
                     pow.kier * sk * (1 + Math.random() * 2), -sk * Math.random() * 1.5);
+            }
+            const g = wysokoscGejzeru(f.wiek);
+            const xg = srodekGejzeru(f, W, sk);
+            const wg = poziomWody(f, xg, this._zaczep, W, H);
+            if (wg && g > 0.3) {
+                const ileG = N.KROPEL_GEJZERU_NA_S * krok * g;
+                for (let i = 0; i < Math.floor(ileG) + (Math.random() < ileG % 1 ? 1 : 0); i++) {
+                    this._kropla(xg + (Math.random() - 0.5) * sk * 0.35, wg.y + Math.random() * sk * 0.3,
+                        pow.kier * sk * (0.3 + Math.random() * 1.8), -sk * (2.5 + Math.random() * 3.5) * g);
+                }
+                const ileM = N.MGIELKI_NA_S * krok * g;
+                for (let i = 0; i < Math.floor(ileM) + (Math.random() < ileM % 1 ? 1 : 0); i++) {
+                    this._mgielki.push({ x: xg + (Math.random() - 0.5) * sk * 0.4, y: wg.y,
+                        vx: pow.kier * sk * (0.3 + Math.random() * 0.6), vy: -sk * (0.4 + Math.random() * 0.8),
+                        r: sk * (0.25 + Math.random() * 0.25), kat: Math.random() * 6.28, wiek: 0 });
+                }
             }
         }
         this._fale = this._fale.filter(f => f.wiek < N.ZYCIE_FALI);
@@ -227,9 +334,15 @@ export class FalaMokoszy {
             q.x += q.vx * krok; q.y += q.vy * krok;
         }
         this._krople = this._krople.filter(q => q.wiek < N.ZYCIE_KROPLI && q.y < H + sk);
+        for (const m of this._mgielki) {
+            m.wiek += krok;
+            m.x += m.vx * krok; m.y += m.vy * krok;
+            m.r += sk * 0.5 * krok;
+        }
+        this._mgielki = this._mgielki.filter(m => m.wiek < N.ZYCIE_MGIELKI);
         if (!ctx) return;
 
-        if (this._fale.length) {
+        if (this._fale.length && !this._shader.gotowa()) {
             const tyl = this._warstwa.zacznij(W, H);
             if (tyl) {
                 this._rysujPianeZa(tyl);
@@ -264,6 +377,51 @@ export class FalaMokoszy {
     }
 
     _rysuj(c) {
+        // GPU (js/wodaShader.js): bryła, piana, refrakcja i słup gejzeru w
+        // jednym shaderze. Bez WebGL2 - dawna woda Canvas2D poniżej.
+        const N = NASTAWY;
+        let gpu = false;
+        if (this._fale.length && typeof c.canvas?.getContext === 'function') {
+            kolumnyWody(this._fale, this._zaczep, this._W, this._H, this._sila * 0.95, this._kolumny);
+            gpu = this._shader.rysuj(c, this._kolumny, {
+                czas: this._czas, glebia: N.BARWA_GLEBI, grzbiet: N.BARWA_GRZBIETU, piana: N.BARWA_PIANY
+            });
+        }
+        if (!gpu) this._rysujCanvas2D(c);
+        this._rysujCzastki(c);
+    }
+
+    /** Mgiełka (smoke CC0, tint piany) i krople (miękki dysk CC0) - z fallbackiem na koła. */
+    _rysujCzastki(c) {
+        const N = NASTAWY, sk = this._zaczep.skala;
+        c.save();
+        c.globalCompositeOperation = 'source-over';
+        const dym = losowyWariant(MANIFEST.mgla);
+        for (const m of this._mgielki) {
+            const a = 0.14 * this._sila * Math.sin(Math.PI * m.wiek / N.ZYCIE_MGIELKI);
+            if (a < 0.005) continue;
+            c.globalAlpha = clamp01(a);
+            if (dym) {
+                const spr = wypalTintowany(m.obraz ??= dym, N.BARWA_PIANY, 128);
+                c.save(); c.translate(m.x, m.y); c.rotate(m.kat);
+                c.drawImage(spr, -m.r, -m.r, m.r * 2, m.r * 2);
+                c.restore();
+            }
+        }
+        // Krople: pełne, wydłużone wzdłuż prędkości (smuga lotu) - nie puste kółka.
+        c.fillStyle = `rgb(${N.BARWA_PIANY.join(',')})`;
+        for (const q of this._krople) {
+            c.globalAlpha = clamp01(0.6 * this._sila * (1 - q.wiek / N.ZYCIE_KROPLI) * (0.5 + q.r / N.PROMIEN_KROPLI * 0.35));
+            const r = Math.max(0.8, q.r * sk);
+            const v = Math.hypot(q.vx, q.vy);
+            c.beginPath();
+            c.ellipse(q.x, q.y, r * (1 + Math.min(2, v / (sk * 3))), r, Math.atan2(q.vy, q.vx), 0, Math.PI * 2);
+            c.fill();
+        }
+        c.restore();
+    }
+
+    _rysujCanvas2D(c) {
         const N = NASTAWY, sk = this._zaczep.skala;
         c.save();
         c.globalCompositeOperation = 'source-over';
@@ -321,14 +479,6 @@ export class FalaMokoszy {
             c.stroke();
         }
 
-        // Krople: drobne, jasne, source-over.
-        c.fillStyle = `rgb(${N.BARWA_PIANY.join(',')})`;
-        for (const q of this._krople) {
-            c.globalAlpha = clamp01(0.8 * this._sila * (1 - q.wiek / N.ZYCIE_KROPLI));
-            c.beginPath();
-            c.arc(q.x, q.y, Math.max(1, q.r * sk), 0, Math.PI * 2);
-            c.fill();
-        }
         c.restore();
     }
 }
