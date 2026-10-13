@@ -44,13 +44,14 @@ import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
 import { Dodola } from './deszcz.js';
+import { FalaMokoszy } from './falaMokoszy.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
     'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'reakcjeTechnik'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy', 'reakcjeTechnik'
 ];
 
 /**
@@ -90,6 +91,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         zawierucha: new Zawierucha(),
         bledneOgniki: new BledneOgniki(),
         dodola: new Dodola(),
+        falaMokoszy: new FalaMokoszy(),
         reakcjeTechnik: new ReakcjeTechnik()
     };
 }

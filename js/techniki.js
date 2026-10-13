@@ -58,7 +58,8 @@ export const BARWA_ZAPLONU = {
     grzmot: [170, 205, 255],        // błękit Peruna, jaśniejszy od Łuku
     zawierucha: [215, 175, 110],    // ochra pyłu, jak Kurzawa
     bledneOgniki: [110, 175, 255],  // zimny błękit ogników (v2) - nie pomarańcz Płonącego Palca
-    dodola: [170, 205, 235]          // chłodny błękit deszczu (js/deszcz.js BARWA, przyciemniona)
+    dodola: [170, 205, 235],         // chłodny błękit deszczu (js/deszcz.js BARWA, przyciemniona)
+    falaMokoszy: [70, 165, 200]      // morska zieleń grzbietu fali (js/falaMokoszy.js BARWA_GRZBIETU)
 };
 
 /**
@@ -91,7 +92,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -206,6 +207,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Zaklinanie: otwiera stan, natężenie deszczu liczy moduł SAM co klatkę
         // z falowania ramion (js/deszcz.js, js/zaklinanie.js). Pobór mocy - main.js.
         s.dodola.zapal();
+    } else if (technika.uzbraja === 'falaMokoszy') {
+        // Siła STAŁA (combo jest gratis). Otwiera okno na zamachy w górę -
+        // fale i ich stronę moduł liczy SAM co klatkę (js/falaMokoszy.js).
+        s.falaMokoszy.zapal(1.0);
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,

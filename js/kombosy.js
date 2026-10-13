@@ -149,6 +149,14 @@ export const KOMBOSY = [
     { id: 'kregiMokoszy', nazwa: 'Kręgi Mokoszy',
       sekwencja: ['mokosz', 'weles'], uzbraja: 'kregiMokoszy' },
 
+    // FALA MOKOSZY (2026-10-13, spec 2026-10-13-fala-i-kruki-design.md):
+    // woda - wiatr ją podnosi - woda wraca; zamachy rąk od dołu do góry
+    // przywołują fale z boków kadru (js/falaMokoszy.js). MUSI stać PRZED
+    // Mgłą: ogon stribog -> mokosz to Mgła, a _dopasuj() zwraca pierwsze
+    // trafienie - Fala ZASTĘPUJE Mgłę, zamiast odpalić ją po drodze.
+    { id: 'falaMokoszy', nazwa: 'Fala Mokoszy',
+      sekwencja: ['mokosz', 'stribog', 'mokosz'], uzbraja: 'falaMokoszy' },
+
     // MGŁA MOKOSZY (2026-10-02, spec 2026-10-02-proste-kombosy-design.md):
     // wiatr (Stribog) niesie wilgoć (Mokosz) - mgła przetacza się przez
     // kadr, gracz wynurza się z niej. Para stribog->mokosz nie koliduje

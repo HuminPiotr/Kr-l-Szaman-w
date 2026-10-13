@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -142,8 +142,14 @@ const jestSufiksemCalej = (krotszy, dluzszy) =>
 // sekwencją Dodoli - o wyniku decyduje kolejność w tabeli, pilnowana jawnie
 // w sekcji DODOLA niżej, zamiast "po cichu" przez _dopasuj().
 const zwykle = KOMBOSY.filter(k => !k.wariant);
-spr('żadna sekwencja nie jest prefiksem ani sufiksem innej (poza wariantami)',
-    zwykle.every(a => zwykle.every(b => a === b ||
+// Drugi wyjątek (2026-10-13, spec 2026-10-13-fala-i-kruki-design.md) - nakładki
+// ZATWIERDZONE przez właściciela, każda z jawnym testem zachowania niżej:
+//  - Fala Mokoszy kończy się Mgłą (stribog->mokosz): Fala stoi PRZED Mgłą i ją zastępuje;
+//  - Kruki zaczynają się Zawieruchą (weles->stribog): łańcuch, Zawierucha po drodze.
+const ZAMIERZONE_NAKLADKI = ['mglaMokoszy<falaMokoszy', 'zawierucha<kruki'];
+const nakladkaZamierzona = (a, b) => ZAMIERZONE_NAKLADKI.includes(`${a.id}<${b.id}`);
+spr('żadna sekwencja nie jest prefiksem ani sufiksem innej (poza wariantami i ZAMIERZONE_NAKLADKI)',
+    zwykle.every(a => zwykle.every(b => a === b || nakladkaZamierzona(a, b) ||
         (!jestPrefiksem(a.sekwencja, b.sekwencja) && !jestSufiksemCalej(a.sekwencja, b.sekwencja)))));
 spr('warianty niosą id istniejącej techniki zwykłej',
     KOMBOSY.filter(k => k.wariant).every(w => zwykle.some(z => z.id === w.id && z.uzbraja === w.uzbraja)));
@@ -349,5 +355,18 @@ spr('...mokosz, stribog -> Dodola (Mgła, potem deszcz)', k40.dodaj('stribog', 1
 const iWariant = KOMBOSY.findIndex(k => k.wariant);
 const iDodola = KOMBOSY.findIndex(k => k.id === 'dodola');
 spr('warianty Tęczy stoją w tabeli PRZED Dodolą', iWariant >= 0 && KOMBOSY.every((k, i) => !k.wariant || i < iDodola));
+
+console.log('\nFALA MOKOSZY (mokosz -> stribog -> mokosz):');
+const k41 = new KomboSilnik();
+spr('mokosz nic', k41.dodaj('mokosz', 0) === null);
+spr('mokosz, stribog nic (żadna dwójka)', k41.dodaj('stribog', 600) === null);
+spr('mokosz, stribog, mokosz -> Fala, NIE Mgła (ogon stribog->mokosz)', k41.dodaj('mokosz', 1200)?.id === 'falaMokoszy');
+const k42 = new KomboSilnik();
+k42.dodaj('stribog', 0);
+spr('samo stribog, mokosz dalej daje Mgłę', k42.dodaj('mokosz', 500)?.id === 'mglaMokoszy');
+const k43 = new KomboSilnik();
+k43.dodaj('mokosz', 0); k43.dodaj('mokosz', 600); k43.dodaj('stribog', 1200);
+spr('Dodola + mokosz -> Fala (łańcuch)', k43.dodaj('mokosz', 1800)?.id === 'falaMokoszy');
+spr('Fala stoi w tabeli PRZED Mgłą', KOMBOSY.findIndex(k => k.id === 'falaMokoszy') < KOMBOSY.findIndex(k => k.id === 'mglaMokoszy'));
 
 process.exit(ok ? 0 : 1);
