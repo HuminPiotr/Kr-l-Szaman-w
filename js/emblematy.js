@@ -90,6 +90,10 @@ export const EMBLEMATY = {
     falaMokoszy: {
         svg: '<path d="M4 56c10 0 14-6 18-16 5-13 14-22 26-22 8 0 12 5 12 10 0 4-3 7-7 7-5 0-6-5-3-8"/><path d="M4 56h56"/><path d="M14 46c4-1 6-4 8-8"/>',
         legenda: 'Woda, wiatr i znów woda — Mokosz posyła falę.'
+    },
+    kruki: {
+        svg: '<path d="M32 30c-6-8-16-12-28-10 8 2 12 6 14 12 4-2 9-3 14-2z"/><path d="M32 30c6-8 16-12 28-10-8 2-12 6-14 12-4-2-9-3-14-2z"/><path d="M29 30l3-7 3 7-1 12-2 6-2-6z"/><path d="M14 56l2-3M22 60l1-4M44 58l-1-4"/>',
+        legenda: 'Ziemia, wiatr i grom — z cienia Welesa zrywają się kruki.'
     }
 };
 

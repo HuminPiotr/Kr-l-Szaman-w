@@ -23,7 +23,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 // Wszystkie znane wartości `uzbraja` - każda ma gałąź w js/techniki.js.
 // Nowa technika = nowy wpis tutaj (wcześniej ta lista była powielona w dwóch asercjach).
-const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy'];
+const ZNANE_UZBRAJA = ['ogien', 'aard', 'tecza', 'gromWZiemie', 'kolowrot', 'dym', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy', 'kruki'];
 
 console.log('DOPASOWANIE SEKWENCJI:');
 const k1 = new KomboSilnik();
@@ -368,5 +368,14 @@ const k43 = new KomboSilnik();
 k43.dodaj('mokosz', 0); k43.dodaj('mokosz', 600); k43.dodaj('stribog', 1200);
 spr('Dodola + mokosz -> Fala (łańcuch)', k43.dodaj('mokosz', 1800)?.id === 'falaMokoszy');
 spr('Fala stoi w tabeli PRZED Mgłą', KOMBOSY.findIndex(k => k.id === 'falaMokoszy') < KOMBOSY.findIndex(k => k.id === 'mglaMokoszy'));
+
+console.log('\nKRUKI (weles -> stribog -> perun):');
+const k44 = new KomboSilnik();
+spr('weles nic', k44.dodaj('weles', 0) === null);
+spr('weles, stribog -> Zawierucha po drodze (łańcuch)', k44.dodaj('stribog', 600)?.id === 'zawierucha');
+spr('...perun -> Kruki', k44.dodaj('perun', 1200)?.id === 'kruki');
+const k45 = new KomboSilnik();
+k45.dodaj('stribog', 0);
+spr('samo stribog, perun nic (wolna para)', k45.dodaj('perun', 500) === null);
 
 process.exit(ok ? 0 : 1);

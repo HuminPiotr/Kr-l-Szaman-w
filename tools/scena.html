@@ -199,6 +199,7 @@ const { Zawierucha, NASTAWY: NASTAWY_ZAWIERUCHY } = await import('./js/zawieruch
 const { BledneOgniki, NASTAWY: NASTAWY_OGNIKOW } = await import('./js/bledneOgniki.js');
 const { Dodola, NASTAWY: NASTAWY_DESZCZU } = await import('./js/deszcz.js');
 const { FalaMokoszy, NASTAWY: NASTAWY_FALAMOKOSZY } = await import('./js/falaMokoszy.js');
+const { Kruki, NASTAWY: NASTAWY_KRUKI } = await import('./js/kruki.js');
 const { ReakcjeTechnik } = await import('./js/reakcjeTechnik.js');
 
 zaladujFont();
@@ -234,6 +235,7 @@ const zawierucha = new Zawierucha();
 const bledneOgniki = new BledneOgniki();
 const dodola = new Dodola();
 const falaMokoszy = new FalaMokoszy();
+const kruki = new Kruki();
 // Stanowisko nie ma worldLandmarks - jakość fali z suwaka, nie z falowania ramion.
 dodola.wymusJakosc = 0.5;
 const reakcjeTechnik = new ReakcjeTechnik();
@@ -259,6 +261,7 @@ const MODULY_NASTAWY = [
     { etykieta: 'Błędne Ogniki', plik: 'js/bledneOgniki.js', nastawy: NASTAWY_OGNIKOW, instancja: bledneOgniki },
     { etykieta: 'Dodola (deszcz)', plik: 'js/deszcz.js', nastawy: NASTAWY_DESZCZU, instancja: dodola },
     { etykieta: 'Fala Mokoszy', plik: 'js/falaMokoszy.js', nastawy: NASTAWY_FALAMOKOSZY, instancja: falaMokoszy },
+    { etykieta: 'Kruki', plik: 'js/kruki.js', nastawy: NASTAWY_KRUKI, instancja: kruki },
     { etykieta: 'Runa (glif pieczęci)', plik: 'js/runa.js', nastawy: (await import('./js/runa.js')).NASTAWY, instancja: runy },
     { etykieta: 'Ekran (wstrząs/soczewka)', plik: 'js/ekran.js', nastawy: (await import('./js/ekran.js')).NASTAWY, instancja: ekran },
     { etykieta: 'Zapłon sylwetki', plik: 'js/zaplon.js', nastawy: (await import('./js/zaplon.js')).NASTAWY, instancja: zaplon },
@@ -384,7 +387,7 @@ function zbudujFrame(t) {
 // ================== WOREK ZALEŻNOŚCI DLA techniki.js (identyczny co main.js) ==================
 const worekTechnik = {
     efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec, podmuch,
-    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy
+    tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki
 };
 const worekPieczeci = { efekty, runy, aura };
 
@@ -467,6 +470,7 @@ function rysujKlatke(dt, frame) {
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
     falaMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
+    kruki.updateAndDraw(ctx, kontekstTechnik, dt);
     dodola.update(frame, undefined, dt);   // moc nieokreślona = bez limitu (stanowisko)
     dodola.updateAndDraw(ctx, kontekstTechnik, dt);
     reakcjeTechnik.klatka({ lukPeruna, kregiMokoszy, mglaMokoszy, piorun, grzmot, kurzawa, zawierucha, bledneOgniki, tecza, dodola, plonacyPalec }, dt);
@@ -537,6 +541,8 @@ const SCENARIUSZE = {
                       zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik);
     },
     falaMokoszy: () => odpalTechnike({ id: 'x', nazwa: 'Fala Mokoszy', uzbraja: 'falaMokoszy', sekwencja: ['mokosz', 'stribog', 'mokosz'] },
+                                          zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
+    kruki: () => odpalTechnike({ id: 'x', nazwa: 'Kruki', uzbraja: 'kruki', sekwencja: ['weles', 'stribog', 'perun'] },
                                           zbudujFrame(0), canvas.width, canvas.height, 0, worekTechnik),
     pieczec: () => odpalPieczec('swarog', zbudujFrame(0), canvas.width, canvas.height, worekPieczeci),
     wszystko: () => { SCENARIUSZE.grom(); SCENARIUSZE.kolowrot(); SCENARIUSZE.tecza(); SCENARIUSZE.aard();
@@ -624,6 +630,7 @@ const TECHNIKI = [
     { uzbraja: 'bledneOgniki', nazwa: 'Błędne Ogniki', sekwencja: ['weles', 'swarog'] },
     { uzbraja: 'dodola', nazwa: 'Dodola (deszcz)', sekwencja: ['mokosz', 'mokosz', 'stribog'] },
     { uzbraja: 'falaMokoszy', nazwa: 'Fala Mokoszy', sekwencja: ['mokosz', 'stribog', 'mokosz'] },
+    { uzbraja: 'kruki', nazwa: 'Kruki', sekwencja: ['weles', 'stribog', 'perun'] },
 ];
 const kontenerPieczeci = document.getElementById('przyciski-pieczecie');
 for (const id of PIECZECIE) {

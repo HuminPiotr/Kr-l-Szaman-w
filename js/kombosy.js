@@ -206,7 +206,14 @@ export const KOMBOSY = [
     // jest żadną dwójką, mokosz->stribog też - po drodze nic nie odpala.
     // Kolizja z Tęczą rozwiązana wariantami wyżej.
     { id: 'dodola', nazwa: 'Dodola',
-      sekwencja: ['mokosz', 'mokosz', 'stribog'], uzbraja: 'dodola' }
+      sekwencja: ['mokosz', 'mokosz', 'stribog'], uzbraja: 'dodola' },
+
+    // KRUKI (2026-10-13, spec 2026-10-13-fala-i-kruki-design.md): Weles
+    // otwiera cień, wiatr go podrywa, grom płoszy stado (js/kruki.js).
+    // Prefiks weles -> stribog to Zawierucha - CELOWY łańcuch: najpierw
+    // poryw, potem kruki; zakończenie stribog -> perun jest wolne.
+    { id: 'kruki', nazwa: 'Kruki',
+      sekwencja: ['weles', 'stribog', 'perun'], uzbraja: 'kruki' }
 ];
 
 export class KomboSilnik {

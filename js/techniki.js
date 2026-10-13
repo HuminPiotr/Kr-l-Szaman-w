@@ -19,6 +19,7 @@ import { pekniecieZiemi } from './iskry.js';
 import { kregSylwetki, BARWA_MGLA as BARWA_KOLOWROTU } from './kolowrot.js';
 import { BOGOWIE } from './jaja.js';
 import { zaczepKlatki } from './grzmot.js';
+import { zaczepIglicy } from './kruki.js';
 
 // Barwa czoła fali Gromu w Ziemię - fiolet Welesa (efekty.js weles: 280°),
 // PODBITY do pełnego nasycenia (nie dosłowna konwersja HSL->RGB), bo
@@ -59,7 +60,8 @@ export const BARWA_ZAPLONU = {
     zawierucha: [215, 175, 110],    // ochra pyłu, jak Kurzawa
     bledneOgniki: [110, 175, 255],  // zimny błękit ogników (v2) - nie pomarańcz Płonącego Palca
     dodola: [170, 205, 235],         // chłodny błękit deszczu (js/deszcz.js BARWA, przyciemniona)
-    falaMokoszy: [70, 165, 200]      // morska zieleń grzbietu fali (js/falaMokoszy.js BARWA_GRZBIETU)
+    falaMokoszy: [70, 165, 200],     // morska zieleń grzbietu fali (js/falaMokoszy.js BARWA_GRZBIETU)
+    kruki: [95, 100, 135]            // chłodny połysk piór (js/kruki.js BARWA_POLYSKU) - czerń by zginęła
 };
 
 /**
@@ -92,7 +94,7 @@ export function odpalPieczec(id, frame, W, H, s) {
  * @param {number} H  wysokość płótna w px
  * @param {number} now
  * @param {{efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
- *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy}} s
+ *          podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki}} s
  */
 export function odpalTechnike(technika, frame, W, H, now, s) {
     s.efekty.odpal(technika.id);
@@ -211,6 +213,10 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
         // Siła STAŁA (combo jest gratis). Otwiera okno na zamachy w górę -
         // fale i ich stronę moduł liczy SAM co klatkę (js/falaMokoszy.js).
         s.falaMokoszy.zapal(1.0);
+    } else if (technika.uzbraja === 'kruki') {
+        // Natychmiastowa, siła STAŁA (combo jest gratis). Namiot palców Iglicy
+        // bierzemy z TEJ klatki - to z niego wylatuje kruk na ekran.
+        s.kruki.zapal(1.0, zaczepIglicy(frame, W, H));
     }
     // KAŻDE inne combo gasi POTENCJAŁ Okadzenia (produkcję), ale NIE
     // kasuje już wydmuchane kłęby - js/dmuchanie.js nagłówek "PAUZA,

@@ -58,6 +58,7 @@ import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
 import { FalaMokoszy } from './falaMokoszy.js';
+import { Kruki } from './kruki.js';
 import { Dodola } from './deszcz.js';
 import { zagrajGrzmot } from './dzwiekGrzmotu.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
@@ -282,6 +283,7 @@ let zawierucha = new Zawierucha();
 let bledneOgniki = new BledneOgniki();
 let dodola = new Dodola();
 let falaMokoszy = new FalaMokoszy();
+let kruki = new Kruki();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -562,7 +564,7 @@ function renderLoop(now) {
 function resetujModuly() {
     ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -847,7 +849,7 @@ function klatka(now) {
             zanotuj(odkrycia.technika(technika, now));
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy
+                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki
             });
             if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
@@ -1063,6 +1065,7 @@ function klatka(now) {
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
     falaMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
+    kruki.updateAndDraw(ctx, kontekstTechnik, dt);
     // Deszcz NA KOŃCU technik: pada przez wszystkie pola (Mgłę, Kurzawę, ogniki).
     dodola.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
@@ -1181,6 +1184,7 @@ function klatka(now) {
         bledneOgniki: { aktywny: bledneOgniki.aktywny, widocznych: bledneOgniki.punkty().length },
         dodola: { aktywny: dodola.aktywny, ...dodola.diagnostyka },
         falaMokoszy: { aktywny: falaMokoszy.aktywny, ...falaMokoszy.diagnostyka },
+        kruki: { aktywny: kruki.aktywny, ...kruki.diagnostyka },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
