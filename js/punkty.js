@@ -182,10 +182,16 @@ export class Punktacja {
         return Number.isFinite(m) && m >= 1 ? m : 1;
     }
 
-    taniec(plynnosc, responsywnosc, dt) {
+    /**
+     * Strumień za taniec. `mnoznik` = mnożnik jakości tańca (js/jakoscTanca.js, 0.67..1.33) -
+     * te same kotwice co tempo ładowania. Przycięty do [0, 2], NIE do 1; domyślnie 1 =
+     * zmierzony balans sprzed 2026-10-14 (Kronika, Kamienie Pamięci).
+     */
+    taniec(plynnosc, responsywnosc, dt, mnoznik = 1) {
         if (!this.aktywna || !Number.isFinite(dt) || dt <= 0) return 0;
+        const m = Number.isFinite(mnoznik) ? Math.max(0, Math.min(2, mnoznik)) : 1;
         return this._dodaj('taniec',
-            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * Math.min(dt, MAX_DT_TANCA_S));
+            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * m * Math.min(dt, MAX_DT_TANCA_S));
     }
 
     /** Strumień za natężenie zaklinania (0..1) - warstwa technik, nie tańca. */

@@ -269,4 +269,19 @@ console.log('\nWSPÓLNA REGUŁA SPLECENIA (Pamięć Plemienia też jej używa):'
     spr('n większe niż historia = cała historia', ogonPieczeci(h, 10).size === 4);
 }
 
+console.log('\nMNOŻNIK JAKOŚCI TAŃCA (2026-10-14):');
+{
+    const a = new Punktacja(), b = new Punktacja(), c = new Punktacja(), d = new Punktacja();
+    a.taniec(0.8, 0.9, 0.05);
+    b.taniec(0.8, 0.9, 0.05, 1);
+    c.taniec(0.8, 0.9, 0.05, 1.33);
+    d.taniec(0.8, 0.9, 0.05, NaN);
+    spr('bez mnożnika = mnożnik 1 (zmierzony balans Kroniki zostaje)', a.wynik === b.wynik);
+    spr('mnożnik 1.33 NIE jest przycinany do 1', Math.abs(c.wynik / a.wynik - 1.33) < 1e-9);
+    spr('NaN = 1', d.wynik === a.wynik);
+    const e = new Punktacja();
+    e.taniec(0.8, 0.9, 0.05, -1);
+    spr('ujemny mnożnik nie odejmuje punktów', e.wynik === 0);
+}
+
 process.exit(ok ? 0 : 1);

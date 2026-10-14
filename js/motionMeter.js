@@ -102,6 +102,9 @@ export class MotionMeter {
         this.predkoscEfektywna = 0; // po odjęciu podłogi szumu; TA steruje grą
         this.responsywnosc = 0;     // predkoscEfektywna zmapowana na 0..1
         this.wspolczynnikPlynnosci = 1; // mnożnik tempa ładowania z płynności
+        this.mnoznikBogactwa = 1;   // z js/jakoscTanca.js - łuki, całe ciało, fala (0.67..1.33)
+        this.mnoznikTransu = 1;     // gniazdo etapu 4 (trans w rytmie) - do tego czasu zawsze 1
+        this.tempoLadowania = 0;    // ułamek paska/s bez zaniku - do HUD ("pełny pasek za ~X s")
         this._wygladzone = null;    // wygładzone pozycje z poprzedniej klatki
         this.szumPunktow = {};      // diagnostyka: prędkość per kończyna [m/s]
     }
@@ -111,6 +114,8 @@ export class MotionMeter {
      * @param {number} plynnosc  0..1 z js/plynnosc.js - jak gładki jest ruch.
      *                           Steruje TEMPEM ładowania, nigdy go nie zeruje.
      * @param {boolean} zamrozZanik  true na czas składania pieczęci.
+     * @param {number} [mnoznikBogactwa]  0.67..1.33 z JakoscTanca; 1 = zachowanie sprzed 2026-10-14
+     * @param {number} [mnoznikTransu]    gniazdo etapu 4; 1 = brak transu
      *
      * ZAMROŻENIE JEST WYMOGIEM, NIE OPTYMALIZACJĄ. Trzymanie postawy jest
      * bezruchem, więc bez niego składanie kosztuje podwójnie: responsywnosc
@@ -121,7 +126,7 @@ export class MotionMeter {
      * reguła nadrzędna. Przyrost nadal nie działa (gracz stoi) - zamrażamy
      * wyłącznie ZANIK.
      */
-    update(frame, plynnosc = 1, zamrozZanik = false) {
+    update(frame, plynnosc = 1, zamrozZanik = false, mnoznikBogactwa = 1, mnoznikTransu = 1) {
         const dt = Math.min(frame.dt, MAX_DT);
         if (dt <= 0) return this.moc;
 
@@ -129,6 +134,9 @@ export class MotionMeter {
         const wsp = PODLOGA_PLYNNOSCI + (1 - PODLOGA_PLYNNOSCI) *
                     (Number.isFinite(plynnosc) ? Math.max(0, Math.min(1, plynnosc)) : 1);
         this.wspolczynnikPlynnosci = wsp;
+        // Mnożniki TEMPA, nie progi: przycięte z dołu powyżej zera, więc ruch zawsze ładuje.
+        this.mnoznikBogactwa = Number.isFinite(mnoznikBogactwa) ? Math.max(0.5, Math.min(2, mnoznikBogactwa)) : 1;
+        this.mnoznikTransu = Number.isFinite(mnoznikTransu) ? Math.max(1, Math.min(3, mnoznikTransu)) : 1;
 
         const pose = frame.pose;
 
@@ -139,6 +147,7 @@ export class MotionMeter {
             this.predkosc += ALFA_WYGLADZANIA * (0 - this.predkosc);
             this.predkoscEfektywna = 0;
             this.responsywnosc = 0;
+            this.tempoLadowania = 0;
             this.moc = Math.max(0, this.moc - ZANIK * ZANIK_POZA_KADREM * dt);
             return this.moc;
         }
@@ -155,7 +164,8 @@ export class MotionMeter {
         // Przyrost jest proporcjonalny do ruchu i NIGDY ujemny.
         // Zanik włącza się dopiero poniżej progu bezruchu i narasta płynnie
         // do pełnej wartości przy całkowitym zatrzymaniu.
-        const przyrost = PRZYROST * this.responsywnosc * wsp;
+        const przyrost = PRZYROST * this.responsywnosc * wsp * this.mnoznikBogactwa * this.mnoznikTransu;
+        this.tempoLadowania = przyrost;
         const bezruch = Math.max(0, (PROG_BEZRUCHU_MS - this.predkoscEfektywna) / PROG_BEZRUCHU_MS);
         const netto = przyrost - (zamrozZanik ? 0 : ZANIK * bezruch);
 
