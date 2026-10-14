@@ -7,7 +7,10 @@
  *   fala           - czy ruch przepływa z opóźnieniem.
  * W etapie 3 dojdzie czwarta składowa (dopasowanie tempa) - jeden wpis w WAGI.
  *
- * ŚREDNIA WAŻONA, NIE ILOCZYN: brak fali nie zeruje łuków. Płynność NIE wchodzi
+ * ŚREDNIA WAŻONA, NIE ILOCZYN: brak fali nie zeruje łuków. Brakująca składowa
+ * liczy się jak BOGACTWO_NEUTRALNE (spec §2), a nie jest pomijana z renormalizacją
+ * wag - inaczej brak danych o fali podbijałby wagę pozostałych i nagradzał lub
+ * karał taniec za coś, czego nie zmierzono. Płynność NIE wchodzi
  * do średniej - zostaje osobnym czynnikiem w MotionMeter (wspPlynnosci 0.25..1),
  * inaczej szarpany taniec całym ciałem wychodził tak samo jak gładkie góra-dół.
  *
@@ -41,15 +44,21 @@ export function mnoznikZBogactwa(b) {
     return N.MNOZNIK_NISKI + (N.MNOZNIK_WYSOKI - N.MNOZNIK_NISKI) * (b - N.KOTWICA_NISKA) / (N.KOTWICA_WYSOKA - N.KOTWICA_NISKA);
 }
 
+/**
+ * Brakująca składowa (null / undefined / NaN) = BOGACTWO_NEUTRALNE, nie pominięcie.
+ * Gdy brakuje WSZYSTKICH, zwraca null - JakoscTanca dryfuje wtedy do neutralnego
+ * z TAU_POWROTU_S (wolniej niż przy żywych danych).
+ */
 export function zlozBogactwo(skladowe) {
-    let suma = 0, wagi = 0;
+    let suma = 0, wagi = 0, znane = 0;
     for (const [k, w] of Object.entries(N.WAGI)) {
         const v = skladowe?.[k];
-        if (v === null || v === undefined || !Number.isFinite(v)) continue;
-        suma += w * Math.max(0, Math.min(1, v));
+        const jest = v !== null && v !== undefined && Number.isFinite(v);
+        suma += w * (jest ? Math.max(0, Math.min(1, v)) : BOGACTWO_NEUTRALNE);
         wagi += w;
+        if (jest) znane++;
     }
-    return wagi > 0 ? suma / wagi : null;
+    return znane > 0 && wagi > 0 ? suma / wagi : null;
 }
 
 export class JakoscTanca {

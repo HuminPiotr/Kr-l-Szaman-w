@@ -35,9 +35,10 @@ spr('wszystko null -> null', zlozBogactwo({ krazenie: null, zaangazowanie: null,
 const w = N.WAGI;
 spr('pełny zestaw = średnia ważona',
     Math.abs(zlozBogactwo({ krazenie: 1, zaangazowanie: 0.5, fala: 0 }) - (w.krazenie + 0.5 * w.zaangazowanie)) < 1e-9);
-spr('brak fali -> wagi renormalizowane po reszcie',
-    Math.abs(zlozBogactwo({ krazenie: 0, zaangazowanie: 1, fala: null }) - w.zaangazowanie / (w.krazenie + w.zaangazowanie)) < 1e-9);
-spr('NaN w składowej traktowany jak brak', zlozBogactwo({ krazenie: NaN, zaangazowanie: 1, fala: null }) === 1);
+spr('brak fali -> liczy się jak neutralne (bez renormalizacji wag)',
+    Math.abs(zlozBogactwo({ krazenie: 0, zaangazowanie: 1, fala: null }) - (w.zaangazowanie + w.fala * BOGACTWO_NEUTRALNE)) < 1e-9);
+spr('NaN w składowej = neutralne, jak null',
+    Math.abs(zlozBogactwo({ krazenie: NaN, zaangazowanie: 1, fala: null }) - (w.zaangazowanie + (w.krazenie + w.fala) * BOGACTWO_NEUTRALNE)) < 1e-9);
 
 console.log('\nCAŁOŚĆ NA SYNTETYKACH:');
 const SIGMA = 0.009, FPS = 60, DT = 1 / FPS, om = 2 * Math.PI * 0.8;
