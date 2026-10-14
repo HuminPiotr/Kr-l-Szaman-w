@@ -15,17 +15,18 @@ import { clamp01 } from './pochodne.js';
 
 const STAWY = [15, 16, 13, 14, 27, 28]; // nadgarstki, łokcie, kostki
 
+// ZGADNIĘTE poza MIN_ODCHYLENIE_M (z pomiaru szumu) - wszystko niżej nie było strojone na nagraniach.
 export const NASTAWY_OKRESU = {
-    OKNO_S: 4.0,
-    MIN_OKRES_S: 0.25,
-    MAX_OKRES_S: 2.5,
+    OKNO_S: 4.0,             // (ZGADNIĘTE)
+    MIN_OKRES_S: 0.25,       // (ZGADNIĘTE)
+    MAX_OKRES_S: 2.5,        // (ZGADNIĘTE)
     CO_ILE_S: 0.25,          // autokorelacja co tyle, nie co klatkę
     MIN_ODCHYLENIE_M: 0.03,  // seria o mniejszym rozrzucie to szum (sigma ~0.009 m) - nie głosuje
-    BLISKO_SZCZYTU: 0.85,    // pierwszy szczyt >= 85% najwyższego wygrywa - bez tego czasem 2T
-    MIN_ROZPIETOSC_S: 1.5,   // okno krótsze niż tyle nie orzeka
-    ZANIK_PEWNOSCI_S: 2.0,   // bez pozy pewność gaśnie do zera w tyle
+    BLISKO_SZCZYTU: 0.85,    // pierwszy szczyt >= 85% najwyższego wygrywa - bez tego czasem 2T   (ZGADNIĘTE)
+    MIN_ROZPIETOSC_S: 1.5,   // okno krótsze niż tyle nie orzeka   (ZGADNIĘTE)
+    ZANIK_PEWNOSCI_S: 2.0,   // bez pozy pewność gaśnie do zera w tyle   (ZGADNIĘTE)
     PROG_WIDOCZNOSCI: 0.5,
-    MAX_PRZERWA_S: 0.2       // krótsza dziura (migotanie śledzenia) nie kasuje okna ani serii
+    MAX_PRZERWA_S: 0.2       // krótsza dziura (migotanie śledzenia) nie kasuje okna ani serii   (ZGADNIĘTE)
 };
 export const PROG_PEWNOSCI = 0.4;
 

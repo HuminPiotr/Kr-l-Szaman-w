@@ -19,17 +19,18 @@ import { clamp01, widoczny } from './pochodne.js';
 
 const STAWY = [15, 16, 13, 14, 27, 28];
 
+// ZGADNIĘTE poza PROG_PREDKOSCI (jak w płynności) i szumem ~0.9 cm w BLISKO_MIN_M.
 export const NASTAWY_KRAZENIA = {
-    OKNO_S: 4.0,             // musi objąć ponad jeden cykl, inaczej okrąg nie ma "powrotu"
+    OKNO_S: 4.0,             // musi objąć ponad jeden cykl, inaczej okrąg nie ma "powrotu"   (ZGADNIĘTE)
     CO_ILE_S: 0.25,
-    POL_ROZNICY_S: 0.08,     // prędkość z różnicy centralnej +-tyle
-    MIN_ODSTEP_S: 0.15,      // krótszy odstęp to ta sama chwila, nie powrót
+    POL_ROZNICY_S: 0.08,     // prędkość z różnicy centralnej +-tyle   (ZGADNIĘTE)
+    MIN_ODSTEP_S: 0.15,      // krótszy odstęp to ta sama chwila, nie powrót   (ZGADNIĘTE)
     BLISKO_UL: 0.2,          // "to samo miejsce" = 20% rozrzutu stawu...   (ZGADNIĘTE)
     BLISKO_MIN_M: 0.03,      // ...ale nie mniej niż 3 cm (szum ~0.9 cm)
     PROG_PREDKOSCI: 0.18,    // m/s średnio - jak w płynności: wolniejszy staw nie głosuje
-    MIN_ROZPIETOSC_S: 1.0,
-    TAU_S: 0.8,              // wygładzanie wyniku
-    MAX_PRZERWA_S: 0.2       // krótsza przerwa w widoczności stawu nie kasuje okna
+    MIN_ROZPIETOSC_S: 1.0,   // (ZGADNIĘTE)
+    TAU_S: 0.8,              // wygładzanie wyniku   (ZGADNIĘTE)
+    MAX_PRZERWA_S: 0.2       // krótsza przerwa w widoczności stawu nie kasuje okna   (ZGADNIĘTE)
 };
 const N = NASTAWY_KRAZENIA;
 

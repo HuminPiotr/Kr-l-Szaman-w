@@ -40,7 +40,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
                                                              ├→ ZnakRegistry → Pieczęcie → Kombosy → Efekty
 ```
 
-**Tańczysz płynnie → moc rośnie → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
+**Tańczysz płynnie → moc rośnie (tempo ładowania × jakość tańca 0.67..1.33) → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
 
 ### Kontrakt klatki
 
@@ -62,12 +62,12 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/handTracker.js` | wrapper MediaPipe Hands (`numHands: 2`) |
 | `js/frameMapper.js` | cover-fit + mapowanie punktów na płótno |
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
-| `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
-| `js/jakoscTanca.js` | jakość tańca (2026-10-14, etap 1 z 4 „gra rozumie muzykę”): krążenie + zaangażowanie + fala → bogactwo 0..1 → mnożnik tempa ładowania 0.67..1.33 (góra–dół ~12 s, piękny taniec ~6 s); brak danych → 1.0. Zmierzone na nagraniach sesji J: zwykły taniec ×1.20–1.23, stanie ×1.00; fala: sztywne skrzydło 0.00, wąż 1.00; syntetyka: dziś 8.1 s, ×0.67 12.0 s, ×1.33 6.2 s |
-| `js/jakosc/okres.js` | dominujący okres ruchu z autokorelacji POZYCJI (nie moduł prędkości — ten daje pół okresu, a dla okręgu nie ma szczytu); gniazdo „pulsu tańca” etapu 2 |
-| `js/jakosc/krazenie.js` | „łuki zamiast linii” jako brak NAWROTÓW toru (pierwszy powrót w to samo miejsce: ten sam kierunek = krąg, przeciwny = wahadło) |
+| `js/motionMeter.js` | ciągłość ruchu × płynność → moc; tempo ładowania × mnożnik jakości tańca (0.67..1.33, domyślnie 1.0) |
+| `js/jakoscTanca.js` | jakość tańca (2026-10-14, etap 1 z 4 „gra rozumie muzykę”): krążenie + zaangażowanie + fala → bogactwo 0..1 → mnożnik tempa ładowania 0.67..1.33 (góra–dół ~12 s, piękny taniec ~6 s); brak danych → 1.0, a brakująca składowa liczy się jak wartość neutralna (nie jest pomijana z renormalizacją wag). Liczby zmierzone na ISTNIEJĄCYCH nagraniach (tools/probki z 2026-09-03 i 2026-10-09), NIE na sesji J; kalibracja na sesji J (zadanie 13) czeka na właściciela. Zwykły taniec ×1.14–1.16 (przed neutralnym uzupełnianiem ×1.20–1.23), stanie ×1.00; fala: sztywne skrzydło 0.00, wąż 1.00; wężowe ×1.14–1.32; syntetyka: dziś 8.1 s, ×0.67 12.0 s, ×1.33 6.2 s |
+| `js/jakosc/okres.js` | dominujący okres ruchu z autokorelacji POZYCJI (nie moduł prędkości — ten daje pół okresu, a dla okręgu nie ma szczytu); krótkie przerwy (≤ 0.2 s) interpoluje; gniazdo „pulsu tańca” etapu 2 |
+| `js/jakosc/krazenie.js` | „łuki zamiast linii” jako brak NAWROTÓW toru (pierwszy powrót w to samo miejsce: ten sam kierunek = krąg, przeciwny = wahadło); przerwy ≤ 0.2 s nie kasują okna |
 | `js/jakosc/zaangazowanie.js`, `js/jakosc/cialo2d.js` | 7 partii ciała, biodra z 2D w pikselach ÷ szerokość barków |
-| `js/jakosc/fala.js` | fala przez ciało, opóźnienie jako UŁAMEK cyklu (niezależne od tempa) |
+| `js/jakosc/fala.js` | fala przez ciało, opóźnienie jako UŁAMEK cyklu (niezależne od tempa); przerwy ≤ 0.2 s nie kasują okna |
 | `js/jakosc/pochodne.js` | wspólne: filtr SG, korelacja z opóźnieniem |
 | `js/blaskTanca.js` | połysk tańczących partii + bieg fali (kreska po węzłach) |
 | `js/aura.js` | maska sylwetki → poświata |
