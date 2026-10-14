@@ -18,7 +18,7 @@ ciała i — w kolejnych etapach — rozumiała muzykę (tempo, rytm) i dostosow
 4. **Trafienia i trans** — akcenty ruchu w takt dają łyk mocy i błysk aury; seria trafień buduje
    trans (mnożnik ładowania i punktów tańca), który gaśnie łagodnie i nic nie zabiera.
 
-Decyzje dla etapu 1: premiować **łuki zamiast linii**, **całe ciało**, **falę przez ciało**
+Decyzje dla etapu 1: premiować **łuki zamiast linii** (mierzone jako krążenie bez nawrotów), **całe ciało**, **falę przez ciało**
 (różnorodność/powtarzanie — NIE). Balans **„pośrodku”**: góra–dół ~12 s do pełnego paska
 (dziś ~8 s), piękny taniec ~6 s. Odczucie: **„aura mówi”** — bez nowych napisów.
 
@@ -30,7 +30,7 @@ Reguła nadrzędna bez zmian (GEMINI.md §2): wszystko ciągłe 0..1, ruch zawsz
 ```
 PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem) → wspPlynnosci 0.25..1
              │                  ├→ Okres ─────────┐ (okresS, pewnosc)
-             │                  ├→ Krzywizna      │
+             │                  ├→ Krazenie       │
              │                  ├→ Fala ◄─────────┘
              └→ landmarks 2D ───┴→ Zaangazowanie
                                      └→ JakoscTanca → bogactwo, mnoznikBogactwa, jakosc
@@ -43,23 +43,30 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
 - `js/jakosc/pochodne.js` — filtr Savitzky'ego-Golaya wydzielony z `js/plynnosc.js` (`_pochodneSG`)
   i korelacja z opóźnieniem wydzielona z `js/ruchy/falowanieRamion.js`. Oba stare moduły
   przechodzą na wspólny kod; **liczby mają zostać identyczne** (regresja na nagraniach).
-- `js/jakosc/okres.js` — autokorelacja sumarycznej prędkości kończyn, okno 4 s, zakres okresu
-  0.25–2.5 s. Zwraca `{ okresS, pewnosc }`. Klocek wspólny z etapem 2 (puls tańca) i 3.
-- `js/jakosc/krzywizna.js` — udział skręcania: `Σ v·a_n² / Σ v·(a_n² + a_t²)` po aktywnych stawach
-  (15, 16, 13, 14, 27, 28), x/y worldLandmarks. Bramka szumu jak w płynności: staw o średniej
-  prędkości < `PROG_PREDKOSCI` nie głosuje. Linia ≈ 0, okrąg ≈ 1. Bezwymiarowa — tempo jej nie zmienia.
+- `js/jakosc/okres.js` — autokorelacja POZYCJI (x, y każdego stawu 15/16/13/14/27/28 osobno,
+  po odjęciu średniej, sumowana), okno 4 s, zakres okresu 0.25–2.5 s. Zwraca `{ okresS, pewnosc }`.
+  NIE autokorelacja |v|: dla kołysania |v| powtarza się co PÓŁ okresu, a dla okręgu jest płaska
+  (brak szczytu). Klocek wspólny z etapem 2 (puls tańca) i 3.
+- `js/jakosc/krazenie.js` — „łuki zamiast linii” mierzone jako **brak nawrotów toru**: dla par
+  próbek tego samego stawu, które są blisko siebie w przestrzeni, a daleko w czasie (> 0.15 s),
+  `Σ v_i·v_j / Σ |v_i||v_j|`, przeskalowane do 0..1. Wahadło (ruch tam i z powrotem po tym samym
+  torze — także łuk prostej ręki wokół barku!) ≈ 0, okrąg ≈ 1, ósemka wysoko. Stawy 15/16/13/14/27/28,
+  x/y worldLandmarks, bramka szumu jak w płynności. Bezwymiarowe — tempo go nie zmienia.
+  POPRAWKA 2026-10-14 (przed planem): pierwotna „krzywizna” (udział przyspieszenia normalnego)
+  nie łapała exploitu — podnoszenie prostych rąk kreśli ŁUK wokół barku, który ma duże a_n.
 - `js/jakosc/zaangazowanie.js` — 7 partii, każda aktywność 0..1 = rampa(sygnał ponad podłogą szumu):
 
   | partia | sygnał |
   |---|---|
   | ręka L / P | prędkość nadgarstka (world, x/y) |
   | noga L / P | prędkość kostki i kolana (world, x/y) |
-  | biodra | prędkość środka bioder 23/24 w 2D ÷ szerokość barków (kroki, kołysanie) |
-  | tułów | prędkość kątowa linii barków względem linii bioder (2D) |
-  | głowa | prędkość nosa (0) względem środka barków ÷ szerokość barków (2D) |
+  | biodra | prędkość środka bioder 23/24 w 2D, w PIKSELACH (x·width, y·height), ÷ szerokość barków w px |
+  | tułów | prędkość środka barków (world — początek układu jest w biodrach) + prędkość kątowa linii barków względem linii bioder (world) |
+  | głowa | prędkość nosa (0) względem środka barków (world) |
 
   Wynik `min(1, Σ aktywności / 4)` — cztery partie wystarczą do pełnej wartości; same ręce ~0.5.
-  Sygnały 2D dzielone przez szerokość barków → niezależne od odległości od kamery.
+  2D tylko dla bioder (world ich nie widzi — tam jest początek układu); przeliczone na piksele,
+  bo landmarki 2D są znormalizowane osobno do szerokości i wysokości płótna.
   Punkty z `visibility < 0.5` nie głosują.
 - `js/jakosc/fala.js` — najsilniejszy z łańcuchów: ramię L, ramię P (kąt ramienia → kąt
   przedramienia, jak w deszczu), biodra → nadgarstki (kołysanie bioder przechodzące w ręce).
@@ -68,11 +75,11 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
   dryfuje do neutralnej, nie do zera.
 - `js/jakoscTanca.js` — składa:
   ```
-  bogactwo = 0.35·krzywizna + 0.35·zaangażowanie + 0.30·fala          (ZGADNIĘTE — stroić)
+  bogactwo = 0.35·krążenie + 0.35·zaangażowanie + 0.30·fala          (ZGADNIĘTE — stroić)
   mnoznikBogactwa = liniowo przez kotwice: bogactwo(góra–dół) → 0.67, bogactwo(piękny taniec) → 1.33,
                     przycięte do [0.67, 1.33]
-  jakosc = wspPlynnosci × bogactwo   (do punktów i aury)
   ```
+  Do aury idzie `bogactwo`; do punktów `mnoznikBogactwa` (sekcja 3).
   Kotwice ustawiane Z POMIARU (sekcja 5). Wygładzanie τ ≈ 1 s (dłuższe niż cykl tańca). Brak danych
   (bezruch, poza kadrem) → składowe dryfują do neutralnej, mnoznikBogactwa → 1.0 (dzisiejsze tempo).
   „Neutralna” = środek między kotwicami, czyli bogactwo dające mnożnik 1.0 (τ powrotu ≈ 2 s, jak
@@ -89,10 +96,11 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
   Prędkość nadal z tych samych 6 punktów — nowe partie idą do jakości, nie do prędkości (szum bioder
   i głowy nie podnosi podłogi bezruchu). `mnoznikTransu` = 1 do etapu 4. Zanik i zamrożenie bez zmian.
   Wartości domyślne zachowują dzisiejsze zachowanie dla wszystkich obecnych wywołań.
-- `js/punkty.js` — `taniec(jakosc, responsywnosc, dt)`: w miejsce płynności podawana `jakosc`.
-  Punkty dalej tylko przybywają.
+- `js/punkty.js` — `taniec(plynnosc, responsywnosc, dt, mnoznik = 1)`: płynność bez zmian, nowy
+  OPCJONALNY mnożnik (`mnoznikBogactwa`, przycięty do [0, 2], nie do 1). Przy mnożniku 1 — dokładnie
+  dzisiejsze punkty (zmierzony balans Kroniki i Kamieni Pamięci zostaje). Punkty dalej tylko przybywają.
 - `js/main.js` — w pętli: okres → płynność → składowe → JakoscTanca → MotionMeter / punkty / aura.
-- `js/debugHud.js` — sekcja „Jakość tańca”: krzywizna, zaangażowanie z 7 paskami partii,
+- `js/debugHud.js` — sekcja „Jakość tańca”: krążenie, zaangażowanie z 7 paskami partii,
   fala (opóźnienie % cyklu, korelacja, łańcuch), okres/BPM ruchu, bogactwo, mnożnik, czas do pełnego paska.
 
 ### 4. Aura (`js/aura.js`) — „aura mówi”
@@ -107,8 +115,11 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
 ### 5. Strojenie z nagrania
 - `SCENARIUSZ_JAKOSC` w `js/nagrywanie/sesja.js` (start z nakładki jak sesja F), 6 ćwiczeń
   × 3 powtórzenia × 10 s, wskazówki „w swoim tempie / wolniej / szybciej”:
-  1. ręce prosto w górę i w dół, 2. kręgi i ósemki rękami, 3. taniec całym ciałem z krokami
-  i biodrami, 4. fala przez ciało (biodra → dłonie), 5. szybki taniec, 6. wolny taniec.
+  1a. „pompowanie” — zgięte ręce prosto w górę i w dół, 1b. proste ręce szerokimi łukami w górę
+  i w dół (oba to dzisiejszy exploit; kotwica 0.67 z WYŻSZEGO z nich), 2. kręgi i ósemki rękami,
+  3. taniec całym ciałem z krokami i biodrami, 4. fala przez ciało (biodra → dłonie),
+  5. szybki taniec, 6. wolny taniec. Id kroków z prefiksem `jakosc-` (sesja.js:107 — kolizja etykiet
+  z `test-rozdzielnosc`).
 - `tools/pomiar-jakosci.mjs` (wzorzec `tools/pomiar-falowania.mjs`, nie test) — rozkład składowych
   i bogactwa na każdej próbce. Z niego: kotwice mnożnika (góra–dół → 0.67, ćw. 3/4 → 1.33),
   wagi, progi partii. Wszystkie stałe przed pomiarem oznaczone ZGADNIĘTE.
@@ -116,15 +127,15 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
   szybki i wolny taniec podobnie przy podobnej jakości.
 
 ## Testy (`tools/test-*.mjs`, dopięte do `tools/test-wszystko.sh`)
-- `test-krzywizna`: linia ≈ 0, okrąg ≈ 1, ósemka > kołysanie; szum przy bezruchu nie głosuje.
+- `test-krazenie`: linia ≈ 0, łuk prostej ręki wokół barku ≈ 0, okrąg ≈ 1, ósemka wysoko; bezruch nie głosuje.
 - `test-zaangazowanie`: same ręce ~0.5; kroki podnoszą biodra; wynik niezależny od skali sylwetki.
 - `test-fala-ciala`: sztywne skrzydło ≈ 0, fala opóźniona wysoko; ten sam wąż wolno i szybko — podobny wynik.
-- `test-okres`: sinusoidy 0.5 / 1 / 2 Hz odczytane poprawnie; szum → niska pewność.
+- `test-okres`: kołysania 0.5 / 1 / 2 Hz ORAZ okrąg ze stałą prędkością odczytane poprawnie; szum → niska pewność.
 - `test-plynnosc` (rozszerzony): szybka gładka sinusoida po skalowaniu nie gorsza niż wolna;
   dotychczasowe pułapki zielone.
 - `test-jakosc-tanca`: kotwice mnożnika, przycięcie [0.67, 1.33], dryf do 1.0 przy braku danych, NaN.
 - MotionMeter: przy ruchu przyrost nigdy 0; domyślne argumenty = dzisiejsze zachowanie; NaN nie zatruwa.
-- `test-punkty`: punkty tylko rosną.
+- `test-punkty`: punkty tylko rosną; mnożnik 1 = dzisiejsze tempo; mnożnik 1.33 nie jest przycinany do 1.
 - Regresja: `test-falowanie`, `test-deszcz`, `test-zaklinanie` i `tools/pomiar-falowania.mjs`
   dają identyczne liczby po wydzieleniu `pochodne.js`.
 
