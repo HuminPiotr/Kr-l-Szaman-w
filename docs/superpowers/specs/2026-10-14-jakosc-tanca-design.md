@@ -89,7 +89,8 @@ PoseTracker ─┬→ worldLandmarks ─┬→ Plynnosc (próg skalowany okresem
 
 ### 3. Zmiany w istniejących
 - `js/plynnosc.js` — próg szarpnięcia skalowany częstotliwością ruchu:
-  `PROG_SZARPNIECIA × clamp(f_ruchu / 1 Hz, 0.5, 2)` (przy niskiej pewności okresu — skala 1).
+  `PROG_SZARPNIECIA × clamp(f_ruchu / 1 Hz, 1, 2)` (przy niskiej pewności okresu — skala 1).
+  Zmiana 2026-10-14 (po przeglądzie końcowym): dolna granica 1 zamiast 0.5 — skalujemy tylko w górę, żeby wolny taniec nie tracił płynności przez szum śledzenia.
   Szybki gładki taniec przestaje tracić względem wolnego. Pięć pułapek z nagłówka zostaje pilnowanych.
 - `js/motionMeter.js` — `update(frame, plynnosc, zamrozZanik, mnoznikBogactwa = 1, mnoznikTransu = 1)`:
   `przyrost = PRZYROST × responsywnosc × wspPlynnosci × mnoznikBogactwa × mnoznikTransu`.

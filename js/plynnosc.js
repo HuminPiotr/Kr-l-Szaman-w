@@ -77,9 +77,12 @@ const PROG_SZARPNIECIA = 60;   // [1/s] -> płynność 0
 // Szarpnięcie rośnie LINIOWO z częstotliwością ruchu (v ~ Aω, a_t ~ Aω²), więc
 // PROG_SZARPNIECIA (dobrany przy ~1 Hz) karał szybki, gładki taniec. Gdy okres
 // ruchu jest pewny (js/jakosc/okres.js), próg skaluje się o f / 1 Hz, przycięte
-// do [0.5, 2]. Bez częstotliwości - skala 1, czyli zachowanie sprzed 2026-10-14.
+// do [1, 2]. Skalujemy TYLKO W GÓRĘ: dla wolnego ruchu (< 1 Hz) obniżony próg
+// zamieniałby szum śledzenia (który nie zależy od tempa) w "szarpnięcie" i karał
+// wolny taniec, a nic nie ma ładować wolniej tylko dlatego, że jest wolne.
+// Bez częstotliwości - skala 1, czyli zachowanie sprzed 2026-10-14.
 const CZESTOTLIWOSC_ODNIESIENIA_HZ = 1.0;
-const SKALA_PROGU_MIN = 0.5, SKALA_PROGU_MAX = 2.0;
+const SKALA_PROGU_MIN = 1.0, SKALA_PROGU_MAX = 2.0;
 
 const TAU_WYGLADZANIA = 0.6;   // s - płynność ma się zmieniać spokojnie, nie migotać
 const TAU_POWROTU = 2.0;       // s - powrót do pełnej płynności, gdy nie ma czego mierzyć

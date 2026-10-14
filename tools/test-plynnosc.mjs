@@ -133,7 +133,9 @@ spr(`szybkie (2 Hz) gładkie kołysanie ze skalowaniem nie gorsze niż wolne: ${
 spr(`skalowanie działa: bez częstotliwości ${szybkieBez.plynnosc.toFixed(2)} < z częstotliwością ${szybkieZ.plynnosc.toFixed(2)}`,
     szybkieBez.plynnosc < szybkieZ.plynnosc);
 spr('bez częstotliwości skala progu = 1 (dzisiejsze zachowanie)', szybkieBez.skalaProgu === 1);
-spr('skala przycięta do [0.5, 2]', przebiegF(1, 10).skalaProgu === 2 && przebiegF(1, 0.1).skalaProgu === 0.5);
+spr('skala przycięta do [1, 2] (tylko w górę - wolny taniec nie traci przez szum)',
+    przebiegF(1, 10).skalaProgu === 2 && przebiegF(1, 0.1).skalaProgu === 1);
+spr('2 Hz -> skala progu dokładnie 2', szybkieZ.skalaProgu === 2);
 spr('NaN jako częstotliwość = skala 1', przebiegF(1, NaN).skalaProgu === 1);
 
 process.exit(ok ? 0 : 1);
