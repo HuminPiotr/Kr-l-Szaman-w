@@ -113,6 +113,55 @@ export const SCENARIUSZ_FALOWANIE = [
     }
 ];
 
+// Jakość tańca (2026-10-14, spec 2026-10-14-jakosc-tanca-design.md): materiał do
+// strojenia tools/pomiar-jakosci.mjs. Kroki 1 i 2 to DZISIEJSZY EXPLOIT w dwóch
+// odmianach - kotwica mnożnika 0.67 idzie z WYŻSZEGO z nich. Id z prefiksem
+// 'jakosc-' (patrz komentarz przy 'taniec-falowanie' niżej).
+export const SCENARIUSZ_JAKOSC = [
+    {
+        nr: 1, id: 'jakosc-pompowanie', nazwa: 'POMPOWANIE',
+        opis: 'Zgięte ręce prosto w górę i w dół, jak pompowanie - reszta ciała spokojnie',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej', 'szybciej']
+    },
+    {
+        nr: 2, id: 'jakosc-luki-prostych-rak', nazwa: 'PROSTE RĘCE',
+        opis: 'Proste ręce szerokim łukiem z dołu wysoko nad głowę i z powrotem',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej', 'szybciej']
+    },
+    {
+        nr: 3, id: 'jakosc-kregi', nazwa: 'KRĘGI I ÓSEMKI',
+        opis: 'Dłonie kreślą kręgi i ósemki w powietrzu - bez cofania po tym samym torze',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej i szerzej', 'szybciej']
+    },
+    {
+        nr: 4, id: 'jakosc-cale-cialo', nazwa: 'CAŁE CIAŁO',
+        opis: 'Tańcz całym ciałem: kroki, biodra, barki, głowa - nie tylko ręce',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej', 'szybciej']
+    },
+    {
+        nr: 5, id: 'jakosc-fala-ciala', nazwa: 'FALA PRZEZ CIAŁO',
+        opis: 'Ruch zaczyna się w biodrach i płynie przez tułów do dłoni, jak fala',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['w swoim tempie', 'wolniej', 'szybciej']
+    },
+    {
+        nr: 6, id: 'jakosc-szybko', nazwa: 'SZYBKI TANIEC',
+        opis: 'Tańcz szybko, ale płynnie - jak do szybkiej pieśni',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['szybko', 'jeszcze szybciej', 'szybko, całym ciałem']
+    },
+    {
+        nr: 7, id: 'jakosc-wolno', nazwa: 'WOLNY TANIEC',
+        opis: 'Tańcz wolno i szeroko - jak do wolnej pieśni',
+        powtorzenia: 3, czasS: 10,
+        wskazowki: ['wolno', 'jeszcze wolniej', 'wolno, całym ciałem']
+    }
+];
+
 export class SesjaNagraniowa {
     constructor({ scenariusz = SCENARIUSZ } = {}) {
         this.scenariusz = scenariusz;

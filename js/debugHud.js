@@ -2,7 +2,7 @@
  * Nakładka diagnostyczna. Przełącznik: klawisz D. Reset zakresu v: R.
  * Zrzut śladu runy do konsoli (Krok 0b, spec run): klawisz N.
  * Sesja nagraniowa (spec pięciu pieczęci): klawisz Z (od kroku 1) albo
- * cyfra 1-8 (od wybranego kroku), Escape przerywa.
+ * cyfra 1-8 (od wybranego kroku), Escape przerywa. J - scenariusz jakości tańca.
  *
  * Nie ma tu testów jednostkowych do napisania - wejściem jest strumień z kamery,
  * a wyjściem wrażenie wzrokowe. Ta nakładka JEST narzędziem weryfikacji.
@@ -11,7 +11,7 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
-import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE } from './nagrywanie/sesja.js';
+import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC } from './nagrywanie/sesja.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
 import { czyPoleTekstowe } from './klawisze.js';
@@ -44,7 +44,7 @@ export class DebugHud {
         this._lastEkranSesjiUpdate = 0;
 
         window.addEventListener('keydown', (e) => {
-            // Pisanie nicku w menu nie może odpalać skrótów debug (D/R/N/Z/1-8) - patrz js/klawisze.js.
+            // Pisanie nicku w menu nie może odpalać skrótów debug (D/R/N/Z/F/J/1-8) - patrz js/klawisze.js.
             if (czyPoleTekstowe(e.target)) return;
             if (e.key === 'd' || e.key === 'D') this.toggle();
             if (e.key === 'r' || e.key === 'R') this.resetujZakres();
@@ -61,6 +61,8 @@ export class DebugHud {
             if (/^[1-8]$/.test(e.key)) this._startSesji(Number(e.key));
             // F: scenariusz falowania ramion (miara falistości) - zawsze od kroku 1.
             if (e.key === 'f' || e.key === 'F') this._startSesji(1, SCENARIUSZ_FALOWANIE);
+            // J: scenariusz jakości tańca (tools/pomiar-jakosci.mjs) - zawsze od kroku 1.
+            if (e.key === 'j' || e.key === 'J') this._startSesji(1, SCENARIUSZ_JAKOSC);
             if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
     }
