@@ -60,12 +60,16 @@ export function pochodneSG(hist, dt) {
 /**
  * Korelacja wzajemna z przesunięciem: szukamy lag, przy którym b (spóźnione
  * o lag próbek) najlepiej pasuje do a. Dodatni lag = b SPÓŹNIA SIĘ za a.
- * @returns {{lag: number, k: number}} k w -1..1
+ * lagDokladny: opóźnienie podpróbkowe z paraboli dopasowanej do k w najLag-1,
+ * najLag, najLag+1 (wierzchołek paraboli, przesunięcie w -0.5..0.5 próbki).
+ * Bez sąsiadów w zakresie albo bez szczytu (parabola nie wypukła w dół) = najLag.
+ * @returns {{lag: number, k: number, lagDokladny: number}} k w -1..1
  */
 export function korelacjaZOpoznieniem(a, b, maxLag) {
     const n = a.length;
     const mA = srednia(a), mB = srednia(b);
     let najK = -Infinity, najLag = 0;
+    const ks = [];
     for (let lag = -maxLag; lag <= maxLag; lag++) {
         let s = 0, sa = 0, sb = 0;
         for (let j = Math.max(0, -lag); j < n - Math.max(0, lag); j++) {
@@ -73,7 +77,17 @@ export function korelacjaZOpoznieniem(a, b, maxLag) {
             s += x * y; sa += x * x; sb += y * y;
         }
         const k = s / (Math.sqrt(sa * sb) + 1e-9);
+        ks[lag + maxLag] = k;
         if (k > najK) { najK = k; najLag = lag; }
     }
-    return { lag: najLag, k: najK };
+    let lagDokladny = najLag;
+    if (najLag - 1 >= -maxLag && najLag + 1 <= maxLag) {
+        const km = ks[najLag - 1 + maxLag], k0 = najK, kp = ks[najLag + 1 + maxLag];
+        const mian = km - 2 * k0 + kp;
+        if (mian < 0) {
+            const delta = Math.max(-0.5, Math.min(0.5, 0.5 * (km - kp) / mian));
+            lagDokladny = najLag + delta;
+        }
+    }
+    return { lag: najLag, k: najK, lagDokladny };
 }
