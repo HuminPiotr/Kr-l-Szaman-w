@@ -87,6 +87,7 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('bufor kombosów pusty', m.kombosy.bufor.length === 0);
     spr('pasek mocy pusty', m.motionMeter.moc === 0);
     spr('jakość tańca neutralna (mnożnik 1)', m.jakoscTanca.mnoznik === 1 && m.jakoscTanca.okres.pewnosc === 0);
+    spr('blask tańca zgaszony', m.blaskTanca._fala === 0 && m.blaskTanca._faza === 0);
 }
 
 console.log('\nNOWE INSTANCJE (nie te same obiekty):');

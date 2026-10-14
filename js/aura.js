@@ -51,6 +51,12 @@ const PRZEBIEGI = [
 // Wnętrze sylwetki tylko lekko rozświetlone - ciało ma prześwitywać,
 // a nie znikać pod poświatą.
 const ALFA_WNETRZA = 0.13;
+// ŻAR JAKOŚCI TAŃCA (2026-10-14). Bogactwo tańca (js/jakoscTanca.js) zagęszcza
+// wąskie obrysy i rozświetla wnętrze - piękny taniec "gorzeje" wyraźniej niż
+// góra-dół przy tej samej mocy. Moc dalej = zasięg, płynność dalej = barwa.
+// Bez bogactwa (null) aura jest dokładnie taka jak przed tą zmianą. ZGADNIĘTE.
+const ZAR_OBRYSU = 0.4;
+const ZAR_WNETRZA = 0.8;
 
 // Stała czasowa zaniku śladu - przy TAU=0.5 s ślad dogasa do ~5% po 1.5 s
 // (3 tau), zgodnie ze spec ("dogasające po ~1,5 s"). ZGADNIĘTE - D.
@@ -107,6 +113,7 @@ export class Aura {
         this._moc = 0;
         this._impuls = 0;
         this._plynnosc = 1;
+        this._zar = 0;
         this._faza = 0;
     }
 
@@ -124,8 +131,9 @@ export class Aura {
      * @param {number} plynnosc  0..1
      * @param {object} fit   z computeCoverFit() - TA SAMA transformacja co wideo
      * @param {number} dt
+     * @param {number|null} [bogactwo]  0..1 z JakoscTanca - żar; null = bez żaru
      */
-    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null) {
+    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null, bogactwo = null) {
         // Jedyny moduł VFX bez WŁASNEGO clampu na dt (P2, 2026-09-21) -
         // main.js:387 klamruje u źródła do 0.1 s, ale test-aura-impuls.mjs
         // i przyszli wywołujący mogą podać dt wprost, więc lokalna osłona
@@ -136,6 +144,7 @@ export class Aura {
         const a = Math.min(1, krok / TAU_WYGLADZANIA);
         this._moc += a * ((Number.isFinite(moc) ? moc : 0) - this._moc);
         this._plynnosc += a * ((Number.isFinite(plynnosc) ? plynnosc : 1) - this._plynnosc);
+        this._zar += a * ((Number.isFinite(bogactwo) ? Math.max(0, Math.min(1, bogactwo)) : 0) - this._zar);
 
         this._faza = (this._faza + krok / OKRES_TETNA_S) % 1;
 
@@ -249,7 +258,8 @@ export class Aura {
             // przez zwykłe drawImage(0, 0, canvas.width, canvas.height)
             // rozciągnęłoby ją na całe płótno i aura usiadłaby OBOK ciała -
             // subtelnie przy 16:9, fatalnie przy każdym innym kształcie okna.
-            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * mocEfektywna * tetno));
+            const zar = p.wytnijWnetrze ? 1 + ZAR_OBRYSU * this._zar : 1;
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * mocEfektywna * tetno * zar));
             ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
         }
 
@@ -263,7 +273,7 @@ export class Aura {
         pc.fillStyle = kolor;
         pc.fillRect(0, 0, pw, ph);
         pc.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * mocEfektywna * tetno));
+        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * (1 + ZAR_WNETRZA * this._zar) * mocEfektywna * tetno));
         ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
 
         ctx.globalAlpha = 1;

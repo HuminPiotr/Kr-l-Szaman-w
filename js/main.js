@@ -5,6 +5,7 @@ import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
 import { JakoscTanca } from './jakoscTanca.js';
+import { BlaskTanca } from './blaskTanca.js';
 import { Aura } from './aura.js';
 import { ZnakRegistry } from './znaki/registry.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
@@ -149,6 +150,7 @@ let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
 let plynnoscMiara = new Plynnosc();
 let jakoscTanca = new JakoscTanca();
+let blaskTanca = new BlaskTanca();
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -564,7 +566,7 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, jakoscTanca, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
@@ -871,7 +873,9 @@ function klatka(now) {
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt, tecza);
+                       moc, plynnosc, fit, dt, tecza, jakoscTanca.bogactwo);
+    // Połysk tańczących partii i bieg fali - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
+    blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
 
     // --- 7a0. Zapłon sylwetki (Kierunek A) ---
     // TA SAMA maska co aura, zero kosztu dodatkowego liczenia - patrz
