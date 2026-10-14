@@ -26,7 +26,8 @@ export const NASTAWY_FALI = {
     OPOZN_OD: 0.02, OPOZN_PELNE: 0.06,                      // ułamek cyklu
     OPOZN_SPADEK_OD: 0.25, OPOZN_SPADEK_DO: 0.35,           // dalej to dwa niezależne ruchy, nie fala
     MAX_OPOZNIENIA_ULAMEK: 0.4,
-    TAU_S: 0.8
+    TAU_S: 0.8,
+    MAX_PRZERWA_S: 0.2                                      // krótsza przerwa w łańcuchu nie kasuje okna
 };
 const N = NASTAWY_FALI;
 
@@ -37,8 +38,23 @@ export class FalaCiala {
         this.fala = null;
         this.diagnostyka = { lancuch: null, opoznienieUlamek: null, korelacja: null };
         this._bufory = Object.fromEntries(LANCUCHY.map(l => [l, []]));   // [{t, a, b}]
+        this._ostatnia = Object.fromEntries(LANCUCHY.map(l => [l, 0]));   // czas ostatniej dobrej próbki łańcucha
         this._t = 0;
-        this._doPrzeliczenia = 0;
+        // Przesunięte względem Okres i Krazenie (0 / 0.125), żeby trzy przeliczenia
+        // nie wypadały w tej samej klatce - inaczej byłaby czkawka 4 Hz.
+        this._doPrzeliczenia = 0.05;
+    }
+
+    /**
+     * Dodaje próbkę łańcucha albo (gdy null) odnotowuje przerwę. Krótka przerwa
+     * (migotanie śledzenia) pomija próbkę i zostawia okno - ocen() poradzi sobie
+     * z dziurą, bo przepróbkowuje na równą siatkę czasu. Przerwa dłuższa niż
+     * MAX_PRZERWA_S czyści okno łańcucha.
+     */
+    _dodaj(l, probka) {
+        const b = this._bufory[l];
+        if (probka) { b.push({ t: this._t, ...probka }); this._ostatnia[l] = this._t; }
+        else if (this._t - this._ostatnia[l] > N.MAX_PRZERWA_S) b.length = 0;
     }
 
     update(world, c2d, okres, dt) {
@@ -48,16 +64,15 @@ export class FalaCiala {
 
         for (const [l, [bark, lok, nad, drugi]] of Object.entries(RAMIONA)) {
             const B = world?.[bark], E = world?.[lok], W = world?.[nad], B2 = world?.[drugi];
-            if (!widoczny(B) || !widoczny(E) || !widoczny(W) || !widoczny(B2)) { this._bufory[l].length = 0; continue; }
+            if (!widoczny(B) || !widoczny(E) || !widoczny(W) || !widoczny(B2)) { this._dodaj(l, null); continue; }
             // Ta sama konwencja kątów co falowanieRamion.js: 0 = poziomo w bok, + = w górę (y w dół).
             const kier = Math.sign(B.x - B2.x) || 1;
             const ku = Math.atan2(-(E.y - B.y), kier * (E.x - B.x));
             const kf = Math.atan2(-(W.y - E.y), kier * (W.x - E.x));
-            if (Number.isFinite(ku) && Number.isFinite(kf)) this._bufory[l].push({ t: this._t, a: ku, b: kf });
+            this._dodaj(l, Number.isFinite(ku) && Number.isFinite(kf) ? { a: ku, b: kf } : null);
         }
         const bio = c2d?.biodra, dl = c2d?.dlonieX;
-        if (bio && Number.isFinite(bio.x) && Number.isFinite(dl)) this._bufory.biodraDlonie.push({ t: this._t, a: bio.x, b: dl });
-        else this._bufory.biodraDlonie.length = 0;
+        this._dodaj('biodraDlonie', bio && Number.isFinite(bio.x) && Number.isFinite(dl) ? { a: bio.x, b: dl } : null);
 
         const T = Number.isFinite(okres?.okresS) && okres.okresS > 0 ? okres.okresS : 1;
         const oknoS = Math.max(N.MIN_OKNO_S, Math.min(N.MAX_OKNO_S, N.OKRESOW_W_OKNIE * T));
@@ -96,7 +111,7 @@ function ocen(buf, T, minA, minB) {
     if (n < N.MIN_PROBEK) return null;
     const dtSr = (buf[n - 1].t - buf[0].t) / (n - 1);
     if (!(dtSr > 0)) return null;
-    const a = buf.map(p => p.a), b = buf.map(p => p.b);
+    const [a, b] = rownaSiatka(buf, dtSr);
     if (odchylenie(a) < minA || odchylenie(b) < minB) return null;
     const maxLag = Math.max(1, Math.min(Math.floor(N.MAX_OPOZNIENIA_ULAMEK * T / dtSr), Math.floor(n / 3)));
     const { k, lagDokladny } = korelacjaZOpoznieniem(a, b, maxLag);
@@ -107,4 +122,29 @@ function ocen(buf, T, minA, minB) {
               rampa(ul, N.OPOZN_OD, N.OPOZN_PELNE) *
               (1 - rampa(ul, N.OPOZN_SPADEK_OD, N.OPOZN_SPADEK_DO));
     return Number.isFinite(q) ? { q, ul, k } : null;
+}
+
+/**
+ * Serie a, b na równej siatce czasu. Korelacja z opóźnieniem liczy lag w próbkach,
+ * więc pominięta klatka (krótka przerwa) przesunęłaby późniejsze próbki o całą
+ * klatkę. Gdy odstępy są równe (z dokładnością do drgań zegara), zwracamy próbki
+ * bez zmian; gdy któryś odstęp jest ponad 1.5x większy, przepróbkowujemy liniowo.
+ */
+function rownaSiatka(buf, dtSr) {
+    const n = buf.length;
+    let dziura = false;
+    for (let i = 1; i < n; i++) if (buf[i].t - buf[i - 1].t > 1.5 * dtSr) { dziura = true; break; }
+    if (!dziura) return [buf.map(p => p.a), buf.map(p => p.b)];
+
+    const a = new Array(n), b = new Array(n);
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+        const t = buf[0].t + i * dtSr;
+        while (k < n - 2 && buf[k + 1].t < t) k++;
+        const p = buf[k], q = buf[k + 1];
+        const u = q.t > p.t ? Math.max(0, Math.min(1, (t - p.t) / (q.t - p.t))) : 0;
+        a[i] = p.a + u * (q.a - p.a);
+        b[i] = p.b + u * (q.b - p.b);
+    }
+    return [a, b];
 }

@@ -28,7 +28,8 @@ export const NASTAWY_KRAZENIA = {
     BLISKO_MIN_M: 0.03,      // ...ale nie mniej niż 3 cm (szum ~0.9 cm)
     PROG_PREDKOSCI: 0.18,    // m/s średnio - jak w płynności: wolniejszy staw nie głosuje
     MIN_ROZPIETOSC_S: 1.0,
-    TAU_S: 0.8               // wygładzanie wyniku
+    TAU_S: 0.8,              // wygładzanie wyniku
+    MAX_PRZERWA_S: 0.2       // krótsza przerwa w widoczności stawu nie kasuje okna
 };
 const N = NASTAWY_KRAZENIA;
 
@@ -36,9 +37,13 @@ export class Krazenie {
     constructor() {
         this.krazenie = null;       // null = brak danych (bezruch, poza kadrem)
         this.aktywnychStawow = 0;
-        this._bufory = STAWY.map(() => []);   // [{t, x, y}]
+        this._bufory = STAWY.map(() => []);   // [{t, x, y, brzeg}]; brzeg = przerwa tuż przed próbką
+        this._ostatnia = STAWY.map(() => 0);  // czas ostatniej dobrej próbki stawu
+        this._pominiete = STAWY.map(() => 0); // ile kolejnych klatek stawu brakuje
         this._t = 0;
-        this._doPrzeliczenia = 0;
+        // Przesunięte o pół kroku względem Okres (0 -> 0.125), żeby oba przeliczenia
+        // nie wypadały w tej samej klatce - inaczej co 0.25 s byłby jeden ciężki kadr (czkawka 4 Hz).
+        this._doPrzeliczenia = 0.125;
     }
 
     update(world, dt) {
@@ -49,8 +54,18 @@ export class Krazenie {
         for (let s = 0; s < STAWY.length; s++) {
             const p = world?.[STAWY[s]];
             const buf = this._bufory[s];
-            if (!widoczny(p)) { buf.length = 0; continue; }   // przerwa = okno od nowa
-            buf.push({ t: this._t, x: p.x, y: p.y });
+            if (!widoczny(p)) {
+                // Krótka przerwa (migotanie śledzenia): pomijamy próbkę, okno zostaje.
+                // Dopiero przerwa dłuższa niż MAX_PRZERWA_S = okno od nowa.
+                this._pominiete[s]++;
+                if (this._t - this._ostatnia[s] > N.MAX_PRZERWA_S) buf.length = 0;
+                continue;
+            }
+            // Jedna brakująca klatka jest jeszcze bezpieczna (różnica centralna liczy się
+            // z prawdziwych czasów), dwie i więcej to brzeg: prędkości nie przekraczają go.
+            buf.push({ t: this._t, x: p.x, y: p.y, brzeg: this._pominiete[s] >= 2 && buf.length > 0 });
+            this._pominiete[s] = 0;
+            this._ostatnia[s] = this._t;
             while (buf.length && this._t - buf[0].t > N.OKNO_S) buf.shift();
         }
 
@@ -81,9 +96,14 @@ function ocenStaw(buf) {
     const dtSr = (buf[n - 1].t - buf[0].t) / (n - 1);
     const k = Math.max(1, Math.round(N.POL_ROZNICY_S / dtSr));
 
+    // Numer odcinka ciągłego: brzeg zaczyna nowy. Różnica centralna tylko w obrębie odcinka.
+    const odc = new Array(n);
+    for (let j = 0, o = 0; j < n; j++) { if (buf[j].brzeg) o++; odc[j] = o; }
+
     const v = [];
     let sumaV = 0, mx = 0, my = 0;
     for (let j = k; j < n - k; j++) {
+        if (odc[j - k] !== odc[j + k]) continue;
         const a = buf[j - k], b = buf[j + k];
         const dt = b.t - a.t;
         const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;

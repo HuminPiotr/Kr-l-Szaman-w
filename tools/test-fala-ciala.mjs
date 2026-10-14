@@ -26,7 +26,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 const SIGMA = 0.009, FPS = 30, DT = 1 / FPS, U = 0.28, F = 0.26;
 
 /** katy(t) -> [ramię, przedramię] w rad (0 = poziomo w bok, + = w górę) - geometria z tools/pomiar-falowania.mjs */
-function przebieg(katy, f, { c2d = () => null, pewnosc = 0.9, sekund = 8, ramiona = true } = {}) {
+function przebieg(katy, f, { c2d = () => null, pewnosc = 0.9, sekund = 8, ramiona = true, migotanie = false } = {}) {
     const m = new FalaCiala();
     const okres = { okresS: 1 / f, pewnosc };
     for (let i = 0; i < sekund * FPS; i++) {
@@ -43,7 +43,11 @@ function przebieg(katy, f, { c2d = () => null, pewnosc = 0.9, sekund = 8, ramion
                 }
             }
         }
-        m.update(w, c2d(t), okres, DT);
+        // migotanie śledzenia: co 0.5 s jedna klatka bez pozy ('staw' - kluczowe stawy z visibility 0)
+        if (migotanie && i % (FPS / 2) === 0) {
+            if (migotanie === 'staw') { for (const j of [11, 12, 13, 14, 15, 16]) w[j] = { ...w[j], visibility: 0 }; m.update(w, c2d(t), okres, DT); }
+            else m.update(null, null, okres, DT);
+        } else m.update(w, c2d(t), okres, DT);
     }
     return m;
 }
@@ -63,6 +67,22 @@ spr('wąż daje wysoką falę (> 0.5)', w08.fala > 0.5);
 spr('sztywne skrzydło daje ~0 (< 0.1)', s08.fala !== null && s08.fala < 0.1);
 spr('ten sam wąż wolno i szybko - podobny wynik (różnica < 0.15)', Math.abs(w08.fala - w16.fala) < 0.15);
 
+{
+    const om = 2 * Math.PI * 0.8;
+    const bio = (t) => ({ biodra: { x: 0.3 * Math.sin(om * t), y: 0 }, dlonieX: 0.6 * Math.sin(om * t - 0.6) });
+    for (const [nazwa, katy, f, c] of [['wąż', waz(0.8), 0.8, w08], ['skrzydło', skrzydlo(0.8), 0.8, s08]]) {
+        for (const rodzaj of [true, 'staw']) {
+            const m = przebieg(katy, f, { migotanie: rodzaj });
+            console.log(`  migotanie ${String(rodzaj).padEnd(5)} ${nazwa}: ${opis(m)} (bez migotania ${c.fala.toFixed(2)})`);
+            spr(`migotanie co 0.5 s (${rodzaj === true ? 'brak pozy' : 'stawy niewidoczne'}): ${nazwa} nie null i blisko (< 0.1)`,
+                m.fala !== null && Math.abs(m.fala - c.fala) < 0.1);
+        }
+    }
+    const czyste = przebieg(() => [0, 0], 0.8, { ramiona: false, c2d: bio });
+    const mig = przebieg(() => [0, 0], 0.8, { ramiona: false, c2d: bio, migotanie: true });
+    console.log(`  migotanie biodra -> dłonie: ${opis(mig)} (bez migotania ${czyste.fala.toFixed(2)})`);
+    spr('migotanie: łańcuch biodraDlonie nie null i blisko (< 0.1)', mig.fala !== null && Math.abs(mig.fala - czyste.fala) < 0.1);
+}
 {
     const om = 2 * Math.PI * 0.8;
     const m = przebieg(() => [0, 0], 0.8, {

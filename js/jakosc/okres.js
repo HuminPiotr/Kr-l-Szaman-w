@@ -24,7 +24,8 @@ export const NASTAWY_OKRESU = {
     BLISKO_SZCZYTU: 0.85,    // pierwszy szczyt >= 85% najwyższego wygrywa - bez tego czasem 2T
     MIN_ROZPIETOSC_S: 1.5,   // okno krótsze niż tyle nie orzeka
     ZANIK_PEWNOSCI_S: 2.0,   // bez pozy pewność gaśnie do zera w tyle
-    PROG_WIDOCZNOSCI: 0.5
+    PROG_WIDOCZNOSCI: 0.5,
+    MAX_PRZERWA_S: 0.2       // krótsza dziura (migotanie śledzenia) nie kasuje okna ani serii
 };
 export const PROG_PEWNOSCI = 0.4;
 
@@ -38,6 +39,7 @@ export class Okres {
         this.pewnosc = 0;
         this._bufor = [];        // [{t, p: ([x, y] | null)[]}]
         this._t = 0;
+        this._bezPozyS = 0;
         this._doPrzeliczenia = 0;
     }
 
@@ -51,11 +53,23 @@ export class Okres {
         const krok = Math.min(dt, 0.1);
         this._t += krok;
 
+        // Brak pozy w klatce to przerwa, nie koniec tańca: pojedyncze migotanie
+        // śledzenia (kilka razy na sekundę) kasowałoby okno i trzymało pewność przy 0.
+        // Krótką przerwę zapisujemy jako wpis bez stawów (null) - odstępy próbek
+        // zostają równe, a _przelicz wypełni dziurę interpolacją. Dopiero przerwa
+        // dłuższa niż MAX_PRZERWA_S czyści okno i wygasza pewność jak dawniej.
         if (!world) {
-            this._bufor.length = 0;
-            this.pewnosc = Math.max(0, this.pewnosc - krok / N.ZANIK_PEWNOSCI_S);
+            this._bezPozyS += krok;
+            if (this._bezPozyS > N.MAX_PRZERWA_S) {
+                this._bufor.length = 0;
+                this.pewnosc = Math.max(0, this.pewnosc - krok / N.ZANIK_PEWNOSCI_S);
+                return this;
+            }
+            this._bufor.push({ t: this._t, p: STAWY.map(() => null) });
+            while (this._bufor.length && this._t - this._bufor[0].t > N.OKNO_S) this._bufor.shift();
             return this;
         }
+        this._bezPozyS = 0;
 
         this._bufor.push({ t: this._t, p: STAWY.map(i => (zdrowy(world[i]) ? [world[i].x, world[i].y] : null)) });
         while (this._bufor.length && this._t - this._bufor[0].t > N.OKNO_S) this._bufor.shift();
@@ -78,13 +92,10 @@ export class Okres {
         for (let s = 0; s < STAWY.length; s++) {
             for (let os = 0; os < 2; os++) {
                 const x = new Float64Array(n);
-                let pelna = true, suma = 0;
-                for (let j = 0; j < n; j++) {
-                    const p = b[j].p[s];
-                    if (!p) { pelna = false; break; }
-                    x[j] = p[os]; suma += x[j];
-                }
-                if (!pelna) continue;
+                for (let j = 0; j < n; j++) { const p = b[j].p[s]; x[j] = p ? p[os] : NaN; }
+                if (!wypelnijPrzerwy(x, dtSr)) continue;   // dziura dłuższa niż MAX_PRZERWA_S - seria nie głosuje
+                let suma = 0;
+                for (let j = 0; j < n; j++) suma += x[j];
                 const m = suma / n;
                 let war = 0;
                 for (let j = 0; j < n; j++) { x[j] -= m; war += x[j] * x[j]; }
@@ -129,4 +140,28 @@ export class Okres {
         if (Number.isFinite(okres) && okres > 0) this.okresS = okres;
         this.pewnosc = clamp01(c);
     }
+}
+
+/**
+ * Wypełnia NaN-y (próbki bez widocznego stawu) liniową interpolacją między
+ * sąsiadami; dziura na brzegu bierze najbliższą znaną wartość. Interpolacja,
+ * nie pominięcie, bo autokorelacja zakłada równe odstępy próbek.
+ * Zwraca false, gdy któraś dziura jest dłuższa niż MAX_PRZERWA_S albo nie ma
+ * żadnej znanej próbki - stawu, który znikał na dłużej, nie zgadujemy.
+ */
+function wypelnijPrzerwy(x, dtSr) {
+    const n = x.length;
+    let j = 0;
+    while (j < n) {
+        if (!Number.isNaN(x[j])) { j++; continue; }
+        let k = j;
+        while (k < n && Number.isNaN(x[k])) k++;
+        if ((k - j) * dtSr > N.MAX_PRZERWA_S + 1e-9) return false;
+        if (j === 0 && k === n) return false;
+        const lewa = j > 0 ? x[j - 1] : x[k];
+        const prawa = k < n ? x[k] : x[j - 1];
+        for (let i = j; i < k; i++) x[i] = lewa + (prawa - lewa) * (i - j + 1) / (k - j + 1);
+        j = k;
+    }
+    return true;
 }

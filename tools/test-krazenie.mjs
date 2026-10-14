@@ -28,7 +28,7 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 const SIGMA = 0.009, FPS = 60, DT = 1 / FPS;
 
 /** tor(t, strona) -> {nadgarstek:[x,y], lokiec:[x,y]}; strona 1 = L, -1 = P */
-function przebieg(tor, sekund = 8) {
+function przebieg(tor, sekund = 8, migotanie = false) {
     const m = new Krazenie();
     for (let i = 0; i < sekund * FPS; i++) {
         const t = i * DT;
@@ -39,7 +39,11 @@ function przebieg(tor, sekund = 8) {
             w[nad] = { x: p.nadgarstek[0] + gauss() * SIGMA, y: p.nadgarstek[1] + gauss() * SIGMA, z: 0, visibility: 0.9 };
             w[lok] = { x: p.lokiec[0] + gauss() * SIGMA, y: p.lokiec[1] + gauss() * SIGMA, z: 0, visibility: 0.9 };
         }
-        m.update(w, DT);
+        // migotanie śledzenia: co 0.5 s jedna klatka bez pozy ('staw' - nadgarstki i łokcie z visibility 0)
+        if (migotanie && i % (FPS / 2) === 0) {
+            if (migotanie === 'staw') { for (const j of [13, 14, 15, 16]) w[j].visibility = 0; m.update(w, DT); }
+            else m.update(null, DT);
+        } else m.update(w, DT);
     }
     return m;
 }
@@ -74,6 +78,20 @@ spr('ósemka ma wysokie krążenie (> 0.6)', w.osemka.krazenie > 0.6);
 spr('ranking: okrąg > ósemka > łuk', w.okrag.krazenie > w.osemka.krazenie && w.osemka.krazenie > w.lukWokolBarku.krazenie);
 spr('bezruch nie głosuje (null, 0 stawów)', w.bezruch.krazenie === null && w.bezruch.aktywnychStawow === 0);
 
+{
+    for (const nazwa of ['okrag', 'osemka', 'pompowanie']) {
+        const tor = { okrag, osemka, pompowanie }[nazwa];
+        for (const rodzaj of [true, 'staw']) {
+            const m = przebieg(tor, 8, rodzaj), c = w[nazwa];
+            console.log(`  migotanie ${String(rodzaj).padEnd(5)} ${nazwa.padEnd(11)} ${m.krazenie === null ? 'null' : m.krazenie.toFixed(2)} (bez migotania ${c.krazenie.toFixed(2)})`);
+            spr(`migotanie (${rodzaj === true ? 'brak pozy' : 'stawy niewidoczne'}) co 0.5 s: ${nazwa} nie null i blisko wyniku bez migotania (< 0.1)`,
+                m.krazenie !== null && Math.abs(m.krazenie - c.krazenie) < 0.1);
+        }
+    }
+    const m = przebieg(okrag, 8);
+    for (let i = 0; i < 30; i++) m.update(null, DT);   // 0.5 s bez pozy: dłuższe niż MAX_PRZERWA_S
+    spr('długa przerwa (0.5 s) czyści okna', m._bufory.every(b => b.length === 0));
+}
 {
     const m = przebieg(okrag);
     const zle = Array.from({ length: 33 }, () => ({ x: NaN, y: NaN, z: NaN, visibility: 0.9 }));
