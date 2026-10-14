@@ -28,7 +28,10 @@ export const NASTAWY_ZAANGAZOWANIA = {
     },
     SKALA_SKRETU_M: 0.2,     // 1 rad skrętu barków względem bioder liczony jak 0.2 m ruchu
     PELNE_PRZY: 4,
-    PROG_CISZY: 0.05         // suma aktywności poniżej = nic nie tańczy -> null (neutralnie)
+    // Suma aktywności poniżej = null (neutralnie). 0.5 = pół partii: szum pojedynczej
+    // partii (np. głowa z zaszumionego nosa, tułów ze skrętu barków) nie może sam
+    // zrobić z bezruchu tańca. Przy σ = 0.013 m szum dawał wcześniej non-null w 98% klatek.
+    PROG_CISZY: 0.5
 };
 const N = NASTAWY_ZAANGAZOWANIA;
 

@@ -58,7 +58,6 @@ const kolysanieBioder = (t) => ({ x: 0.5 * Math.sin(om * t), y: 0 });
 
 const r = przebieg(rece);
 const c = przebieg(caleCialo, kolysanieBioder);
-const s = przebieg(() => ({}));
 const fmt = (m) => PARTIE.map(p => `${p} ${m.aktywnosci[p].toFixed(2)}`).join('  ');
 console.log('  same ręce:   ' + fmt(r) + `  => ${r.zaangazowanie?.toFixed(2)}`);
 console.log('  całe ciało:  ' + fmt(c) + `  => ${c.zaangazowanie?.toFixed(2)}`);
@@ -66,7 +65,29 @@ console.log('  całe ciało:  ' + fmt(c) + `  => ${c.zaangazowanie?.toFixed(2)}`
 spr(`same ręce dają ~0.5 (${r.zaangazowanie?.toFixed(2)})`, r.zaangazowanie > 0.35 && r.zaangazowanie < 0.65);
 spr(`całe ciało z biodrami wyraźnie więcej (${c.zaangazowanie?.toFixed(2)})`, c.zaangazowanie > 0.85);
 spr('kołysanie bioder w 2D zapala partię "biodra"', c.aktywnosci.biodra > 0.5 && r.aktywnosci.biodra < 0.1);
-spr('bezruch (sam szum) = null, nic nie tańczy', s.zaangazowanie === null);
+/** Bezruch: szum tracking'u w worldLandmarks (sigma) i w biodrach 2D (0.01 szer. barków na klatkę). */
+function bezruch(sigma, sekund = 120) {
+    const m = new Zaangazowanie();
+    let niepustePoRozgrzewce = 0, maksZ = 0, klatek = 0;
+    for (let i = 0; i < sekund * FPS; i++) {
+        const t = i * DT;
+        const w = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0 }));
+        for (const [k, [x, y]] of Object.entries(BAZA)) {
+            w[k] = { x: x + gauss() * sigma, y: y + gauss() * sigma, z: 0, visibility: 0.9 };
+        }
+        const z = m.update(w, { x: gauss() * 0.01, y: gauss() * 0.01 }, DT);
+        if (t >= 1) {
+            klatek++;
+            if (z !== null) { niepustePoRozgrzewce++; maksZ = Math.max(maksZ, z); }
+        }
+    }
+    return { niepusteProcent: 100 * niepustePoRozgrzewce / klatek, maksZ };
+}
+for (const sigma of [0.009, 0.013]) {
+    const b = bezruch(sigma);
+    spr(`bezruch σ=${sigma}: zaangazowanie nigdy nie != null po 1 s (max po klatkach ${b.maksZ.toFixed(2)}, ${b.niepusteProcent.toFixed(1)}% klatek)`,
+        b.niepusteProcent === 0);
+}
 {
     const bezNog = przebieg(caleCialo, kolysanieBioder, { widoczneNogi: false });
     spr('stopy poza kadrem: nogi 0, reszta dalej działa',
