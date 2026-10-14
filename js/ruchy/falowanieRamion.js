@@ -26,6 +26,8 @@
  * nadgarstek nad głową ma y mniejsze niż bark), stąd minus przy kątach.
  */
 
+import { korelacjaZOpoznieniem } from '../jakosc/pochodne.js';
+
 const OKNO_S = 2.0;            // ~2 cykle fali przy 1 Hz
 const MIN_PROBEK = 20;
 const MAX_OPOZNIENIA_S = 0.4;
@@ -158,18 +160,8 @@ function zmierz(buf) {
 
     // Korelacja wzajemna kąta ramienia i przedramienia; szukamy przesunięcia,
     // przy którym przedramię (spóźnione o `lag`) najlepiej pasuje do ramienia.
-    const mU = srednia(ku), mF = srednia(kf);
     const maxLag = Math.min(Math.floor(MAX_OPOZNIENIA_S / dtSr), Math.floor(n / 3));
-    let najK = -Infinity, najLag = 0;
-    for (let lag = -maxLag; lag <= maxLag; lag++) {
-        let s = 0, su = 0, sf = 0;
-        for (let j = Math.max(0, -lag); j < n - Math.max(0, lag); j++) {
-            const a = ku[j] - mU, b = kf[j + lag] - mF;
-            s += a * b; su += a * a; sf += b * b;
-        }
-        const k = s / (Math.sqrt(su * sf) + 1e-9);
-        if (k > najK) { najK = k; najLag = lag; }
-    }
+    const { lag: najLag, k: najK } = korelacjaZOpoznieniem(ku, kf, maxLag);
 
     return {
         rozpostarcie, zasieg, wysokosc,

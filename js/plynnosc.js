@@ -40,6 +40,8 @@
  * tools/test-plynnosc.mjs pilnuje wszystkich pięciu pułapek powyżej.
  */
 
+import { pochodneSG } from './jakosc/pochodne.js';
+
 // Okno filtra podane w SEKUNDACH, nie w klatkach. Przy spadku FPS okno liczone
 // w klatkach zmieniłoby swoją długość w czasie i miara przestałaby znaczyć to samo.
 const OKNO_S = 0.09;           // połowa okna; +-0.09 s = +-5 klatek przy 60 FPS
@@ -217,28 +219,10 @@ export class Plynnosc {
      * różniczkowaniu - przy drugiej pochodnej to 3600x przy 60 FPS.
      * Dopasowanie wielomianu do całego okna wykorzystuje wszystkie próbki
      * i tłumi szum nieskorelowany zamiast go wzmacniać.
+     * Implementacja we wspólnym js/jakosc/pochodne.js (używa jej też jakość tańca).
      */
     _pochodneSG(hist, dt) {
-        const pol = (hist.length - 1) / 2;
-        let n = 0, k2 = 0, k4 = 0;
-        let s0x = 0, s0y = 0, s1x = 0, s1y = 0, s2x = 0, s2y = 0;
-
-        for (let j = 0; j < hist.length; j++) {
-            const k = j - pol;
-            const y = hist[j];
-            n++; k2 += k * k; k4 += k * k * k * k;
-            s0x += y.x;         s0y += y.y;
-            s1x += k * y.x;     s1y += k * y.y;
-            s2x += k * k * y.x; s2y += k * k * y.y;
-        }
-
-        const mian = n * k4 - k2 * k2;
-        return {
-            vx: s1x / k2 / dt,
-            vy: s1y / k2 / dt,
-            ax: 2 * (n * s2x - k2 * s0x) / mian / (dt * dt),
-            ay: 2 * (n * s2y - k2 * s0y) / mian / (dt * dt)
-        };
+        return pochodneSG(hist, dt);
     }
 
     _zdrowy(p) {
