@@ -112,4 +112,28 @@ spr('klatki z NaN nie psują płynności', Number.isFinite(m.plynnosc) && m.plyn
 m.update(null, DT);
 spr('brak ciała w kadrze nie psuje płynności', Number.isFinite(m.plynnosc));
 
+// 7. Skalowanie progiem częstotliwości (2026-10-14, jakość tańca).
+//    Szarpnięcie = rms(a_t)/średnia(v) rośnie LINIOWO z częstotliwością ruchu
+//    (v ~ Aω, a ~ Aω²), więc bez skalowania szybki, gładki taniec wyglądał na
+//    szarpany - a przy szybkiej pieśni (etap 3) ma być premiowany.
+function przebiegF(f, czest) {
+    const m = new Plynnosc();
+    for (let i = 0; i < N; i++) {
+        const t = i * DT;
+        const x = 0.3 * Math.sin(2 * Math.PI * f * t);
+        const lm = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
+        for (const j of SLEDZONE) lm[j] = { x: x + gauss() * SIGMA, y: gauss() * SIGMA, z: 0, visibility: 0.9 };
+        m.update(lm, DT, czest);
+    }
+    return m;
+}
+const wolne = przebiegF(1, 1), szybkieBez = przebiegF(2, null), szybkieZ = przebiegF(2, 2);
+spr(`szybkie (2 Hz) gładkie kołysanie ze skalowaniem nie gorsze niż wolne: ${szybkieZ.plynnosc.toFixed(2)} vs ${wolne.plynnosc.toFixed(2)}`,
+    szybkieZ.plynnosc >= wolne.plynnosc - 0.05);
+spr(`skalowanie działa: bez częstotliwości ${szybkieBez.plynnosc.toFixed(2)} < z częstotliwością ${szybkieZ.plynnosc.toFixed(2)}`,
+    szybkieBez.plynnosc < szybkieZ.plynnosc);
+spr('bez częstotliwości skala progu = 1 (dzisiejsze zachowanie)', szybkieBez.skalaProgu === 1);
+spr('skala przycięta do [0.5, 2]', przebiegF(1, 10).skalaProgu === 2 && przebiegF(1, 0.1).skalaProgu === 0.5);
+spr('NaN jako częstotliwość = skala 1', przebiegF(1, NaN).skalaProgu === 1);
+
 process.exit(ok ? 0 : 1);

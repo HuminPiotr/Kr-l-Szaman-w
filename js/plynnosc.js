@@ -74,6 +74,13 @@ const MAX_DT = 0.06;           // s (~17 FPS)
 // Tancerz robiący dokładnie to, o co prosimy, nie może widzieć "prawie źle".
 const PROG_SZARPNIECIA = 60;   // [1/s] -> płynność 0
 
+// Szarpnięcie rośnie LINIOWO z częstotliwością ruchu (v ~ Aω, a_t ~ Aω²), więc
+// PROG_SZARPNIECIA (dobrany przy ~1 Hz) karał szybki, gładki taniec. Gdy okres
+// ruchu jest pewny (js/jakosc/okres.js), próg skaluje się o f / 1 Hz, przycięte
+// do [0.5, 2]. Bez częstotliwości - skala 1, czyli zachowanie sprzed 2026-10-14.
+const CZESTOTLIWOSC_ODNIESIENIA_HZ = 1.0;
+const SKALA_PROGU_MIN = 0.5, SKALA_PROGU_MAX = 2.0;
+
 const TAU_WYGLADZANIA = 0.6;   // s - płynność ma się zmieniać spokojnie, nie migotać
 const TAU_POWROTU = 2.0;       // s - powrót do pełnej płynności, gdy nie ma czego mierzyć
 const TAU_SREDNIEJ_V = 0.4;    // s - okno średniej prędkości stawu (decyduje, czy staw głosuje)
@@ -87,6 +94,7 @@ export class Plynnosc {
         this.szarpniecie = 0;     // [1/s] surowe - do strojenia progu
         this.aktywnychStawow = 0; // ile stawów głosowało w tej klatce
         this.zaWolno = false;     // klatkaż za niski, żeby uczciwie mierzyć
+        this.skalaProgu = 1;      // mnożnik PROG_SZARPNIECIA z częstotliwości ruchu
 
         this._historia = SLEDZONE_PUNKTY.map(() => []);
         this._srednieV = SLEDZONE_PUNKTY.map(() => 0);
@@ -104,9 +112,14 @@ export class Plynnosc {
     /**
      * @param {Array} worldLandmarks  metryczne 3D z MediaPipe (może być null)
      * @param {number} dt             krok czasu [s]
+     * @param {number|null} [czestotliwoscHz]  dominująca częstotliwość ruchu (JakoscTanca); null = bez skalowania
      * @returns {number} płynność 0..1
      */
-    update(worldLandmarks, dt) {
+    update(worldLandmarks, dt, czestotliwoscHz = null) {
+        this.skalaProgu = Number.isFinite(czestotliwoscHz) && czestotliwoscHz > 0
+            ? Math.max(SKALA_PROGU_MIN, Math.min(SKALA_PROGU_MAX, czestotliwoscHz / CZESTOTLIWOSC_ODNIESIENIA_HZ))
+            : 1;
+
         if (!worldLandmarks || dt <= 0) {
             this.aktywnychStawow = 0;
             this.zaWolno = false;
@@ -206,7 +219,7 @@ export class Plynnosc {
         const s = rmsStycznego / (sredniaPredkosc + 1e-6);
         if (Number.isFinite(s)) this.szarpniecie = s;
 
-        const cel = 1 - Math.min(1, Math.max(0, this.szarpniecie / PROG_SZARPNIECIA));
+        const cel = 1 - Math.min(1, Math.max(0, this.szarpniecie / (PROG_SZARPNIECIA * this.skalaProgu)));
         this.plynnosc = Number.isFinite(cel) ? cel : this.plynnosc;
 
         return this.plynnosc;
