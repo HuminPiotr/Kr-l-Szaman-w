@@ -21,6 +21,25 @@ import { Trans } from '../js/rytm/trans.js';
 import { SiatkaUderzen } from '../js/rytm/siatka.js';
 import { walidujRytm } from '../js/piesni.js';
 import { SCENARIUSZ_TRANS } from '../js/nagrywanie/sesja.js';
+import { execFileSync } from 'node:child_process';
+import { Sluch } from '../js/rytm/sluch.js';
+
+// --sluch: zamiast rytmu z pliku - rytm, który SŁUCH miałby w każdej chwili, słuchając tej pieśni
+// (dekodowanej z pliku, bez mikrofonu). Sprawdza, ile zgodności kosztuje słuch zamiast pliku.
+const PRZEZ_SLUCH = process.argv.includes('--sluch');
+function historiaSluchu(plikPiesni) {
+    const SR = 48000, b = execFileSync('ffmpeg', ['-v', 'error', '-i', join(KATALOG, '..', '..', 'assets', 'muzyka', plikPiesni), '-ac', '1', '-ar', String(SR), '-f', 'f32le', '-'], { maxBuffer: 1 << 30 });
+    const pcm = new Float32Array(b.buffer, b.byteOffset, b.length / 4);
+    const s = new Sluch({ mediaDevices: undefined, magazyn: null });
+    s.stan = 'słucha'; s.opoznienieS = 0;
+    const stany = [];
+    for (let i = 0; i < pcm.length; i += 2048) {
+        s.przyjmij({ pcm: pcm.subarray(i, i + 2048), t: i / SR, sr: SR });
+        const sl = s.sledzenie;
+        stany.push({ t: (i + 2048) / SR, siatka: sl.pewny ? sl.siatka : null });
+    }
+    return (t) => { let lo = 0, hi = stany.length - 1; if (!(t >= stany[0].t)) return null; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (stany[m].t <= t) lo = m; else hi = m; } return stany[lo].siatka; };
+}
 
 const KROKI = Object.fromEntries(SCENARIUSZ_TRANS.map(k => [k.id, k]));
 
@@ -33,12 +52,13 @@ const kwantyl = (a, q) => {
 const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : '  - ').padStart(5);
 const kol = (a) => (a.length ? `${f2(kwantyl(a, 0.5))} [${f2(kwantyl(a, 0.1))}..${f2(kwantyl(a, 0.9))}]` : '  brak danych'.padEnd(20));
 
-function przepusc(klatki, siatka) {
+function przepusc(klatki, siatka, sluchW = null) {
     const z = new ZgodnoscRytmu(), tr = new Trans();
     const zg = [], sur = [], ak = [], siatki = {};
     let czas = 0, bezCzasu = 0, maxPoziom = 0;
     for (const k of klatki) {
-        const rytm = Number.isFinite(k.czasPiesniS) ? { siatka, czasS: k.czasPiesniS } : null;
+        const s = sluchW && Number.isFinite(k.czasPiesniS) ? sluchW(k.czasPiesniS) : siatka;
+        const rytm = Number.isFinite(k.czasPiesniS) && s ? { siatka: s, czasS: k.czasPiesniS } : null;
         if (!rytm) bezCzasu++;
         z.update(k.pose ?? null, k.dt, rytm);
         tr.update(z.zgodnosc, k.dt);
@@ -61,11 +81,13 @@ for (const plik of readdirSync(KATALOG).filter(f => f.endsWith('.json')).sort())
     if (!rytm) continue;
     cokolwiek = true;
     const siatka = SiatkaUderzen.z(rytm);
+    const sluchW = PRZEZ_SLUCH ? historiaSluchu(dane.piesn.plik) : null;
+    if (PRZEZ_SLUCH) console.log('   (rytm ze SŁUCHU pieśni, nie z pliku)');
     console.log(`-- ${plik}  (${dane.piesn.tytul ?? dane.piesn.plik}, ${rytm.bpm} BPM)`);
     console.log(''.padEnd(28) + ' błysk         zgodność             surowa               koher.     sygnał         max poziom  koniec');
     for (const [etykieta, zapisane] of Object.entries(dane.kroki ?? {})) {
         const kl = zapisane.map(z => odtworzKlatke(z, dane));
-        const r = przepusc(kl, siatka);
+        const r = przepusc(kl, siatka, sluchW);
         const uwaga = r.bezCzasu > r.n * 0.1 ? `  ⚠ ${r.bezCzasu}/${r.n} klatek bez czasu pieśni` : '';
         const k = KROKI[etykieta.replace(/#\d+$/, '')];
         const etyk = k ? `${String(k.tempoBlysku).padStart(4)}x ${k.wRytmie ? 'RYTM ' : 'obok '}` : '   ?      ';
