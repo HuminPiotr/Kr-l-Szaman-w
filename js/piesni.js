@@ -35,10 +35,30 @@ export function walidujManifest(dane) {
             licencja: tekst(w.licencja),
             // Długość z manifestu tylko do WYŚWIETLENIA w menu; prawdziwą, autorytatywną
             // długość rundy daje audio.duration po załadowaniu (Piesn.zaladuj).
-            dlugoscS: typeof w.dlugoscS === 'number' && Number.isFinite(w.dlugoscS) && w.dlugoscS > 0 ? w.dlugoscS : 0
+            dlugoscS: typeof w.dlugoscS === 'number' && Number.isFinite(w.dlugoscS) && w.dlugoscS > 0 ? w.dlugoscS : 0,
+            rytm: walidujRytm(w.rytm)
         });
     }
     return out;
+}
+
+/**
+ * Rytm pieśni z tools/analiza-rytmu.mjs (spec 2026-10-30-trans-design.md). Złe dane = null
+ * (pieśń bez transu), nigdy wyjątek. Lista uderzeń musi rosnąć - inaczej siatka by się cofała.
+ * @returns {{bpm:number, pierwszeUderzenieS:number, uderzenia:number[]|null} | null}
+ */
+export function walidujRytm(r) {
+    if (!r || typeof r !== 'object') return null;
+    const { bpm, pierwszeUderzenieS: p } = r;
+    if (!(typeof bpm === 'number' && bpm >= 40 && bpm <= 240) || !(typeof p === 'number' && Number.isFinite(p) && p >= 0)) return null;
+    let uderzenia = null;
+    if (Array.isArray(r.uderzenia)) {
+        const u = r.uderzenia;
+        const ok = u.length >= 2 && u.every((v, i) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && (i === 0 || v > u[i - 1]));
+        if (!ok) return null;
+        uderzenia = u.slice();
+    }
+    return { bpm, pierwszeUderzenieS: p, uderzenia };
 }
 
 /** @returns {Promise<ReturnType<typeof walidujManifest>>} pusta lista przy każdej awarii */

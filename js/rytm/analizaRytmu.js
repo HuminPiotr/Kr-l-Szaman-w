@@ -12,8 +12,9 @@
  *  3. dopasujSiatke: DOKŁADNE tempo i faza grzebieniem po całej pieśni.
  *     Precyzja jest krytyczna: 0.1 BPM błędu przy 120 BPM to 0.2 s rozjazdu
  *     po 4 minutach - więcej niż szerokość uderzenia.
- *  4. dryf: faza w ~20-sekundowych odcinkach. Suno zwykle trzyma tempo, ale
- *     jeśli siatka się rozjeżdża, zwracamy listę uderzeń zamiast samego BPM.
+ *  4. sledzUderzenia: uderzenia programowaniem dynamicznym (odstępy bliskie
+ *     okresu, trafienia w akcenty). Gdy leżą na równej siatce - wystarczy BPM
+ *     i pierwsze uderzenie; gdy pieśń dryfuje (Suno potrafi) - lista uderzeń.
  */
 
 export const NASTAWY_ANALIZY = {
@@ -26,9 +27,8 @@ export const NASTAWY_ANALIZY = {
     WAGA_BASU: 0.7,           // bas wyznacza uderzenie; szum hi-hatu na ósemkach przesuwał siatkę o pół
     DOKLADNOSC_BPM: 0.005,
     ZAKRES_DOKLADNY: 0.04,    // +-4% wokół zgrubnego: autokorelacja liczy w całych ramkach (150 -> 152 BPM)
-    ODCINEK_S: 10,
-    MAX_DRYF_S: 0.04,
-    MIN_SILA_ODCINKA: 0.5,    // odcinek słabszy niż tyle x średnia (wstęp, przejście bez bębnów) nie orzeka o fazie         // większy rozjazd faz odcinków = zapisujemy listę uderzeń
+    MAX_DRYF_S: 0.04,         // uderzenie dalej od równej siatki = zapisujemy listę uderzeń
+    CIASNOSC: 100,            // kara za nierówny odstęp w śledzeniu uderzeń (Ellis: 100-680)
     // Szczyt przyrostu widma wypada PRZED atakiem: ramka ma czas swojego początku, a atak
     // wchodzi w okno od końca. ZMIERZONE na syntetycznym bębnie (szczyt ~75 ms przed uderzeniem,
     // hi-hat ~45 ms) - do potwierdzenia odsłuchem podglądu z klikami.
@@ -169,32 +169,63 @@ export function dopasujSiatke(obw, klatekNaS, bpmZgrubne) {
 }
 
 /**
- * Faza w kolejnych odcinkach względem globalnej siatki: przesunięcie (s) w zakresie
- * +-okres/2. Rozrzut przesunięć to dryf - stałe tempo daje rozrzut ~0.
+ * Śledzenie uderzeń programowaniem dynamicznym (Ellis 2007): każde uderzenie
+ * ma trafić w akcent obwiedni, a odstępy mają być bliskie okresu. Kara za
+ * odstęp rośnie z kwadratem log(odstęp/okres), więc przeskok o pół uderzenia
+ * (łapanie słabej części taktu na kilka sekund) jest "drogi" - siatka odcinków
+ * robiła to na `Woda być`. Płynny dryf tempa za to przechodzi bez kary.
+ * @returns {number[]} czasy uderzeń [s] (bez KOREKTA_S)
  */
-export function przesunieciaOdcinkow(obw, klatekNaS, okresS, fazaS, silaCalosci = 0) {
-    const dlugoscS = (obw.length - 1) / klatekNaS;
-    const out = [];
-    for (let od = 0; od < dlugoscS; od += N.ODCINEK_S) {
-        const doS = Math.min(dlugoscS, od + N.ODCINEK_S);
-        if (doS - od < N.ODCINEK_S / 2) break;
-        const { fazaS: f, wynik } = najlepszaFaza(obw, klatekNaS, okresS, od, doS);
-        if (wynik < N.MIN_SILA_ODCINKA * silaCalosci) continue;
-        let d = f - fazaS;
-        d -= Math.round(d / okresS) * okresS;
-        out.push({ srodekS: (od + doS) / 2, przesuniecieS: d });
+export function sledzUderzenia(obw, klatekNaS, okresS) {
+    const n = obw.length, P = okresS * klatekNaS;
+    if (!(n > 0) || !(P > 1)) return [];
+    let m = 0, w = 0;
+    for (const v of obw) m += v;
+    m /= n;
+    for (const v of obw) w += (v - m) ** 2;
+    const sd = Math.sqrt(w / n) || 1;
+    const e = Float64Array.from(obw, v => v / sd);
+    const wynik = new Float64Array(n), skad = new Int32Array(n).fill(-1);
+    const odMin = Math.round(P / 2), odMax = Math.round(2 * P);
+    for (let t = 0; t < n; t++) {
+        let naj = 0, najP = -1;
+        for (let p = t - odMax; p <= t - odMin; p++) {
+            if (p < 0) continue;
+            const kara = N.CIASNOSC * Math.log((t - p) / P) ** 2;
+            const v = wynik[p] - kara;
+            if (v > naj || najP < 0) { naj = v; najP = p; }
+        }
+        wynik[t] = e[t] + (najP >= 0 ? Math.max(0, naj) : 0);
+        skad[t] = najP >= 0 && naj > 0 ? najP : -1;
     }
-    // Rozwinięcie: sąsiednie odcinki nie skaczą o więcej niż pół okresu.
-    for (let i = 1; i < out.length; i++) {
-        let d = out[i].przesuniecieS - out[i - 1].przesuniecieS;
-        out[i].przesuniecieS -= Math.round(d / okresS) * okresS;
-    }
-    return out;
+    let t = n - 1, najW = -Infinity;
+    for (let k = Math.max(0, n - Math.ceil(P)); k < n; k++) if (wynik[k] > najW) { najW = wynik[k]; t = k; }
+    const ramki = [];
+    for (; t >= 0; t = skad[t]) ramki.push(t);
+    ramki.reverse();
+    // Doprecyzowanie podramkowe parabolą przez szczyt obwiedni.
+    return ramki.map(r => {
+        const a = e[r - 1] ?? e[r], b = e[r], c = e[r + 1] ?? e[r];
+        const mian = a - 2 * b + c;
+        const d = mian < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / mian)) : 0;
+        return (r + d) / klatekNaS;
+    });
+}
+
+/** Prosta najmniejszych kwadratów: t = a + b·i. */
+function dopasujProsta(t) {
+    const n = t.length;
+    let si = 0, st = 0, sii = 0, sit = 0;
+    for (let i = 0; i < n; i++) { si += i; st += t[i]; sii += i * i; sit += i * t[i]; }
+    const b = (n * sit - si * st) / (n * sii - si * si);
+    return { a: (st - b * si) / n, b };
 }
 
 /**
  * @returns {{bpm:number, pierwszeUderzenieS:number, dryfS:number, uderzenia?:number[]} | null}
  *   null = nie udało się znaleźć rytmu (cisza, za krótko) - pieśń bez transu, nie błąd.
+ *   dryfS = największe odchylenie uderzenia od równej siatki. Gdy > MAX_DRYF_S,
+ *   wynik niesie listę uderzeń; inaczej wystarczą BPM i pierwsze uderzenie.
  */
 export function analizujRytm(pcm, sr) {
     if (!pcm || !(pcm.length > sr * 4) || !(sr > 0)) return null;
@@ -203,27 +234,14 @@ export function analizujRytm(pcm, sr) {
     if (!Number.isFinite(zgrubne)) return null;
     const s = dopasujSiatke(obwiednia, klatekNaS, zgrubne);
     if (!(s.okresS > 0) || !(s.wynik > 0)) return null;
-    const odcinki = przesunieciaOdcinkow(obwiednia, klatekNaS, s.okresS, s.fazaS, s.wynik);
-    s.fazaS = ((s.fazaS + N.KOREKTA_S) % s.okresS + s.okresS) % s.okresS;
-    const p = odcinki.map(o => o.przesuniecieS);
-    const dryfS = p.length ? Math.max(...p) - Math.min(...p) : 0;
-    const wynik = { bpm: Math.round(s.bpm * 1000) / 1000, pierwszeUderzenieS: Math.round(s.fazaS * 1000) / 1000, dryfS: Math.round(dryfS * 1000) / 1000 };
-    if (dryfS > N.MAX_DRYF_S && odcinki.length >= 2) {
-        // Siatka z płynnie interpolowanym przesunięciem odcinków.
-        const dlugoscS = (obwiednia.length - 1) / klatekNaS;
-        const przes = (t) => {
-            if (t <= odcinki[0].srodekS) return odcinki[0].przesuniecieS;
-            for (let i = 1; i < odcinki.length; i++) {
-                if (t <= odcinki[i].srodekS) {
-                    const a = odcinki[i - 1], b = odcinki[i], u = (t - a.srodekS) / (b.srodekS - a.srodekS);
-                    return a.przesuniecieS + u * (b.przesuniecieS - a.przesuniecieS);
-                }
-            }
-            return odcinki[odcinki.length - 1].przesuniecieS;
-        };
-        const uderzenia = [];
-        for (let t = s.fazaS; t <= dlugoscS; t += s.okresS) uderzenia.push(Math.round((t + przes(t)) * 1000) / 1000);
-        wynik.uderzenia = uderzenia;
-    }
+    const ud = sledzUderzenia(obwiednia, klatekNaS, s.okresS).map(t => t + N.KOREKTA_S);
+    if (ud.length < 8) return null;
+    const { a, b } = dopasujProsta(ud);
+    let dryfS = 0;
+    for (let i = 0; i < ud.length; i++) dryfS = Math.max(dryfS, Math.abs(ud[i] - (a + b * i)));
+    const r3 = (v) => Math.round(v * 1000) / 1000;
+    const pierwsze = ((a % b) + b) % b;
+    const wynik = { bpm: r3(60 / b), pierwszeUderzenieS: r3(pierwsze), dryfS: r3(dryfS) };
+    if (dryfS > N.MAX_DRYF_S) wynik.uderzenia = ud.map(r3);
     return wynik;
 }

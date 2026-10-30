@@ -5,7 +5,7 @@
  * { ok:false } i komunikatem "Duchy zgubiły pieśń", nie wyjątkiem.
  */
 import { readFileSync } from 'node:fs';
-import { sciezkaPliku, walidujManifest, wczytajManifest, Piesn, KATALOG_MUZYKI } from '../js/piesni.js';
+import { sciezkaPliku, walidujManifest, walidujRytm, wczytajManifest, Piesn, KATALOG_MUZYKI } from '../js/piesni.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -42,6 +42,18 @@ console.log('\nMANIFEST - WALIDACJA:');
     spr('brak/zła dlugoscS = 0', [undefined, NaN, -5, 'x', 0, Infinity].every(d => walidujManifest([{ plik: 'a.m4a', dlugoscS: d }])[0].dlugoscS === 0));
     spr('ścieżka z ../ odrzucona (nie wychodzimy z katalogu)', walidujManifest([{ plik: '../../etc/passwd' }, { plik: 'a/b.m4a' }, { plik: 'a\\b.m4a' }]).length === 0);
     spr('pola nie-tekstowe nie rzucają', walidujManifest([{ plik: 'a.m4a', tytul: 5, autor: {}, licencja: null }]).length === 1);
+}
+
+console.log('\nMANIFEST - RYTM (trans, 2026-10-30):');
+{
+    spr('brak rytmu -> null', walidujManifest([{ plik: 'a.m4a' }])[0].rytm === null);
+    const r = walidujRytm({ wersja: 1, bpm: 128, pierwszeUderzenieS: 0.3 });
+    spr('BPM + pierwsze uderzenie przechodzą, bez listy', r?.bpm === 128 && r.pierwszeUderzenieS === 0.3 && r.uderzenia === null);
+    spr('lista uderzeń przechodzi', walidujRytm({ bpm: 128, pierwszeUderzenieS: 0.3, uderzenia: [0.3, 0.77, 1.24] })?.uderzenia?.length === 3);
+    spr('złe dane -> null, nie wyjątek',
+        walidujRytm({ bpm: 'x', pierwszeUderzenieS: 0 }) === null && walidujRytm({ bpm: 500, pierwszeUderzenieS: 0 }) === null &&
+        walidujRytm({ bpm: 120, pierwszeUderzenieS: -1 }) === null && walidujRytm({ bpm: 120, pierwszeUderzenieS: 0, uderzenia: [1, 0.5] }) === null &&
+        walidujRytm({ bpm: 120, pierwszeUderzenieS: 0, uderzenia: [1, NaN] }) === null && walidujRytm(null) === null && walidujRytm(5) === null);
 }
 
 console.log('\nMANIFEST - WCZYTANIE:');
