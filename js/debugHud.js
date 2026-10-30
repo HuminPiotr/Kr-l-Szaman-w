@@ -14,7 +14,9 @@ import { znormalizujSlad } from './runy/ksztalt.js';
 import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC, SCENARIUSZ_TRANS } from './nagrywanie/sesja.js';
 import { wczytajManifest, Piesn } from './piesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
-import { ZapisProbek } from './nagrywanie/zapis.js';
+// ?v= wymusza pobranie: Chrome trzymał w pamięci zapis.js sprzed zapisu czasu pieśni (sesja T, 2026-10-30)
+// mimo Cache-Control: no-store i Cmd+Shift+R - dwa nagrania bez czasu pieśni.
+import { ZapisProbek } from './nagrywanie/zapis.js?v=2026-10-30';
 
 import { czyPoleTekstowe } from './klawisze.js';
 import { PARTIE } from './jakosc/zaangazowanie.js';
