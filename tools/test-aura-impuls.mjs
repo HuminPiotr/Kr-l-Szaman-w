@@ -184,4 +184,27 @@ console.log('\nJAKOŚĆ TAŃCA W AURZE (2026-10-30) - barwa żaru i tętno:');
     spr('NaN w jakości/rytmie nie zatruwa tętna', Number.isFinite(z._czestTetna) && Number.isFinite(z._fazaTetna));
 }
 
+console.log('\nRYTM PIEŚNI W AURZE (trans, 2026-10-30):');
+{
+    // Tempo przyrostu fazy tętna: w rytmie równe, poza rytmem rozjechane.
+    const przyrosty = (rytm) => {
+        const a = nowa(), d = [];
+        for (let i = 0; i < 20 / DT; i++) {
+            const przed = a._fazaTetna;
+            a.updateAndDraw(null, 0, 0, 0.5, 1, fit, DT, null, 0.5, null, rytm && { ...rytm, faza01: (i * DT * 2) % 1 });
+            if (i > 5 / DT) d.push(((a._fazaTetna - przed) % 1 + 1) % 1);
+        }
+        const m = d.reduce((x, y) => x + y, 0) / d.length;
+        return { a, rozrzut: Math.sqrt(d.reduce((x, y) => x + (y - m) ** 2, 0) / d.length) / m };
+    };
+    const wRytmie = przyrosty({ zgodnosc: 1 }), poza = przyrosty({ zgodnosc: 0 }), bez = przyrosty(null);
+    console.log(`  rozrzut tempa tętna: w rytmie ${wRytmie.rozrzut.toFixed(3)}, poza rytmem ${poza.rozrzut.toFixed(3)}, bez pieśni ${bez.rozrzut.toFixed(3)}`);
+    spr('poza rytmem tętno nieregularne, w rytmie równe', poza.rozrzut > 0.2 && wRytmie.rozrzut < 0.02);
+    spr('bez pieśni tętno jak dawniej (równe, rytm nieobecny)', bez.rozrzut < 0.02 && bez.a._jestRytm < 0.01);
+    spr('w rytmie aura wie, że gra pieśń, i ma zgodność ~1', wRytmie.a._jestRytm > 0.99 && wRytmie.a._zgodnosc > 0.99);
+    const z = nowa();
+    z.updateAndDraw(null, 0, 0, 0.5, 1, fit, DT, null, 0.5, null, { zgodnosc: NaN, faza01: NaN });
+    spr('NaN w rytmie nie zatruwa', Number.isFinite(z._fazaTetna) && Number.isFinite(z._zgodnosc));
+}
+
 process.exit(ok ? 0 : 1);

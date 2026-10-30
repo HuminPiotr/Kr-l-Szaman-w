@@ -10,6 +10,9 @@
  *   płynność -> JAK:  barwa i spokój tętna
  *   jakość   -> ŻAR:  rudy, przygaszony żar -> jasne złoto; płytki oddech ->
  *                     głębsze tętno, w rytmie tańca, gdy okres ruchu jest pewny
+ *   rytm     -> TAKT: przy pieśni z rytmem (Obrzęd) tętno bije z uderzeniami pieśni
+ *                     i aura lśni pełniej; poza rytmem przygasa, a tętno się rozjeżdża
+ *                     (płynnie, bez progu - spec 2026-10-30-trans-design.md)
  *
  * To rozdzielenie jest sednem efektu. Gracz widzi różnicę między "mam dużo
  * mocy" a "płynę", zanim ktokolwiek mu to wytłumaczy.
@@ -37,6 +40,12 @@ const TETNO_ZARU_HZ = 0.8;                   // tętno przy pełnym żarze bez p
 const TETNO_RYTMU_HZ = [0.4, 2.0];           // rytm tańca przycięty do tego zakresu
 const GLEBIA_ZARU = 1.0;                     // przy pełnym żarze tętno 2x głębsze
 const TAU_TETNA_S = 1.5;                     // zmiana tempa tętna płynna, nie skokowa
+
+// RYTM PIEŚNI (trans, 2026-10-30). ZGADNIĘTE - stroić na kamerze.
+const LSNIENIE_RYTMU = [0.8, 1.15];          // mnożnik jasności przy zgodności 0 / 1
+const GLEBIA_RYTMU = 0.8;                    // tętno w rytmie do 1.8x głębsze
+const NIEREGULARNOSC = 0.6;                  // poza rytmem: rozjazd tempa tętna +-60%
+const TAU_RYTMU_S = 0.6;                     // wejście/wyjście z bicia w takt - płynnie
 
 const TAU_WYGLADZANIA = 0.5;    // s - wszystkie wielkości sterujące
 
@@ -139,6 +148,10 @@ export class Aura {
         this._faza = 0;
         this._fazaTetna = 0;
         this._czestTetna = 1 / OKRES_TETNA_S;
+        this._zgodnosc = 0;     // wygładzona zgodność z rytmem pieśni
+        this._jestRytm = 0;     // 0..1 - czy gra pieśń z rytmem (płynne wejście/wyjście)
+        this._fazaUderzenia = null;
+        this._czas = 0;
     }
 
     /** Pieczęć się złożyła - aura wylewa się w efekt i wraca. */
@@ -157,8 +170,9 @@ export class Aura {
      * @param {number} dt
      * @param {number|null} [bogactwo]  0..1 z JakoscTanca.zar (bogactwo z kotwic: machanie 0, dobry taniec 1); null = bez żaru
      * @param {number|null} [rytmHz]    częstotliwość tańca z JakoscTanca (null = rytm niepewny)
+     * @param {{zgodnosc:number|null, faza01:number}|null} [rytmPiesni]  takt pieśni Obrzędu; null = bez pieśni z rytmem
      */
-    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null, bogactwo = null, rytmHz = null) {
+    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null, bogactwo = null, rytmHz = null, rytmPiesni = null) {
         // Jedyny moduł VFX bez WŁASNEGO clampu na dt (P2, 2026-09-21) -
         // main.js:387 klamruje u źródła do 0.1 s, ale test-aura-impuls.mjs
         // i przyszli wywołujący mogą podać dt wprost, więc lokalna osłona
@@ -180,7 +194,19 @@ export class Aura {
             ? bezRytmu + (Math.max(TETNO_RYTMU_HZ[0], Math.min(TETNO_RYTMU_HZ[1], rytmHz)) - bezRytmu) * this._zar
             : bezRytmu;
         this._czestTetna += Math.min(1, krok / TAU_TETNA_S) * (cel - this._czestTetna);
-        this._fazaTetna = (this._fazaTetna + krok * this._czestTetna) % 1;
+
+        // Rytm pieśni: im mniejsza zgodność, tym bardziej tempo tętna się rozjeżdża
+        // (gładki szum z niewspółmiernych sinusów - nierówno, ale bez migotania).
+        const fazaUderzenia = Number.isFinite(rytmPiesni?.faza01) ? rytmPiesni.faza01 : null;
+        const b = Math.min(1, krok / TAU_RYTMU_S);
+        this._jestRytm += b * ((fazaUderzenia !== null ? 1 : 0) - this._jestRytm);
+        const zg = Number.isFinite(rytmPiesni?.zgodnosc) ? Math.max(0, Math.min(1, rytmPiesni.zgodnosc)) : 0;
+        this._zgodnosc += b * (zg - this._zgodnosc);
+        this._czas += krok;
+        const szum = 0.6 * Math.sin(this._czas * 1.7) + 0.4 * Math.sin(this._czas * 4.3 + 1);
+        const rozjazd = 1 + NIEREGULARNOSC * this._jestRytm * (1 - this._zgodnosc) * szum;
+        this._fazaTetna = (this._fazaTetna + krok * this._czestTetna * rozjazd) % 1;
+        this._fazaUderzenia = fazaUderzenia;
 
         // Rozpad MUSI być przed wczesnym powrotem niżej - inaczej impuls
         // zamarza, gdy maski chwilowo nie ma, i wraca jako przebłysk.
@@ -223,9 +249,14 @@ export class Aura {
 
         // Tętno: płynny ruch oddycha spokojnie, szarpany drży szybciej i nierówno.
         const drzenie = 1 - this._plynnosc;
-        const tetnoWolne = Math.sin(this._fazaTetna * Math.PI * 2);
+        const tetnoWlasne = Math.sin(this._fazaTetna * Math.PI * 2);
+        // W rytmie tętno bije z uderzeniem: szczyt w chwili uderzenia, szybkie opadanie.
+        const naUderzeniu = this._fazaUderzenia !== null ? 2 * ((1 + Math.cos(2 * Math.PI * this._fazaUderzenia)) / 2) ** 2 - 1 : 0;
+        const wTakt = this._jestRytm * this._zgodnosc;
+        const tetnoWolne = (1 - wTakt) * tetnoWlasne + wTakt * naUderzeniu * (1 + GLEBIA_RYTMU);
         const tetnoSzybkie = Math.sin(this._faza * Math.PI * 2 * 5.5);
-        const tetno = 1 + GLEBIA_TETNA * ((1 + GLEBIA_ZARU * this._zar) * tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie);
+        const lsnienie = 1 + this._jestRytm * (LSNIENIE_RYTMU[0] + (LSNIENIE_RYTMU[1] - LSNIENIE_RYTMU[0]) * this._zgodnosc - 1);
+        const tetno = lsnienie * (1 + GLEBIA_TETNA * ((1 + GLEBIA_ZARU * this._zar) * tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie));
 
         const { h, s } = barwaAury(this._plynnosc, tecza, this._zarZnany ? this._zar : null);
         const ctx = this.ctx;

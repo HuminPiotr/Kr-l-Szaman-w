@@ -893,7 +893,8 @@ function klatka(now) {
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz);
+                       moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz,
+                       rytm ? { zgodnosc: zgodnoscRytmu.zgodnosc, faza01: rytm.siatka.faza(rytm.czasS)?.faza01 } : null);
     // Miękkie ciepło tańczących partii - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
     blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
 
@@ -1235,6 +1236,15 @@ function klatka(now) {
             skalaProgu: plynnoscMiara.skalaProgu,
             tempoLadowania: motionMeter.tempoLadowania
         },
+        trans: (() => {
+            const r = rytmTeraz(), f = r ? r.siatka.faza(r.czasS) : null;
+            return {
+                rytm: !!r, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null,
+                zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
+                akcentow: zgodnoscRytmu._akcenty.length, poziom: trans.poziom, stopien: trans.stopien,
+                mana: trans.mnoznikMany, technika: trans.mnoznikTechniki
+            };
+        })(),
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
         dlonie: opiszDlonie(frame),
         postawy,

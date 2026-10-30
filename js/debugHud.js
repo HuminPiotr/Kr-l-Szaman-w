@@ -402,6 +402,17 @@ export class DebugHud {
                 : '      pełny pasek: — (nie ładuje)');
         }
 
+        // Trans (2026-10-30): progi ZGADNIĘTE - stroić stąd i z sesji T. Bije "●" na każdym uderzeniu pieśni.
+        const tr = stats.trans;
+        if (tr) {
+            if (!tr.rytm) lines.push('trans  — (brak pieśni z rytmem: tylko Obrzęd z pieśnią z manifestu)');
+            else {
+                const bije = tr.faza01 !== null && tr.faza01 < 0.15 ? '●' : '○';
+                lines.push(`trans  ${bije} ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (surowa ${this._num(tr.surowa)}, siatka ${tr.siatka ?? '—'}, akcentów ${tr.akcentow})`);
+                lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
+            }
+        }
+
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);
         // Dodola: natężenie deszczu i składniki miary falowania - stąd stroić
         // NASTAWY w js/ruchy/falowanieRamion.js i js/zaklinanie.js.
