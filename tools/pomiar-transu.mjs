@@ -20,6 +20,9 @@ import { ZgodnoscRytmu } from '../js/rytm/zgodnosc.js';
 import { Trans } from '../js/rytm/trans.js';
 import { SiatkaUderzen } from '../js/rytm/siatka.js';
 import { walidujRytm } from '../js/piesni.js';
+import { SCENARIUSZ_TRANS } from '../js/nagrywanie/sesja.js';
+
+const KROKI = Object.fromEntries(SCENARIUSZ_TRANS.map(k => [k.id, k]));
 
 const KATALOG = join(dirname(fileURLToPath(import.meta.url)), 'probki');
 
@@ -59,12 +62,15 @@ for (const plik of readdirSync(KATALOG).filter(f => f.endsWith('.json')).sort())
     cokolwiek = true;
     const siatka = SiatkaUderzen.z(rytm);
     console.log(`-- ${plik}  (${dane.piesn.tytul ?? dane.piesn.plik}, ${rytm.bpm} BPM)`);
-    console.log(''.padEnd(28) + ' zgodność             surowa               akcentów   siatka  max poziom  koniec');
+    console.log(''.padEnd(28) + ' błysk         zgodność             surowa               akcentów   siatka  max poziom  koniec');
     for (const [etykieta, zapisane] of Object.entries(dane.kroki ?? {})) {
         const kl = zapisane.map(z => odtworzKlatke(z, dane));
         const r = przepusc(kl, siatka);
         const uwaga = r.bezCzasu > r.n * 0.1 ? `  ⚠ ${r.bezCzasu}/${r.n} klatek bez czasu pieśni` : '';
-        console.log(`${etykieta.padEnd(28)} ${kol(r.zg)} ${kol(r.sur)} ${f2(kwantyl(r.ak, 0.5))}     ${r.siatka1.padEnd(6)} ${f2(r.maxPoziom)}      ${f2(r.koniec)}${uwaga}`);
+        const k = KROKI[etykieta.replace(/#\d+$/, '')];
+        const etyk = k ? `${String(k.tempoBlysku).padStart(4)}x ${k.wRytmie ? 'RYTM ' : 'obok '}` : '   ?      ';
+        if (!r.zg.length && r.bezCzasu === r.n) { console.log(`${etykieta.padEnd(28)} ${etyk}  ⚠ brak czasu pieśni - nie do zmierzenia`); continue; }
+        console.log(`${etykieta.padEnd(28)} ${etyk} ${kol(r.zg)} ${kol(r.sur)} ${f2(kwantyl(r.ak, 0.5))}     ${r.siatka1.padEnd(6)} ${f2(r.maxPoziom)}      ${f2(r.koniec)}${uwaga}`);
     }
 }
 if (!cokolwiek) console.log('Brak nagrań sesji T (z czasem pieśni) w tools/probki/. Nagraj: w grze klawisz T.');

@@ -164,39 +164,50 @@ export const SCENARIUSZ_JAKOSC = [
 
 /**
  * Trans (2026-10-30, tools/pomiar-transu.mjs). Sesja SAMA gra pieśń z manifestu
- * (debugHud, klawisz T) od początku dojścia i zapisuje czas pieśni w każdej klatce.
- * Całość ~2.5 min - krócej niż najkrótsza pieśń (187 s), więc muzyka gra do końca.
- * Opisy proste, bo gracz nie musi znać się na muzyce: "w rytm bębna" wystarczy.
+ * (debugHud, klawisz T) i zapisuje czas pieśni w każdej klatce.
+ *
+ * ETYKIETY Z KONSTRUKCJI: gracz nie musi słyszeć rytmu (właściciel: "nie wiem, czy
+ * dobrze czytam rytm" - pierwsze nagranie z "tańcz w rytm bębna" nie trzymało tempa).
+ * Na ekranie błyska znak, a gracz rusza się "gdy błyska". `tempoBlysku` to krotność
+ * tempa pieśni: 1 = na każde uderzenie, 0.5 = co drugie (oba W RYTMIE), 0.8 / 1.25 =
+ * celowo złe tempo (POZA RYTMEM przy tym samym stylu ruchu), 0 = bez błysku.
+ * Całość ~2:50 - krócej niż najkrótsza pieśń (187 s).
  */
 export const SCENARIUSZ_TRANS = [
     {
-        nr: 1, id: 'trans-w-rytmie', nazwa: 'W RYTM',
-        opis: 'Kołysz się albo machaj rękami w rytm bębna - na każde uderzenie',
-        powtorzenia: 2, czasS: 20,
-        wskazowki: ['w rytm bębna', 'dalej w rytm, możesz szerzej']
+        nr: 1, id: 'trans-blysk-1x', nazwa: 'RUCH NA BŁYSK',
+        opis: 'Ruszaj się, gdy błyska: ugnij kolana albo machnij rękami na każdy błysk',
+        powtorzenia: 2, czasS: 18, tempoBlysku: 1, wRytmie: true,
+        wskazowki: ['na każdy błysk', 'na każdy błysk, możesz szerzej']
     },
     {
-        nr: 2, id: 'trans-co-drugie', nazwa: 'CO DRUGIE UDERZENIE',
-        opis: 'Dalej w rytm, ale wolniej: jeden ruch na dwa uderzenia bębna',
-        powtorzenia: 1, czasS: 15,
-        wskazowki: ['co drugie uderzenie']
+        nr: 2, id: 'trans-blysk-co-drugi', nazwa: 'WOLNIEJ - NA BŁYSK',
+        opis: 'Błyska rzadziej - jeden ruch na jeden błysk',
+        powtorzenia: 1, czasS: 15, tempoBlysku: 0.5, wRytmie: true,
+        wskazowki: ['na każdy błysk']
     },
     {
-        nr: 3, id: 'trans-taniec-w-rytmie', nazwa: 'TANIEC W RYTM',
-        opis: 'Tańcz po swojemu, całym ciałem - ale trzymaj się rytmu pieśni',
-        powtorzenia: 1, czasS: 20,
-        wskazowki: ['swobodnie, w rytm']
+        nr: 3, id: 'trans-taniec-na-blysk', nazwa: 'TANIEC NA BŁYSK',
+        opis: 'Tańcz po swojemu, całym ciałem - mocniejszy ruch wypada na błysk',
+        powtorzenia: 1, czasS: 20, tempoBlysku: 1, wRytmie: true,
+        wskazowki: ['swobodnie, akcent na błysk']
     },
     {
-        nr: 4, id: 'trans-poza-rytmem', nazwa: 'POZA RYTMEM',
-        opis: 'Tańcz, nie słuchając muzyki - swoim tempem, wolniej albo szybciej niż bęben',
-        powtorzenia: 2, czasS: 15,
-        wskazowki: ['swoim tempem, wolniej niż bęben', 'swoim tempem, szybciej niż bęben']
+        nr: 4, id: 'trans-blysk-0.8x', nazwa: 'RUCH NA BŁYSK',
+        opis: 'Ruszaj się, gdy błyska - na każdy błysk',
+        powtorzenia: 1, czasS: 15, tempoBlysku: 0.8, wRytmie: false,
+        wskazowki: ['na każdy błysk']
     },
     {
-        nr: 5, id: 'trans-bezruch', nazwa: 'BEZRUCH',
+        nr: 5, id: 'trans-blysk-1.25x', nazwa: 'RUCH NA BŁYSK',
+        opis: 'Ruszaj się, gdy błyska - na każdy błysk',
+        powtorzenia: 1, czasS: 15, tempoBlysku: 1.25, wRytmie: false,
+        wskazowki: ['na każdy błysk']
+    },
+    {
+        nr: 6, id: 'trans-bezruch', nazwa: 'BEZRUCH',
         opis: 'Stój spokojnie, ręce luźno',
-        powtorzenia: 1, czasS: 8,
+        powtorzenia: 1, czasS: 8, tempoBlysku: 0, wRytmie: false,
         wskazowki: ['stój']
     }
 ];

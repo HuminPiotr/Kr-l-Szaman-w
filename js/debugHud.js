@@ -13,6 +13,7 @@
 import { znormalizujSlad } from './runy/ksztalt.js';
 import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC, SCENARIUSZ_TRANS } from './nagrywanie/sesja.js';
 import { wczytajManifest, Piesn } from './piesni.js';
+import { SiatkaUderzen } from './rytm/siatka.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
 import { czyPoleTekstowe } from './klawisze.js';
@@ -84,12 +85,38 @@ export class DebugHud {
         const { ok } = await p.zaladuj();
         if (!ok || this._piesnSesji !== p || !(await p.graj())) { console.warn('[T] Pieśń sesji się nie wczytała / autoplay odrzucony.'); return; }
         if (this.zapis) this.zapis.piesn = { plik: utwor.plik, tytul: utwor.tytul, rytm: utwor.rytm };
+        this._siatkaSesji = SiatkaUderzen.z(utwor.rytm);
         console.log(`[T] Gra "${utwor.tytul}" - tańcz według wskazówek na ekranie.`);
     }
 
     _zatrzymajPiesnSesji() {
         this._piesnSesji?.zatrzymaj();
         this._piesnSesji = null;
+        this._siatkaSesji = null;
+        if (this._blysk) this._blysk.style.opacity = '0';
+    }
+
+    /**
+     * Błysk sesji T - co klatkę (ekran sesji odświeża się tylko UPDATE_HZ razy na sekundę,
+     * za rzadko na takt). Faza z siatki uderzeń pieśni razy tempoBlysku kroku: 1 i 0.5 =
+     * w rytmie pieśni, 0.8 / 1.25 = celowo obok. Bez czasu pieśni nie błyska wcale.
+     */
+    _rysujBlysk(s) {
+        this._blysk ??= (() => {
+            const el = document.createElement('div');
+            el.style.cssText = `position: fixed; left: 50%; bottom: 7vh; width: 22vh; height: 22vh; margin-left: -11vh;
+                border-radius: 50%; background: radial-gradient(circle, #fff 0%, #ffd27a 45%, rgba(255,160,40,0) 70%);
+                z-index: 1001; pointer-events: none; opacity: 0;`;
+            document.body.appendChild(el);
+            return el;
+        })();
+        const tempo = s.krok?.tempoBlysku ?? 0;
+        const czas = this._piesnSesji?.czasS;
+        const f = this._siatkaSesji && Number.isFinite(czas) ? this._siatkaSesji.faza(czas) : null;
+        if (!f || !(tempo > 0) || s.stan === 'bezczynna') { this._blysk.style.opacity = '0'; return; }
+        const faza = ((f.indeks + f.faza01) * tempo) % 1;
+        const naUderzeniuS = faza * f.okresS / tempo;   // ile sekund po błysku
+        this._blysk.style.opacity = Math.exp(-naUderzeniuS / 0.09).toFixed(3);
     }
 
     resetujZakres() {
@@ -153,6 +180,7 @@ export class DebugHud {
         // Klatki zbierane WYŁĄCZNIE w stanie nagrywania - przerwy i dojście
         // to spacer i szukanie pozycji, czyli materiał, którego nikt nie użyje.
         if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame, { czasPiesniS: this._piesnSesji?.czasS ?? null });
+        this._rysujBlysk(s);
 
         if (s.sygnal === 'start') this._piknij(880, 0.35);
         if (s.sygnal === 'stop') this._piknij(440, 0.12);
@@ -231,6 +259,9 @@ export class DebugHud {
             </div>
             <div style="width:60vw;height:10px;background:rgba(255,255,255,0.15);border-radius:5px">
                 <div style="width:${szer}%;height:100%;background:${kolor};border-radius:5px"></div>
+            </div>
+            <div style="font-size:16px;color:${Number.isFinite(this._piesnSesji?.czasS) ? '#9fffe0' : '#ff8a6a'}">
+                ${Number.isFinite(this._piesnSesji?.czasS) ? `♪ czas pieśni ${this._piesnSesji.czasS.toFixed(1)} s - zapisuje się` : '⚠ brak czasu pieśni - nagranie nie zmierzy rytmu'}
             </div>
             <div style="font-size:14px;opacity:0.5">Escape przerywa</div>
         `;
