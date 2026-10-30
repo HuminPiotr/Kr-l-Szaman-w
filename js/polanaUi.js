@@ -31,10 +31,11 @@ export class PolanaUi {
      * @param {Document} doc
      * @param {{menu, ksiega, losoweImie:()=>string, onStart:(konfig)=>void, onJeszczeRaz:()=>void, onDoPolany:()=>void}} deps
      */
-    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany, naPlik = async () => '', naLinkYt = async () => '', naUsunPiesn = () => {}, odkrycia = null }) {
+    constructor(doc, { menu, ksiega, losoweImie, onStart, onJeszczeRaz, onDoPolany, naPlik = async () => '', naLinkYt = async () => '', naUsunPiesn = () => {}, odkrycia = null, nauczone = null }) {
         this.doc = doc;
         this.menu = menu;
         this.ksiega = ksiega;
+        this.nauczone = nauczone;   // rytmy pieśni YouTube nauczone słuchem (js/rytm/nauka.js) - jadą z Księgą
         this.losoweImie = losoweImie;
         this.onStart = onStart;
         this.onJeszczeRaz = onJeszczeRaz;
@@ -170,6 +171,9 @@ export class PolanaUi {
 
     _eksport() {
         const dodatki = this.odkrycia ? { odkrycia: this.odkrycia.eksportFragment() } : {};
+        // Nauczone rytmy YouTube - żeby przenieść je na komputer warsztatowy (decyzja projektanta, spec słuchu).
+        const rytmy = this.nauczone?.eksport();
+        if (rytmy && Object.keys(rytmy).length) dodatki.rytmy = rytmy;
         const blob = new Blob([this.ksiega.eksportuj(dodatki)], { type: 'application/json' });
         const a = this.doc.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -187,9 +191,12 @@ export class PolanaUi {
             const wynik = this.ksiega.importuj(String(r.result));
             if (wynik.ok) {
                 const odk = wynik.dane?.odkrycia && this.odkrycia ? this.odkrycia.scal(wynik.dane.odkrycia).dodano : 0;
+                const rytmow = wynik.dane?.rytmy && this.nauczone ? this.nauczone.importuj(wynik.dane.rytmy) : 0;
+                if (rytmow > 0) for (const p of this.menu.piesni) if (p.zrodlo === 'yt' && this.nauczone.rytm(p.ytId)) p.znaRytm = true;
                 const czesci = [];
                 if (wynik.dodano > 0) czesci.push(`${wynik.dodano} wpisów`);
                 if (odk > 0) czesci.push(`${odk} odkryć`);
+                if (rytmow > 0) czesci.push(`${rytmow} rytmów pieśni`);
                 this.infoKsiegi = czesci.length ? `Dopisano do Księgi: ${czesci.join(' i ')}.` : 'To wszystko już jest w Księdze.';
                 this.zakladka = this.ksiega.klucze()[0] ?? null;
             } else {
@@ -243,7 +250,8 @@ export class PolanaUi {
 
         const piesni = $('konfig-piesni'); piesni.replaceChildren();
         menu.piesni.forEach((p, i) => {
-            const ikona = p.zrodlo === 'yt' ? '▶ ' : p.zrodlo === 'plik' ? '♪ ' : '';
+            // ♫ = gra zna rytm tej pieśni z YouTube (nauczony słuchem) - trans także na słuchawkach.
+            const ikona = p.zrodlo === 'yt' ? (p.znaRytm ? '▶♫ ' : '▶ ') : p.zrodlo === 'plik' ? '♪ ' : '';
             const b = pigulka(doc, ikona + (p.dlugoscS > 0 ? `${p.tytul} (${formatCzasu(p.dlugoscS)})` : p.tytul), i === menu.piesn);
             b.addEventListener('click', () => { menu.ustaw('piesn', i); this.render(); });
             if (p.zrodlo !== 'plik' && p.zrodlo !== 'yt') { piesni.appendChild(b); return; }

@@ -86,6 +86,8 @@ console.log('\nBEZCZYNNOŚĆ (REVIEW FOCUS 5):');
     spr('piorun nie bije', m.piorun._trwa === false);
     spr('bufor kombosów pusty', m.kombosy.bufor.length === 0);
     spr('pasek mocy pusty', m.motionMeter.moc === 0);
+    spr('jakość tańca neutralna (mnożnik 1)', m.jakoscTanca.mnoznik === 1 && m.jakoscTanca.okres.pewnosc === 0);
+    spr('blask tańca zgaszony', Object.values(m.blaskTanca._sila).every(v => v === 0));
 }
 
 console.log('\nNOWE INSTANCJE (nie te same obiekty):');

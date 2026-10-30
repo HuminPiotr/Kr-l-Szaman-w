@@ -207,4 +207,23 @@ console.log('\nZAŚMIECONE PIEŚNI (review końcowy):');
     spr('pusty manifest (awaria wczytania) nie kasuje postępu', o3.liczniki.piesni.includes('a.mp3'));
 }
 
+console.log('\nTANIEC PRZODKÓW (technika w 3. stopniu transu, 2026-10-30):');
+{
+    const zagrajWTransie = (o, stopien) => {
+        const k = new KomboSilnik(), nowe = [];
+        let t = 50000;
+        for (const id of ['stribog', 'stribog']) {
+            nowe.push(...o.pieczec(id, t));
+            const kombo = k.dodaj(id, t);
+            if (kombo) nowe.push(...o.technika(kombo, t, { stopienTransu: stopien }));
+            t += 500;
+        }
+        return nowe;
+    };
+    const dwa = nowa(), trzy = nowa();
+    spr('technika w 2. stopniu - bez kamienia', !ma(zagrajWTransie(dwa, 2), 'kamien', 'taniecPrzodkow'));
+    spr('technika w 3. stopniu - kamień Taniec Przodków', ma(zagrajWTransie(trzy, 3), 'kamien', 'taniecPrzodkow'));
+    spr('poza transem (bez opcji) - jak dawniej', !ma(zagraj(nowa(), ['stribog', 'stribog']), 'kamien', 'taniecPrzodkow'));
+}
+
 process.exit(ok ? 0 : 1);

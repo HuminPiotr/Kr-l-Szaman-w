@@ -27,6 +27,11 @@ export const TRUDNOSC = { mokosz: 1.0, weles: 1.0, perun: 1.2, stribog: 1.4, swa
 // samego tańca (~500) to mniej więcej dwie techniki - ktoś, komu nie
 // wychodzą pieczęcie, dalej punktuje, ale combo wyraźnie się opłaca.
 export const PUNKTY_TANCA_NA_S = 4;
+// Punkty reagują na jakość tańca MOCNIEJ niż ładowanie many: mnożnik do potęgi.
+// Decyzja właściciela 2026-10-30 - taniec ma być generatorem many, ale dobry taniec
+// ma być widać w wyniku. Przy 2: machanie x0.67 -> x0.45 (~1.2 pkt/s), dobry taniec
+// x1.5 -> x2.25 (~6.8 pkt/s), x1.0 bez zmian. ZGADNIĘTE - stroić po grze.
+export const WYKLADNIK_JAKOSCI_PUNKTOW = 2;
 export const PUNKTY_PIECZECI = 25;
 export const BAZA_TECHNIKI = 100;
 export const SPADEK_POWTORZENIA = 0.25;   // ta sama technika pod rząd: -25% za każde powtórzenie
@@ -113,6 +118,8 @@ export function punktyJednostki(def, k) {
 }
 
 const clamp01 = (v) => Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+// Mnożnik transu: nigdy poniżej 1 (trans tylko dokłada), sufit jak MotionMeter.
+const mnoznikTr = (v) => Number.isFinite(v) ? Math.max(1, Math.min(3, v)) : 1;
 
 /**
  * Wartość techniki = BAZA × suma trudności jej pieczęci. Nowe combo
@@ -160,7 +167,7 @@ export class Punktacja {
     reset() {
         this.wynik = 0;
         this.rozbicie = { taniec: 0, pieczecie: 0, techniki: 0, reakcje: 0 };
-        this.momenty = { serie: {}, techniki: {}, splecenia: 0 };
+        this.momenty = { serie: {}, techniki: {}, splecenia: 0, technikWTransie: 0 };
         this._zdarzenia = [];
         this._historia = [];          // [{id, t}] złożonych pieczęci - do splecenia (Task 2)
         this._poprzedniOgon = null;   // {id, t:Set} ogona poprzedniej techniki
@@ -182,10 +189,17 @@ export class Punktacja {
         return Number.isFinite(m) && m >= 1 ? m : 1;
     }
 
-    taniec(plynnosc, responsywnosc, dt) {
+    /**
+     * Strumień za taniec. `mnoznik` = mnożnik jakości tańca (js/jakoscTanca.js, 0.67..1.5) -
+     * te same kotwice co tempo ładowania, ale podniesiony do WYKLADNIK_JAKOSCI_PUNKTOW.
+     * Przycięty do [0, 2] przed potęgą, NIE do 1; domyślnie 1 = zmierzony balans sprzed
+     * 2026-10-14 (Kronika, Kamienie Pamięci).
+     */
+    taniec(plynnosc, responsywnosc, dt, mnoznik = 1, mnoznikTransu = 1) {
         if (!this.aktywna || !Number.isFinite(dt) || dt <= 0) return 0;
+        const m = Math.pow(Number.isFinite(mnoznik) ? Math.max(0, Math.min(2, mnoznik)) : 1, WYKLADNIK_JAKOSCI_PUNKTOW);
         return this._dodaj('taniec',
-            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * Math.min(dt, MAX_DT_TANCA_S));
+            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * m * mnoznikTr(mnoznikTransu) * Math.min(dt, MAX_DT_TANCA_S));
     }
 
     /** Strumień za natężenie zaklinania (0..1) - warstwa technik, nie tańca. */
@@ -204,7 +218,12 @@ export class Punktacja {
         return p;
     }
 
-    technika(kombo, now, miejsce = null) {
+    /**
+     * @param {number} [mnoznikTransu]  z js/rytm/trans.js (x1.25 / 1.5 / 2) - ZAPISANY w chwili rzutu
+     *   przez wołającego; późniejsze gubienie rytmu niczego nie odbiera. Splecenie (warstwa
+     *   reakcji) liczone bez transu - spec 2026-10-30: trans nie mnoży reakcji.
+     */
+    technika(kombo, now, miejsce = null, mnoznikTransu = 1) {
         if (!this.aktywna || !kombo || !Number.isFinite(now)) return 0;
         const baza = wartoscTechniki(kombo);
         if (baza <= 0) return 0;
@@ -229,20 +248,23 @@ export class Punktacja {
         this._powtorzen = kombo.id === this._ostatniaTechnika ? this._powtorzen + 1 : 0;
         this._ostatniaTechnika = kombo.id;
         const czynnik = Math.max(PODLOGA_POWTORZENIA, 1 - SPADEK_POWTORZENIA * this._powtorzen);
-        const p = this._dodaj('techniki', baza * czynnik * this._zew('technika', kombo));
+        const mt = mnoznikTr(mnoznikTransu);
+        const bezTransu = baza * czynnik * this._zew('technika', kombo);
+        const p = this._dodaj('techniki', bezTransu * mt);
 
         // SPLECENIE - po NAKŁADANIU OGONÓW, nie po czasie. Pieczęć dzieląca ogony
         // dwóch RÓŻNYCH technik to naturalny sygnał "połączyłeś" (kombosy.js,
         // "łańcuchy są celowe"). Ta sama technika ze sobą już odpadła wyżej.
         let premia = 0;
         if (nakladaSie) {
-            premia = this._dodaj('reakcje', p * PREMIA_SPLECENIA);
+            premia = this._dodaj('reakcje', (p / mt) * PREMIA_SPLECENIA);
             if (premia > 0) this.momenty.splecenia++;
         }
         this._poprzedniOgon = { id: kombo.id, t: ogon };
 
         this.momenty.techniki[kombo.id] = (this.momenty.techniki[kombo.id] ?? 0) + 1;
-        if (p > 0) this._zdarzenia.push({ rodzaj: 'technika', tekst: kombo.nazwa, punkty: p, t: now, miejsce });
+        if (p > 0) this._zdarzenia.push({ rodzaj: 'technika', tekst: kombo.nazwa, punkty: p, t: now, miejsce, ...(mt > 1 ? { mnoznik: mt } : {}) });
+        if (p > 0 && mt > 1) this.momenty.technikWTransie++;
         if (premia > 0) this._zdarzenia.push({ rodzaj: 'splecenie', tekst: 'Splecenie', punkty: premia, t: now, miejsce });
         return p + premia;
     }

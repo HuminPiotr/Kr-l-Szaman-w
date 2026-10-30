@@ -4,6 +4,8 @@ import { AudioEngine } from './audioEngine.js';
 import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
+import { JakoscTanca } from './jakoscTanca.js';
+import { BlaskTanca } from './blaskTanca.js';
 import { Aura } from './aura.js';
 import { ZnakRegistry } from './znaki/registry.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
@@ -21,6 +23,15 @@ import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js'
 import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
 import { WlasnePiesni } from './wlasnePiesni.js';
+import { SiatkaUderzen } from './rytm/siatka.js';
+import { wybierzRytm } from './rytm/zrodlaRytmu.js';
+import { Sluch } from './rytm/sluch.js';
+import { NaukaRytmu, NauczonePiesni } from './rytm/nauka.js';
+import { rytmZPliku } from './rytm/rytmZPliku.js';
+import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
+import { Trans } from './rytm/trans.js';
+import { TransEfekty } from './trans/transEfekty.js';
+import { KolejkaTaktu } from './rytm/kolejkaTaktu.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -57,6 +68,8 @@ import { Bania } from './bania.js';
 import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
+import { FalaMokoszy } from './falaMokoszy.js';
+import { Kruki } from './kruki.js';
 import { Dodola } from './deszcz.js';
 import { zagrajGrzmot } from './dzwiekGrzmotu.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
@@ -145,6 +158,12 @@ let audioEngine = new AudioEngine();
 let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
 let plynnoscMiara = new Plynnosc();
+let jakoscTanca = new JakoscTanca();
+let blaskTanca = new BlaskTanca();
+let zgodnoscRytmu = new ZgodnoscRytmu();   // taniec w rytm pieśni Obrzędu (spec 2026-10-30-trans)
+let trans = new Trans();
+let transEfekty = new TransEfekty();
+let kolejkaTaktu = new KolejkaTaktu();   // techniki w transie czekające na uderzenie
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -171,6 +190,15 @@ const wynikHud = new WynikHud(document.getElementById('wynik-hud'));
 let przebieg = null;
 let piesn = null;                 // Piesn bieżącej rundy (Obrzęd) albo null
 let utworRundy = null;            // wpis z manifestu wybrany do Obrzędu
+let siatkaRundy = null;           // uderzenia pieśni Obrzędu (rytm z manifestu) - null = bez transu
+// Słuch: mikrofon -> rytm dowolnej muzyki w pokoju, w KAŻDYM trybie (spec 2026-10-30-sluch).
+// Urządzenie, nie stan rundy - żyje przez całą grę (poza swiezeModuly), zerowane na starcie rundy.
+const sluch = new Sluch();
+// Nauka pieśni z YouTube: słuch zapisuje uderzenia w czasie odtwarzacza; po rundzie rytm zostaje
+// zapamiętany per film (localStorage) i przy następnym graniu jest źródłem 'nauczona'.
+const nauczone = new NauczonePiesni();
+let naukaRundy = null;            // NaukaRytmu bieżącej rundy z pieśnią YouTube albo null
+let siatkaNauczona = null;        // rytm nauczony wcześniej dla pieśni tej rundy
 const rundaHud = new RundaHud(document.getElementById('runda-hud'));
 punkty.aktywna = false;           // do pierwszej rundy
 punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
@@ -201,7 +229,7 @@ const wlasne = new WlasnePiesni({
 });
 const BRAK_PIESNI = 'Ta pieśń nie chce zabrzmieć — spróbuj innego pliku.';
 const polanaUi = new PolanaUi(document, {
-    menu, ksiega, losoweImie, odkrycia,
+    menu, ksiega, losoweImie, odkrycia, nauczone,
     // Własne pieśni zwracają ciepłe zdanie zwrotne (pusty tekst = sukces bez komentarza).
     naPlik: async (file) => {
         try {
@@ -213,7 +241,9 @@ const polanaUi = new PolanaUi(document, {
             probny.zatrzymaj();
             URL.revokeObjectURL(url);
             if (!ok) return BRAK_PIESNI;
-            const z = await wlasne.dodajPlik({ ...u, dlugoscS }, file);
+            // Rytm z pliku od razu (spec słuchu, zad. 9) - pieśń z rytmem daje trans bez mikrofonu.
+            const rytm = await rytmZPliku(file);
+            const z = await wlasne.dodajPlik({ ...u, dlugoscS, rytm }, file);
             if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
             menu.dodajPiesn(z);
             return wlasne.trwala ? '' : 'Ta przeglądarka nie zapamięta pieśni po zamknięciu karty.';
@@ -245,7 +275,7 @@ const polanaUi = new PolanaUi(document, {
 // Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
 Promise.all([wczytajManifest(), wlasne.wczytaj().catch(() => [])]).then(([lista, moje]) => {
     odkrycia.ustawManifest(lista.map(u => u.plik));   // tylko pieśni plemienia - własne nie przesuwają celu
-    menu.ustawPiesni([...lista, ...moje]);
+    menu.ustawPiesni([...lista, ...moje].map(oznaczZnajomosc));
     // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
     menu.zUrl(parsujKonfiguracje(window.location.search));
     polanaUi.render();
@@ -280,6 +310,8 @@ let grzmot = new Grzmot();
 let zawierucha = new Zawierucha();
 let bledneOgniki = new BledneOgniki();
 let dodola = new Dodola();
+let falaMokoszy = new FalaMokoszy();
+let kruki = new Kruki();
 let reakcjeTechnik = new ReakcjeTechnik();
 
 // Ostatnia rzecz, którą gracz zrobił - HUD ma o niej mówić przez chwilę,
@@ -337,6 +369,9 @@ window.addEventListener('keydown', (e) => {
     // Nick w menu: litera 'm' to część imienia, nie wyciszenie (js/klawisze.js).
     if (czyPoleTekstowe(e.target)) return;
     if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
+    // Poprawka opóźnienia słuchu (nakładka D pokazuje wartość): tyk aury ma trafiać w bęben.
+    if (e.key === '[') sluch.przesunOpoznienie(-0.01);
+    if (e.key === ']') sluch.przesunOpoznienie(0.01);
 });
 
 // Strażnik przed podwójnym startem kamery: "Rozpal ogień" można kliknąć dwa razy
@@ -393,6 +428,8 @@ async function rozpalOgien(konfig) {
     const dziala = await uruchomGre();
     menu.zajety = false;
     if (!dziala) { polanaUi.render(); return; }
+    // Słuch PO kamerze: osobna zgoda na mikrofon. Nigdy nie odrzuca - odmowa = gra bez słuchu (§2).
+    sluch.start(audioEngine.audioCtx);
     menu.naGre(); polanaUi.render();
     // Obrzęd: długość z metadanych i pieśń; swobodny: nic (przebieg === null, punkty wyłączone).
     uruchomZKonfiguracji({ ...konfig }).catch((e) => console.error('Tryb:', e));
@@ -558,9 +595,10 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, transEfekty, kolejkaTaktu, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
-       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+       kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+    sluch.zeruj();   // nowa runda = zwykle nowa pieśń; słuch łapie rytm od nowa (~4-8 s)
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -570,15 +608,68 @@ function resetujModuly() {
 function przygotujPiesn() {
     piesn?.zatrzymaj();
     piesn = null;
+    siatkaRundy = null;
+    naukaRundy = null;
+    siatkaNauczona = null;
     if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
+    siatkaRundy = SiatkaUderzen.z(utworRundy.rytm);   // własne pieśni i YouTube nie mają rytmu z pliku
+    if (utworRundy.zrodlo === 'yt') {
+        siatkaNauczona = SiatkaUderzen.z(nauczone.rytm(utworRundy.ytId));
+        naukaRundy = new NaukaRytmu();   // uczymy się (albo poprawiamy) przy każdym graniu
+    }
     piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
 }
 
+/**
+ * Efekt techniki (dispatch w js/techniki.js) + grzmot; w transie dodatkowo wspólna złota oprawa.
+ * Wołane od razu albo z kolejki taktu (technika w transie startuje na uderzenie).
+ */
+function odpalTechnikeTeraz(technika, frame, now, ogon, stopienTransu) {
+    odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
+        efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
+        podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki,
+        ogon
+    });
+    if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
+    if (stopienTransu > 0) transEfekty.oprawaTechniki(stopienTransu);
+}
+
+/**
+ * Rytm w tej klatce (js/rytm/zrodlaRytmu.js): pieśń z rytmem z pliku, nauczona pieśń
+ * z YouTube albo słuch na żywo z mikrofonu - w każdym trybie. null = bez transu.
+ */
+function rytmTeraz() {
+    return wybierzRytm({
+        plik: siatkaRundy ? { siatka: siatkaRundy, czasS: piesn?.czasS ?? null } : null,
+        nauczona: siatkaNauczona ? { siatka: siatkaNauczona, czasS: piesn?.czasS ?? null } : null,
+        sluch: sluch.rytm
+    });
+}
+
+/** Rytm pieśni z YouTube po rundzie (także przerwanej Esc) - zapis, jeśli usłyszane dość. */
+function zapiszNauke() {
+    const n = naukaRundy, u = utworRundy;
+    naukaRundy = null;
+    if (!n || !u?.ytId) return;
+    const w = n.wynik(przebieg?.konfig?.dlugoscS ?? u.dlugoscS, nauczone.rytm(u.ytId));
+    if (w && nauczone.zapisz(u.ytId, w.rytm, w.pokrycie)) {
+        const p = menu.piesni.find(x => x.ytId === u.ytId);
+        if (p) p.znaRytm = true;
+    }
+}
+
+/** Menu: pieśń z YouTube, której rytm gra już zna. */
+function oznaczZnajomosc(p) {
+    return p?.zrodlo === 'yt' && nauczone.rytm(p.ytId) ? { ...p, znaRytm: true } : p;
+}
+
 function zakonczPrzebieg() {
+    zapiszNauke();
     piesn?.zatrzymaj();
     piesn = null;
+    siatkaRundy = null;
     przebieg = null;
     punkty.reset();
     punkty.aktywna = false;
@@ -610,6 +701,7 @@ function dalejZKroniki() {
 
 /** Koniec rundy: zapis do Księgi, Kronika, jaja. Wołane raz, z obsluzZdarzeniaRundy('koniecRundy'). */
 function pokazKronike(pods) {
+    zapiszNauke();
     const klucz = kluczKsiegi(przebieg.konfig, utworRundy);
     const nick = pods.nick ?? String(przebieg.konfig.nick ?? '').trim();
     const wk = klucz && nick ? ksiega.dodaj(klucz, nick, pods.wynik, Date.now()) : null;
@@ -646,7 +738,8 @@ function obsluzZdarzeniaRundy(zdarzenia, now) {
             piesn?.zatrzymaj();
             piesn = null;
             // Zapis RAZ - Przebieg odrzuca drugie wywołanie. Kopie, bo punkty.reset() je wyczyści.
-            const pods = przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie }, JSON.parse(JSON.stringify(punkty.momenty)));
+            const pods = przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie },
+                { ...JSON.parse(JSON.stringify(punkty.momenty)), najwyzszyStopienTransu: trans.najwyzszyStopien });
             if (pods) pokazKronike(pods);
         }
     }
@@ -774,11 +867,14 @@ function klatka(now) {
     // ma zawierać SUROWE landmarki, niezależne od tego, jak gra je dziś czyta.
     debugHud.aktualizujSesje(frame, dt);
 
-    // --- 4. Płynność ruchu ---
-    // Liczona z SUROWYCH worldLandmarks - filtr Savitzky'ego-Golaya robi
-    // własne wygładzanie. Podanie tu pozycji już wygładzonych przez
-    // MotionMeter zabiłoby sygnał, którego szukamy.
-    const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt);
+    // --- 4. Jakość tańca i płynność ruchu ---
+    // Jakość PRZED płynnością: płynność skaluje próg szarpnięcia częstotliwością
+    // ruchu z okresu (js/jakosc/okres.js) - szybki, gładki taniec nie traci.
+    // Obie liczone z SUROWYCH landmarków - filtry robią własne wygładzanie.
+    // Podanie tu pozycji już wygładzonych przez MotionMeter zabiłoby sygnał,
+    // którego szukamy.
+    const mnoznikBogactwa = jakoscTanca.update(frame, dt);
+    const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt, jakoscTanca.czestotliwoscHz);
 
     // --- 4a. Skala ciała ---
     // RAZ NA KLATKĘ, PRZED znaki.ocen() - pięć znaków dzieli jedną wygładzoną
@@ -811,8 +907,14 @@ function klatka(now) {
     }
     const skl = skladanie.update(postawy, motionMeter.moc, dt);
 
-    // --- 6. Ciągłość ruchu razy płynność -> moc ---
-    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik);
+    // --- 6. Ciągłość ruchu × płynność × jakość tańca × trans -> moc ---
+    // Trans tylko w Obrzędzie z pieśnią, która ma rytm w manifeście; poza tym rytmTeraz() = null
+    // i trans gaśnie do zera (mnożnik 1).
+    const rytm = rytmTeraz();
+    naukaRundy?.update(sluch.rytm, piesn?.czasS ?? null);
+    zgodnoscRytmu.update(frame.pose ?? null, dt, rytm);
+    trans.update(zgodnoscRytmu.zgodnosc, dt);
+    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa, trans.mnoznikMany);
 
     // Jajo z nickiem-bogiem i koronacja za nowy rekord (Kronika): odpalane tu, bo dopiero
     // w tym miejscu klatki istnieje `frame` (zaczep efektów). Koronacja ostatnia - złoto wygrywa z zapłonem jaja.
@@ -841,13 +943,16 @@ function klatka(now) {
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
-            punkty.technika(technika, now, miejscePunktow);
-            zanotuj(odkrycia.technika(technika, now));
-            odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
-                efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola
-            });
-            if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
+            // Punkty, odkrycia i komunikat OD RAZU - mnożnik transu zapisany w chwili rzutu.
+            const stopienRzutu = trans.stopien;
+            punkty.technika(technika, now, miejscePunktow, trans.mnoznikTechniki);
+            zanotuj(odkrycia.technika(technika, now, { stopienTransu: stopienRzutu }));
+            // W transie efekt czeka na najbliższe uderzenie pieśni (<= ~0.5 s, spec trans).
+            const ogon = kombosy.bufor.slice(-technika.sekwencja.length);
+            const start = stopienRzutu > 0 && rytm ? rytm.siatka.nastepneUderzenieS(rytm.czasS, 0.5) : null;
+            if (!(start > rytm?.czasS + 0.02 && kolejkaTaktu.odloz({ technika, ogon, stopien: stopienRzutu }, start))) {
+                odpalTechnikeTeraz(technika, frame, now, ogon, stopienRzutu);
+            }
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
@@ -855,14 +960,25 @@ function klatka(now) {
         }
         ostatniKomunikatDo = now + 1600;
     }
+    // Techniki z transu, których uderzenie właśnie nadeszło (bez rytmu - wszystkie od razu).
+    for (const z of kolejkaTaktu.dojrzale(rytm?.czasS ?? null)) odpalTechnikeTeraz(z.technika, frame, now, z.ogon, z.stopien);
 
     // --- 7. Aura ---
     // tecza.update() PRZED aura.updateAndDraw(), żeby aura czytała stan
     // z tej samej klatki (tempo obrotu barwy zależy od motionMeter.responsywnosc -
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
+    // Takt pieśni w tej klatce (Obrzęd z rytmem) - wspólny dla aury i efektów transu.
+    const takt = rytm ? rytm.siatka.faza(rytm.czasS) : null;
+    // Efekty stopni transu POD aurą: winieta (świat przygasa) i przodkowie "za" graczem.
+    transEfekty.rysujPrzed(ctx, frame, trans, takt, { dane: frame.pose ? maskaDane : null, szer: maskaSzer, wys: maskaWys }, fit, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt, tecza);
+                       moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz,
+                       takt ? { zgodnosc: zgodnoscRytmu.zgodnosc, faza01: takt.faza01 } : null);
+    // Miękkie ciepło tańczących partii - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
+    blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
+    // Efekty transu NAD aurą: kręgi od stóp na uderzenia, echa sylwetki.
+    transEfekty.rysujPo(ctx, frame, trans, fit);
 
     // --- 7a0. Zapłon sylwetki (Kierunek A) ---
     // TA SAMA maska co aura, zero kosztu dodatkowego liczenia - patrz
@@ -1060,6 +1176,8 @@ function klatka(now) {
     for (const sila of grzmot.dudnienia) ekran.uderz(sila);   // przetaczające się uderzenia po pierwszym
     zawierucha.updateAndDraw(ctx, kontekstTechnik, dt);
     bledneOgniki.updateAndDraw(ctx, kontekstTechnik, dt);
+    falaMokoszy.updateAndDraw(ctx, kontekstTechnik, dt);
+    kruki.updateAndDraw(ctx, kontekstTechnik, dt);
     // Deszcz NA KOŃCU technik: pada przez wszystkie pola (Mgłę, Kurzawę, ogniki).
     dodola.updateAndDraw(ctx, kontekstTechnik, dt);
     // Reakcje między technikami (js/reakcjeTechnik.js) - efekty rysują same
@@ -1099,7 +1217,7 @@ function klatka(now) {
     // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
-    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
+    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt, mnoznikBogactwa, trans.mnoznikMany);
     punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
     odkryciaHud.update(now);
@@ -1177,6 +1295,8 @@ function klatka(now) {
         zawierucha: { aktywny: zawierucha.aktywny, ...zawierucha.diagnostyka },
         bledneOgniki: { aktywny: bledneOgniki.aktywny, widocznych: bledneOgniki.punkty().length },
         dodola: { aktywny: dodola.aktywny, ...dodola.diagnostyka },
+        falaMokoszy: { aktywny: falaMokoszy.aktywny, ...falaMokoszy.diagnostyka },
+        kruki: { aktywny: kruki.aktywny, ...kruki.diagnostyka },
         kolowrot: { aktywny: kolowrot.aktywny, mgla: kolowrot._mgla.length, drobiny: kolowrot._drobiny.length },
         // _gest to pole prywatne (podkreślnik) - ten sam wzorzec co
         // plonacyPalec._utrzymanie parę linijek wyżej: diagnostyka do
@@ -1189,6 +1309,24 @@ function klatka(now) {
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
+        jakosc: {
+            bogactwo: jakoscTanca.bogactwo, mnoznik: jakoscTanca.mnoznik,
+            skladowe: jakoscTanca.skladowe,
+            aktywnosci: jakoscTanca.zaangazowanieMiara.aktywnosci,
+            fala: jakoscTanca.falaMiara.diagnostyka,
+            okresS: jakoscTanca.okres.okresS, pewnosc: jakoscTanca.okres.pewnosc,
+            skalaProgu: plynnoscMiara.skalaProgu,
+            tempoLadowania: motionMeter.tempoLadowania
+        },
+        trans: (() => {
+            const r = rytmTeraz(), f = r ? r.siatka.faza(r.czasS) : null;
+            return {
+                rytm: !!r, zrodlo: r?.zrodlo ?? null, sluch: sluch.opis, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
+                zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
+                koherencja: zgodnoscRytmu.koherencja, amplituda: zgodnoscRytmu.amplituda, poziom: trans.poziom, stopien: trans.stopien,
+                mana: trans.mnoznikMany, technika: trans.mnoznikTechniki
+            };
+        })(),
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
         dlonie: opiszDlonie(frame),
         postawy,

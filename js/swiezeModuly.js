@@ -17,6 +17,7 @@
  */
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
+import { JakoscTanca } from './jakoscTanca.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -44,13 +45,20 @@ import { Grzmot } from './grzmot.js';
 import { Zawierucha } from './zawierucha.js';
 import { BledneOgniki } from './bledneOgniki.js';
 import { Dodola } from './deszcz.js';
+import { FalaMokoszy } from './falaMokoszy.js';
+import { Kruki } from './kruki.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
+import { BlaskTanca } from './blaskTanca.js';
+import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
+import { Trans } from './rytm/trans.js';
+import { TransEfekty } from './trans/transEfekty.js';
+import { KolejkaTaktu } from './rytm/kolejkaTaktu.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
-    'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
+    'motionMeter', 'plynnoscMiara', 'jakoscTanca', 'blaskTanca', 'zgodnoscRytmu', 'trans', 'transEfekty', 'kolejkaTaktu', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
-    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'reakcjeTechnik'
+    'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy', 'kruki', 'reakcjeTechnik'
 ];
 
 /**
@@ -63,6 +71,12 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
     return {
         motionMeter: new MotionMeter(),
         plynnoscMiara: new Plynnosc(),
+        jakoscTanca: new JakoscTanca(),
+        blaskTanca: new BlaskTanca(),
+        zgodnoscRytmu: new ZgodnoscRytmu(),
+        trans: new Trans(),
+        transEfekty: new TransEfekty(),
+        kolejkaTaktu: new KolejkaTaktu(),
         skladanie: new SkladaniePieczeci(),
         kombosy: new KomboSilnik(),
         efekty: new Efekty(),
@@ -90,6 +104,8 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         zawierucha: new Zawierucha(),
         bledneOgniki: new BledneOgniki(),
         dodola: new Dodola(),
+        falaMokoszy: new FalaMokoszy(),
+        kruki: new Kruki(),
         reakcjeTechnik: new ReakcjeTechnik()
     };
 }

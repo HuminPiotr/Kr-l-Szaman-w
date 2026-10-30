@@ -31,7 +31,9 @@ export function pozycjaWLustrze(miejsce, W, H) {
 
 export function tekstZdarzenia(z) {
     const p = `+${Math.round(z.punkty)}`;
-    return z.tekst ? `${p} ${z.tekst}` : p;
+    const t = z.tekst ? `${p} ${z.tekst}` : p;
+    // Mnożnik transu - JEDYNE miejsce, gdzie trans pokazuje liczbę (decyzja właściciela 2026-10-30).
+    return z.mnoznik > 1 ? `${t} ×${Math.round(z.mnoznik * 100) / 100}` : t;
 }
 
 export function tekstSerii(s) {

@@ -86,6 +86,14 @@ export const EMBLEMATY = {
     dodola: {
         svg: '<path d="M16 32a8 8 0 0 1 1-16 12 12 0 0 1 22-4 9 9 0 0 1 9 20z"/><path d="M20 40l-3 8M30 40l-3 8M40 40l-3 8M25 52l-3 8M35 52l-3 8"/>',
         legenda: 'Woda w misie, wiatr niesie ją w chmury — pada deszcz.'
+    },
+    falaMokoszy: {
+        svg: '<path d="M4 56c10 0 14-6 18-16 5-13 14-22 26-22 8 0 12 5 12 10 0 4-3 7-7 7-5 0-6-5-3-8"/><path d="M4 56h56"/><path d="M14 46c4-1 6-4 8-8"/>',
+        legenda: 'Woda, wiatr i znów woda — Mokosz posyła falę.'
+    },
+    kruki: {
+        svg: '<path d="M32 30c-6-8-16-12-28-10 8 2 12 6 14 12 4-2 9-3 14-2z"/><path d="M32 30c6-8 16-12 28-10-8 2-12 6-14 12-4-2-9-3-14-2z"/><path d="M29 30l3-7 3 7-1 12-2 6-2-6z"/><path d="M14 56l2-3M22 60l1-4M44 58l-1-4"/>',
+        legenda: 'Ziemia, wiatr i grom — z cienia Welesa zrywają się kruki.'
     }
 };
 
