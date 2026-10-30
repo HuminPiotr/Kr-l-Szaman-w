@@ -229,7 +229,7 @@ const wlasne = new WlasnePiesni({
 });
 const BRAK_PIESNI = 'Ta pieśń nie chce zabrzmieć — spróbuj innego pliku.';
 const polanaUi = new PolanaUi(document, {
-    menu, ksiega, losoweImie, odkrycia,
+    menu, ksiega, losoweImie, odkrycia, nauczone,
     // Własne pieśni zwracają ciepłe zdanie zwrotne (pusty tekst = sukces bez komentarza).
     naPlik: async (file) => {
         try {
