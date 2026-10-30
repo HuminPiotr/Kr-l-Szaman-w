@@ -123,6 +123,10 @@ export const KAMIENIE = [
       kategoria: 'mit', kiedy: 'zywo', runa: 'ᛃ',
       warunek: (s, c) => rozneWOknie(s.historia, 'pieczec', 20000, c?.now) >= PIECZECIE.length },
 
+    { id: 'taniecPrzodkow', nazwa: 'Taniec Przodków', opis: 'Technika rzucona w trzecim stopniu transu, gdy tańczą z tobą przodkowie.',
+      kategoria: 'mit', kiedy: 'zywo', runa: 'ᛞ',
+      warunek: (s) => tab(s.historia).some(h => h?.rodzaj === 'technika' && h.stopien >= 3) },
+
     // --- KUNSZT I OBRZĘD (tylko rundy dokończone do Kroniki) ---
     { id: 'podpalaczNieba', nazwa: 'Podpalacz Nieba', opis: 'Pożoga na sto kłębów w jednej serii.',
       kategoria: 'kunszt', kiedy: 'runda', runa: 'ᚱ',

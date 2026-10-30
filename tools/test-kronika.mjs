@@ -121,4 +121,12 @@ console.log('\nNOWE W KSIĘDZE:');
     spr('śmieci w liście odpadają', zbudujKronike(pods(), { nowe: [null, { rodzaj: 'technika', id: 'a' }, { rodzaj: 'kamien', id: 'b', nazwa: 'B' }] }).noweWKsiedze.pozycje.length === 1);
 }
 
+console.log('\nTRANS W KRONICE (2026-10-30):');
+{
+    const linie = (m) => zbudujKronike(pods({ momenty: { serie: {}, techniki: {}, splecenia: 0, ...m } }), {}).linie;
+    spr('trzeci stopień i techniki w transie', linie({ najwyzszyStopienTransu: 3, technikWTransie: 4 }).includes('trans: trzeci stopień · technik w transie: 4'));
+    spr('sam stopień, bez technik', linie({ najwyzszyStopienTransu: 1 }).includes('trans: pierwszy stopień'));
+    spr('bez transu - bez linijki', !linie({}).some(l => l.startsWith('trans')));
+}
+
 process.exit(ok ? 0 : 1);

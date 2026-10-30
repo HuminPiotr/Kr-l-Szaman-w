@@ -738,7 +738,8 @@ function obsluzZdarzeniaRundy(zdarzenia, now) {
             piesn?.zatrzymaj();
             piesn = null;
             // Zapis RAZ - Przebieg odrzuca drugie wywołanie. Kopie, bo punkty.reset() je wyczyści.
-            const pods = przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie }, JSON.parse(JSON.stringify(punkty.momenty)));
+            const pods = przebieg.zapiszWynik(punkty.wynik, { ...punkty.rozbicie },
+                { ...JSON.parse(JSON.stringify(punkty.momenty)), najwyzszyStopienTransu: trans.najwyzszyStopien });
             if (pods) pokazKronike(pods);
         }
     }
@@ -945,7 +946,7 @@ function klatka(now) {
             // Punkty, odkrycia i komunikat OD RAZU - mnożnik transu zapisany w chwili rzutu.
             const stopienRzutu = trans.stopien;
             punkty.technika(technika, now, miejscePunktow, trans.mnoznikTechniki);
-            zanotuj(odkrycia.technika(technika, now));
+            zanotuj(odkrycia.technika(technika, now, { stopienTransu: stopienRzutu }));
             // W transie efekt czeka na najbliższe uderzenie pieśni (<= ~0.5 s, spec trans).
             const ogon = kombosy.bufor.slice(-technika.sekwencja.length);
             const start = stopienRzutu > 0 && rytm ? rytm.siatka.nastepneUderzenieS(rytm.czasS, 0.5) : null;
