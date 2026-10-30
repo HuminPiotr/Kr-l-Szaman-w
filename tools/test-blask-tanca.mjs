@@ -1,5 +1,5 @@
 /**
- * Blask tańca - połysk tańczących partii i bieg fali.
+ * Blask tańca - miękkie ciepło tańczących partii (bieg fali usunięty 2026-10-30).
  *
  *   node tools/test-blask-tanca.mjs
  */
@@ -40,7 +40,7 @@ const jakosc = (akt, fala = null, lancuch = null) => ({
 {
     const b = new BlaskTanca(), { ctx, l } = atrapa();
     for (let i = 0; i < 60; i++) b.updateAndDraw(ctx, frame, jakosc({}, 0.9, 'ramieL'), 1, 1 / 60);
-    spr('wysoka fala rysuje kreskę wzdłuż łańcucha', l.stroke > 0);
+    spr('wysoka fala NIE rysuje kreski po stawach (za nachalna - 2026-10-30)', l.stroke === 0);
 }
 {
     const b = new BlaskTanca(), { ctx } = atrapa();
@@ -52,6 +52,6 @@ const jakosc = (akt, fala = null, lancuch = null) => ({
         const zle = { pose: { landmarks: lm.map(p => ({ ...p, x: NaN })) }, width: 1920, height: 1080 };
         b.updateAndDraw(ctx, zle, jakosc({ biodra: 1 }, 0.9, 'ramieL'), 1, 1 / 60);
     } catch (e) { blad = e; }
-    spr('null / NaN / brak płótna nie rzucają', blad === null && Number.isFinite(b._faza));
+    spr('null / NaN / brak płótna nie rzucają', blad === null && Object.values(b._sila).every(Number.isFinite));
 }
 process.exit(ok ? 0 : 1);

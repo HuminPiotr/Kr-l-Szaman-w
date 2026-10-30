@@ -79,6 +79,15 @@ export class JakoscTanca {
     /** Częstotliwość ruchu dla płynności - null, gdy okres niepewny. */
     get czestotliwoscHz() { return this.okres.czestotliwoscHz; }
 
+    /**
+     * Bogactwo przeliczone z kotwic na 0..1 (machanie 0, dobry taniec 1) - dla aury.
+     * Surowe bogactwo żyje w ~0.3-0.75, więc barwa żaru ledwo by się ruszała.
+     */
+    get zar() {
+        const z = (this.bogactwo - N.KOTWICA_NISKA) / (N.KOTWICA_WYSOKA - N.KOTWICA_NISKA);
+        return Number.isFinite(z) ? Math.max(0, Math.min(1, z)) : 0;
+    }
+
     /** @returns {number} mnożnik tempa ładowania 0.67..1.5 */
     update(frame, dt) {
         if (!Number.isFinite(dt) || dt <= 0) return this.mnoznik;

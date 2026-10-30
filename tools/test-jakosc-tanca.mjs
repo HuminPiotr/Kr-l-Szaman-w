@@ -30,6 +30,13 @@ spr('neutralne -> 1.0', Math.abs(mnoznikZBogactwa(BOGACTWO_NEUTRALNE) - 1) < 1e-
 spr(`przycięcie: 0 -> ${N.MNOZNIK_NISKI}, 1 -> ${N.MNOZNIK_WYSOKI}`, mnoznikZBogactwa(0) === N.MNOZNIK_NISKI && mnoznikZBogactwa(1) === N.MNOZNIK_WYSOKI);
 spr('ciągłość w neutralnym (oba odcinki)', Math.abs(mnoznikZBogactwa(BOGACTWO_NEUTRALNE - 1e-6) - mnoznikZBogactwa(BOGACTWO_NEUTRALNE + 1e-6)) < 1e-3);
 spr('NaN -> 1 (dzisiejsze tempo)', mnoznikZBogactwa(NaN) === 1);
+{
+    const j = new JakoscTanca();
+    j.bogactwo = N.KOTWICA_NISKA; const z0 = j.zar;
+    j.bogactwo = N.KOTWICA_WYSOKA; const z1 = j.zar;
+    j.bogactwo = NaN; const zn = j.zar;
+    spr('żar dla aury: kotwica niska -> 0, wysoka -> 1, NaN -> 0', z0 === 0 && z1 === 1 && zn === 0);
+}
 
 console.log('\nSKŁADANIE:');
 spr('wszystko null -> null', zlozBogactwo({ krazenie: null, zaangazowanie: null, fala: null }) === null);

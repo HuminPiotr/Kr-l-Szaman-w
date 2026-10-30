@@ -873,8 +873,8 @@ function klatka(now) {
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt, tecza, jakoscTanca.bogactwo);
-    // Połysk tańczących partii i bieg fali - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
+                       moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz);
+    // Miękkie ciepło tańczących partii - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
     blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
 
     // --- 7a0. Zapłon sylwetki (Kierunek A) ---
