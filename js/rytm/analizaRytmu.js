@@ -37,7 +37,7 @@ export const NASTAWY_ANALIZY = {
 const N = NASTAWY_ANALIZY;
 
 /** FFT in-place (radix-2), re/im długości potęgi 2. */
-function fft(re, im) {
+export function fft(re, im) {
     const n = re.length;
     for (let i = 1, j = 0; i < n; i++) {
         let bit = n >> 1;
