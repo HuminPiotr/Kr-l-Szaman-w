@@ -319,8 +319,17 @@ export class PiesnYoutube {
         }, (t * 1000) / kroki);
     }
 
-    /** YouTube nie ma rytmu z manifestu - bez transu. */
-    get czasS() { return null; }
+    /**
+     * Czas odtwarzacza [s], gdy gra (stan PLAYING = 1); null w pauzie, buforowaniu, reklamie.
+     * Rytm YouTube pochodzi ze słuchu i nauki (js/rytm/nauka.js) - nie z manifestu.
+     */
+    get czasS() {
+        try {
+            if (this._gracz?.getPlayerState?.() !== 1) return null;
+            const t = this._gracz.getCurrentTime();
+            return Number.isFinite(t) ? t : null;
+        } catch { return null; }
+    }
 
     zatrzymaj() {
         clearInterval(this._zanik);

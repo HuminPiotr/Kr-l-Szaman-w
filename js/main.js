@@ -26,6 +26,7 @@ import { WlasnePiesni } from './wlasnePiesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
 import { wybierzRytm } from './rytm/zrodlaRytmu.js';
 import { Sluch } from './rytm/sluch.js';
+import { NaukaRytmu, NauczonePiesni } from './rytm/nauka.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
@@ -192,6 +193,11 @@ let siatkaRundy = null;           // uderzenia pieśni Obrzędu (rytm z manifest
 // Słuch: mikrofon -> rytm dowolnej muzyki w pokoju, w KAŻDYM trybie (spec 2026-10-30-sluch).
 // Urządzenie, nie stan rundy - żyje przez całą grę (poza swiezeModuly), zerowane na starcie rundy.
 const sluch = new Sluch();
+// Nauka pieśni z YouTube: słuch zapisuje uderzenia w czasie odtwarzacza; po rundzie rytm zostaje
+// zapamiętany per film (localStorage) i przy następnym graniu jest źródłem 'nauczona'.
+const nauczone = new NauczonePiesni();
+let naukaRundy = null;            // NaukaRytmu bieżącej rundy z pieśnią YouTube albo null
+let siatkaNauczona = null;        // rytm nauczony wcześniej dla pieśni tej rundy
 const rundaHud = new RundaHud(document.getElementById('runda-hud'));
 punkty.aktywna = false;           // do pierwszej rundy
 punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
@@ -266,7 +272,7 @@ const polanaUi = new PolanaUi(document, {
 // Manifest pieśni wczytuje się w tle - Obrzęd odblokowuje się, gdy dotrze.
 Promise.all([wczytajManifest(), wlasne.wczytaj().catch(() => [])]).then(([lista, moje]) => {
     odkrycia.ustawManifest(lista.map(u => u.plik));   // tylko pieśni plemienia - własne nie przesuwają celu
-    menu.ustawPiesni([...lista, ...moje]);
+    menu.ustawPiesni([...lista, ...moje].map(oznaczZnajomosc));
     // Skrót dewelopera: ?tryb=... wypełnia konfigurację (kamera i tak startuje z kliknięcia).
     menu.zUrl(parsujKonfiguracje(window.location.search));
     polanaUi.render();
@@ -600,8 +606,14 @@ function przygotujPiesn() {
     piesn?.zatrzymaj();
     piesn = null;
     siatkaRundy = null;
+    naukaRundy = null;
+    siatkaNauczona = null;
     if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
-    siatkaRundy = SiatkaUderzen.z(utworRundy.rytm);   // własne pieśni i YouTube nie mają rytmu
+    siatkaRundy = SiatkaUderzen.z(utworRundy.rytm);   // własne pieśni i YouTube nie mają rytmu z pliku
+    if (utworRundy.zrodlo === 'yt') {
+        siatkaNauczona = SiatkaUderzen.z(nauczone.rytm(utworRundy.ytId));
+        naukaRundy = new NaukaRytmu();   // uczymy się (albo poprawiamy) przy każdym graniu
+    }
     piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
@@ -628,11 +640,30 @@ function odpalTechnikeTeraz(technika, frame, now, ogon, stopienTransu) {
 function rytmTeraz() {
     return wybierzRytm({
         plik: siatkaRundy ? { siatka: siatkaRundy, czasS: piesn?.czasS ?? null } : null,
+        nauczona: siatkaNauczona ? { siatka: siatkaNauczona, czasS: piesn?.czasS ?? null } : null,
         sluch: sluch.rytm
     });
 }
 
+/** Rytm pieśni z YouTube po rundzie (także przerwanej Esc) - zapis, jeśli usłyszane dość. */
+function zapiszNauke() {
+    const n = naukaRundy, u = utworRundy;
+    naukaRundy = null;
+    if (!n || !u?.ytId) return;
+    const w = n.wynik(przebieg?.konfig?.dlugoscS ?? u.dlugoscS, nauczone.rytm(u.ytId));
+    if (w && nauczone.zapisz(u.ytId, w.rytm, w.pokrycie)) {
+        const p = menu.piesni.find(x => x.ytId === u.ytId);
+        if (p) p.znaRytm = true;
+    }
+}
+
+/** Menu: pieśń z YouTube, której rytm gra już zna. */
+function oznaczZnajomosc(p) {
+    return p?.zrodlo === 'yt' && nauczone.rytm(p.ytId) ? { ...p, znaRytm: true } : p;
+}
+
 function zakonczPrzebieg() {
+    zapiszNauke();
     piesn?.zatrzymaj();
     piesn = null;
     siatkaRundy = null;
@@ -667,6 +698,7 @@ function dalejZKroniki() {
 
 /** Koniec rundy: zapis do Księgi, Kronika, jaja. Wołane raz, z obsluzZdarzeniaRundy('koniecRundy'). */
 function pokazKronike(pods) {
+    zapiszNauke();
     const klucz = kluczKsiegi(przebieg.konfig, utworRundy);
     const nick = pods.nick ?? String(przebieg.konfig.nick ?? '').trim();
     const wk = klucz && nick ? ksiega.dodaj(klucz, nick, pods.wynik, Date.now()) : null;
@@ -875,6 +907,7 @@ function klatka(now) {
     // Trans tylko w Obrzędzie z pieśnią, która ma rytm w manifeście; poza tym rytmTeraz() = null
     // i trans gaśnie do zera (mnożnik 1).
     const rytm = rytmTeraz();
+    naukaRundy?.update(sluch.rytm, piesn?.czasS ?? null);
     zgodnoscRytmu.update(frame.pose ?? null, dt, rytm);
     trans.update(zgodnoscRytmu.zgodnosc, dt);
     const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa, trans.mnoznikMany);

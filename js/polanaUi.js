@@ -243,7 +243,8 @@ export class PolanaUi {
 
         const piesni = $('konfig-piesni'); piesni.replaceChildren();
         menu.piesni.forEach((p, i) => {
-            const ikona = p.zrodlo === 'yt' ? '▶ ' : p.zrodlo === 'plik' ? '♪ ' : '';
+            // ♫ = gra zna rytm tej pieśni z YouTube (nauczony słuchem) - trans także na słuchawkach.
+            const ikona = p.zrodlo === 'yt' ? (p.znaRytm ? '▶♫ ' : '▶ ') : p.zrodlo === 'plik' ? '♪ ' : '';
             const b = pigulka(doc, ikona + (p.dlugoscS > 0 ? `${p.tytul} (${formatCzasu(p.dlugoscS)})` : p.tytul), i === menu.piesn);
             b.addEventListener('click', () => { menu.ustaw('piesn', i); this.render(); });
             if (p.zrodlo !== 'plik' && p.zrodlo !== 'yt') { piesni.appendChild(b); return; }

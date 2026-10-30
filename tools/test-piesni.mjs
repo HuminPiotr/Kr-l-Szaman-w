@@ -5,7 +5,7 @@
  * { ok:false } i komunikatem "Duchy zgubiły pieśń", nie wyjątkiem.
  */
 import { readFileSync } from 'node:fs';
-import { sciezkaPliku, walidujManifest, walidujRytm, wczytajManifest, Piesn, KATALOG_MUZYKI } from '../js/piesni.js';
+import { PiesnYoutube, sciezkaPliku, walidujManifest, walidujRytm, wczytajManifest, Piesn, KATALOG_MUZYKI } from '../js/piesni.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -159,6 +159,19 @@ console.log('\nPIESN - CZAS (rytm transu):');
     spr('koniec -> null', p.czasS === null);
     atrapa.ended = false; atrapa.currentTime = NaN;
     spr('NaN -> null', p.czasS === null);
+}
+
+console.log('\nPIESN YOUTUBE - CZAS ODTWARZACZA (nauka rytmu):');
+{
+    const yt = new PiesnYoutube({ ytId: 'dQw4w9WgXcQ' }, { kontener: () => null });
+    spr('bez odtwarzacza -> null', yt.czasS === null);
+    let stan = 1;
+    yt._gracz = { getPlayerState: () => stan, getCurrentTime: () => 42.5 };
+    spr('gra (stan 1) -> czas odtwarzacza', yt.czasS === 42.5);
+    stan = 2;
+    spr('pauza / buforowanie / reklama -> null', yt.czasS === null);
+    yt._gracz = { getPlayerState: () => { throw new Error('zniszczony'); } };
+    spr('odtwarzacz rzuca -> null', yt.czasS === null);
 }
 
 console.log('\nPIESN - GŁOŚNOŚĆ I MAGISTRALA:');
