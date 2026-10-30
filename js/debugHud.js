@@ -407,11 +407,11 @@ export class DebugHud {
         // uderzeniu pieśni - ma iść równo z bębnem (to jest test analizy rytmu na żywo).
         const tr = stats.trans;
         if (tr) {
-            if (!tr.rytm) lines.push('trans  — (brak pieśni z rytmem: tylko Obrzęd z pieśnią z manifestu)');
+            if (!tr.rytm) lines.push(`trans  — (brak rytmu: ani pieśni z rytmem, ani pewnego słuchu${tr.sluch ? ` · słuch: ${tr.sluch}` : ''})`);
             else {
                 const k = ((tr.indeks ?? 0) % 4 + 4) % 4;
                 const bije = [0, 1, 2, 3].map(i => (i === k ? '●' : '○')).join('');
-                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (koher. ${this._num(tr.koherencja)}, ampl. ${this._num(tr.amplituda)}, ${tr.siatka ?? '—'})`);
+                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM (${tr.zrodlo})  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (koher. ${this._num(tr.koherencja)}, ampl. ${this._num(tr.amplituda)}, ${tr.siatka ?? '—'})`);
                 lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
             }
             lines.push('');

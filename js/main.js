@@ -24,6 +24,7 @@ import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
 import { WlasnePiesni } from './wlasnePiesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
+import { wybierzRytm } from './rytm/zrodlaRytmu.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
@@ -610,10 +611,14 @@ function odpalTechnikeTeraz(technika, frame, now, ogon, stopienTransu) {
     if (stopienTransu > 0) transEfekty.oprawaTechniki(stopienTransu);
 }
 
-/** Rytm w tej klatce: pieśń Obrzędu z rytmem i aktualnie grająca; inaczej null (bez transu). */
+/**
+ * Rytm w tej klatce (js/rytm/zrodlaRytmu.js): pieśń z rytmem z pliku, nauczona pieśń
+ * z YouTube albo słuch na żywo z mikrofonu - w każdym trybie. null = bez transu.
+ */
 function rytmTeraz() {
-    const czasS = siatkaRundy ? piesn?.czasS : null;
-    return Number.isFinite(czasS) ? { siatka: siatkaRundy, czasS } : null;
+    return wybierzRytm({
+        plik: siatkaRundy ? { siatka: siatkaRundy, czasS: piesn?.czasS ?? null } : null
+    });
 }
 
 function zakonczPrzebieg() {
@@ -1268,7 +1273,7 @@ function klatka(now) {
         trans: (() => {
             const r = rytmTeraz(), f = r ? r.siatka.faza(r.czasS) : null;
             return {
-                rytm: !!r, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
+                rytm: !!r, zrodlo: r?.zrodlo ?? null, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
                 zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
                 koherencja: zgodnoscRytmu.koherencja, amplituda: zgodnoscRytmu.amplituda, poziom: trans.poziom, stopien: trans.stopien,
                 mana: trans.mnoznikMany, technika: trans.mnoznikTechniki
