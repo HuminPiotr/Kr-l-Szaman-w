@@ -6,7 +6,7 @@
  * Spec: docs/superpowers/specs/2026-10-01-punktacja-design.md
  */
 import {
-    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie
+    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie, WYKLADNIK_JAKOSCI_PUNKTOW
 } from '../js/punkty.js';
 import { KOMBOSY } from '../js/kombosy.js';
 
@@ -277,7 +277,14 @@ console.log('\nMNOŻNIK JAKOŚCI TAŃCA (2026-10-14):');
     c.taniec(0.8, 0.9, 0.05, 1.33);
     d.taniec(0.8, 0.9, 0.05, NaN);
     spr('bez mnożnika = mnożnik 1 (zmierzony balans Kroniki zostaje)', a.wynik === b.wynik);
-    spr('mnożnik 1.33 NIE jest przycinany do 1', Math.abs(c.wynik / a.wynik - 1.33) < 1e-9);
+    spr('mnożnik 1.33 NIE jest przycinany do 1 (i idzie do potęgi)', Math.abs(c.wynik / a.wynik - Math.pow(1.33, WYKLADNIK_JAKOSCI_PUNKTOW)) < 1e-9);
+    // Decyzja 2026-10-30: punkty reagują na jakość mocniej niż ładowanie many.
+    const machanie = new Punktacja(), dobry = new Punktacja();
+    machanie.taniec(0.8, 0.9, 0.05, 0.67);
+    dobry.taniec(0.8, 0.9, 0.05, 1.5);
+    spr('machanie (x0.67) daje mniej niż liniowo', machanie.wynik < a.wynik * 0.67);
+    spr('dobry taniec (x1.5) daje więcej niż liniowo', dobry.wynik > a.wynik * 1.5);
+    spr('dobry taniec >= 4x machanie', dobry.wynik >= 4 * machanie.wynik);
     spr('NaN = 1', d.wynik === a.wynik);
     const e = new Punktacja();
     e.taniec(0.8, 0.9, 0.05, -1);
