@@ -24,6 +24,8 @@ import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
 import { WlasnePiesni } from './wlasnePiesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
+import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
+import { Trans } from './rytm/trans.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -152,6 +154,8 @@ let motionMeter = new MotionMeter();
 let plynnoscMiara = new Plynnosc();
 let jakoscTanca = new JakoscTanca();
 let blaskTanca = new BlaskTanca();
+let zgodnoscRytmu = new ZgodnoscRytmu();   // taniec w rytm pieśni Obrzędu (spec 2026-10-30-trans)
+let trans = new Trans();
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -568,7 +572,7 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
@@ -833,8 +837,13 @@ function klatka(now) {
     }
     const skl = skladanie.update(postawy, motionMeter.moc, dt);
 
-    // --- 6. Ciągłość ruchu × płynność × jakość tańca -> moc ---
-    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa);
+    // --- 6. Ciągłość ruchu × płynność × jakość tańca × trans -> moc ---
+    // Trans tylko w Obrzędzie z pieśnią, która ma rytm w manifeście; poza tym rytmTeraz() = null
+    // i trans gaśnie do zera (mnożnik 1).
+    const rytm = rytmTeraz();
+    zgodnoscRytmu.update(frame.pose?.worldLandmarks ?? null, dt, rytm);
+    trans.update(zgodnoscRytmu.zgodnosc, dt);
+    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa, trans.mnoznikMany);
 
     // Jajo z nickiem-bogiem i koronacja za nowy rekord (Kronika): odpalane tu, bo dopiero
     // w tym miejscu klatki istnieje `frame` (zaczep efektów). Koronacja ostatnia - złoto wygrywa z zapłonem jaja.
@@ -863,7 +872,7 @@ function klatka(now) {
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
-            punkty.technika(technika, now, miejscePunktow);
+            punkty.technika(technika, now, miejscePunktow, trans.mnoznikTechniki);   // mnożnik zapisany w chwili rzutu
             zanotuj(odkrycia.technika(technika, now));
             odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
                 efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
@@ -1125,7 +1134,7 @@ function klatka(now) {
     // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
-    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt, mnoznikBogactwa);
+    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt, mnoznikBogactwa, trans.mnoznikMany);
     punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
     odkryciaHud.update(now);
