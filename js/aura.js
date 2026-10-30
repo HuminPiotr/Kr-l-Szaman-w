@@ -8,6 +8,8 @@
  * CO KODUJE:
  *   moc      -> ILE:  zasięg poświaty, jasność, nasycenie
  *   płynność -> JAK:  barwa i spokój tętna
+ *   jakość   -> ŻAR:  rudy, przygaszony żar -> jasne złoto; płytki oddech ->
+ *                     głębsze tętno, w rytmie tańca, gdy okres ruchu jest pewny
  *
  * To rozdzielenie jest sednem efektu. Gracz widzi różnicę między "mam dużo
  * mocy" a "płynę", zanim ktokolwiek mu to wytłumaczy.
@@ -23,6 +25,18 @@ const BARWA_SZARPANA = { h: 265, s: 70 }; // chłodny fiolet
 
 const OKRES_TETNA_S = 3.6;      // oddech, nie stroboskop
 const GLEBIA_TETNA = 0.13;      // jak mocno tętno zmienia jasność
+
+// JAKOŚĆ TAŃCA W SAMEJ AURZE (2026-10-30, zamiast świecących punktów po stawach,
+// które właściciel uznał za za nachalne). Słaby taniec: rudy, przygaszony żar
+// i spokojny, płytki oddech. Dobry: jasne złoto, tętno głębsze i szybsze - w rytmie
+// tańca, gdy okres ruchu jest pewny (js/jakosc/okres.js). ZGADNIĘTE - stroić na kamerze.
+const BARWA_ZARU_NISKA = { h: 22, s: 80 };   // rudy żar
+const BARWA_ZARU_WYSOKA = { h: 46, s: 100 }; // jasne złoto
+const JASNOSC_ZARU = 10;                     // punkty % jasności HSL przy pełnym żarze
+const TETNO_ZARU_HZ = 0.8;                   // tętno przy pełnym żarze bez pewnego rytmu
+const TETNO_RYTMU_HZ = [0.4, 2.0];           // rytm tańca przycięty do tego zakresu
+const GLEBIA_ZARU = 1.0;                     // przy pełnym żarze tętno 2x głębsze
+const TAU_TETNA_S = 1.5;                     // zmiana tempa tętna płynna, nie skokowa
 
 const TAU_WYGLADZANIA = 0.5;    // s - wszystkie wielkości sterujące
 
@@ -51,6 +65,12 @@ const PRZEBIEGI = [
 // Wnętrze sylwetki tylko lekko rozświetlone - ciało ma prześwitywać,
 // a nie znikać pod poświatą.
 const ALFA_WNETRZA = 0.13;
+// ŻAR JAKOŚCI TAŃCA (2026-10-14). Bogactwo tańca (js/jakoscTanca.js) zagęszcza
+// wąskie obrysy i rozświetla wnętrze - piękny taniec "gorzeje" wyraźniej niż
+// góra-dół przy tej samej mocy. Moc dalej = zasięg, płynność dalej = barwa.
+// Bez bogactwa (null) aura jest dokładnie taka jak przed tą zmianą. ZGADNIĘTE.
+const ZAR_OBRYSU = 0.4;
+const ZAR_WNETRZA = 0.8;
 
 // Stała czasowa zaniku śladu - przy TAU=0.5 s ślad dogasa do ~5% po 1.5 s
 // (3 tau), zgodnie ze spec ("dogasające po ~1,5 s"). ZGADNIĘTE - D.
@@ -69,11 +89,18 @@ const TECZA_NASYCENIE = 88;
  * przetestować bez document (updateAndDraw() tworzy płótna, których nie
  * ma w Node), tym samym wzorcem co rzutPerspektywiczny w fala.js.
  */
-export function barwaAury(plynnosc, tecza) {
+export function barwaAury(plynnosc, tecza, zar = null) {
     const t = Math.max(0, Math.min(1, Number.isFinite(plynnosc) ? plynnosc : 1));
+    // Ciepły koniec skali płynności przesuwa jakość tańca: rudy żar -> złoto.
+    // Bez jakości (null) ciepły koniec to dawny bursztyn - aura jak przed zmianą.
+    const z = Number.isFinite(zar) ? Math.max(0, Math.min(1, zar)) : null;
+    const ciepla = z === null ? BARWA_PLYNNA : {
+        h: BARWA_ZARU_NISKA.h + (BARWA_ZARU_WYSOKA.h - BARWA_ZARU_NISKA.h) * z,
+        s: BARWA_ZARU_NISKA.s + (BARWA_ZARU_WYSOKA.s - BARWA_ZARU_NISKA.s) * z
+    };
     const normalna = {
-        h: BARWA_SZARPANA.h + (BARWA_PLYNNA.h - BARWA_SZARPANA.h) * t,
-        s: BARWA_SZARPANA.s + (BARWA_PLYNNA.s - BARWA_SZARPANA.s) * t
+        h: BARWA_SZARPANA.h + (ciepla.h - BARWA_SZARPANA.h) * t,
+        s: BARWA_SZARPANA.s + (ciepla.s - BARWA_SZARPANA.s) * t
     };
     if (!tecza || !tecza.aktywna) return normalna;
 
@@ -107,7 +134,11 @@ export class Aura {
         this._moc = 0;
         this._impuls = 0;
         this._plynnosc = 1;
+        this._zar = 0;
+        this._zarZnany = false; // czy kiedykolwiek przyszła jakość - bez niej barwa jak dawniej
         this._faza = 0;
+        this._fazaTetna = 0;
+        this._czestTetna = 1 / OKRES_TETNA_S;
     }
 
     /** Pieczęć się złożyła - aura wylewa się w efekt i wraca. */
@@ -124,8 +155,10 @@ export class Aura {
      * @param {number} plynnosc  0..1
      * @param {object} fit   z computeCoverFit() - TA SAMA transformacja co wideo
      * @param {number} dt
+     * @param {number|null} [bogactwo]  0..1 z JakoscTanca.zar (bogactwo z kotwic: machanie 0, dobry taniec 1); null = bez żaru
+     * @param {number|null} [rytmHz]    częstotliwość tańca z JakoscTanca (null = rytm niepewny)
      */
-    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null) {
+    updateAndDraw(maska, szer, wys, moc, plynnosc, fit, dt, tecza = null, bogactwo = null, rytmHz = null) {
         // Jedyny moduł VFX bez WŁASNEGO clampu na dt (P2, 2026-09-21) -
         // main.js:387 klamruje u źródła do 0.1 s, ale test-aura-impuls.mjs
         // i przyszli wywołujący mogą podać dt wprost, więc lokalna osłona
@@ -136,8 +169,18 @@ export class Aura {
         const a = Math.min(1, krok / TAU_WYGLADZANIA);
         this._moc += a * ((Number.isFinite(moc) ? moc : 0) - this._moc);
         this._plynnosc += a * ((Number.isFinite(plynnosc) ? plynnosc : 1) - this._plynnosc);
+        this._zar += a * ((Number.isFinite(bogactwo) ? Math.max(0, Math.min(1, bogactwo)) : 0) - this._zar);
+        if (Number.isFinite(bogactwo)) this._zarZnany = true;
 
         this._faza = (this._faza + krok / OKRES_TETNA_S) % 1;
+        // Tempo tętna: oddech -> szybciej z żarem; pewny rytm tańca wygrywa,
+        // ale tylko w miarę żaru (słaby taniec w rytmie dalej oddycha spokojnie).
+        const bezRytmu = 1 / OKRES_TETNA_S + (TETNO_ZARU_HZ - 1 / OKRES_TETNA_S) * this._zar;
+        const cel = Number.isFinite(rytmHz) && rytmHz > 0
+            ? bezRytmu + (Math.max(TETNO_RYTMU_HZ[0], Math.min(TETNO_RYTMU_HZ[1], rytmHz)) - bezRytmu) * this._zar
+            : bezRytmu;
+        this._czestTetna += Math.min(1, krok / TAU_TETNA_S) * (cel - this._czestTetna);
+        this._fazaTetna = (this._fazaTetna + krok * this._czestTetna) % 1;
 
         // Rozpad MUSI być przed wczesnym powrotem niżej - inaczej impuls
         // zamarza, gdy maski chwilowo nie ma, i wraca jako przebłysk.
@@ -180,17 +223,17 @@ export class Aura {
 
         // Tętno: płynny ruch oddycha spokojnie, szarpany drży szybciej i nierówno.
         const drzenie = 1 - this._plynnosc;
-        const tetnoWolne = Math.sin(this._faza * Math.PI * 2);
+        const tetnoWolne = Math.sin(this._fazaTetna * Math.PI * 2);
         const tetnoSzybkie = Math.sin(this._faza * Math.PI * 2 * 5.5);
-        const tetno = 1 + GLEBIA_TETNA * (tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie);
+        const tetno = 1 + GLEBIA_TETNA * ((1 + GLEBIA_ZARU * this._zar) * tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie);
 
-        const { h, s } = barwaAury(this._plynnosc, tecza);
+        const { h, s } = barwaAury(this._plynnosc, tecza, this._zarZnany ? this._zar : null);
         const ctx = this.ctx;
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
-        const jasnosc = 40 + mocEfektywna * 18;
+        const jasnosc = 40 + mocEfektywna * 18 + JASNOSC_ZARU * this._zar;
         const kolor = `hsl(${h}, ${s}%, ${jasnosc}%)`;
         const pc = this._pracaCtx;
         const pw = this._praca.width, ph = this._praca.height;
@@ -249,7 +292,8 @@ export class Aura {
             // przez zwykłe drawImage(0, 0, canvas.width, canvas.height)
             // rozciągnęłoby ją na całe płótno i aura usiadłaby OBOK ciała -
             // subtelnie przy 16:9, fatalnie przy każdym innym kształcie okna.
-            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * mocEfektywna * tetno));
+            const zar = p.wytnijWnetrze ? 1 + ZAR_OBRYSU * this._zar : 1;
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.alfa * mocEfektywna * tetno * zar));
             ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
         }
 
@@ -263,7 +307,7 @@ export class Aura {
         pc.fillStyle = kolor;
         pc.fillRect(0, 0, pw, ph);
         pc.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * mocEfektywna * tetno));
+        ctx.globalAlpha = Math.max(0, Math.min(1, ALFA_WNETRZA * (1 + ZAR_WNETRZA * this._zar) * mocEfektywna * tetno));
         ctx.drawImage(this._praca, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
 
         ctx.globalAlpha = 1;

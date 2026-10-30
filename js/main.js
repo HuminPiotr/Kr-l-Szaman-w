@@ -4,6 +4,8 @@ import { AudioEngine } from './audioEngine.js';
 import { DebugHud } from './debugHud.js';
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
+import { JakoscTanca } from './jakoscTanca.js';
+import { BlaskTanca } from './blaskTanca.js';
 import { Aura } from './aura.js';
 import { ZnakRegistry } from './znaki/registry.js';
 import { swarogDlon } from './znaki/swarogDlon.js';
@@ -147,6 +149,8 @@ let audioEngine = new AudioEngine();
 let debugHud = new DebugHud();
 let motionMeter = new MotionMeter();
 let plynnoscMiara = new Plynnosc();
+let jakoscTanca = new JakoscTanca();
+let blaskTanca = new BlaskTanca();
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -562,7 +566,7 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
@@ -778,11 +782,14 @@ function klatka(now) {
     // ma zawierać SUROWE landmarki, niezależne od tego, jak gra je dziś czyta.
     debugHud.aktualizujSesje(frame, dt);
 
-    // --- 4. Płynność ruchu ---
-    // Liczona z SUROWYCH worldLandmarks - filtr Savitzky'ego-Golaya robi
-    // własne wygładzanie. Podanie tu pozycji już wygładzonych przez
-    // MotionMeter zabiłoby sygnał, którego szukamy.
-    const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt);
+    // --- 4. Jakość tańca i płynność ruchu ---
+    // Jakość PRZED płynnością: płynność skaluje próg szarpnięcia częstotliwością
+    // ruchu z okresu (js/jakosc/okres.js) - szybki, gładki taniec nie traci.
+    // Obie liczone z SUROWYCH landmarków - filtry robią własne wygładzanie.
+    // Podanie tu pozycji już wygładzonych przez MotionMeter zabiłoby sygnał,
+    // którego szukamy.
+    const mnoznikBogactwa = jakoscTanca.update(frame, dt);
+    const plynnosc = plynnoscMiara.update(frame.pose?.worldLandmarks ?? null, dt, jakoscTanca.czestotliwoscHz);
 
     // --- 4a. Skala ciała ---
     // RAZ NA KLATKĘ, PRZED znaki.ocen() - pięć znaków dzieli jedną wygładzoną
@@ -815,8 +822,8 @@ function klatka(now) {
     }
     const skl = skladanie.update(postawy, motionMeter.moc, dt);
 
-    // --- 6. Ciągłość ruchu razy płynność -> moc ---
-    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik);
+    // --- 6. Ciągłość ruchu × płynność × jakość tańca -> moc ---
+    const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa);
 
     // Jajo z nickiem-bogiem i koronacja za nowy rekord (Kronika): odpalane tu, bo dopiero
     // w tym miejscu klatki istnieje `frame` (zaczep efektów). Koronacja ostatnia - złoto wygrywa z zapłonem jaja.
@@ -866,7 +873,9 @@ function klatka(now) {
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
-                       moc, plynnosc, fit, dt, tecza);
+                       moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz);
+    // Miękkie ciepło tańczących partii - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
+    blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
 
     // --- 7a0. Zapłon sylwetki (Kierunek A) ---
     // TA SAMA maska co aura, zero kosztu dodatkowego liczenia - patrz
@@ -1105,7 +1114,7 @@ function klatka(now) {
     // --- 7d. Pasek sekwencji (js/sekwencja.js) ---
     // PULL z bufora kombosów co klatkę - ten sam wzorzec co zarzewia dymu.
     sekwencja.update(now, kombosy.aktywne(now), skl.skladana, skl.postep);
-    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt);
+    punkty.taniec(plynnosc, motionMeter.responsywnosc, dt, mnoznikBogactwa);
     punkty.zaklinanie(dodola.pada ? dodola.natezenie : 0, dt);
     wynikHud.update(punkty, now, canvas.width, canvas.height);
     odkryciaHud.update(now);
@@ -1197,6 +1206,15 @@ function klatka(now) {
         oknoKlatek: plynnoscMiara._polOkna * 2 + 1,
         dt,
         wspPlynnosci: motionMeter.wspolczynnikPlynnosci,
+        jakosc: {
+            bogactwo: jakoscTanca.bogactwo, mnoznik: jakoscTanca.mnoznik,
+            skladowe: jakoscTanca.skladowe,
+            aktywnosci: jakoscTanca.zaangazowanieMiara.aktywnosci,
+            fala: jakoscTanca.falaMiara.diagnostyka,
+            okresS: jakoscTanca.okres.okresS, pewnosc: jakoscTanca.okres.pewnosc,
+            skalaProgu: plynnoscMiara.skalaProgu,
+            tempoLadowania: motionMeter.tempoLadowania
+        },
         maska: maskaDane ? `${maskaSzer}x${maskaWys}` : 'brak',
         dlonie: opiszDlonie(frame),
         postawy,

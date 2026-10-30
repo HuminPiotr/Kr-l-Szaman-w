@@ -27,6 +27,11 @@ export const TRUDNOSC = { mokosz: 1.0, weles: 1.0, perun: 1.2, stribog: 1.4, swa
 // samego tańca (~500) to mniej więcej dwie techniki - ktoś, komu nie
 // wychodzą pieczęcie, dalej punktuje, ale combo wyraźnie się opłaca.
 export const PUNKTY_TANCA_NA_S = 4;
+// Punkty reagują na jakość tańca MOCNIEJ niż ładowanie many: mnożnik do potęgi.
+// Decyzja właściciela 2026-10-30 - taniec ma być generatorem many, ale dobry taniec
+// ma być widać w wyniku. Przy 2: machanie x0.67 -> x0.45 (~1.2 pkt/s), dobry taniec
+// x1.5 -> x2.25 (~6.8 pkt/s), x1.0 bez zmian. ZGADNIĘTE - stroić po grze.
+export const WYKLADNIK_JAKOSCI_PUNKTOW = 2;
 export const PUNKTY_PIECZECI = 25;
 export const BAZA_TECHNIKI = 100;
 export const SPADEK_POWTORZENIA = 0.25;   // ta sama technika pod rząd: -25% za każde powtórzenie
@@ -182,10 +187,17 @@ export class Punktacja {
         return Number.isFinite(m) && m >= 1 ? m : 1;
     }
 
-    taniec(plynnosc, responsywnosc, dt) {
+    /**
+     * Strumień za taniec. `mnoznik` = mnożnik jakości tańca (js/jakoscTanca.js, 0.67..1.5) -
+     * te same kotwice co tempo ładowania, ale podniesiony do WYKLADNIK_JAKOSCI_PUNKTOW.
+     * Przycięty do [0, 2] przed potęgą, NIE do 1; domyślnie 1 = zmierzony balans sprzed
+     * 2026-10-14 (Kronika, Kamienie Pamięci).
+     */
+    taniec(plynnosc, responsywnosc, dt, mnoznik = 1) {
         if (!this.aktywna || !Number.isFinite(dt) || dt <= 0) return 0;
+        const m = Math.pow(Number.isFinite(mnoznik) ? Math.max(0, Math.min(2, mnoznik)) : 1, WYKLADNIK_JAKOSCI_PUNKTOW);
         return this._dodaj('taniec',
-            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * Math.min(dt, MAX_DT_TANCA_S));
+            PUNKTY_TANCA_NA_S * clamp01(plynnosc) * clamp01(responsywnosc) * m * Math.min(dt, MAX_DT_TANCA_S));
     }
 
     /** Strumień za natężenie zaklinania (0..1) - warstwa technik, nie tańca. */

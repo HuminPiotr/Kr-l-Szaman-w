@@ -6,7 +6,7 @@
  * Spec: docs/superpowers/specs/2026-10-01-punktacja-design.md
  */
 import {
-    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie
+    Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie, WYKLADNIK_JAKOSCI_PUNKTOW
 } from '../js/punkty.js';
 import { KOMBOSY } from '../js/kombosy.js';
 
@@ -267,6 +267,28 @@ console.log('\nWSPÓLNA REGUŁA SPLECENIA (Pamięć Plemienia też jej używa):'
     spr('nie nakłada się bez wspólnej', ogonyNakladajaSie(ogon, new Set([1])) === false);
     spr('brak poprzedniego = brak nakładania', ogonyNakladajaSie(ogon, null) === false && ogonyNakladajaSie(ogon, undefined) === false);
     spr('n większe niż historia = cała historia', ogonPieczeci(h, 10).size === 4);
+}
+
+console.log('\nMNOŻNIK JAKOŚCI TAŃCA (2026-10-14):');
+{
+    const a = new Punktacja(), b = new Punktacja(), c = new Punktacja(), d = new Punktacja();
+    a.taniec(0.8, 0.9, 0.05);
+    b.taniec(0.8, 0.9, 0.05, 1);
+    c.taniec(0.8, 0.9, 0.05, 1.33);
+    d.taniec(0.8, 0.9, 0.05, NaN);
+    spr('bez mnożnika = mnożnik 1 (zmierzony balans Kroniki zostaje)', a.wynik === b.wynik);
+    spr('mnożnik 1.33 NIE jest przycinany do 1 (i idzie do potęgi)', Math.abs(c.wynik / a.wynik - Math.pow(1.33, WYKLADNIK_JAKOSCI_PUNKTOW)) < 1e-9);
+    // Decyzja 2026-10-30: punkty reagują na jakość mocniej niż ładowanie many.
+    const machanie = new Punktacja(), dobry = new Punktacja();
+    machanie.taniec(0.8, 0.9, 0.05, 0.67);
+    dobry.taniec(0.8, 0.9, 0.05, 1.5);
+    spr('machanie (x0.67) daje mniej niż liniowo', machanie.wynik < a.wynik * 0.67);
+    spr('dobry taniec (x1.5) daje więcej niż liniowo', dobry.wynik > a.wynik * 1.5);
+    spr('dobry taniec >= 4x machanie', dobry.wynik >= 4 * machanie.wynik);
+    spr('NaN = 1', d.wynik === a.wynik);
+    const e = new Punktacja();
+    e.taniec(0.8, 0.9, 0.05, -1);
+    spr('ujemny mnożnik nie odejmuje punktów', e.wynik === 0);
 }
 
 process.exit(ok ? 0 : 1);

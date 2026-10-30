@@ -162,4 +162,26 @@ console.log('\nCLAMP DT (P2, 2026-09-21 - jedyny moduł bez WŁASNEGO clampu):')
     spr('ujemne dt traktowane jak 0, bez wyjątku', Number.isFinite(a11._moc));
 }
 
+console.log('\nJAKOŚĆ TAŃCA W AURZE (2026-10-30) - barwa żaru i tętno:');
+{
+    const slaby = barwaAury(1, null, 0), dobry = barwaAury(1, null, 1), bez = barwaAury(1, null, null);
+    spr(`słaby taniec -> rudy żar (h=${slaby.h.toFixed(0)}), dobry -> złoto (h=${dobry.h.toFixed(0)})`, slaby.h < 30 && dobry.h > 40);
+    spr(`bez jakości (null) -> dawny bursztyn (h=${bez.h.toFixed(0)})`, Math.abs(bez.h - 35) < 1);
+    spr('szarpany ruch dalej fioletowy, żar go nie zmienia', Math.abs(barwaAury(0, null, 1).h - 265) < 1);
+    const tetno = (bogactwo, rytm) => {
+        const a = nowa();
+        for (let i = 0; i < 15 / DT; i++) a.updateAndDraw(null, 0, 0, 0.5, 1, fit, DT, null, bogactwo, rytm);
+        return a._czestTetna;
+    };
+    const oddech = tetno(0, null), zywe = tetno(1, null), wRytmie = tetno(1, 1.2), slabyWRytmie = tetno(0, 1.2);
+    console.log(`  tętno: słaby ${oddech.toFixed(2)} Hz, dobry ${zywe.toFixed(2)} Hz, dobry w rytmie 1.2 Hz -> ${wRytmie.toFixed(2)} Hz`);
+    spr('słaby taniec oddycha spokojnie (~1/3.6 Hz)', Math.abs(oddech - 1 / 3.6) < 0.02);
+    spr('dobry taniec pulsuje szybciej', zywe > oddech + 0.3);
+    spr('dobry taniec z pewnym rytmem pulsuje w rytmie', Math.abs(wRytmie - 1.2) < 0.05);
+    spr('słaby taniec w rytmie dalej oddycha spokojnie', Math.abs(slabyWRytmie - oddech) < 0.02);
+    const z = nowa();
+    z.updateAndDraw(null, 0, 0, 0.5, 1, fit, DT, null, NaN, NaN);
+    spr('NaN w jakości/rytmie nie zatruwa tętna', Number.isFinite(z._czestTetna) && Number.isFinite(z._fazaTetna));
+}
+
 process.exit(ok ? 0 : 1);

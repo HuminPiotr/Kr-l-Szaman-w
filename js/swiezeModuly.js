@@ -17,6 +17,7 @@
  */
 import { MotionMeter } from './motionMeter.js';
 import { Plynnosc } from './plynnosc.js';
+import { JakoscTanca } from './jakoscTanca.js';
 import { SkladaniePieczeci } from './pieczecie.js';
 import { KomboSilnik } from './kombosy.js';
 import { Efekty } from './efekty.js';
@@ -47,10 +48,11 @@ import { Dodola } from './deszcz.js';
 import { FalaMokoszy } from './falaMokoszy.js';
 import { Kruki } from './kruki.js';
 import { ReakcjeTechnik } from './reakcjeTechnik.js';
+import { BlaskTanca } from './blaskTanca.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
-    'motionMeter', 'plynnoscMiara', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
+    'motionMeter', 'plynnoscMiara', 'jakoscTanca', 'blaskTanca', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
     'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy', 'kruki', 'reakcjeTechnik'
 ];
@@ -65,6 +67,8 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
     return {
         motionMeter: new MotionMeter(),
         plynnoscMiara: new Plynnosc(),
+        jakoscTanca: new JakoscTanca(),
+        blaskTanca: new BlaskTanca(),
         skladanie: new SkladaniePieczeci(),
         kombosy: new KomboSilnik(),
         efekty: new Efekty(),

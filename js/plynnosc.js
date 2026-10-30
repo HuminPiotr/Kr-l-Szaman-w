@@ -40,6 +40,8 @@
  * tools/test-plynnosc.mjs pilnuje wszystkich pięciu pułapek powyżej.
  */
 
+import { pochodneSG } from './jakosc/pochodne.js';
+
 // Okno filtra podane w SEKUNDACH, nie w klatkach. Przy spadku FPS okno liczone
 // w klatkach zmieniłoby swoją długość w czasie i miara przestałaby znaczyć to samo.
 const OKNO_S = 0.09;           // połowa okna; +-0.09 s = +-5 klatek przy 60 FPS
@@ -72,6 +74,16 @@ const MAX_DT = 0.06;           // s (~17 FPS)
 // Tancerz robiący dokładnie to, o co prosimy, nie może widzieć "prawie źle".
 const PROG_SZARPNIECIA = 60;   // [1/s] -> płynność 0
 
+// Szarpnięcie rośnie LINIOWO z częstotliwością ruchu (v ~ Aω, a_t ~ Aω²), więc
+// PROG_SZARPNIECIA (dobrany przy ~1 Hz) karał szybki, gładki taniec. Gdy okres
+// ruchu jest pewny (js/jakosc/okres.js), próg skaluje się o f / 1 Hz, przycięte
+// do [1, 2]. Skalujemy TYLKO W GÓRĘ: dla wolnego ruchu (< 1 Hz) obniżony próg
+// zamieniałby szum śledzenia (który nie zależy od tempa) w "szarpnięcie" i karał
+// wolny taniec, a nic nie ma ładować wolniej tylko dlatego, że jest wolne.
+// Bez częstotliwości - skala 1, czyli zachowanie sprzed 2026-10-14.
+const CZESTOTLIWOSC_ODNIESIENIA_HZ = 1.0;
+const SKALA_PROGU_MIN = 1.0, SKALA_PROGU_MAX = 2.0;
+
 const TAU_WYGLADZANIA = 0.6;   // s - płynność ma się zmieniać spokojnie, nie migotać
 const TAU_POWROTU = 2.0;       // s - powrót do pełnej płynności, gdy nie ma czego mierzyć
 const TAU_SREDNIEJ_V = 0.4;    // s - okno średniej prędkości stawu (decyduje, czy staw głosuje)
@@ -85,6 +97,7 @@ export class Plynnosc {
         this.szarpniecie = 0;     // [1/s] surowe - do strojenia progu
         this.aktywnychStawow = 0; // ile stawów głosowało w tej klatce
         this.zaWolno = false;     // klatkaż za niski, żeby uczciwie mierzyć
+        this.skalaProgu = 1;      // mnożnik PROG_SZARPNIECIA z częstotliwości ruchu
 
         this._historia = SLEDZONE_PUNKTY.map(() => []);
         this._srednieV = SLEDZONE_PUNKTY.map(() => 0);
@@ -102,9 +115,14 @@ export class Plynnosc {
     /**
      * @param {Array} worldLandmarks  metryczne 3D z MediaPipe (może być null)
      * @param {number} dt             krok czasu [s]
+     * @param {number|null} [czestotliwoscHz]  dominująca częstotliwość ruchu (JakoscTanca); null = bez skalowania
      * @returns {number} płynność 0..1
      */
-    update(worldLandmarks, dt) {
+    update(worldLandmarks, dt, czestotliwoscHz = null) {
+        this.skalaProgu = Number.isFinite(czestotliwoscHz) && czestotliwoscHz > 0
+            ? Math.max(SKALA_PROGU_MIN, Math.min(SKALA_PROGU_MAX, czestotliwoscHz / CZESTOTLIWOSC_ODNIESIENIA_HZ))
+            : 1;
+
         if (!worldLandmarks || dt <= 0) {
             this.aktywnychStawow = 0;
             this.zaWolno = false;
@@ -204,7 +222,7 @@ export class Plynnosc {
         const s = rmsStycznego / (sredniaPredkosc + 1e-6);
         if (Number.isFinite(s)) this.szarpniecie = s;
 
-        const cel = 1 - Math.min(1, Math.max(0, this.szarpniecie / PROG_SZARPNIECIA));
+        const cel = 1 - Math.min(1, Math.max(0, this.szarpniecie / (PROG_SZARPNIECIA * this.skalaProgu)));
         this.plynnosc = Number.isFinite(cel) ? cel : this.plynnosc;
 
         return this.plynnosc;
@@ -217,28 +235,10 @@ export class Plynnosc {
      * różniczkowaniu - przy drugiej pochodnej to 3600x przy 60 FPS.
      * Dopasowanie wielomianu do całego okna wykorzystuje wszystkie próbki
      * i tłumi szum nieskorelowany zamiast go wzmacniać.
+     * Implementacja we wspólnym js/jakosc/pochodne.js (używa jej też jakość tańca).
      */
     _pochodneSG(hist, dt) {
-        const pol = (hist.length - 1) / 2;
-        let n = 0, k2 = 0, k4 = 0;
-        let s0x = 0, s0y = 0, s1x = 0, s1y = 0, s2x = 0, s2y = 0;
-
-        for (let j = 0; j < hist.length; j++) {
-            const k = j - pol;
-            const y = hist[j];
-            n++; k2 += k * k; k4 += k * k * k * k;
-            s0x += y.x;         s0y += y.y;
-            s1x += k * y.x;     s1y += k * y.y;
-            s2x += k * k * y.x; s2y += k * k * y.y;
-        }
-
-        const mian = n * k4 - k2 * k2;
-        return {
-            vx: s1x / k2 / dt,
-            vy: s1y / k2 / dt,
-            ax: 2 * (n * s2x - k2 * s0x) / mian / (dt * dt),
-            ay: 2 * (n * s2y - k2 * s0y) / mian / (dt * dt)
-        };
+        return pochodneSG(hist, dt);
     }
 
     _zdrowy(p) {

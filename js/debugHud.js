@@ -2,7 +2,7 @@
  * Nakładka diagnostyczna. Przełącznik: klawisz D. Reset zakresu v: R.
  * Zrzut śladu runy do konsoli (Krok 0b, spec run): klawisz N.
  * Sesja nagraniowa (spec pięciu pieczęci): klawisz Z (od kroku 1) albo
- * cyfra 1-8 (od wybranego kroku), Escape przerywa.
+ * cyfra 1-8 (od wybranego kroku), Escape przerywa. J - scenariusz jakości tańca.
  *
  * Nie ma tu testów jednostkowych do napisania - wejściem jest strumień z kamery,
  * a wyjściem wrażenie wzrokowe. Ta nakładka JEST narzędziem weryfikacji.
@@ -11,10 +11,11 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
-import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE } from './nagrywanie/sesja.js';
+import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC } from './nagrywanie/sesja.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
 import { czyPoleTekstowe } from './klawisze.js';
+import { PARTIE } from './jakosc/zaangazowanie.js';
 const PANEL_ID = 'debug-hud';
 const UPDATE_HZ = 10; // DOM aktualizowany 10x/s, nie 60x/s - zapis do DOM w pętli klatek to marnotrawstwo
 
@@ -43,7 +44,7 @@ export class DebugHud {
         this._lastEkranSesjiUpdate = 0;
 
         window.addEventListener('keydown', (e) => {
-            // Pisanie nicku w menu nie może odpalać skrótów debug (D/R/N/Z/1-8) - patrz js/klawisze.js.
+            // Pisanie nicku w menu nie może odpalać skrótów debug (D/R/N/Z/F/J/1-8) - patrz js/klawisze.js.
             if (czyPoleTekstowe(e.target)) return;
             if (e.key === 'd' || e.key === 'D') this.toggle();
             if (e.key === 'r' || e.key === 'R') this.resetujZakres();
@@ -60,6 +61,8 @@ export class DebugHud {
             if (/^[1-8]$/.test(e.key)) this._startSesji(Number(e.key));
             // F: scenariusz falowania ramion (miara falistości) - zawsze od kroku 1.
             if (e.key === 'f' || e.key === 'F') this._startSesji(1, SCENARIUSZ_FALOWANIE);
+            // J: scenariusz jakości tańca (tools/pomiar-jakosci.mjs) - zawsze od kroku 1.
+            if (e.key === 'j' || e.key === 'J') this._startSesji(1, SCENARIUSZ_JAKOSC);
             if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
     }
@@ -376,6 +379,27 @@ export class DebugHud {
                 lines.push(`      okno ${stats.oknoKlatek} kl. = ${(stats.oknoKlatek * stats.dt * 1000).toFixed(0)} ms`);
             }
             lines.push(`      tempo ładowania x${this._num(stats.wspPlynnosci)}`);
+        }
+
+        // Jakość tańca (2026-10-14): składowe bogactwa i mnożnik tempa ładowania.
+        // Wagi, kotwice i progi partii są ZGADNIĘTE - stroić stąd i z
+        // tools/pomiar-jakosci.mjs (sesja J). "—" = brak danych (neutralnie, nie zero).
+        const jq = stats.jakosc;
+        if (jq) {
+            const n = (v) => (v === null || v === undefined ? '  — ' : this._num(v));
+            const SKROT = { rekaL: 'rL', rekaP: 'rP', nogaL: 'nL', nogaP: 'nP', biodra: 'bi', tulow: 'tu', glowa: 'gł' };
+            lines.push(`jakość ${this._num(jq.bogactwo)}   ${this._bar(jq.bogactwo)}   tempo ×${this._num(jq.mnoznik)}`);
+            lines.push(`      krążenie ${n(jq.skladowe?.krazenie)}  zaang. ${n(jq.skladowe?.zaangazowanie)}  fala ${n(jq.skladowe?.fala)}`);
+            lines.push(`      partie ${PARTIE.map(p => `${SKROT[p]} ${this._num(jq.aktywnosci?.[p] ?? 0)}`).join(' ')}`);
+            const fd = jq.fala;
+            lines.push(fd?.lancuch
+                ? `      fala ${fd.lancuch}: opóźn. ${(fd.opoznienieUlamek * 100).toFixed(0)}% cyklu, kor ${this._num(fd.korelacja)}`
+                : '      fala: — (brak okresu albo amplitudy)');
+            const bpm = jq.okresS > 0 ? (60 / jq.okresS).toFixed(0) : '—';
+            lines.push(`      okres ${this._num(jq.okresS)} s = ${bpm} ruchów/min  pewność ${this._num(jq.pewnosc)}  próg płynn. ×${this._num(jq.skalaProgu)}`);
+            lines.push(jq.tempoLadowania > 0
+                ? `      pełny pasek za ~${(1 / jq.tempoLadowania).toFixed(1)} s przy tym tańcu`
+                : '      pełny pasek: — (nie ładuje)');
         }
 
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);

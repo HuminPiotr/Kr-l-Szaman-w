@@ -33,13 +33,14 @@ Front-end only, HTML + CSS + JavaScript (Vanilla, moduły ES). Bez backendu i ba
 ```
 kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────────────────┐
                       │                                              ├→ MotionMeter → moc → Aura + HUD
+                      ├→ JakoscTanca (okres, krążenie, zaangażowanie, fala) → mnożnik → MotionMeter
                       ├→ worldLandmarks(15/16) → Ślad run ──┐         │
                       └→ maska sylwetki ─────────────────── │ ───────┴→ Aura
        HandTracker ───→ landmarks → kwalifikator + Swaróg ──┤
                                                              ├→ ZnakRegistry → Pieczęcie → Kombosy → Efekty
 ```
 
-**Tańczysz płynnie → moc rośnie → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
+**Tańczysz płynnie → moc rośnie (tempo ładowania × jakość tańca 0.67..1.5) → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
 
 ### Kontrakt klatki
 
@@ -61,8 +62,15 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/handTracker.js` | wrapper MediaPipe Hands (`numHands: 2`) |
 | `js/frameMapper.js` | cover-fit + mapowanie punktów na płótno |
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
-| `js/motionMeter.js` | ciągłość ruchu × płynność → moc |
-| `js/aura.js` | maska sylwetki → poświata |
+| `js/motionMeter.js` | ciągłość ruchu × płynność → moc; tempo ładowania × mnożnik jakości tańca (0.67..1.5, domyślnie 1.0) |
+| `js/jakoscTanca.js` | jakość tańca (2026-10-14, etap 1 z 4 „gra rozumie muzykę”): krążenie + zaangażowanie + fala → bogactwo 0..1 → mnożnik tempa ładowania 0.67..1.5, dwa odcinki przez (neutralne, 1.0); brak danych → 1.0, a brakująca składowa liczy się jak wartość neutralna (nie jest pomijana z renormalizacją wag). Kotwice ZMIERZONE na sesji J 2026-10-30 (`tools/probki/probki-2026-10-30-10-58-19.json`): NISKA 0.40 (pompowanie), WYSOKA 0.60 (zwykły taniec całym ciałem właściciela, nie ideał). Wynik: pompowanie i łuki prostych rąk ×0.67–0.94 (pełny pasek 14–43 s), taniec całym ciałem / szybko ×1.36–1.5 (7–11 s), kręgi ×1.1–1.5. Zakres 1.33 → 1.5, bo przy 1.33 wolny taniec ładował się dłużej niż exploit łuków. Ograniczenie: krok „fala ciała” właściciela nie jest rozpoznawany przez łańcuchy rąk (opóźnienie ≈0 lub odwrotne) i ma niską prędkość kończyn, więc ładuje się wolno (19–33 s) |
+| `js/jakosc/okres.js` | dominujący okres ruchu z autokorelacji POZYCJI (nie moduł prędkości — ten daje pół okresu, a dla okręgu nie ma szczytu); krótkie przerwy (≤ 0.2 s) interpoluje; okno 8 s i okres do 4 s (przy 4 s / 2.5 s wolne łuki i fala miały pewność 0); swobodny taniec rzadko daje pewność ≥ 0.4, pompowanie ~0.9; gniazdo „pulsu tańca” etapu 2 |
+| `js/jakosc/krazenie.js` | „łuki zamiast linii” jako brak NAWROTÓW toru (pierwszy powrót w to samo miejsce: ten sam kierunek = krąg, przeciwny = wahadło); przerwy ≤ 0.2 s nie kasują okna |
+| `js/jakosc/zaangazowanie.js`, `js/jakosc/cialo2d.js` | 7 partii ciała, biodra z 2D w pikselach ÷ szerokość barków |
+| `js/jakosc/fala.js` | fala przez ciało, opóźnienie jako UŁAMEK cyklu (niezależne od tempa); przy niepewnym okresie wyjście awaryjne: ułamek z `T_ZASTEPCZY_S` 1.5 s (czyli opóźnienie w sekundach), a nie null; przerwy ≤ 0.2 s nie kasują okna |
+| `js/jakosc/pochodne.js` | wspólne: filtr SG, korelacja z opóźnieniem |
+| `js/blaskTanca.js` | miękkie, ledwie widoczne ciepło tańczących partii; bieg fali (kreska po stawach) usunięty 2026-10-30 jako za nachalny |
+| `js/aura.js` | maska sylwetki → poświata; jakość tańca (`JakoscTanca.zar`, bogactwo z kotwic 0..1) = barwa rudy żar → złoto + tętno od oddechu 3.6 s do 0.8 Hz, w rytmie tańca przy pewnym okresie (2026-10-30, ZGADNIĘTE) |
 | `js/audioEngine.js` | CIENKA magistrala audio, bez syntezy: `masterGain` → kompresor → `destination`, wyciszenie (klawisz M, trwałe w `localStorage`) i `podlaczPiesn`. **Gra nie ma efektów dźwiękowych (decyzja 2026-10-01) - jedyny dźwięk to pieśni rund** (`js/piesni.js`) **i JEDEN świadomy wyjątek: Grzmot (2026-10-08, życzenie właściciela) - `js/dzwiekGrzmotu.js`, synteza trzasku i dudnienia przez `audioEngine.magistrala()`, wyciszany klawiszem M**. `tools/test-brak-efektow-dzwiekowych.mjs` pilnuje, żeby synteza i stary interfejs (`graj*`/`play*SFX`/`ustaw*`) nie wróciły; wyjątek: osobny AudioContext w `debugHud.js` (sygnały sesji nagraniowej dewelopera) |
 | `js/debugHud.js` | nakładka (`D` = pokaż, `R` = reset zakresu, `N` = zrzuć ślad runy do konsoli) |
 | `js/znaki/registry.js` | rejestr znaków; `score(frame)` → 0..1, nigdy boolean |
@@ -98,7 +106,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/glify.js` | Król Szamanów (2026-09-14): mapa pięciu pieczęci na runy Elder Futharku (`Noto Sans Runic`), ładowanie fontu (`document.fonts`, nigdy nie odrzuca - brak fontu nie jest błędem), lista glifów ZAKAZANYCH (symbole zawłaszczone politycznie, patrz §7) |
 | `js/runa.js` | Wielka runa przy dłoniach - zastępuje dawną animację pierścienia przy KAŻDEJ złożonej pieczęci (jedyny ślad okręgu: bardzo słaby pierścień, wyłącznie w fazie narodzin). Trzy fazy (narodziny/żar/rozsypanie), iskry rozsypania startują z PIKSELI SAMEGO GLIFU (rasteryzacja na offscreen canvas, cache per znak) |
 | `js/sekwencja.js` | Pasek sekwencji u dołu ekranu (DOM, nie płótno - lustro i webfont-na-canvasie to oba powody). Czyta `KomboSilnik.aktywne(now)` co klatkę (PULL, bufor NIGDY nie jest czyszczony), sloty gasną z wiekiem (`alfaSlotu`), combo "wiąże" ogon bufora złotą poświatą po znaczniku czasu, nie po pozycji |
-| `js/punkty.js` | Punktacja (2026-10-01): cztery warstwy (taniec / pieczęć / technika / reakcje), wartość techniki = 100 × suma `TRUDNOSC` pieczęci (z ZMIERZONEJ rozpoznawalności), malejący przyrost za powtarzanie, rejestr `REAKCJE` (Pożoga, Rozwianie - serie z logarytmicznym przyrostem), splecenie po NAKŁADANIU OGONÓW (nie po czasie). Czysta logika; `tools/test-punkty.mjs` jest strażnikiem: nowe combo bez wpisu w `TRUDNOSC` albo reakcja wołana z main.js bez wpisu w `REAKCJE` = czerwony test |
+| `js/punkty.js` | Punktacja (2026-10-01): cztery warstwy (taniec / pieczęć / technika / reakcje), wartość techniki = 100 × suma `TRUDNOSC` pieczęci (z ZMIERZONEJ rozpoznawalności), malejący przyrost za powtarzanie, rejestr `REAKCJE` (Pożoga, Rozwianie - serie z logarytmicznym przyrostem), splecenie po NAKŁADANIU OGONÓW (nie po czasie). Taniec: mnożnik jakości do kwadratu (`WYKLADNIK_JAKOSCI_PUNKTOW`, 2026-10-30) - na sesji J machanie 0.5–2.1 pkt/s, taniec właściciela 3.5–6.3 (kolumna pkt/s w `tools/pomiar-jakosci.mjs`); mana bez zmian. Czysta logika; `tools/test-punkty.mjs` jest strażnikiem: nowe combo bez wpisu w `TRUDNOSC` albo reakcja wołana z main.js bez wpisu w `REAKCJE` = czerwony test |
 | `js/wynikHud.js` | HUD wyniku (DOM): licznik w lewym górnym rogu, linijka serii reakcji, unoszące się „+340 Okadzenie" w miejscu zdarzenia (lustro przeliczone w `pozycjaWLustrze`) |
 | `js/tryby.js` | Silnik rundy (ZAPOWIEDZ→ODLICZANIE→TRWA→WYBRZMIENIE→KONIEC; czas ze SKUMULOWANYCH przyciętych `dt` - zawieszona karta nie przeskakuje rundy; wybrzmienie dopuszcza dopalenie dymu), `Zew` (×2 dla żywiołu: pieczęć i technika, NIE reakcje i taniec - inaczej psuje zmierzony balans), `Krag` (2-6 graczy, dubel dostaje sufiks, podium), `parsujKonfiguracje` (`?tryb=proba&czas=60&zew=1&krag=Ola,Bartek`, `?tryb=obrzed&piesn=0`) |
 | `js/przebieg.js` | Orkiestrator rundy: zdarzenia klatki (`trwa`/`wybrzmienie`/`koniecRundy`), zapis wyniku RAZ, Krąg, Zew. Tryb swobodny nie ma przebiegu (`przebieg === null` w main.js, `punkty.aktywna = false`) |
@@ -129,12 +137,15 @@ Wszystkie **zmierzone**, nie teoretyczne. Nie cofać bez ponownego pomiaru.
 - **Nie przeskalowywać przez `1/alfa`** „dla przywrócenia skali" — to mnoży szum z powrotem i kasuje cały zysk filtra.
 - **Stała czasowa wygładzania musi być dłuższa niż cykl ruchu tanecznego** (~1 s), inaczej moc w każdym takcie rośnie i opada.
 - **Płynność ≠ mało przyspieszenia.** Okrąg kreślony ze stałą prędkością ma duże przyspieszenie dośrodkowe, a jest wzorcem płynności. Liczy się tylko składowa STYCZNA.
+- **Exploit „ręce w górę i w dół” to ŁUK, nie linia.** Prosta ręka kreśli łuk wokół barku z dużym przyspieszeniem normalnym — krzywizna go nagradza. Różnicą jest nawrót po tym samym torze.
+- **Miary jakości muszą być niezależne od tempa** (ułamek cyklu, bezwymiarowe udziały) — szarpnięcie w 1/s rośnie liniowo z częstotliwością i karało szybki gładki taniec.
 - **ŚREDNIA(|a_t|)/ŚREDNIA(|v|) daje ODWROTNY ranking** (gładkie 6,3 vs szarpane 3,7). Oba zmieniają prędkość o tyle samo na sekundę; różni je SKUPIENIE w czasie. Stąd **RMS**, czuły na szczyty: 7,0 vs 21,0.
 - **Zwykłe różniczkowanie dwukrotne nie przeżywa szumu** — rozdział spadał z 3,0× do 1,05×. Stąd **Savitzky-Golay**: pochodne z dopasowania wielomianu w oknie.
 - **Miary czysto geometryczne nie działają** — kołysanie gładkie i szarpane kreślą tę samą prostą, różni je wyłącznie czas zwrotu.
 - **Okna filtrów liczyć w SEKUNDACH, nie klatkach** — przy spadku FPS miara musi znaczyć to samo.
 - **Oś Z z jednej kamery jest zgadywana** — pomijana (`WAGA_Z = 0`).
 - **Jedna klatka z NaN potrafiła zatruć moc na stałe** (`Math.max(0, Math.min(1, NaN))` to nadal NaN).
+- **Opóźnienie fali w KLATKACH nie wystarcza.** Przy 30 FPS jedna klatka to 2,7 % cyklu 0,8 Hz, więc `korelacjaZOpoznieniem` zwraca `lagDokladny` z paraboli dopasowanej do szczytu korelacji (podpróbkowo).
 
 ### Aura i rendering
 
@@ -177,6 +188,7 @@ Stąd `SZEROKOSC_DETEKCJI = 480` w `poseTracker.js`. Aura jest rozmyta, więc ni
 sh tools/test-wszystko.sh    # cała logika bez kamery
 node tools/tune-motion.mjs   # strojenie MotionMeter
 node tools/pomiar-reakcji.mjs # balans punktów za reakcje dymu (Pożoga/Rozwianie, ~15 s)
+node tools/pomiar-jakosci.mjs # jakość tańca na nagraniach (tabela, NIE test - nic nie pada na czerwono)
 ```
 
 Testy **nie zastępują** sprawdzenia na żywym ciele — wejściem gry jest strumień z kamery. Do tego służy nakładka debug (`D`).
@@ -190,7 +202,7 @@ Odniesienie z sygnałów syntetycznych (szarpnięcie w 1/s): okrąg 1,5 · koły
 1. **Nagrać prawdziwe szablony run** — zastąpić syntetyczne koło/zygzak/falę w `runy/szablony.js` nagraniami z żywego ciała (klawisz `N`). Najwyższy priorytet: to jedyna rzecz, przez którą cała przebudowa na runy może jeszcze zawieść w praktyce.
 2. **Potwierdzić na żywym ciele** — progi `ksztalt.js` (`BLAD_ZERO`/`BLAD_PELNY`), okno śladu (`MAX_DLUGOSC_M`), margines i czas przejęcia lepkiego argmaxu, oraz ograniczenie tempa kombosa x3 (§4).
 3. **Oprawa szamańska** — ~~paleta ognia/węgla~~ zrobione 2026-09-14 (style.css, main.js, js/runa.js, js/sekwencja.js, js/glify.js - nazwa "Król Szamanów", runy zamiast pierścienia, pasek sekwencji). Łuna ogniska jest DZIŚ tylko na ekranie startowym (`#start-screen::after`, gradient CSS) - ognisko WIDOCZNE PRZEZ CAŁĄ GRĘ (cząstki na płótnie, nie tylko start) zostaje w kolejce
-4. **Rytm** — bęben ~90 BPM, płynność w zgodzie z taktem (uwaga: gra nie ma dziś efektów dźwiękowych, więc rytm to dodatek do pieśni, nie do syntezatora)
+4. **Rytm** — etapy 2–4 specu `docs/superpowers/specs/2026-10-14-jakosc-tanca-design.md`: słuch (plik → mikrofon → puls tańca), dopasowanie tempa ½×/2×, trafienia i trans. Uwaga: gra nie ma dziś efektów dźwiękowych, więc rytm to dodatek do pieśni, nie do syntezatora
 5. **Czwarty żywioł/piąty kształt** (np. spirala) — dopiero po potwierdzeniu obecnej czwórki (koło/zygzak/fala/piramidka) na żywo
 6. ~~Menu i Księga rekordów~~ zrobione 2026-10-01 (podprojekt 3): menu „Polana", Kronika, Księga Plemienia (lokalna), jaja z nickami-bogami. Zostaje: **strojenie tytułów Kroniki** (`PROGI_TYTULOW`, pkt/min) na żywym ciele oraz **test całego przepływu z kamerą** (start z menu, runda, Kronika, zapis, Esc). Pamięć Plemienia (2026-10-12): zostaje **strojenie progów Kamieni Pamięci** (okna mitów, Pożoga 100, 8 technik w rundzie) na żywym ciele. Wspólna tablica online wymaga backendu (łamie §3) - świadomie poza zakresem. Pieśni właściciela w `assets/muzyka/` (4 utwory Suno + własne pieśni gracza: plik/przeciągnięcie → `js/wlasnePiesni.js` [IndexedDB], link YouTube → `PiesnYoutube` [widoczny odtwarzacz, regulamin YT]) - LICENCJĘ sprawdzić przed publikacją gry.
 
