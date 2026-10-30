@@ -4,7 +4,7 @@
  * brak pamięci (prywatne okno) to nie błąd: pieśni żyją do zamknięcia karty
  * (`trwala = false`). Żadna metoda nie odrzuca obietnicy.
  */
-import { utworYoutube } from './piesni.js';
+import { utworYoutube, walidujRytm } from './piesni.js';
 
 const BAZA = 'krolSzamanow', SKLEP = 'piesni', KLUCZ_YT = 'krolSzamanow.piesniYt';
 export const MAX_WLASNYCH = 20;
@@ -63,7 +63,8 @@ export class WlasnePiesni {
         if (Array.isArray(wpisy)) {
             for (const w of wpisy) {
                 if (!w?.blob || typeof w.plik !== 'string' || this._pliki.has(w.plik)) continue;
-                this._pliki.set(w.plik, { utwor: { ...w.utwor, url: this._tworzUrl(w.blob) }, blob: w.blob });
+                // Rytm z IndexedDB to dane z dysku - walidujemy jak manifest (zły = brak rytmu z pliku).
+                this._pliki.set(w.plik, { utwor: { ...w.utwor, rytm: walidujRytm(w.utwor?.rytm), url: this._tworzUrl(w.blob) }, blob: w.blob });
             }
         }
         return this.lista();

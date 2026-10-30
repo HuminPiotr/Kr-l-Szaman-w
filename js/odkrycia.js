@@ -168,8 +168,8 @@ export class Odkrycia {
         nowe.push({ rodzaj, id });
     }
 
-    _wHistorii(rodzaj, id, now) {
-        this.historia.push({ rodzaj, id, t: now });
+    _wHistorii(rodzaj, id, now, dodatek = null) {
+        this.historia.push(dodatek ? { rodzaj, id, t: now, ...dodatek } : { rodzaj, id, t: now });
         const od = now - OKNO_HISTORII_MS;
         while (this.historia.length && (this.historia[0].t < od || this.historia.length > MAX_HISTORII)) this.historia.shift();
     }
@@ -199,8 +199,11 @@ export class Odkrycia {
         return this._zamknij(nowe, 'zywo', now);
     }
 
-    /** Wołać PO pieczec() tej samej pieczęci (ogon musi ją już zawierać) - jak w punkty.js. */
-    technika(kombo, now) {
+    /**
+     * Wołać PO pieczec() tej samej pieczęci (ogon musi ją już zawierać) - jak w punkty.js.
+     * @param {{stopienTransu?: number}} [opcje]  stopień transu w chwili rzutu (Kamień "Taniec Przodków")
+     */
+    technika(kombo, now, { stopienTransu = 0 } = {}) {
         const id = kombo?.id;
         if (!ID.technika.has(id) || !liczbaOk(now) || !Array.isArray(kombo.sekwencja)) return [];
         const ogon = ogonPieczeci(this._historiaPieczeci, kombo.sekwencja.length);
@@ -213,7 +216,7 @@ export class Odkrycia {
         this.splotSeria = naklada ? this.splotSeria + 1 : 0;
         const nowe = [];
         this._odkryj('technika', id, nowe);
-        this._wHistorii('technika', id, now);
+        this._wHistorii('technika', id, now, stopienTransu > 0 ? { stopien: stopienTransu } : null);
         return this._zamknij(nowe, 'zywo', now);
     }
 

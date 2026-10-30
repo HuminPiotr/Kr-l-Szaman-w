@@ -54,13 +54,14 @@ export class ZapisProbek {
         // przy pierwszej klatce, zamiast powtarzany w każdej.
         this.width = null;
         this.height = null;
+        this.piesn = null;      // sesja T: {plik, tytul, rytm} grającej pieśni
     }
 
     /**
      * @param {string} etykieta  z SesjaNagraniowa (`${id}#${powtorzenie}`)
      * @param {object} frame     kontrakt klatki z main.js:buildFrame
      */
-    dodaj(etykieta, frame) {
+    dodaj(etykieta, frame, { czasPiesniS = null } = {}) {
         if (!etykieta) return;
         if (this.width === null) {
             this.width = frame.width ?? null;
@@ -68,6 +69,8 @@ export class ZapisProbek {
         }
         (this.kroki[etykieta] ??= []).push({
             dt: okr(frame.dt),
+            // Sesja T: pozycja w pieśni [s] - bez niej nie da się policzyć zgodności z rytmem.
+            ...(Number.isFinite(czasPiesniS) ? { cp: Math.round(czasPiesniS * 1000) / 1000 } : {}),
             // null, nie pusta tablica: "poza nie została wykryta" to inna
             // informacja niż "wykryta i pusta", a bramka widoczności
             // w postawa.js rozróżnia te przypadki.
@@ -88,6 +91,7 @@ export class ZapisProbek {
             wersja: WERSJA_FORMATU,
             utworzono: new Date().toISOString(),
             liczbaKlatek: this.liczbaKlatek,
+            ...(this.piesn ? { piesn: this.piesn } : {}),   // sesja T: plik i rytm grającej pieśni
             width: this.width,
             height: this.height,
             kroki: this.kroki
@@ -124,6 +128,7 @@ export function odtworzKlatke(zapisana, wymiary) {
         width: wymiary?.width ?? 1920,
         height: wymiary?.height ?? 1080,
         dt: Number.isFinite(zapisana.dt) ? zapisana.dt : 1 / 60,
+        czasPiesniS: Number.isFinite(zapisana.cp) ? zapisana.cp : null,
         now: 0
     };
 }

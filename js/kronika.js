@@ -88,6 +88,10 @@ export function zbudujKronike(pods, opcje) {
     if (pozoga > 0) linie.push(`największa Pożoga: ${Math.floor(pozoga)} kłębów`);
     const splecenia = liczba(pods?.momenty?.splecenia);
     if (splecenia > 0) linie.push(`spleceń technik: ${Math.floor(splecenia)}`);
+    // Trans (2026-10-30): najgłębszy stopień i techniki rzucone w transie - podsumowanie, nie wyrok.
+    const stopien = Math.floor(liczba(pods?.momenty?.najwyzszyStopienTransu));
+    const wTransie = Math.floor(liczba(pods?.momenty?.technikWTransie));
+    if (stopien > 0) linie.push(`trans: ${['', 'pierwszy', 'drugi', 'trzeci'][Math.min(3, stopien)]} stopień${wTransie > 0 ? ` · technik w transie: ${wTransie}` : ''}`);
 
     let podpis = 'Enter: jeszcze raz. Esc: wróć na Polanę.';
     if (pods?.kragKoniec === false && pods.nastepny) podpis = `Enter: teraz tańczy ${pods.nastepny}. Esc: wróć na Polanę.`;

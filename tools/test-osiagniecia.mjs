@@ -24,7 +24,7 @@ const ev = (rodzaj, id, t) => ({ rodzaj, id, t });
 console.log('REJESTR:');
 {
     const ids = KAMIENIE.map(k => k.id);
-    spr('24 kamienie, bez duplikatów', KAMIENIE.length === 24 && new Set(ids).size === 24);
+    spr('25 kamieni, bez duplikatów', KAMIENIE.length === 25 && new Set(ids).size === 25);
     spr('każdy ma nazwę, opis, kategorię, kiedy, runę, warunek', KAMIENIE.every(k =>
         k.nazwa && k.opis && KATEGORIE.some(c => c.id === k.kategoria)
         && ['zywo', 'runda', 'nick', 'zawsze'].includes(k.kiedy) && typeof k.runa === 'string' && typeof k.warunek === 'function'));

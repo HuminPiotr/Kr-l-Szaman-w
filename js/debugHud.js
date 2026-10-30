@@ -11,8 +11,12 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
-import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC } from './nagrywanie/sesja.js';
-import { ZapisProbek } from './nagrywanie/zapis.js';
+import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC, SCENARIUSZ_TRANS } from './nagrywanie/sesja.js';
+import { wczytajManifest, Piesn } from './piesni.js';
+import { SiatkaUderzen } from './rytm/siatka.js';
+// ?v= wymusza pobranie: Chrome trzymał w pamięci zapis.js sprzed zapisu czasu pieśni (sesja T, 2026-10-30)
+// mimo Cache-Control: no-store i Cmd+Shift+R - dwa nagrania bez czasu pieśni.
+import { ZapisProbek } from './nagrywanie/zapis.js?v=2026-10-30';
 
 import { czyPoleTekstowe } from './klawisze.js';
 import { PARTIE } from './jakosc/zaangazowanie.js';
@@ -63,8 +67,58 @@ export class DebugHud {
             if (e.key === 'f' || e.key === 'F') this._startSesji(1, SCENARIUSZ_FALOWANIE);
             // J: scenariusz jakości tańca (tools/pomiar-jakosci.mjs) - zawsze od kroku 1.
             if (e.key === 'j' || e.key === 'J') this._startSesji(1, SCENARIUSZ_JAKOSC);
+            // T: scenariusz transu (tools/pomiar-transu.mjs) - sesja sama gra pierwszą pieśń z manifestu.
+            if (e.key === 't' || e.key === 'T') { this._startSesji(1, SCENARIUSZ_TRANS); this._grajPiesnSesji(); }
             if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
+    }
+
+    /**
+     * Pieśń sesji T: pierwsza z manifestu z rytmem. Start w geście (naciśnięcie T),
+     * bo inaczej przeglądarka odrzuci autoplay. Brak pieśni = sesja nagrywa bez
+     * czasu pieśni, a pomiar to zgłosi (nic nie rzuca).
+     */
+    async _grajPiesnSesji() {
+        this._zatrzymajPiesnSesji();
+        const utwor = (await wczytajManifest()).find(u => u.rytm);
+        if (!utwor || !this.sesja.aktywna) { console.warn('[T] Brak pieśni z rytmem w manifeście - nagranie bez czasu pieśni.'); return; }
+        const p = new Piesn(utwor);
+        this._piesnSesji = p;
+        const { ok } = await p.zaladuj();
+        if (!ok || this._piesnSesji !== p || !(await p.graj())) { console.warn('[T] Pieśń sesji się nie wczytała / autoplay odrzucony.'); return; }
+        if (this.zapis) this.zapis.piesn = { plik: utwor.plik, tytul: utwor.tytul, rytm: utwor.rytm };
+        this._siatkaSesji = SiatkaUderzen.z(utwor.rytm);
+        console.log(`[T] Gra "${utwor.tytul}" - tańcz według wskazówek na ekranie.`);
+    }
+
+    _zatrzymajPiesnSesji() {
+        this._piesnSesji?.zatrzymaj();
+        this._piesnSesji = null;
+        this._siatkaSesji = null;
+        if (this._blysk) this._blysk.style.opacity = '0';
+    }
+
+    /**
+     * Błysk sesji T - co klatkę (ekran sesji odświeża się tylko UPDATE_HZ razy na sekundę,
+     * za rzadko na takt). Faza z siatki uderzeń pieśni razy tempoBlysku kroku: 1 i 0.5 =
+     * w rytmie pieśni, 0.8 / 1.25 = celowo obok. Bez czasu pieśni nie błyska wcale.
+     */
+    _rysujBlysk(s) {
+        this._blysk ??= (() => {
+            const el = document.createElement('div');
+            el.style.cssText = `position: fixed; left: 50%; bottom: 7vh; width: 22vh; height: 22vh; margin-left: -11vh;
+                border-radius: 50%; background: radial-gradient(circle, #fff 0%, #ffd27a 45%, rgba(255,160,40,0) 70%);
+                z-index: 1001; pointer-events: none; opacity: 0;`;
+            document.body.appendChild(el);
+            return el;
+        })();
+        const tempo = s.krok?.tempoBlysku ?? 0;
+        const czas = this._piesnSesji?.czasS;
+        const f = this._siatkaSesji && Number.isFinite(czas) ? this._siatkaSesji.faza(czas) : null;
+        if (!f || !(tempo > 0) || s.stan === 'bezczynna') { this._blysk.style.opacity = '0'; return; }
+        const faza = ((f.indeks + f.faza01) * tempo) % 1;
+        const naUderzeniuS = faza * f.okresS / tempo;   // ile sekund po błysku
+        this._blysk.style.opacity = Math.exp(-naUderzeniuS / 0.09).toFixed(3);
     }
 
     resetujZakres() {
@@ -105,6 +159,7 @@ export class DebugHud {
     _przerwijSesje() {
         const klatek = this.zapis?.liczbaKlatek ?? 0;
         this.sesja.przerwij();
+        this._zatrzymajPiesnSesji();
         this._ukryjEkranSesji();
         if (klatek > 0) {
             console.log(`[Escape] Sesja przerwana - materiał ZAPISANY (${klatek} klatek). Zaraz pobranie pliku.`);
@@ -126,12 +181,14 @@ export class DebugHud {
 
         // Klatki zbierane WYŁĄCZNIE w stanie nagrywania - przerwy i dojście
         // to spacer i szukanie pozycji, czyli materiał, którego nikt nie użyje.
-        if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame);
+        if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame, { czasPiesniS: this._piesnSesji?.czasS ?? null });
+        this._rysujBlysk(s);
 
         if (s.sygnal === 'start') this._piknij(880, 0.35);
         if (s.sygnal === 'stop') this._piknij(440, 0.12);
         if (s.sygnal === 'koniec') {
             this._piknij(220, 0.6);
+            this._zatrzymajPiesnSesji();
             this._zapiszProbki();
             this._ukryjEkranSesji();
             return;
@@ -204,6 +261,9 @@ export class DebugHud {
             </div>
             <div style="width:60vw;height:10px;background:rgba(255,255,255,0.15);border-radius:5px">
                 <div style="width:${szer}%;height:100%;background:${kolor};border-radius:5px"></div>
+            </div>
+            <div style="font-size:16px;color:${Number.isFinite(this._piesnSesji?.czasS) ? '#9fffe0' : '#ff8a6a'}">
+                ${Number.isFinite(this._piesnSesji?.czasS) ? `♪ czas pieśni ${this._piesnSesji.czasS.toFixed(1)} s - zapisuje się` : '⚠ brak czasu pieśni - nagranie nie zmierzy rytmu'}
             </div>
             <div style="font-size:14px;opacity:0.5">Escape przerywa</div>
         `;
@@ -341,6 +401,22 @@ export class DebugHud {
             `ręce  ${rece}`,
             ''
         );
+
+        // Trans (2026-10-30) - NA GÓRZE: panel nie przewija się, a na dole wypadał poza ekran.
+        // Progi ZGADNIĘTE - stroić stąd i z sesji T. Licznik taktu ●○○○ przeskakuje na każdym
+        // uderzeniu pieśni - ma iść równo z bębnem (to jest test analizy rytmu na żywo).
+        const tr = stats.trans;
+        if (tr) {
+            if (!tr.rytm) lines.push(`trans  — (brak rytmu: ani pieśni z rytmem, ani pewnego słuchu${tr.sluch ? ` · słuch: ${tr.sluch}` : ''})`);
+            else {
+                const k = ((tr.indeks ?? 0) % 4 + 4) % 4;
+                const bije = [0, 1, 2, 3].map(i => (i === k ? '●' : '○')).join('');
+                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM (${tr.zrodlo})  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (koher. ${this._num(tr.koherencja)}, ampl. ${this._num(tr.amplituda)}, ${tr.siatka ?? '—'})`);
+                lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
+                if (tr.sluch) lines.push(`      słuch: ${tr.sluch}   [ ] opóźnienie`);
+            }
+            lines.push('');
+        }
 
         // Prędkość wygładzona jest tym, co naprawdę steruje grą - surowa tylko
         // podglądowo. Min/max podtrzymane, bo z chwilowej wartości nic się nie

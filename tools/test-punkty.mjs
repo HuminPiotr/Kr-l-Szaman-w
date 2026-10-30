@@ -9,6 +9,7 @@ import {
     Punktacja, wartoscTechniki, TRUDNOSC, PUNKTY_PIECZECI, PUNKTY_ULEWY_NA_S, ogonPieczeci, ogonyNakladajaSie, WYKLADNIK_JAKOSCI_PUNKTOW
 } from '../js/punkty.js';
 import { KOMBOSY } from '../js/kombosy.js';
+import { tekstZdarzenia } from '../js/wynikHud.js';
 
 let ok = true;
 const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opis}`); if (!warunek) ok = false; };
@@ -289,6 +290,45 @@ console.log('\nMNOŻNIK JAKOŚCI TAŃCA (2026-10-14):');
     const e = new Punktacja();
     e.taniec(0.8, 0.9, 0.05, -1);
     spr('ujemny mnożnik nie odejmuje punktów', e.wynik === 0);
+}
+
+console.log('\nTRANS (2026-10-30):');
+{
+    const a = new Punktacja(), b = new Punktacja();
+    a.taniec(0.8, 0.9, 0.05, 1, 1);
+    b.taniec(0.8, 0.9, 0.05, 1, 1.6);
+    spr('taniec w transie x1.6 (liniowo)', Math.abs(b.wynik / a.wynik - 1.6) < 1e-9);
+    const c = new Punktacja();
+    c.taniec(0.8, 0.9, 0.05, 1, 0.5);
+    spr('mnożnik transu < 1 nie odbiera (przycięty do 1)', c.wynik === a.wynik);
+
+    const kombo = KOMBOSY.find(k => k.sekwencja.length === 3);
+    const zwykla = new Punktacja(), wTransie = new Punktacja();
+    for (const [pk, mt] of [[zwykla, 1], [wTransie, 2]]) {
+        kombo.sekwencja.forEach((id, i) => pk.pieczec(id, 1000 + i));
+        pk.odbierzZdarzenia();
+        pk.technika(kombo, 1100, null, mt);
+    }
+    const zt = wTransie.odbierzZdarzenia().find(z => z.rodzaj === 'technika');
+    const zz = zwykla.odbierzZdarzenia().find(z => z.rodzaj === 'technika');
+    spr(`technika w transie x2: ${zz.punkty} -> ${zt.punkty}`, Math.abs(zt.punkty / zz.punkty - 2) < 1e-9);
+    spr(`tekst przy punktach pokazuje mnożnik: "${tekstZdarzenia(zt)}"`, tekstZdarzenia(zt).endsWith('×2') && !tekstZdarzenia(zz).includes('×'));
+    spr('licznik technik w transie do Kroniki', wTransie.momenty.technikWTransie === 1 && zwykla.momenty.technikWTransie === 0);
+    spr('×1.25 wyświetla się równo', tekstZdarzenia({ punkty: 100, tekst: 'X', mnoznik: 1.25 }).endsWith('×1.25'));
+}
+{
+    // Splecenie (warstwa reakcji) liczone bez transu.
+    const druga = KOMBOSY.find(k => k.sekwencja.length === 2);
+    const pierwsza = KOMBOSY.find(k => k.sekwencja.length === 2 && k.sekwencja[1] === druga.sekwencja[0] && k.id !== druga.id);
+    if (pierwsza) {
+        const wynik = (mt) => {
+            const p = new Punktacja();
+            p.pieczec(pierwsza.sekwencja[0], 1); p.pieczec(pierwsza.sekwencja[1], 2); p.technika(pierwsza, 2);
+            p.pieczec(druga.sekwencja[1], 3); p.technika(druga, 3, null, mt);
+            return p.odbierzZdarzenia().find(z => z.rodzaj === 'splecenie')?.punkty;
+        };
+        spr(`splecenie bez transu (${wynik(1)} = ${wynik(2)})`, wynik(1) !== undefined && wynik(1) === wynik(2));
+    } else console.log('  (brak pary dwójek do splecenia - pominięte)');
 }
 
 process.exit(ok ? 0 : 1);

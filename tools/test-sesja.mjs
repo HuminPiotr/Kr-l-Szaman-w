@@ -95,4 +95,14 @@ const poOgromnym = s5.tick(999);
 spr('ogromne dt nie przeskakuje kroku - stan zostaje dojście', poOgromnym.stan === 'dojscie');
 spr('ogromne dt jest ucięte do sufitu MAX_DT', Math.abs(poOgromnym.pozostaloS - 11.9) < 0.001);
 
+console.log('\nSCENARIUSZ TRANSU:');
+{
+    const { SCENARIUSZ_TRANS } = await import('../js/nagrywanie/sesja.js');
+    const nagrania = SCENARIUSZ_TRANS.reduce((s, k) => s + k.powtorzenia * k.czasS, 0);
+    const przerwy = SCENARIUSZ_TRANS.reduce((s, k) => s + k.powtorzenia, 0) * 5;
+    const calosc = 12 + nagrania + przerwy;
+    spr(`sesja T (~${calosc} s) krótsza niż najkrótsza pieśń (187 s) - muzyka gra do końca`, calosc < 187);
+    spr('id kroków transu unikalne', new Set(SCENARIUSZ_TRANS.map(k => k.id)).size === SCENARIUSZ_TRANS.length);
+}
+
 process.exit(ok ? 0 : 1);
