@@ -11,7 +11,8 @@
  * Cały DOM i style tworzy sama, żeby dało się ją usunąć jednym importem mniej.
  */
 import { znormalizujSlad } from './runy/ksztalt.js';
-import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC } from './nagrywanie/sesja.js';
+import { SesjaNagraniowa, SCENARIUSZ, SCENARIUSZ_FALOWANIE, SCENARIUSZ_JAKOSC, SCENARIUSZ_TRANS } from './nagrywanie/sesja.js';
+import { wczytajManifest, Piesn } from './piesni.js';
 import { ZapisProbek } from './nagrywanie/zapis.js';
 
 import { czyPoleTekstowe } from './klawisze.js';
@@ -63,8 +64,32 @@ export class DebugHud {
             if (e.key === 'f' || e.key === 'F') this._startSesji(1, SCENARIUSZ_FALOWANIE);
             // J: scenariusz jakości tańca (tools/pomiar-jakosci.mjs) - zawsze od kroku 1.
             if (e.key === 'j' || e.key === 'J') this._startSesji(1, SCENARIUSZ_JAKOSC);
+            // T: scenariusz transu (tools/pomiar-transu.mjs) - sesja sama gra pierwszą pieśń z manifestu.
+            if (e.key === 't' || e.key === 'T') { this._startSesji(1, SCENARIUSZ_TRANS); this._grajPiesnSesji(); }
             if (e.key === 'Escape' && this.sesja.aktywna) this._przerwijSesje();
         });
+    }
+
+    /**
+     * Pieśń sesji T: pierwsza z manifestu z rytmem. Start w geście (naciśnięcie T),
+     * bo inaczej przeglądarka odrzuci autoplay. Brak pieśni = sesja nagrywa bez
+     * czasu pieśni, a pomiar to zgłosi (nic nie rzuca).
+     */
+    async _grajPiesnSesji() {
+        this._zatrzymajPiesnSesji();
+        const utwor = (await wczytajManifest()).find(u => u.rytm);
+        if (!utwor || !this.sesja.aktywna) { console.warn('[T] Brak pieśni z rytmem w manifeście - nagranie bez czasu pieśni.'); return; }
+        const p = new Piesn(utwor);
+        this._piesnSesji = p;
+        const { ok } = await p.zaladuj();
+        if (!ok || this._piesnSesji !== p || !(await p.graj())) { console.warn('[T] Pieśń sesji się nie wczytała / autoplay odrzucony.'); return; }
+        if (this.zapis) this.zapis.piesn = { plik: utwor.plik, tytul: utwor.tytul, rytm: utwor.rytm };
+        console.log(`[T] Gra "${utwor.tytul}" - tańcz według wskazówek na ekranie.`);
+    }
+
+    _zatrzymajPiesnSesji() {
+        this._piesnSesji?.zatrzymaj();
+        this._piesnSesji = null;
     }
 
     resetujZakres() {
@@ -105,6 +130,7 @@ export class DebugHud {
     _przerwijSesje() {
         const klatek = this.zapis?.liczbaKlatek ?? 0;
         this.sesja.przerwij();
+        this._zatrzymajPiesnSesji();
         this._ukryjEkranSesji();
         if (klatek > 0) {
             console.log(`[Escape] Sesja przerwana - materiał ZAPISANY (${klatek} klatek). Zaraz pobranie pliku.`);
@@ -126,12 +152,13 @@ export class DebugHud {
 
         // Klatki zbierane WYŁĄCZNIE w stanie nagrywania - przerwy i dojście
         // to spacer i szukanie pozycji, czyli materiał, którego nikt nie użyje.
-        if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame);
+        if (s.stan === 'nagrywanie') this.zapis.dodaj(s.etykieta, frame, { czasPiesniS: this._piesnSesji?.czasS ?? null });
 
         if (s.sygnal === 'start') this._piknij(880, 0.35);
         if (s.sygnal === 'stop') this._piknij(440, 0.12);
         if (s.sygnal === 'koniec') {
             this._piknij(220, 0.6);
+            this._zatrzymajPiesnSesji();
             this._zapiszProbki();
             this._ukryjEkranSesji();
             return;

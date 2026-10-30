@@ -162,6 +162,45 @@ export const SCENARIUSZ_JAKOSC = [
     }
 ];
 
+/**
+ * Trans (2026-10-30, tools/pomiar-transu.mjs). Sesja SAMA gra pieśń z manifestu
+ * (debugHud, klawisz T) od początku dojścia i zapisuje czas pieśni w każdej klatce.
+ * Całość ~2.5 min - krócej niż najkrótsza pieśń (187 s), więc muzyka gra do końca.
+ * Opisy proste, bo gracz nie musi znać się na muzyce: "w rytm bębna" wystarczy.
+ */
+export const SCENARIUSZ_TRANS = [
+    {
+        nr: 1, id: 'trans-w-rytmie', nazwa: 'W RYTM',
+        opis: 'Kołysz się albo machaj rękami w rytm bębna - na każde uderzenie',
+        powtorzenia: 2, czasS: 20,
+        wskazowki: ['w rytm bębna', 'dalej w rytm, możesz szerzej']
+    },
+    {
+        nr: 2, id: 'trans-co-drugie', nazwa: 'CO DRUGIE UDERZENIE',
+        opis: 'Dalej w rytm, ale wolniej: jeden ruch na dwa uderzenia bębna',
+        powtorzenia: 1, czasS: 15,
+        wskazowki: ['co drugie uderzenie']
+    },
+    {
+        nr: 3, id: 'trans-taniec-w-rytmie', nazwa: 'TANIEC W RYTM',
+        opis: 'Tańcz po swojemu, całym ciałem - ale trzymaj się rytmu pieśni',
+        powtorzenia: 1, czasS: 20,
+        wskazowki: ['swobodnie, w rytm']
+    },
+    {
+        nr: 4, id: 'trans-poza-rytmem', nazwa: 'POZA RYTMEM',
+        opis: 'Tańcz, nie słuchając muzyki - swoim tempem, wolniej albo szybciej niż bęben',
+        powtorzenia: 2, czasS: 15,
+        wskazowki: ['swoim tempem, wolniej niż bęben', 'swoim tempem, szybciej niż bęben']
+    },
+    {
+        nr: 5, id: 'trans-bezruch', nazwa: 'BEZRUCH',
+        opis: 'Stój spokojnie, ręce luźno',
+        powtorzenia: 1, czasS: 8,
+        wskazowki: ['stój']
+    }
+];
+
 export class SesjaNagraniowa {
     constructor({ scenariusz = SCENARIUSZ } = {}) {
         this.scenariusz = scenariusz;

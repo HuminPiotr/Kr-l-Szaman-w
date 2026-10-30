@@ -111,4 +111,17 @@ spr('zdrowy punkt przechodzi round-trip bez zmiany mimo sąsiedztwa zepsutego',
 console.log('\nNAZWA PLIKU:');
 spr('nazwa pliku wygląda jak plik próbek', /^probki-.*\.json$/.test(z.nazwaPliku()));
 
+console.log('\nSESJA T - CZAS PIEŚNI I PIEŚŃ (trans, 2026-10-30):');
+{
+    const zt = new ZapisProbek();
+    zt.piesn = { plik: 'a.m4a', tytul: 'A', rytm: { bpm: 120, pierwszeUderzenieS: 0.3, uderzenia: null } };
+    zt.dodaj('trans-w-rytmie#1', klatka(), { czasPiesniS: 12.3456 });
+    zt.dodaj('trans-w-rytmie#1', klatka());
+    const j = JSON.parse(JSON.stringify(zt.doJson()));
+    spr('nagłówek niesie pieśń i jej rytm', j.piesn?.plik === 'a.m4a' && j.piesn.rytm.bpm === 120);
+    spr('czas pieśni zapisany (do ms) i odtworzony', odtworzKlatke(j.kroki['trans-w-rytmie#1'][0]).czasPiesniS === 12.346);
+    spr('klatka bez czasu pieśni -> null, nie 0', odtworzKlatke(j.kroki['trans-w-rytmie#1'][1]).czasPiesniS === null);
+    spr('zwykła sesja nie ma pola piesn', !('piesn' in new ZapisProbek().doJson()));
+}
+
 process.exit(ok ? 0 : 1);
