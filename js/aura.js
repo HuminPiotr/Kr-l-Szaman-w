@@ -46,6 +46,11 @@ const LSNIENIE_RYTMU = [0.8, 1.15];          // mnożnik jasności przy zgodnoś
 const GLEBIA_RYTMU = 0.8;                    // tętno w rytmie do 1.8x głębsze
 const NIEREGULARNOSC = 0.6;                  // poza rytmem: rozjazd tempa tętna +-60%
 const TAU_RYTMU_S = 0.6;                     // wejście/wyjście z bicia w takt - płynnie
+// PODPOWIEDŹ RYTMU (właściciel 2026-10-30: "niech aura, jak kropka, podpowiada subtelnie
+// graczowi o rytmie"). Na KAŻDE uderzenie pieśni krótki tyk jasności - także zanim gracz
+// złapie rytm, bo nie każdy go słyszy. Krótki i płytki: podpowiedź, nie stroboskop.
+const PODPOWIEDZ_RYTMU = 0.12;               // +12% jasności w chwili uderzenia
+const PODPOWIEDZ_DLUGOSC = 0.25;             // ułamek uderzenia, w którym tyk gaśnie
 
 const TAU_WYGLADZANIA = 0.5;    // s - wszystkie wielkości sterujące
 
@@ -256,7 +261,9 @@ export class Aura {
         const tetnoWolne = (1 - wTakt) * tetnoWlasne + wTakt * naUderzeniu * (1 + GLEBIA_RYTMU);
         const tetnoSzybkie = Math.sin(this._faza * Math.PI * 2 * 5.5);
         const lsnienie = 1 + this._jestRytm * (LSNIENIE_RYTMU[0] + (LSNIENIE_RYTMU[1] - LSNIENIE_RYTMU[0]) * this._zgodnosc - 1);
-        const tetno = lsnienie * (1 + GLEBIA_TETNA * ((1 + GLEBIA_ZARU * this._zar) * tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie));
+        const tyk = this._fazaUderzenia !== null ? Math.max(0, 1 - this._fazaUderzenia / PODPOWIEDZ_DLUGOSC) ** 2 : 0;
+        const podpowiedz = 1 + PODPOWIEDZ_RYTMU * this._jestRytm * tyk;
+        const tetno = podpowiedz * lsnienie * (1 + GLEBIA_TETNA * ((1 + GLEBIA_ZARU * this._zar) * tetnoWolne * this._plynnosc + tetnoSzybkie * drzenie));
 
         const { h, s } = barwaAury(this._plynnosc, tecza, this._zarZnany ? this._zar : null);
         const ctx = this.ctx;

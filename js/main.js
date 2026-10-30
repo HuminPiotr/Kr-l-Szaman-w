@@ -26,6 +26,7 @@ import { WlasnePiesni } from './wlasnePiesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
+import { TransEfekty } from './trans/transEfekty.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -156,6 +157,7 @@ let jakoscTanca = new JakoscTanca();
 let blaskTanca = new BlaskTanca();
 let zgodnoscRytmu = new ZgodnoscRytmu();   // taniec w rytm pieśni Obrzędu (spec 2026-10-30-trans)
 let trans = new Trans();
+let transEfekty = new TransEfekty();
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -572,7 +574,7 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, transEfekty, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
@@ -892,11 +894,17 @@ function klatka(now) {
     // z tej samej klatki (tempo obrotu barwy zależy od motionMeter.responsywnosc -
     // "stoisz, tęcza płynie leniwie; tańczysz, wiruje" ze spec).
     tecza.update(motionMeter.responsywnosc, dt);
+    // Takt pieśni w tej klatce (Obrzęd z rytmem) - wspólny dla aury i efektów transu.
+    const takt = rytm ? rytm.siatka.faza(rytm.czasS) : null;
+    // Efekty stopni transu POD aurą: winieta (świat przygasa) i przodkowie "za" graczem.
+    transEfekty.rysujPrzed(ctx, frame, trans, takt, { dane: frame.pose ? maskaDane : null, szer: maskaSzer, wys: maskaWys }, fit, dt);
     aura.updateAndDraw(frame.pose ? maskaDane : null, maskaSzer, maskaWys,
                        moc, plynnosc, fit, dt, tecza, jakoscTanca.zar, jakoscTanca.czestotliwoscHz,
-                       rytm ? { zgodnosc: zgodnoscRytmu.zgodnosc, faza01: rytm.siatka.faza(rytm.czasS)?.faza01 } : null);
+                       takt ? { zgodnosc: zgodnoscRytmu.zgodnosc, faza01: takt.faza01 } : null);
     // Miękkie ciepło tańczących partii - PO aurze, PRZED zapłonem (spec jakości tańca, sekcja 4).
     blaskTanca.updateAndDraw(ctx, frame, jakoscTanca, moc, dt);
+    // Efekty transu NAD aurą: kręgi od stóp na uderzenia, echa sylwetki.
+    transEfekty.rysujPo(ctx, frame, trans, fit);
 
     // --- 7a0. Zapłon sylwetki (Kierunek A) ---
     // TA SAMA maska co aura, zero kosztu dodatkowego liczenia - patrz
