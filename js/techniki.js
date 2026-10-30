@@ -103,7 +103,9 @@ export function odpalTechnike(technika, frame, W, H, now, s) {
     // dodane PO tym combo nie dziedziczą więzi (js/sekwencja.js
     // nagłówek). Bufor sam NIE jest czyszczony - kombosy.js
     // nagłówek, łańcuchy są celowe.
-    s.sekwencja.oznaczCombo(s.kombosy.bufor.slice(-technika.sekwencja.length), technika.nazwa, now);
+    // s.ogon: technika w transie odpala na uderzenie (do ~0.5 s później, js/rytm/kolejkaTaktu.js) -
+    // ogon zapamiętany w chwili rzutu, bo w międzyczasie mogła dojść nowa pieczęć.
+    s.sekwencja.oznaczCombo(s.ogon ?? s.kombosy.bufor.slice(-technika.sekwencja.length), technika.nazwa, now);
     s.aura.rozblysk(1);
     // Zapłon sylwetki (js/zaplon.js) i wstrząs ekranu (js/ekran.js) -
     // WARSTWA WSPÓLNA dla WSZYSTKICH czterech technik, nie tylko

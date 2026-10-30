@@ -52,10 +52,11 @@ import { BlaskTanca } from './blaskTanca.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
+import { KolejkaTaktu } from './rytm/kolejkaTaktu.js';
 
 // Nazwy kluczy = nazwy zmiennych w main.js (destrukturyzacja po przypisaniu).
 export const KLUCZE_MODULOW = [
-    'motionMeter', 'plynnoscMiara', 'jakoscTanca', 'blaskTanca', 'zgodnoscRytmu', 'trans', 'transEfekty', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
+    'motionMeter', 'plynnoscMiara', 'jakoscTanca', 'blaskTanca', 'zgodnoscRytmu', 'trans', 'transEfekty', 'kolejkaTaktu', 'skladanie', 'kombosy', 'efekty', 'runy', 'sekwencja',
     'ogien', 'plonacyPalec', 'dmuchanie', 'dym', 'podmuch', 'fala', 'tecza', 'iskry',
     'zaplon', 'ekran', 'piorun', 'kolowrot', 'kamiennaTarcza', 'kurzawa', 'lukPeruna', 'kregiMokoszy', 'mglaMokoszy', 'bania', 'grzmot', 'zawierucha', 'bledneOgniki', 'dodola', 'falaMokoszy', 'kruki', 'reakcjeTechnik'
 ];
@@ -75,6 +76,7 @@ export function swiezeModuly({ slotySekwencji = null, nazwaSekwencji = null } = 
         zgodnoscRytmu: new ZgodnoscRytmu(),
         trans: new Trans(),
         transEfekty: new TransEfekty(),
+        kolejkaTaktu: new KolejkaTaktu(),
         skladanie: new SkladaniePieczeci(),
         kombosy: new KomboSilnik(),
         efekty: new Efekty(),

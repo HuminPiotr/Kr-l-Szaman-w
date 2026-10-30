@@ -27,6 +27,7 @@ import { SiatkaUderzen } from './rytm/siatka.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
+import { KolejkaTaktu } from './rytm/kolejkaTaktu.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -158,6 +159,7 @@ let blaskTanca = new BlaskTanca();
 let zgodnoscRytmu = new ZgodnoscRytmu();   // taniec w rytm pieśni Obrzędu (spec 2026-10-30-trans)
 let trans = new Trans();
 let transEfekty = new TransEfekty();
+let kolejkaTaktu = new KolejkaTaktu();   // techniki w transie czekające na uderzenie
 let aura = null;
 
 let znaki = new ZnakRegistry();
@@ -574,7 +576,7 @@ function renderLoop(now) {
  * odziedziczyć uzbrojonego Aarda, chmury dymu ani paska mocy poprzednika.
  */
 function resetujModuly() {
-    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, transEfekty, skladanie, kombosy, efekty, runy, sekwencja, ogien,
+    ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, transEfekty, kolejkaTaktu, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
     poprzNadgarstkiPx = null;
@@ -592,6 +594,20 @@ function przygotujPiesn() {
     piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
+}
+
+/**
+ * Efekt techniki (dispatch w js/techniki.js) + grzmot; w transie dodatkowo wspólna złota oprawa.
+ * Wołane od razu albo z kolejki taktu (technika w transie startuje na uderzenie).
+ */
+function odpalTechnikeTeraz(technika, frame, now, ogon, stopienTransu) {
+    odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
+        efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
+        podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki,
+        ogon
+    });
+    if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
+    if (stopienTransu > 0) transEfekty.oprawaTechniki(stopienTransu);
 }
 
 /** Rytm w tej klatce: pieśń Obrzędu z rytmem i aktualnie grająca; inaczej null (bez transu). */
@@ -874,13 +890,16 @@ function klatka(now) {
 
         const technika = kombosy.dodaj(skl.zlozona.id, now);
         if (technika) {
-            punkty.technika(technika, now, miejscePunktow, trans.mnoznikTechniki);   // mnożnik zapisany w chwili rzutu
+            // Punkty, odkrycia i komunikat OD RAZU - mnożnik transu zapisany w chwili rzutu.
+            const stopienRzutu = trans.stopien;
+            punkty.technika(technika, now, miejscePunktow, trans.mnoznikTechniki);
             zanotuj(odkrycia.technika(technika, now));
-            odpalTechnike(technika, frame, canvas.width, canvas.height, now, {
-                efekty, sekwencja, kombosy, aura, zaplon, ekran, plonacyPalec,
-                podmuch, tecza, piorun, fala, iskry, kolowrot, dmuchanie, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki
-            });
-            if (technika.uzbraja === 'grzmot') zagrajGrzmot(audioEngine.magistrala());
+            // W transie efekt czeka na najbliższe uderzenie pieśni (<= ~0.5 s, spec trans).
+            const ogon = kombosy.bufor.slice(-technika.sekwencja.length);
+            const start = stopienRzutu > 0 && rytm ? rytm.siatka.nastepneUderzenieS(rytm.czasS, 0.5) : null;
+            if (!(start > rytm?.czasS + 0.02 && kolejkaTaktu.odloz({ technika, ogon, stopien: stopienRzutu }, start))) {
+                odpalTechnikeTeraz(technika, frame, now, ogon, stopienRzutu);
+            }
             ostatniKomunikat = `${technika.nazwa} ${IKONA.swit}`;
         } else {
             const znak = znaki.znaki.find(z => z.id === skl.zlozona.id);
@@ -888,6 +907,8 @@ function klatka(now) {
         }
         ostatniKomunikatDo = now + 1600;
     }
+    // Techniki z transu, których uderzenie właśnie nadeszło (bez rytmu - wszystkie od razu).
+    for (const z of kolejkaTaktu.dojrzale(rytm?.czasS ?? null)) odpalTechnikeTeraz(z.technika, frame, now, z.ogon, z.stopien);
 
     // --- 7. Aura ---
     // tecza.update() PRZED aura.updateAndDraw(), żeby aura czytała stan

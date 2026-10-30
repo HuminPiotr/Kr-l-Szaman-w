@@ -79,4 +79,14 @@ function graj(e, poziom, sekund, z = true) {
     } catch (x) { blad = x; }
     spr('null / NaN nie rzucają', blad === null);
 }
+{
+    const e = new TransEfekty({ plotno: atrapaPlotna });
+    e.oprawaTechniki(3);
+    zeruj(); graj(e, 3, 0.3);
+    spr('oprawa techniki w transie: złoty błysk i fala rysowane', licz.fillRect > 0 && licz.ellipse > 0 && e._oprawa !== null);
+    graj(e, 3, N.OPRAWA_ZYCIE_S);
+    spr(`oprawa gaśnie po ${N.OPRAWA_ZYCIE_S} s`, e._oprawa === null);
+    e.oprawaTechniki(0); e.oprawaTechniki(NaN);
+    spr('poza transem (stopień 0) / NaN - bez oprawy', e._oprawa === null);
+}
 process.exit(ok ? 0 : 1);

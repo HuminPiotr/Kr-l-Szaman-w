@@ -23,7 +23,10 @@ export const NASTAWY_EFEKTOW = {
     ECHO_BARWA: 'rgb(255, 196, 90)', MAX_ECH: 4,
     PRZODEK_OPOZNIENIE_UDERZEN: 4, PRZODEK_SKALA: 0.8, PRZODEK_ODSTEP_BW: 2.6, PRZODEK_ALFA: 0.3,
     PRZODEK_BARWA: 'rgb(150, 140, 175)', PRZODEK_ROZMYCIE: 3,
-    HISTORIA_HZ: 12, HISTORIA_S: 3.0
+    HISTORIA_HZ: 12, HISTORIA_S: 3.0,
+    // Oprawa techniki rzuconej w transie (wspólna dla wszystkich technik).
+    OPRAWA_ZYCIE_S: 0.9, OPRAWA_BLYSK_ALFA: 0.28, OPRAWA_FALA_ALFA: 0.5, OPRAWA_BARWA: '255, 205, 110',
+    OPRAWA_PRZODKOWIE: 1.5        // stopień 3: przodkowie rozbłyskują i unoszą się razem z graczem
 };
 const N = NASTAWY_EFEKTOW;
 
@@ -51,6 +54,7 @@ export class TransEfekty {
         this._historia = [];       // {t, c} - maski do przodków
         this._pula = [];           // wolne płótna masek
         this._ostatniIndeks = null;
+        this._oprawa = null;       // {t, stopien} - technika w transie właśnie odpaliła
         this._czas = 0;
         this._doZrzutu = 0;
         this._maska = null; this._maskaCtx = null; this._obraz = null;
@@ -99,6 +103,14 @@ export class TransEfekty {
     }
 
     /**
+     * Technika rzucona w transie odpaliła (na uderzenie): złoty błysk i fala od tancerza,
+     * na stopniu 3 przodkowie rozbłyskują i unoszą się z graczem.
+     */
+    oprawaTechniki(stopien) {
+        if (Number.isFinite(stopien) && stopien > 0) this._oprawa = { t: 0, stopien };
+    }
+
+    /**
      * POD aurą: winieta i przodkowie. Tu też krok czasu, nowe uderzenia i zrzuty masek.
      * @param {{indeks:number, faza01:number, okresS:number}|null} takt  z SiatkaUderzen.faza(); null = bez pieśni
      * @param {{dane:Uint8Array|null, szer:number, wys:number}} maska
@@ -109,6 +121,8 @@ export class TransEfekty {
         for (const k of this._kregi) k.t += krok;
         for (const e of this._echa) e.t += krok;
         this._kregi = this._kregi.filter(k => k.t < N.KRAG_ZYCIE_S);
+        if (this._oprawa) { this._oprawa.t += krok; if (this._oprawa.t >= N.OPRAWA_ZYCIE_S) this._oprawa = null; }
+        const uniesienie = this._oprawa?.stopien >= 3 ? 1 - this._oprawa.t / N.OPRAWA_ZYCIE_S : 0;
         this._echa = this._echa.filter(e => { if (e.t < N.ECHO_ZYCIE_S) return true; this._pula.push(e.c); return false; });
 
         const s1 = trans?.sila?.(1) ?? 0, s2 = trans?.sila?.(2) ?? 0, s3 = trans?.sila?.(3) ?? 0;
@@ -162,9 +176,9 @@ export class TransEfekty {
             ctx.globalCompositeOperation = 'lighter';
             for (const strona of [-1, 1]) {
                 const migot = 0.85 + 0.15 * Math.sin(this._czas * 2.3 + strona);
-                ctx.globalAlpha = Math.max(0, Math.min(1, N.PRZODEK_ALFA * s3 * migot));
+                ctx.globalAlpha = Math.max(0, Math.min(1, N.PRZODEK_ALFA * s3 * migot * (1 + N.OPRAWA_PRZODKOWIE * uniesienie)));
                 ctx.save();
-                ctx.translate(geo.stopy.x + strona * N.PRZODEK_ODSTEP_BW * geo.bw, geo.stopy.y - 0.3 * geo.bw);
+                ctx.translate(geo.stopy.x + strona * N.PRZODEK_ODSTEP_BW * geo.bw, geo.stopy.y - (0.3 + 0.6 * uniesienie) * geo.bw);
                 ctx.scale(N.PRZODEK_SKALA, N.PRZODEK_SKALA);
                 ctx.translate(-geo.stopy.x, -geo.stopy.y);
                 ctx.drawImage(h.c, fit.offsetX, fit.offsetY, fit.scaledW, fit.scaledH);
@@ -174,12 +188,33 @@ export class TransEfekty {
         }
     }
 
-    /** NAD aurą: kręgi od stóp i echa sylwetki. */
+    /** NAD aurą: kręgi od stóp, echa sylwetki i oprawa techniki w transie. */
     rysujPo(ctx, frame, trans, fit) {
         if (!ctx) return;
         const s1 = trans?.sila?.(1) ?? 0, s2 = trans?.sila?.(2) ?? 0;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
+        const W = frame?.width, H = frame?.height, geo = geometriaCiala(frame);
+        if (this._oprawa && W > 0 && H > 0) {
+            const u = this._oprawa.t / N.OPRAWA_ZYCIE_S;
+            const c = geo?.barki ?? { x: W / 2, y: H / 2 };
+            const diag = Math.hypot(W, H);
+            // Złoty błysk - krótki, ciepły, od tancerza.
+            const b = N.OPRAWA_BLYSK_ALFA * (1 - Math.min(1, u * 1.8)) ** 2;
+            if (b > 0.002) {
+                const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, diag * 0.6);
+                g.addColorStop(0, `rgba(${N.OPRAWA_BARWA}, ${b.toFixed(3)})`);
+                g.addColorStop(1, `rgba(${N.OPRAWA_BARWA}, 0)`);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, W, H);
+            }
+            // Fala - pierścień od tancerza przez cały ekran.
+            ctx.strokeStyle = `rgba(${N.OPRAWA_BARWA}, ${(N.OPRAWA_FALA_ALFA * (1 - u)).toFixed(3)})`;
+            ctx.lineWidth = Math.max(1, (geo?.bw ?? 60) * 0.35 * (1 - u));
+            ctx.beginPath();
+            ctx.ellipse(c.x, c.y, diag * 0.7 * u + 1, diag * 0.7 * u + 1, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
         if (s1 > 0.01) {
             for (const k of this._kregi) {
                 const u = k.t / N.KRAG_ZYCIE_S;
