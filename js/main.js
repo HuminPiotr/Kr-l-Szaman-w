@@ -25,6 +25,7 @@ import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYo
 import { WlasnePiesni } from './wlasnePiesni.js';
 import { SiatkaUderzen } from './rytm/siatka.js';
 import { wybierzRytm } from './rytm/zrodlaRytmu.js';
+import { Sluch } from './rytm/sluch.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
@@ -188,6 +189,9 @@ let przebieg = null;
 let piesn = null;                 // Piesn bieżącej rundy (Obrzęd) albo null
 let utworRundy = null;            // wpis z manifestu wybrany do Obrzędu
 let siatkaRundy = null;           // uderzenia pieśni Obrzędu (rytm z manifestu) - null = bez transu
+// Słuch: mikrofon -> rytm dowolnej muzyki w pokoju, w KAŻDYM trybie (spec 2026-10-30-sluch).
+// Urządzenie, nie stan rundy - żyje przez całą grę (poza swiezeModuly), zerowane na starcie rundy.
+const sluch = new Sluch();
 const rundaHud = new RundaHud(document.getElementById('runda-hud'));
 punkty.aktywna = false;           // do pierwszej rundy
 punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
@@ -356,6 +360,9 @@ window.addEventListener('keydown', (e) => {
     // Nick w menu: litera 'm' to część imienia, nie wyciszenie (js/klawisze.js).
     if (czyPoleTekstowe(e.target)) return;
     if (e.key === 'm' || e.key === 'M') przelaczDzwiek();
+    // Poprawka opóźnienia słuchu (nakładka D pokazuje wartość): tyk aury ma trafiać w bęben.
+    if (e.key === '[') sluch.przesunOpoznienie(-0.01);
+    if (e.key === ']') sluch.przesunOpoznienie(0.01);
 });
 
 // Strażnik przed podwójnym startem kamery: "Rozpal ogień" można kliknąć dwa razy
@@ -412,6 +419,8 @@ async function rozpalOgien(konfig) {
     const dziala = await uruchomGre();
     menu.zajety = false;
     if (!dziala) { polanaUi.render(); return; }
+    // Słuch PO kamerze: osobna zgoda na mikrofon. Nigdy nie odrzuca - odmowa = gra bez słuchu (§2).
+    sluch.start(audioEngine.audioCtx);
     menu.naGre(); polanaUi.render();
     // Obrzęd: długość z metadanych i pieśń; swobodny: nic (przebieg === null, punkty wyłączone).
     uruchomZKonfiguracji({ ...konfig }).catch((e) => console.error('Tryb:', e));
@@ -580,6 +589,7 @@ function resetujModuly() {
     ({ motionMeter, plynnoscMiara, jakoscTanca, blaskTanca, zgodnoscRytmu, trans, transEfekty, kolejkaTaktu, skladanie, kombosy, efekty, runy, sekwencja, ogien,
        plonacyPalec, dmuchanie, dym, podmuch, fala, tecza, iskry, zaplon, ekran, piorun,
        kolowrot, kamiennaTarcza, kurzawa, lukPeruna, kregiMokoszy, mglaMokoszy, bania, grzmot, zawierucha, bledneOgniki, dodola, falaMokoszy, kruki, reakcjeTechnik } = swiezeModuly({ slotySekwencji: uiSekwencjaSloty, nazwaSekwencji: uiSekwencjaNazwa }));
+    sluch.zeruj();   // nowa runda = zwykle nowa pieśń; słuch łapie rytm od nowa (~4-8 s)
     poprzNadgarstkiPx = null;
     ostatniKomunikat = null;
     ostatniKomunikatDo = 0;
@@ -617,7 +627,8 @@ function odpalTechnikeTeraz(technika, frame, now, ogon, stopienTransu) {
  */
 function rytmTeraz() {
     return wybierzRytm({
-        plik: siatkaRundy ? { siatka: siatkaRundy, czasS: piesn?.czasS ?? null } : null
+        plik: siatkaRundy ? { siatka: siatkaRundy, czasS: piesn?.czasS ?? null } : null,
+        sluch: sluch.rytm
     });
 }
 
@@ -1273,7 +1284,7 @@ function klatka(now) {
         trans: (() => {
             const r = rytmTeraz(), f = r ? r.siatka.faza(r.czasS) : null;
             return {
-                rytm: !!r, zrodlo: r?.zrodlo ?? null, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
+                rytm: !!r, zrodlo: r?.zrodlo ?? null, sluch: sluch.opis, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
                 zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
                 koherencja: zgodnoscRytmu.koherencja, amplituda: zgodnoscRytmu.amplituda, poziom: trans.poziom, stopien: trans.stopien,
                 mana: trans.mnoznikMany, technika: trans.mnoznikTechniki

@@ -413,6 +413,7 @@ export class DebugHud {
                 const bije = [0, 1, 2, 3].map(i => (i === k ? '●' : '○')).join('');
                 lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM (${tr.zrodlo})  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (koher. ${this._num(tr.koherencja)}, ampl. ${this._num(tr.amplituda)}, ${tr.siatka ?? '—'})`);
                 lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
+                if (tr.sluch) lines.push(`      słuch: ${tr.sluch}   [ ] opóźnienie`);
             }
             lines.push('');
         }
