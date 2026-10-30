@@ -841,7 +841,7 @@ function klatka(now) {
     // Trans tylko w Obrzędzie z pieśnią, która ma rytm w manifeście; poza tym rytmTeraz() = null
     // i trans gaśnie do zera (mnożnik 1).
     const rytm = rytmTeraz();
-    zgodnoscRytmu.update(frame.pose?.worldLandmarks ?? null, dt, rytm);
+    zgodnoscRytmu.update(frame.pose ?? null, dt, rytm);
     trans.update(zgodnoscRytmu.zgodnosc, dt);
     const moc = motionMeter.update(frame, plynnosc, skladanie.zamrazaZanik, mnoznikBogactwa, trans.mnoznikMany);
 
@@ -1241,7 +1241,7 @@ function klatka(now) {
             return {
                 rytm: !!r, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
                 zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
-                akcentow: zgodnoscRytmu._akcenty.length, poziom: trans.poziom, stopien: trans.stopien,
+                koherencja: zgodnoscRytmu.koherencja, amplituda: zgodnoscRytmu.amplituda, poziom: trans.poziom, stopien: trans.stopien,
                 mana: trans.mnoznikMany, technika: trans.mnoznikTechniki
             };
         })(),

@@ -25,23 +25,27 @@ const FPS = 30, DT = 1 / FPS, SIGMA = 0.009;
 const siatka = SiatkaUderzen.z({ bpm: 128, pierwszeUderzenieS: 0.3, uderzenia: null });
 const T = siatka.okresS;
 
-/** ruch(t) -> przesunięcie [m] ramion i nóg; czasS = t. */
+/** ruch(t) -> przesunięcie w szerokościach barków (ręce i głowa w obrazie); czasS = t. */
 function przebieg(ruch, { sekund = 16, rytm = true } = {}) {
     const z = new ZgodnoscRytmu();
+    const BW = 0.12;   // szerokość barków w obrazie (ułamek kadru)
     for (let i = 0; i < sekund * FPS; i++) {
         const t = i * DT;
-        const d = ruch(t);
-        const w = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.9 }));
-        for (const j of [15, 16, 13, 14]) w[j] = { x: 0.3 * (j % 2 ? 1 : -1) + gauss() * SIGMA, y: -0.2 + d + gauss() * SIGMA, z: 0, visibility: 0.9 };
-        for (const j of [27, 28]) w[j] = { x: 0.1 * (j % 2 ? 1 : -1) + gauss() * SIGMA, y: 0.9 + 0.3 * d + gauss() * SIGMA, z: 0, visibility: 0.9 };
-        z.update(w, DT, rytm ? { siatka, czasS: t } : null);
+        const d = ruch(t) * BW;
+        const l = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 }));
+        const p = (x, y) => ({ x: x + gauss() * SIGMA * 0.1, y: y + gauss() * SIGMA * 0.1, z: 0, visibility: 0.9 });
+        l[11] = p(0.44, 0.35); l[12] = p(0.56, 0.35);
+        l[15] = p(0.40, 0.30 + d); l[16] = p(0.60, 0.30 + d);
+        l[23] = p(0.46, 0.60 + 0.2 * d); l[24] = p(0.54, 0.60 + 0.2 * d);
+        l[0] = p(0.50, 0.25 + 0.3 * d);
+        z.update({ landmarks: l }, DT, rytm ? { siatka, czasS: t } : null);
     }
     return z;
 }
 
-const kolys = (okres, przes = 0) => (t) => 0.25 * Math.sin(2 * Math.PI * (t - 0.3 - przes) / okres);
+const kolys = (okres, przes = 0) => (t) => 0.4 * Math.sin(2 * Math.PI * (t - 0.3 - przes) / okres);
 // "Losowy" taniec: suma sinusów o niewspółmiernych okresach - ruch jest, rytmu nie ma.
-const chaos = (t) => 0.12 * Math.sin(2 * Math.PI * t / 0.71) + 0.1 * Math.sin(2 * Math.PI * t / 1.13 + 1) + 0.08 * Math.sin(2 * Math.PI * t / 0.37 + 2);
+const chaos = (t) => 0.2 * Math.sin(2 * Math.PI * t / 0.71) + 0.16 * Math.sin(2 * Math.PI * t / 1.13 + 1) + 0.12 * Math.sin(2 * Math.PI * t / 0.37 + 2);
 
 console.log('SPÓJNOŚĆ FAZ:');
 spr('te same fazy -> 1', Math.abs(spojnoscFaz([0.2, 0.2, 0.2, 0.2]) - 1) < 1e-9);
@@ -62,17 +66,19 @@ const wyniki = {
     'bezruch': [przebieg(() => 0), (z) => z < 0.05]
 };
 for (const [opis, [z, warunek]] of Object.entries(wyniki)) {
-    spr(`${opis}: zgodność ${z.zgodnosc?.toFixed(2)} (siatka ${z.siatkaWygrana})`, warunek(z.zgodnosc));
+    spr(`${opis}: zgodność ${z.zgodnosc?.toFixed(2)} (koherencja ${z.koherencja.toFixed(2)}, ${z.siatkaWygrana ?? '—'})`, warunek(z.zgodnosc));
 }
 console.log('\nBEZ PIEŚNI I ODPORNOŚĆ:');
 spr('bez rytmu -> null', przebieg(kolys(T), { rytm: false }).zgodnosc === null);
 {
     const z = przebieg(kolys(T));
     z.update(null, DT, { siatka, czasS: 16 });
-    z.update(Array(33).fill({ x: NaN, y: NaN, visibility: 1 }), DT, { siatka, czasS: 16.03 });
-    z.update(null, NaN, { siatka, czasS: NaN });
-    spr('NaN / brak pozy nie zatruwają', Number.isFinite(z.zgodnosc) || z.zgodnosc === null);
+    z.update({ landmarks: Array(33).fill({ x: NaN, y: NaN, visibility: 1 }) }, DT, { siatka, czasS: 16.03 });
+    z.update({ landmarks: Array(33).fill({ x: 0.5, y: 0.5, visibility: 1 }) }, NaN, { siatka, czasS: 16.06 });
+    spr('NaN / brak pozy / złe dt nie zatruwają', Number.isFinite(z.zgodnosc) && Object.values(z._akum).every(a => Number.isFinite(a.re + a.im + a.e + a.w)));
+    z.update(null, DT, { siatka, czasS: NaN });
+    spr('czas pieśni NaN -> brak rytmu (null)', z.zgodnosc === null);
     z.update(null, DT, null);
-    spr('koniec pieśni -> null i czyste akcenty', z.zgodnosc === null && z._akcenty.length === 0);
+    spr('koniec pieśni -> null i czyste akumulatory', z.zgodnosc === null && Object.keys(z._akum).length === 0);
 }
 process.exit(ok ? 0 : 1);

@@ -40,14 +40,14 @@ function przepusc(klatki, siatka) {
     for (const k of klatki) {
         const rytm = Number.isFinite(k.czasPiesniS) ? { siatka, czasS: k.czasPiesniS } : null;
         if (!rytm) bezCzasu++;
-        z.update(k.pose?.worldLandmarks ?? null, k.dt, rytm);
+        z.update(k.pose ?? null, k.dt, rytm);
         tr.update(z.zgodnosc, k.dt);
         czas += k.dt;
         maxPoziom = Math.max(maxPoziom, tr.poziom);
         if (czas < 3) continue;   // rozgrzanie okna akcentów
         if (Number.isFinite(z.zgodnosc)) zg.push(z.zgodnosc);
         sur.push(z.surowa);
-        ak.push(z._akcenty.length);
+        ak.push(z.koherencja);
         if (z.siatkaWygrana) siatki[z.siatkaWygrana] = (siatki[z.siatkaWygrana] ?? 0) + 1;
     }
     const siatka1 = Object.entries(siatki).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
@@ -62,7 +62,7 @@ for (const plik of readdirSync(KATALOG).filter(f => f.endsWith('.json')).sort())
     cokolwiek = true;
     const siatka = SiatkaUderzen.z(rytm);
     console.log(`-- ${plik}  (${dane.piesn.tytul ?? dane.piesn.plik}, ${rytm.bpm} BPM)`);
-    console.log(''.padEnd(28) + ' błysk         zgodność             surowa               akcentów   siatka  max poziom  koniec');
+    console.log(''.padEnd(28) + ' błysk         zgodność             surowa               koher.     sygnał         max poziom  koniec');
     for (const [etykieta, zapisane] of Object.entries(dane.kroki ?? {})) {
         const kl = zapisane.map(z => odtworzKlatke(z, dane));
         const r = przepusc(kl, siatka);
@@ -70,7 +70,7 @@ for (const plik of readdirSync(KATALOG).filter(f => f.endsWith('.json')).sort())
         const k = KROKI[etykieta.replace(/#\d+$/, '')];
         const etyk = k ? `${String(k.tempoBlysku).padStart(4)}x ${k.wRytmie ? 'RYTM ' : 'obok '}` : '   ?      ';
         if (!r.zg.length && r.bezCzasu === r.n) { console.log(`${etykieta.padEnd(28)} ${etyk}  ⚠ brak czasu pieśni - nie do zmierzenia`); continue; }
-        console.log(`${etykieta.padEnd(28)} ${etyk} ${kol(r.zg)} ${kol(r.sur)} ${f2(kwantyl(r.ak, 0.5))}     ${r.siatka1.padEnd(6)} ${f2(r.maxPoziom)}      ${f2(r.koniec)}${uwaga}`);
+        console.log(`${etykieta.padEnd(28)} ${etyk} ${kol(r.zg)} ${kol(r.sur)} ${f2(kwantyl(r.ak, 0.5))}     ${r.siatka1.padEnd(12)} ${f2(r.maxPoziom)}      ${f2(r.koniec)}${uwaga}`);
     }
 }
 if (!cokolwiek) console.log('Brak nagrań sesji T (z czasem pieśni) w tools/probki/. Nagraj: w grze klawisz T.');

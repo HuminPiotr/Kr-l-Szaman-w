@@ -411,7 +411,7 @@ export class DebugHud {
             else {
                 const k = ((tr.indeks ?? 0) % 4 + 4) % 4;
                 const bije = [0, 1, 2, 3].map(i => (i === k ? '●' : '○')).join('');
-                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (surowa ${this._num(tr.surowa)}, siatka ${tr.siatka ?? '—'}, akcentów ${tr.akcentow})`);
+                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (koher. ${this._num(tr.koherencja)}, ampl. ${this._num(tr.amplituda)}, ${tr.siatka ?? '—'})`);
                 lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
             }
             lines.push('');
