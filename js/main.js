@@ -23,6 +23,7 @@ import { parsujKonfiguracje, WYBRZMIENIE_S, PIESN_AWARYJNA_S } from './tryby.js'
 import { swiezeModuly } from './swiezeModuly.js';
 import { wczytajManifest, Piesn, PiesnYoutube, utworzPiesn, utworZPliku, utworYoutube, wyciagnijIdYoutube } from './piesni.js';
 import { WlasnePiesni } from './wlasnePiesni.js';
+import { SiatkaUderzen } from './rytm/siatka.js';
 import { RundaHud, widokRundy } from './rundaHud.js';
 import { Menu } from './menu.js';
 import { PolanaUi } from './polanaUi.js';
@@ -177,6 +178,7 @@ const wynikHud = new WynikHud(document.getElementById('wynik-hud'));
 let przebieg = null;
 let piesn = null;                 // Piesn bieżącej rundy (Obrzęd) albo null
 let utworRundy = null;            // wpis z manifestu wybrany do Obrzędu
+let siatkaRundy = null;           // uderzenia pieśni Obrzędu (rytm z manifestu) - null = bez transu
 const rundaHud = new RundaHud(document.getElementById('runda-hud'));
 punkty.aktywna = false;           // do pierwszej rundy
 punkty.mnoznikZewu = (rodzaj, arg) => przebieg ? przebieg.mnoznikZewu(rodzaj, arg) : 1;
@@ -578,15 +580,24 @@ function resetujModuly() {
 function przygotujPiesn() {
     piesn?.zatrzymaj();
     piesn = null;
+    siatkaRundy = null;
     if (!utworRundy || przebieg?.konfig.tryb !== 'obrzed') return;
+    siatkaRundy = SiatkaUderzen.z(utworRundy.rytm);   // własne pieśni i YouTube nie mają rytmu
     piesn = utworzPiesn(utworRundy, { magistrala: (el) => audioEngine.podlaczPiesn(el), yt: { wyciszona: () => audioEngine.wyciszony } });
     piesn.naKoniec(() => przebieg?.zakonczPiesn());
     piesn.zaladuj();   // nie czekamy - runda ma >= 3 s odliczania; graj() sprawdza gotowość
 }
 
+/** Rytm w tej klatce: pieśń Obrzędu z rytmem i aktualnie grająca; inaczej null (bez transu). */
+function rytmTeraz() {
+    const czasS = siatkaRundy ? piesn?.czasS : null;
+    return Number.isFinite(czasS) ? { siatka: siatkaRundy, czasS } : null;
+}
+
 function zakonczPrzebieg() {
     piesn?.zatrzymaj();
     piesn = null;
+    siatkaRundy = null;
     przebieg = null;
     punkty.reset();
     punkty.aktywna = false;

@@ -146,6 +146,21 @@ console.log('\nPIESN - GRANIE:');
     spr('graj() przed zaladuj() = false', (await bezZaladowania.graj()) === false);
 }
 
+console.log('\nPIESN - CZAS (rytm transu):');
+{
+    const atrapa = { paused: false, ended: false, currentTime: 12.5 };
+    const p = new Piesn({ plik: 'a.m4a' });
+    spr('przed załadowaniem czasS = null', p.czasS === null);
+    p._audio = atrapa;
+    spr('gra -> currentTime', p.czasS === 12.5);
+    atrapa.paused = true;
+    spr('pauza -> null', p.czasS === null);
+    atrapa.paused = false; atrapa.ended = true;
+    spr('koniec -> null', p.czasS === null);
+    atrapa.ended = false; atrapa.currentTime = NaN;
+    spr('NaN -> null', p.czasS === null);
+}
+
 console.log('\nPIESN - GŁOŚNOŚĆ I MAGISTRALA:');
 {
     const audio = atrapaAudio();

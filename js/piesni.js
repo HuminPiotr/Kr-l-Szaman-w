@@ -147,6 +147,14 @@ export class Piesn {
     /** Jednorazowe wywołanie przy `ended` (podwójne zdarzenie nie dubluje końca rundy). */
     naKoniec(cb) { this._naKoniec = typeof cb === 'function' ? cb : null; }
 
+    /** Pozycja w pieśni [s], gdy gra; null w pauzie, przed startem i po końcu - wtedy nie ma rytmu. */
+    get czasS() {
+        const a = this._audio;
+        if (!a || a.paused || a.ended) return null;
+        const t = a.currentTime;
+        return Number.isFinite(t) ? t : null;
+    }
+
     _koniecPiesni() {
         const cb = this._naKoniec;
         this._naKoniec = null;
@@ -310,6 +318,9 @@ export class PiesnYoutube {
             if (i >= kroki) clearInterval(this._zanik);
         }, (t * 1000) / kroki);
     }
+
+    /** YouTube nie ma rytmu z manifestu - bez transu. */
+    get czasS() { return null; }
 
     zatrzymaj() {
         clearInterval(this._zanik);
