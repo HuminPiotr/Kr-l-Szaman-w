@@ -3,7 +3,7 @@
  *
  *   node tools/test-jakosc-tanca.mjs
  *
- * Kotwice: góra-dół -> 0.67 (~12 s do pełnego paska), piękny taniec -> 1.33 (~6 s),
+ * Kotwice: góra-dół -> 0.67 (~12 s do pełnego paska), piękny taniec -> 1.5 (~6-7 s; 1.33 do 2026-10-30),
  * brak danych -> 1.0 (dzisiejsze tempo). Decyzja właściciela 2026-10-14: "pośrodku".
  */
 import { JakoscTanca, NASTAWY_JAKOSCI as N, BOGACTWO_NEUTRALNE, mnoznikZBogactwa, zlozBogactwo } from '../js/jakoscTanca.js';
@@ -25,9 +25,10 @@ const spr = (opis, warunek) => { console.log(`  ${warunek ? '✓' : '✗'} ${opi
 
 console.log('KOTWICE:');
 spr('kotwica niska -> 0.67', Math.abs(mnoznikZBogactwa(N.KOTWICA_NISKA) - 0.67) < 1e-9);
-spr('kotwica wysoka -> 1.33', Math.abs(mnoznikZBogactwa(N.KOTWICA_WYSOKA) - 1.33) < 1e-9);
+spr(`kotwica wysoka -> ${N.MNOZNIK_WYSOKI}`, Math.abs(mnoznikZBogactwa(N.KOTWICA_WYSOKA) - N.MNOZNIK_WYSOKI) < 1e-9);
 spr('neutralne -> 1.0', Math.abs(mnoznikZBogactwa(BOGACTWO_NEUTRALNE) - 1) < 1e-9);
-spr('przycięcie: 0 -> 0.67, 1 -> 1.33', mnoznikZBogactwa(0) === 0.67 && mnoznikZBogactwa(1) === 1.33);
+spr(`przycięcie: 0 -> ${N.MNOZNIK_NISKI}, 1 -> ${N.MNOZNIK_WYSOKI}`, mnoznikZBogactwa(0) === N.MNOZNIK_NISKI && mnoznikZBogactwa(1) === N.MNOZNIK_WYSOKI);
+spr('ciągłość w neutralnym (oba odcinki)', Math.abs(mnoznikZBogactwa(BOGACTWO_NEUTRALNE - 1e-6) - mnoznikZBogactwa(BOGACTWO_NEUTRALNE + 1e-6)) < 1e-3);
 spr('NaN -> 1 (dzisiejsze tempo)', mnoznikZBogactwa(NaN) === 1);
 
 console.log('\nSKŁADANIE:');
@@ -114,7 +115,7 @@ console.log('\nNEUTRALNOŚĆ I ODPORNOŚĆ:');
     const zla = klatka(goraDol, 0);
     for (const p of zla.pose.worldLandmarks) p.x = NaN;
     for (let i = 0; i < 30; i++) j.update(zla, DT);
-    spr('null / dt=2 s / NaN nie psują mnożnika', Number.isFinite(j.mnoznik) && j.mnoznik >= 0.67 && j.mnoznik <= 1.33);
+    spr('null / dt=2 s / NaN nie psują mnożnika', Number.isFinite(j.mnoznik) && j.mnoznik >= N.MNOZNIK_NISKI && j.mnoznik <= N.MNOZNIK_WYSOKI);
 }
 
 process.exit(ok ? 0 : 1);

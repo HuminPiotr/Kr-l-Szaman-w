@@ -2327,11 +2327,13 @@ git commit -m "GEMINI.md: jakość tańca (moduły, lekcje: łuk wokół barku, 
 
 To zadanie wymaga właściciela przed kamerą — wykonawca przygotowuje i prowadzi, nie zgaduje liczb.
 
-- [ ] **Step 1:** Właściciel nagrywa sesję J (klawisz J w grze; aplikacja prowadzi głosem i odliczaniem, ~4 min). Plik ląduje w pobranych — przenieść do `tools/probki/`.
-- [ ] **Step 2:** `node tools/pomiar-jakosci.mjs jakosc-` — z tabeli:
+- [x] **Step 1:** Właściciel nagrywa sesję J (klawisz J w grze; aplikacja prowadzi głosem i odliczaniem, ~4 min). Plik ląduje w pobranych — przenieść do `tools/probki/`.
+- [x] **Step 2:** `node tools/pomiar-jakosci.mjs jakosc-` — z tabeli:
   - `KOTWICA_NISKA` = wyższa z median bogactwa kroków `jakosc-pompowanie` i `jakosc-luki-prostych-rak`,
   - `KOTWICA_WYSOKA` = mediana bogactwa kroków `jakosc-cale-cialo` / `jakosc-fala-ciala` (niższa z nich),
   - sprawdź „pełny za”: exploit ~12 s, cel ~6 s dla całego ciała / fali; `jakosc-szybko` i `jakosc-wolno` podobnie przy podobnym bogactwie,
   - jeśli któraś składowa nie rozdziela exploitu od tańca — popraw progi w jej `NASTAWY_*`, nie kotwice.
-- [ ] **Step 3:** Zamień przy zmienionych stałych „ZGADNIĘTE” na „ZMIERZONE 2026-xx-xx (nagranie …)” z liczbami z tabeli; `sh tools/test-wszystko.sh`; commit `Jakość tańca: kotwice i progi z nagrania sesji J`.
+- [x] **Step 3:** Zamień przy zmienionych stałych „ZGADNIĘTE” na „ZMIERZONE 2026-xx-xx (nagranie …)” z liczbami z tabeli; `sh tools/test-wszystko.sh`; commit `Jakość tańca: kotwice i progi z nagrania sesji J`.
 - [ ] **Step 4:** Test gry z kamerą: właściciel ocenia odczucie (czy góra–dół „czuć wolniej”, czy połysk partii i bieg fali czytają się bez słów). Poprawki wizualne — chirurgicznie, po teście (pamięć: iteracja VFX).
+
+> 2026-10-30: nagranie `probki-2026-10-30-10-58-19.json`. Poza kotwicami: okres OKNO_S 8 s / MAX_OKRES_S 4 s, fala z T_ZASTEPCZY_S przy niepewnym okresie, MNOZNIK_WYSOKI 1.5 z mapowaniem dwuodcinkowym, KOTWICA_WYSOKA ze zwykłego tańca całym ciałem (nie min z fali ciała, bo tej fali łańcuchy nie rozpoznają).

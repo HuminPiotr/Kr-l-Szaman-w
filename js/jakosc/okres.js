@@ -17,9 +17,9 @@ const STAWY = [15, 16, 13, 14, 27, 28]; // nadgarstki, łokcie, kostki
 
 // ZGADNIĘTE poza MIN_ODCHYLENIE_M (z pomiaru szumu) - wszystko niżej nie było strojone na nagraniach.
 export const NASTAWY_OKRESU = {
-    OKNO_S: 4.0,             // (ZGADNIĘTE)
+    OKNO_S: 8.0,             // dwa cykle wolnej fali (~3-4 s); przy 4 s łuki i fala ciała miały pewność 0 (nagranie 2026-10-30)
     MIN_OKRES_S: 0.25,       // (ZGADNIĘTE)
-    MAX_OKRES_S: 2.5,        // (ZGADNIĘTE)
+    MAX_OKRES_S: 4.0,        // ZMIERZONE 2026-10-30: łuki ~2.8-3.5 s, fala ciała dłużej niż 2.5 s
     CO_ILE_S: 0.25,          // autokorelacja co tyle, nie co klatkę
     MIN_ODCHYLENIE_M: 0.03,  // seria o mniejszym rozrzucie to szum (sigma ~0.009 m) - nie głosuje
     BLISKO_SZCZYTU: 0.85,    // pierwszy szczyt >= 85% najwyższego wygrywa - bez tego czasem 2T   (ZGADNIĘTE)

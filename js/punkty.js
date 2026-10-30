@@ -183,7 +183,7 @@ export class Punktacja {
     }
 
     /**
-     * Strumień za taniec. `mnoznik` = mnożnik jakości tańca (js/jakoscTanca.js, 0.67..1.33) -
+     * Strumień za taniec. `mnoznik` = mnożnik jakości tańca (js/jakoscTanca.js, 0.67..1.5) -
      * te same kotwice co tempo ładowania. Przycięty do [0, 2], NIE do 1; domyślnie 1 =
      * zmierzony balans sprzed 2026-10-14 (Kronika, Kamienie Pamięci).
      */

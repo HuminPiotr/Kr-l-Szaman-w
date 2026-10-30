@@ -55,6 +55,12 @@ for (const f of [0.5, 1, 2]) {
         blisko(m.okresS, 1 / f, 0.08) && m.pewnosc > 0.6);
 }
 {
+    // Wolna fala / łuki (~3 s) - przy oknie 4 s i MAX_OKRES 2.5 s pewność była 0 (nagranie 2026-10-30).
+    const m = przebieg(kolysanie(1 / 3), { sekund: 12 });
+    spr(`wolne kołysanie 1/3 Hz -> okres ${m.okresS.toFixed(3)} s (cel 3.000), pewność ${m.pewnosc.toFixed(2)}`,
+        blisko(m.okresS, 3, 0.08) && m.pewnosc >= PROG_PEWNOSCI);
+}
+{
     const m = przebieg(okrag(1));
     spr(`okrąg 1 Hz (stała prędkość) -> okres ${m.okresS.toFixed(3)} s, pewność ${m.pewnosc.toFixed(2)}`,
         blisko(m.okresS, 1, 0.08) && m.pewnosc > 0.6);

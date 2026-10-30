@@ -9,7 +9,12 @@
  * Opóźnienie liczone jako UŁAMEK OKRESU (js/jakosc/okres.js), nie w sekundach:
  * wolna fala ma dłuższe opóźnienie, szybka krótsze, a obie są "wężem". Bez tego
  * szybka pieśń (etap 3) karałaby szybki taniec.
- * Sztywne skrzydło: opóźnienie 0 -> fala 0. Okres niepewny -> null (neutralnie).
+ * Sztywne skrzydło: opóźnienie 0 -> fala 0.
+ *
+ * Okres niepewny (swobodny taniec rzadko się powtarza: pewność 0.24-0.5 na nagraniu
+ * 2026-10-30, a pompowanie - exploit - ma 0.9) -> wyjście awaryjne: ułamki liczone
+ * względem T_ZASTEPCZY_S, czyli opóźnienie w sekundach. Bez tego fala milczała
+ * właśnie przy fali ciała, a brak danych (neutralny) zawyżał exploit.
  */
 import { korelacjaZOpoznieniem, rampa, odchylenie, widoczny } from './pochodne.js';
 import { PROG_PEWNOSCI } from './okres.js';
@@ -27,6 +32,7 @@ export const NASTAWY_FALI = {
     OPOZN_SPADEK_OD: 0.25, OPOZN_SPADEK_DO: 0.35,           // dalej to dwa niezależne ruchy, nie fala
     MAX_OPOZNIENIA_ULAMEK: 0.4,
     TAU_S: 0.8,
+    T_ZASTEPCZY_S: 1.5,                                     // okres niepewny: start fali 0.03 s, pełna 0.09 s, spadek od 0.375 s
     MAX_PRZERWA_S: 0.2                                      // krótsza przerwa w łańcuchu nie kasuje okna
 };
 const N = NASTAWY_FALI;
@@ -74,15 +80,14 @@ export class FalaCiala {
         const bio = c2d?.biodra, dl = c2d?.dlonieX;
         this._dodaj('biodraDlonie', bio && Number.isFinite(bio.x) && Number.isFinite(dl) ? { a: bio.x, b: dl } : null);
 
-        const T = Number.isFinite(okres?.okresS) && okres.okresS > 0 ? okres.okresS : 1;
+        const pewny = okres?.pewnosc >= PROG_PEWNOSCI && Number.isFinite(okres?.okresS) && okres.okresS > 0;
+        const T = pewny ? okres.okresS : N.T_ZASTEPCZY_S;
         const oknoS = Math.max(N.MIN_OKNO_S, Math.min(N.MAX_OKNO_S, N.OKRESOW_W_OKNIE * T));
         for (const b of Object.values(this._bufory)) while (b.length && this._t - b[0].t > oknoS) b.shift();
 
         this._doPrzeliczenia -= krok;
         if (this._doPrzeliczenia > 0) return this.fala;
         this._doPrzeliczenia = N.CO_ILE_S;
-
-        if (!(okres?.pewnosc >= PROG_PEWNOSCI)) return this._brak();
 
         let naj = null;
         for (const l of LANCUCHY) {

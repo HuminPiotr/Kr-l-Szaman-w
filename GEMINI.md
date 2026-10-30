@@ -40,7 +40,7 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
                                                              ├→ ZnakRegistry → Pieczęcie → Kombosy → Efekty
 ```
 
-**Tańczysz płynnie → moc rośnie (tempo ładowania × jakość tańca 0.67..1.33) → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
+**Tańczysz płynnie → moc rośnie (tempo ładowania × jakość tańca 0.67..1.5) → aura rozkwita.** Runy i piramidka dopisują drugą warstwę: gotowa moc + narysowany w powietrzu kształt (albo trzymana piramidka) → pieczęć → sekwencja pieczęci → technika.
 
 ### Kontrakt klatki
 
@@ -62,12 +62,12 @@ kamera → PoseTracker ─┬→ worldLandmarks → Plynnosc ──────�
 | `js/handTracker.js` | wrapper MediaPipe Hands (`numHands: 2`) |
 | `js/frameMapper.js` | cover-fit + mapowanie punktów na płótno |
 | `js/plynnosc.js` | jak gładki jest ruch → 0..1 |
-| `js/motionMeter.js` | ciągłość ruchu × płynność → moc; tempo ładowania × mnożnik jakości tańca (0.67..1.33, domyślnie 1.0) |
-| `js/jakoscTanca.js` | jakość tańca (2026-10-14, etap 1 z 4 „gra rozumie muzykę”): krążenie + zaangażowanie + fala → bogactwo 0..1 → mnożnik tempa ładowania 0.67..1.33 (góra–dół ~12 s, piękny taniec ~6 s); brak danych → 1.0, a brakująca składowa liczy się jak wartość neutralna (nie jest pomijana z renormalizacją wag). Liczby zmierzone na ISTNIEJĄCYCH nagraniach (tools/probki z 2026-09-03 i 2026-10-09), NIE na sesji J; kalibracja na sesji J (zadanie 13) czeka na właściciela. Zwykły taniec ×1.14–1.16 (przed neutralnym uzupełnianiem ×1.20–1.23), stanie ×1.00; fala: sztywne skrzydło 0.00, wąż 1.00; wężowe ×1.14–1.32; syntetyka: dziś 8.1 s, ×0.67 12.0 s, ×1.33 6.2 s |
-| `js/jakosc/okres.js` | dominujący okres ruchu z autokorelacji POZYCJI (nie moduł prędkości — ten daje pół okresu, a dla okręgu nie ma szczytu); krótkie przerwy (≤ 0.2 s) interpoluje; gniazdo „pulsu tańca” etapu 2 |
+| `js/motionMeter.js` | ciągłość ruchu × płynność → moc; tempo ładowania × mnożnik jakości tańca (0.67..1.5, domyślnie 1.0) |
+| `js/jakoscTanca.js` | jakość tańca (2026-10-14, etap 1 z 4 „gra rozumie muzykę”): krążenie + zaangażowanie + fala → bogactwo 0..1 → mnożnik tempa ładowania 0.67..1.5, dwa odcinki przez (neutralne, 1.0); brak danych → 1.0, a brakująca składowa liczy się jak wartość neutralna (nie jest pomijana z renormalizacją wag). Kotwice ZMIERZONE na sesji J 2026-10-30 (`tools/probki/probki-2026-10-30-10-58-19.json`): NISKA 0.40 (pompowanie), WYSOKA 0.60 (zwykły taniec całym ciałem właściciela, nie ideał). Wynik: pompowanie i łuki prostych rąk ×0.67–0.94 (pełny pasek 14–43 s), taniec całym ciałem / szybko ×1.36–1.5 (7–11 s), kręgi ×1.1–1.5. Zakres 1.33 → 1.5, bo przy 1.33 wolny taniec ładował się dłużej niż exploit łuków. Ograniczenie: krok „fala ciała” właściciela nie jest rozpoznawany przez łańcuchy rąk (opóźnienie ≈0 lub odwrotne) i ma niską prędkość kończyn, więc ładuje się wolno (19–33 s) |
+| `js/jakosc/okres.js` | dominujący okres ruchu z autokorelacji POZYCJI (nie moduł prędkości — ten daje pół okresu, a dla okręgu nie ma szczytu); krótkie przerwy (≤ 0.2 s) interpoluje; okno 8 s i okres do 4 s (przy 4 s / 2.5 s wolne łuki i fala miały pewność 0); swobodny taniec rzadko daje pewność ≥ 0.4, pompowanie ~0.9; gniazdo „pulsu tańca” etapu 2 |
 | `js/jakosc/krazenie.js` | „łuki zamiast linii” jako brak NAWROTÓW toru (pierwszy powrót w to samo miejsce: ten sam kierunek = krąg, przeciwny = wahadło); przerwy ≤ 0.2 s nie kasują okna |
 | `js/jakosc/zaangazowanie.js`, `js/jakosc/cialo2d.js` | 7 partii ciała, biodra z 2D w pikselach ÷ szerokość barków |
-| `js/jakosc/fala.js` | fala przez ciało, opóźnienie jako UŁAMEK cyklu (niezależne od tempa); przerwy ≤ 0.2 s nie kasują okna |
+| `js/jakosc/fala.js` | fala przez ciało, opóźnienie jako UŁAMEK cyklu (niezależne od tempa); przy niepewnym okresie wyjście awaryjne: ułamek z `T_ZASTEPCZY_S` 1.5 s (czyli opóźnienie w sekundach), a nie null; przerwy ≤ 0.2 s nie kasują okna |
 | `js/jakosc/pochodne.js` | wspólne: filtr SG, korelacja z opóźnieniem |
 | `js/blaskTanca.js` | połysk tańczących partii + bieg fali (kreska po węzłach) |
 | `js/aura.js` | maska sylwetki → poświata |

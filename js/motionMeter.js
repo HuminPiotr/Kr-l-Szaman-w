@@ -102,7 +102,7 @@ export class MotionMeter {
         this.predkoscEfektywna = 0; // po odjęciu podłogi szumu; TA steruje grą
         this.responsywnosc = 0;     // predkoscEfektywna zmapowana na 0..1
         this.wspolczynnikPlynnosci = 1; // mnożnik tempa ładowania z płynności
-        this.mnoznikBogactwa = 1;   // z js/jakoscTanca.js - łuki, całe ciało, fala (0.67..1.33)
+        this.mnoznikBogactwa = 1;   // z js/jakoscTanca.js - łuki, całe ciało, fala (0.67..1.5)
         this.mnoznikTransu = 1;     // gniazdo etapu 4 (trans w rytmie) - do tego czasu zawsze 1
         this.tempoLadowania = 0;    // ułamek paska/s bez zaniku - do HUD ("pełny pasek za ~X s")
         this._wygladzone = null;    // wygładzone pozycje z poprzedniej klatki
@@ -114,7 +114,7 @@ export class MotionMeter {
      * @param {number} plynnosc  0..1 z js/plynnosc.js - jak gładki jest ruch.
      *                           Steruje TEMPEM ładowania, nigdy go nie zeruje.
      * @param {boolean} zamrozZanik  true na czas składania pieczęci.
-     * @param {number} [mnoznikBogactwa]  0.67..1.33 z JakoscTanca; 1 = zachowanie sprzed 2026-10-14
+     * @param {number} [mnoznikBogactwa]  0.67..1.5 z JakoscTanca; 1 = zachowanie sprzed 2026-10-14
      * @param {number} [mnoznikTransu]    gniazdo etapu 4; 1 = brak transu
      *
      * ZAMROŻENIE JEST WYMOGIEM, NIE OPTYMALIZACJĄ. Trzymanie postawy jest

@@ -93,8 +93,15 @@ spr('ten sam wąż wolno i szybko - podobny wynik (różnica < 0.15)', Math.abs(
     spr('fala z bioder do dłoni bez widocznych ramion (> 0.5, łańcuch biodraDlonie)', m.fala > 0.5 && m.diagnostyka.lancuch === 'biodraDlonie');
 }
 {
-    const m = przebieg(waz(0.8), 0.8, { pewnosc: 0 });
-    spr('okres niepewny -> fala null (neutralnie, nie zero)', m.fala === null);
+    // Swobodny taniec rzadko ma pewny okres (nagranie 2026-10-30) - fala liczy wtedy
+    // opóźnienie względem T_ZASTEPCZY_S, zamiast milczeć.
+    const w = przebieg(waz(0.8), 0.8, { pewnosc: 0 });
+    const s = przebieg(skrzydlo(0.8), 0.8, { pewnosc: 0 });
+    const b = przebieg(() => [0, 0], 0.8, { ramiona: false, pewnosc: 0 });
+    console.log(`  okres niepewny: wąż ${opis(w)}, skrzydło ${opis(s)}`);
+    spr('okres niepewny: wąż nadal daje falę (> 0.5)', w.fala > 0.5);
+    spr('okres niepewny: sztywne skrzydło nadal ~0 (< 0.1)', s.fala !== null && s.fala < 0.1);
+    spr('okres niepewny i brak ruchu -> null (neutralnie)', b.fala === null);
 }
 {
     const m = przebieg(waz(0.8), 0.8);
