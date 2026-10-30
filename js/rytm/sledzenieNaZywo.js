@@ -21,8 +21,17 @@ import { rampa } from '../jakosc/pochodne.js';
 // ZGADNIĘTE - stroić z sesji S (tools/pomiar-sluchu.mjs).
 export const NASTAWY_SLUCHU = {
     OKNO_S: 8, PRZELICZ_S: 0.5, MIN_DANYCH_S: 4,
-    MIN_BPM: 60, MAX_BPM: 180, BPM_PREFEROWANE: 120, SZEROKOSC_PREFERENCJI_OKT: 0.9,
+    // ZMIERZONE 2026-10-30 (tools/pomiar-sluchu-plikow.mjs, 4 pieśni Suno, plik i "głośnik"):
+    // przy szerokości 0.9 okt słuch łapał 2/3 albo 4/3 tempa na Ogniu w żyłach (rytm 3-3-2:
+    // uderzenie i półtora uderzenia równie silne). Wąska preferencja typowego tempa tańca
+    // rozstrzyga: wszystkie 4 pieśni w tempie, błąd mediany 9-17 ms.
+    MIN_BPM: 60, MAX_BPM: 180, BPM_PREFEROWANE: 120, SZEROKOSC_PREFERENCJI_OKT: 0.4,
     TRZYMANIE_TEMPA_OKT: 0.15,      // preferencja bieżącego tempa po złapaniu
+    SILA_TRZYMANIA: 0.25,           // ile ta preferencja waży (było 1.0 - utrwalała złe tempo: 0.81x na Ogniu w żyłach)
+    HARMONICZNE: 0,                 // suma z 2x okresem: na pieśniach Suno wzmacniała 2/3 tempa - wyłączona
+    // Pamięć autokorelacji - krótka (wygładza odczyt tempa na ~4 przeliczenia). Długa (30 s)
+    // nie pomogła: pieśni Suno pływają o kilka %, więc autokorelacja całej pieśni się rozmywa.
+    TAU_PAMIECI_S: 2, WAGA_SWIEZEJ: 0,
     TOLERANCJA_TEMPA: 0.04,         // bliżej niż 4% = to samo tempo (wygładzane)
     ZMIANA_PO: 3,                   // tyle zgodnych odczytów innego tempa = zmiana tempa
     WYGLADZANIE_TEMPA: 0.3,
@@ -67,6 +76,7 @@ export class SledzenieNaZywo {
         this.bpm = null;
         this.pewnosc = 0;
         this.okresowosc = 0;
+        this._pamiec = null;        // Float64Array - uśredniona znormalizowana autokorelacja po lagach
         this._kandydat = null; this._kandydatIle = 0;
     }
 
@@ -103,8 +113,15 @@ export class SledzenieNaZywo {
             const bpm0 = 60 / T;
             const r = odczyt / bpm0;
             const blisko = (x) => Math.abs(x - 1) < N.TOLERANCJA_TEMPA;
-            if (blisko(r) || blisko(r / 2) || blisko(r * 2)) {
-                const cel = blisko(r) ? odczyt : bpm0;   // oktawa bieżącego = trzymamy bieżące
+            // Oktawa bieżącego tempa (połowa/dwukrotność): wygrywa ta bliższa naturalnemu tempu tańca
+            // (BPM_PREFEROWANE) - inaczej złapana połowa (Świecę Ja: 67 zamiast 135) trzymała się na zawsze.
+            const odPref = (b) => Math.abs(Math.log2(b / N.BPM_PREFEROWANE));
+            if ((blisko(r / 2) || blisko(r * 2)) && odPref(odczyt) + 0.25 < odPref(bpm0)) {
+                if (this._kandydat && Math.abs(odczyt / this._kandydat - 1) < N.TOLERANCJA_TEMPA) this._kandydatIle++;
+                else { this._kandydat = odczyt; this._kandydatIle = 1; }
+                if (this._kandydatIle >= N.ZMIANA_PO) { T = 60 / odczyt; this._kandydat = null; this._kandydatIle = 0; }
+            } else if (blisko(r) || blisko(r / 2) || blisko(r * 2)) {
+                const cel = blisko(r) ? odczyt : bpm0;   // oktawa dalsza od naturalnego tempa = trzymamy bieżące
                 T = 60 / (bpm0 + N.WYGLADZANIE_TEMPA * (cel - bpm0));
                 this._kandydat = null; this._kandydatIle = 0;
             } else {
@@ -171,18 +188,35 @@ export class SledzenieNaZywo {
         for (const x of v) e += (x - m) ** 2;
         if (!(e > 1e-12)) return null;
         const lagMin = Math.floor(60 / N.MAX_BPM / dtR), lagMax = Math.ceil(60 / N.MIN_BPM / dtR);
+        const lagDo = Math.min(n - 1, 2 * lagMax + 2);   // pamięć sięga 2x okresu - suma harmoniczna z pamięci
         const bpm0 = this.siatka ? 60 / this.siatka.okresS : null;
         let najW = -Infinity, najLag = 0;
-        const r = new Float64Array(lagMax + 2);
-        for (let lag = Math.max(1, lagMin - 1); lag <= lagMax + 1 && lag < n; lag++) {
+        const r = new Float64Array(lagDo + 1);
+        for (let lag = Math.max(1, lagMin - 1); lag <= lagDo; lag++) {
             let s = 0;
             for (let j = 0; j + lag < n; j++) s += (v[j] - m) * (v[j + lag] - m);
             r[lag] = s / (n - lag);
         }
+        // Pamięć: autokorelacja znormalizowana wariancją (głośne i ciche fragmenty ważą tyle samo).
+        const war = e / n;
+        if (!this._pamiec || this._pamiec.length !== r.length) this._pamiec = Float64Array.from(r, x => x / war);
+        else {
+            const a = Math.min(1, N.PRZELICZ_S / N.TAU_PAMIECI_S);
+            for (let lag = 0; lag < r.length; lag++) this._pamiec[lag] += a * (r[lag] / war - this._pamiec[lag]);
+        }
+        const rr = (lag) => (lag < r.length ? this._pamiec[lag] + N.WAGA_SWIEZEJ * r[lag] / war : 0);
+        // r przy 2x okresie (do sumy harmonicznej) - liczone na żądanie, poza zakresem lagMax.
+        const r2 = (lag) => {
+            const L = 2 * lag;
+            if (L >= n) return 0;
+            let s2 = 0;
+            for (let j = 0; j + L < n; j++) s2 += (v[j] - m) * (v[j + L] - m);
+            return s2 / (n - L);
+        };
         for (let lag = lagMin; lag <= lagMax && lag < n - 1; lag++) {
             const bpm = 60 / (lag * dtR);
-            let w = r[lag] * Math.exp(-0.5 * (Math.log2(bpm / N.BPM_PREFEROWANE) / N.SZEROKOSC_PREFERENCJI_OKT) ** 2);
-            if (bpm0) w *= 0.5 + Math.exp(-0.5 * (Math.log2(bpm / bpm0) / N.TRZYMANIE_TEMPA_OKT) ** 2);
+            let w = (rr(lag) + N.HARMONICZNE * (2 * lag < r.length ? rr(2 * lag) : r2(lag) / war)) * Math.exp(-0.5 * (Math.log2(bpm / N.BPM_PREFEROWANE) / N.SZEROKOSC_PREFERENCJI_OKT) ** 2);
+            if (bpm0) w *= 1 + N.SILA_TRZYMANIA * Math.exp(-0.5 * (Math.log2(bpm / bpm0) / N.TRZYMANIE_TEMPA_OKT) ** 2);
             if (w > najW) { najW = w; najLag = lag; }
         }
         if (!(najLag > 0) || !(najW > 0)) return null;
@@ -190,7 +224,7 @@ export class SledzenieNaZywo {
         // mają szczyty obwiedni, ale nie powtarzają się co okres - grzebień sam tego nie odróżniał.
         this.okresowosc = Math.max(0, r[najLag] / (e / n));
         // Doprecyzowanie parabolą - inaczej tempo skacze o całą ramkę (~2-3 BPM).
-        const a = r[najLag - 1] ?? r[najLag], b = r[najLag], c = r[najLag + 1] ?? r[najLag];
+        const a = rr(najLag - 1), b = rr(najLag), c = rr(najLag + 1);
         const mian = a - 2 * b + c;
         const d = mian < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / mian)) : 0;
         return 60 / ((najLag + d) * dtR);
