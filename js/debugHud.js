@@ -342,6 +342,21 @@ export class DebugHud {
             ''
         );
 
+        // Trans (2026-10-30) - NA GÓRZE: panel nie przewija się, a na dole wypadał poza ekran.
+        // Progi ZGADNIĘTE - stroić stąd i z sesji T. Licznik taktu ●○○○ przeskakuje na każdym
+        // uderzeniu pieśni - ma iść równo z bębnem (to jest test analizy rytmu na żywo).
+        const tr = stats.trans;
+        if (tr) {
+            if (!tr.rytm) lines.push('trans  — (brak pieśni z rytmem: tylko Obrzęd z pieśnią z manifestu)');
+            else {
+                const k = ((tr.indeks ?? 0) % 4 + 4) % 4;
+                const bije = [0, 1, 2, 3].map(i => (i === k ? '●' : '○')).join('');
+                lines.push(`trans  takt ${bije}  ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (surowa ${this._num(tr.surowa)}, siatka ${tr.siatka ?? '—'}, akcentów ${tr.akcentow})`);
+                lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
+            }
+            lines.push('');
+        }
+
         // Prędkość wygładzona jest tym, co naprawdę steruje grą - surowa tylko
         // podglądowo. Min/max podtrzymane, bo z chwilowej wartości nic się nie
         // odczyta. Zatańcz, przeczytaj zakres, zresetuj klawiszem R.
@@ -400,17 +415,6 @@ export class DebugHud {
             lines.push(jq.tempoLadowania > 0
                 ? `      pełny pasek za ~${(1 / jq.tempoLadowania).toFixed(1)} s przy tym tańcu`
                 : '      pełny pasek: — (nie ładuje)');
-        }
-
-        // Trans (2026-10-30): progi ZGADNIĘTE - stroić stąd i z sesji T. Bije "●" na każdym uderzeniu pieśni.
-        const tr = stats.trans;
-        if (tr) {
-            if (!tr.rytm) lines.push('trans  — (brak pieśni z rytmem: tylko Obrzęd z pieśnią z manifestu)');
-            else {
-                const bije = tr.faza01 !== null && tr.faza01 < 0.15 ? '●' : '○';
-                lines.push(`trans  ${bije} ${tr.bpm?.toFixed(1)} BPM  zgodność ${this._num(tr.zgodnosc ?? 0)} ${this._bar(tr.zgodnosc ?? 0)} (surowa ${this._num(tr.surowa)}, siatka ${tr.siatka ?? '—'}, akcentów ${tr.akcentow})`);
-                lines.push(`      poziom ${this._num(tr.poziom)}  stopień ${tr.stopien}  mana/taniec ×${this._num(tr.mana)}  technika ×${tr.technika}`);
-            }
         }
 
         if (stats.moc !== undefined)  lines.push(`moc   ${this._num(stats.moc)}   ${this._bar(stats.moc)}`);

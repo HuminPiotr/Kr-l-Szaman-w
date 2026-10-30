@@ -1239,7 +1239,7 @@ function klatka(now) {
         trans: (() => {
             const r = rytmTeraz(), f = r ? r.siatka.faza(r.czasS) : null;
             return {
-                rytm: !!r, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null,
+                rytm: !!r, bpm: f ? 60 / f.okresS : null, faza01: f?.faza01 ?? null, indeks: f?.indeks ?? null,
                 zgodnosc: zgodnoscRytmu.zgodnosc, surowa: zgodnoscRytmu.surowa, siatka: zgodnoscRytmu.siatkaWygrana,
                 akcentow: zgodnoscRytmu._akcenty.length, poziom: trans.poziom, stopien: trans.stopien,
                 mana: trans.mnoznikMany, technika: trans.mnoznikTechniki
