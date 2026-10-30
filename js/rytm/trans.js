@@ -11,10 +11,12 @@
  * płynnie pomiędzy). Technika: z PEŁNEGO stopnia (x1.25 / 1.5 / 2) -
  * gracz widzi przy punktach równą liczbę, nie x1.37.
  */
-// ZGADNIĘTE - stroić na nagraniu sesji T i na kamerze.
+// Progi ZMIERZONE (niżej), czasy stopni ZGADNIĘTE - stroić na kamerze.
 export const NASTAWY_TRANSU = {
-    PROG_WZROSTU: 0.6,           // zgodność, od której trans narasta
-    PROG_GASNIECIA: 0.35,        // poniżej - gaśnie; pomiędzy - trzyma się
+    // ZMIERZONE 2026-10-30 (sesja T): właściciel chce, żeby trans był łatwy - przy 0.6/0.35
+    // nie wszedł w stopień 1 przez całą pieśń swobodnego tańca.
+    PROG_WZROSTU: 0.45,          // zgodność, od której trans narasta
+    PROG_GASNIECIA: 0.2,         // poniżej - gaśnie; pomiędzy - trzyma się
     CZAS_STOPNIA_S: [4, 10, 15], // ile tańca w rytmie na wejście w stopień 1, 2, 3
     GASNIECIE_S: 3,              // tyle na zgaśnięcie jednego stopnia
     MANA_NA_STOPIEN: 0.2,

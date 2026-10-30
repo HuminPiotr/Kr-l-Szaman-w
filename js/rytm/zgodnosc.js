@@ -29,9 +29,13 @@ import { rampa } from '../jakosc/pochodne.js';
 export const NASTAWY_ZGODNOSCI = {
     PROG_WIDOCZNOSCI: 0.5,
     KROTNOSCI: [0.5, 1],          // ruchów na uderzenie: co drugie / na każde
-    OKNO_UDERZEN: 12,             // stała czasowa okna koherencji (w uderzeniach)
+    // ZMIERZONE 2026-10-30 (sesja T, wariant B): swobodny taniec właściciela ma koherencję tylko
+    // ~0.37 (głowa/biodra sprężynują na uderzenie), więc progi 0.35..0.6 przy oknie 12 trzymały go
+    // poza transem przez całą pieśń. Dłuższe okno obniża poziom przypadku, stąd niższe progi:
+    // swobodny taniec 0.20 -> 0.76, ruch obok tempa (0.8x) 0.37, bezruch 0.
+    OKNO_UDERZEN: 16,             // stała czasowa okna koherencji (w uderzeniach)
     TAU_SREDNIEJ_S: 1.5,          // odjęcie powolnego dryfu pozycji (zmiana miejsca, pochylenie)
-    KOHERENCJA_OD: 0.35, KOHERENCJA_DO: 0.6,
+    KOHERENCJA_OD: 0.22, KOHERENCJA_DO: 0.42,
     AMPLITUDA_OD: 0.03, AMPLITUDA_DO: 0.08,   // RMS ruchu w szerokościach barków - bezruch to szum śledzenia
     TAU_S: 1.0                    // wynik wygładzony - trans, nie migotanie
 };

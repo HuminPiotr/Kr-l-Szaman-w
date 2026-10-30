@@ -19,8 +19,8 @@ const tancz = (t, zgodnosc, sekund) => { for (let i = 0; i < sekund / DT; i++) t
     spr(`dalej w rytmie: stopień 3 (mana ×${t.mnoznikMany.toFixed(2)}, technika ×${t.mnoznikTechniki})`, t.stopien === 3 && Math.abs(t.mnoznikMany - 1.6) < 1e-9 && t.mnoznikTechniki === 2);
     tancz(t, 1, 30);
     spr('nie rośnie ponad 3', t.poziom === 3);
-    tancz(t, 0.5, 10);
-    spr('strefa pośrednia (0.35..0.6) trzyma stopień', t.stopien === 3);
+    tancz(t, 0.3, 10);
+    spr('strefa pośrednia trzyma stopień', t.stopien === 3);
     tancz(t, 0, 0.5);
     spr(`zgubiony rytm: po 0.5 s nadal blisko 3 (poziom ${t.poziom.toFixed(2)}) - gaśnie łagodnie, bez skoku`, t.poziom > 2.8);
     tancz(t, 0, N.GASNIECIE_S - 0.6);
