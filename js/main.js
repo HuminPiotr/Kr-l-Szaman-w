@@ -27,6 +27,7 @@ import { SiatkaUderzen } from './rytm/siatka.js';
 import { wybierzRytm } from './rytm/zrodlaRytmu.js';
 import { Sluch } from './rytm/sluch.js';
 import { NaukaRytmu, NauczonePiesni } from './rytm/nauka.js';
+import { rytmZPliku } from './rytm/rytmZPliku.js';
 import { ZgodnoscRytmu } from './rytm/zgodnosc.js';
 import { Trans } from './rytm/trans.js';
 import { TransEfekty } from './trans/transEfekty.js';
@@ -240,7 +241,9 @@ const polanaUi = new PolanaUi(document, {
             probny.zatrzymaj();
             URL.revokeObjectURL(url);
             if (!ok) return BRAK_PIESNI;
-            const z = await wlasne.dodajPlik({ ...u, dlugoscS }, file);
+            // Rytm z pliku od razu (spec słuchu, zad. 9) - pieśń z rytmem daje trans bez mikrofonu.
+            const rytm = await rytmZPliku(file);
+            const z = await wlasne.dodajPlik({ ...u, dlugoscS, rytm }, file);
             if (!z) return 'Plemię zna już dość pieśni — usuń którąś, żeby dopisać nową.';
             menu.dodajPiesn(z);
             return wlasne.trwala ? '' : 'Ta przeglądarka nie zapamięta pieśni po zamknięciu karty.';
